@@ -1,0 +1,6 @@
+{
+  "name": "Snake Ultra",
+  "description": "High-performance full-screen survival game with dynamic customization, revive system, and flat premium UI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

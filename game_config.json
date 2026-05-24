@@ -1,0 +1,32 @@
+{
+  "settings": {
+    "gameName": "SNAKE ULTRA",
+    "tagline": "NATIVE NEON SURVIVAL PROTOCOL",
+    "turboSpeed": 1.8,
+    "snakeAcceleration": 0.05,
+    "spawnRate": 0.02,
+    "reviveCount": 1,
+    "soundEnabled": true,
+    "hapticEnabled": true,
+    "activeThemeIds": ["fire-red", "neon-blue", "toxic-green", "royal-purple", "gold-snake", "ice-cyan"]
+  },
+  "themes": [
+    { "id": "fire-red", "name": "Fire Red", "head": "#ff3b3b", "tail": "#ff7a00", "primary": "#ff3b3b", "secondary": "#ff7a00", "glow": "#ff3b3b", "pattern": "Electric" },
+    { "id": "neon-blue", "name": "Neon Blue", "head": "#29b6ff", "tail": "#005eff", "primary": "#29b6ff", "secondary": "#005eff", "glow": "#29b6ff", "pattern": "Pulse" },
+    { "id": "toxic-green", "name": "Toxic Green", "head": "#32ff5e", "tail": "#00ff41", "primary": "#32ff5e", "secondary": "#00ff41", "glow": "#32ff5e", "pattern": "Neon Tube" },
+    { "id": "royal-purple", "name": "Royal Purple", "head": "#c23cff", "tail": "#9333ea", "primary": "#c23cff", "secondary": "#9333ea", "glow": "#c23cff", "pattern": "RGB Animation" },
+    { "id": "gold-snake", "name": "Gold Snake", "head": "#ffd700", "tail": "#ff8c00", "primary": "#ffd700", "secondary": "#ff8c00", "glow": "#ffd700", "pattern": "Metallic" },
+    { "id": "ice-cyan", "name": "Ice Cyan", "head": "#00f2ff", "tail": "#0066ff", "primary": "#00f2ff", "secondary": "#0066ff", "glow": "#00f2ff", "pattern": "Metallic" },
+    { "id": "pink-candy", "name": "Pink Candy", "head": "#fb00ff", "tail": "#ff0066", "primary": "#fb00ff", "secondary": "#ff0066", "glow": "#fb00ff", "pattern": "Pulse" },
+    { "id": "rainbow-rgb", "name": "Rainbow RGB", "head": "#ff01ff", "tail": "#01ffff", "primary": "#ff01ff", "secondary": "#01ffff", "glow": "#ffffff", "pattern": "RGB Animation" },
+    { "id": "shadow-black", "name": "Shadow Black", "head": "#333333", "tail": "#111111", "primary": "#333333", "secondary": "#111111", "glow": "#555555", "pattern": "Solid" },
+    { "id": "lava-orange", "name": "Lava Orange", "head": "#ff7a00", "tail": "#ff3b3b", "primary": "#ff7a00", "secondary": "#ff3b3b", "glow": "#ff7a00", "pattern": "Electric" }
+  ],
+  "reviveAd": {
+    "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    "thumbnailUrl": "https://via.placeholder.com/1280x720",
+    "title": "Watch Ad for Revive",
+    "duration": 30,
+    "skipTime": 27
+  }
+}

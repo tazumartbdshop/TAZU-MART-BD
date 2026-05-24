@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "GameSettings": {
+      "title": "Game Settings",
+      "description": "Global configuration for the Tazu Arena game",
+      "type": "object",
+      "properties": {
+        "gameName": { "type": "string" },
+        "tagline": { "type": "string" },
+        "turboSpeed": { "type": "number" },
+        "snakeAcceleration": { "type": "number" },
+        "spawnRate": { "type": "number" },
+        "reviveCount": { "type": "number" },
+        "soundEnabled": { "type": "boolean" },
+        "hapticEnabled": { "type": "boolean" },
+        "activeThemeIds": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["gameName", "tagline", "turboSpeed", "snakeAcceleration", "spawnRate"]
+    },
+    "SnakePalette": {
+      "title": "Snake Palette",
+      "description": "Visual theme for a snake",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "primaryColor": { "type": "string" },
+        "secondaryColor": { "type": "string" },
+        "glowColor": { "type": "string" },
+        "headColor": { "type": "string" },
+        "bodyGradient": { "type": "string" },
+        "neonEffect": { "type": "boolean" },
+        "pattern": { "type": "string", "enum": ["Solid", "Stripes", "Dots", "Neon Tube", "Electric", "Pulse", "Gradient", "Metallic", "Scale Texture", "RGB Animation"] },
+        "price": { "type": "number" },
+        "isFree": { "type": "boolean" }
+      },
+      "required": ["name", "primaryColor", "secondaryColor", "glowColor", "headColor"]
+    },
+    "ReviveAd": {
+      "title": "Revive Ad",
+      "description": "Configuration for the revive video ad",
+      "type": "object",
+      "properties": {
+        "videoUrl": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "title": { "type": "string" },
+        "duration": { "type": "number" },
+        "skipTime": { "type": "number" }
+      },
+      "required": ["videoUrl", "title", "duration", "skipTime"]
+    }
+  },
+  "firestore": {
+    "/game_config/settings": {
+      "schema": "GameSettings",
+      "description": "Global game configuration"
+    },
+    "/snake_palettes/{paletteId}": {
+      "schema": "SnakePalette",
+      "description": "Available snake themes"
+    },
+    "/ad_config/revive": {
+      "schema": "ReviveAd",
+      "description": "Revive ad settings"
+    }
+  }
+}
