@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowRight, ChevronRight, Star, Heart, Eye, ShoppingCart, Zap, TrendingUp, Award, Clock, Menu, Image as ImageIcon } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { useCategoryStore } from '../store/useCategoryStore';
 import { useProductStore } from '../store/useProductStore';
+import { useOfferStore } from '../store/useOfferStore';
 import { formatPrice } from '../lib/utils';
 import { CompactProductCard } from '../components/product/CompactProductCard';
 import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
@@ -10,7 +11,10 @@ import { AutoScrollCarousel } from '../components/ui/AutoScrollCarousel';
 import { motion } from 'motion/react';
 import { useBannerStore } from '../store/useBannerStore';
 import MainHeroCarousel from '../components/home/MainHeroCarousel';
-import { banners as mockBanners } from '../data/mockData';
+import { useEffect } from 'react';
+import FlashSaleSection from '../components/home/FlashSaleSection';
+import TrendingSection from '../components/home/TrendingSection';
+import BestSellingSection from '../components/home/BestSellingSection';
 
 import FlashSaleTimer from '../components/home/FlashSaleTimer';
 
@@ -18,23 +22,41 @@ export default function Home() {
   const { categories } = useCategoryStore();
   const { products } = useProductStore();
   const { banners: storeBanners } = useBannerStore();
+  const location = useLocation();
 
-  const activeBanners = storeBanners.filter(b => b.status === 'active' && b.image);
+  // Handle hash scrolling for Homepage sections
+  useEffect(() => {
+    const hash = location.hash;
+    if (hash) {
+      setTimeout(() => {
+        const element = document.querySelector(hash);
+        if (element) {
+          const headerHeight = 80; // Account for the sticky header
+          const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+          window.scrollTo({
+            top: elementPosition - headerHeight,
+            behavior: 'smooth'
+          });
+        }
+      }, 300);
+    }
+  }, [location.hash]);
+
+  const allActiveBanners = storeBanners.filter(b => b && b.status === 'active' && (b.image || b.bannerType === 'designed'));
   
-  // Create display banners with fallback to mock data if store is empty
-  const displayBanners = activeBanners.length > 0 
-    ? activeBanners 
-    : mockBanners.map(mb => ({
-        id: mb.id,
-        image: mb.image,
-        name: mb.title,
-        buttonEnabled: true,
-        buttonText: 'Shop Now',
-        status: 'active' as const,
-        order: 0,
-        isCustomButtonText: false,
-        connectedProductId: mb.link.includes('category') ? undefined : mb.id
-      }));
+  const mainHeroBanners = allActiveBanners.filter(b => {
+    if (!b.locations || !Array.isArray(b.locations) || b.locations.length === 0) return true;
+    return b.locations.some(loc => {
+      const l = typeof loc === 'string' ? loc.toLowerCase() : '';
+      return l === 'main hero banner' || l === 'homepage hero' || l === 'homepage-hero';
+    });
+  }).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const floaterBanners = allActiveBanners.filter(b => 
+    b.locations && Array.isArray(b.locations) && b.locations.some(loc => typeof loc === 'string' && loc.toLowerCase() === 'floater banner')
+  );
+  const underHeroCTABanner = allActiveBanners.find(b => 
+    b.locations && Array.isArray(b.locations) && b.locations.some(loc => typeof loc === 'string' && loc.toLowerCase() === 'under hero cta')
+  );
 
   const sortedCategories = [...categories]
     .filter(c => c.status === 'Active' && c.showOnHomepage)
@@ -44,9 +66,21 @@ export default function Home() {
       return orderA - orderB;
     });
 
-  const flashSaleProducts = products.filter(p => p.is_flash_sale);
-  const trendingProducts = products.filter(p => p.is_trending);
-  const bestSellingProducts = products.filter(p => p.is_best_selling);
+  const { offers } = useOfferStore();
+  const activeOffers = offers.filter(o => o.status === 'Active');
+
+  const activeFlashOffers = activeOffers.filter(o => o.homepageVisibility && (o.type === 'Flash Sale' || o.showAsFlashSale));
+  const flashOfferProductIds = activeFlashOffers.flatMap(o => [...(o.productIds || []), ...(o.manualProductIds || [])]);
+
+  const activeTrendingOffers = activeOffers.filter(o => o.homepageVisibility && (o.type === 'Trending Items' || o.showAsTrending));
+  const trendingOfferProductIds = activeTrendingOffers.flatMap(o => [...(o.productIds || []), ...(o.manualProductIds || [])]);
+
+  const activeBestOffers = activeOffers.filter(o => o.homepageVisibility && (o.type === 'Best Selling' || o.showAsBestSelling));
+  const bestOfferProductIds = activeBestOffers.flatMap(o => [...(o.productIds || []), ...(o.manualProductIds || [])]);
+
+  const flashSaleProducts = products.filter(p => (p.is_flash_sale || flashOfferProductIds.includes(p.id)) && p.status === 'active');
+  const trendingProducts = products.filter(p => (p.is_trending || trendingOfferProductIds.includes(p.id)) && p.status === 'active');
+  const bestSellingProducts = products.filter(p => (p.is_best_selling || bestOfferProductIds.includes(p.id)) && p.status === 'active');
   const displayBestSellingList = [...bestSellingProducts, ...bestSellingProducts, ...bestSellingProducts].slice(0, 15);
 
   return (
@@ -57,159 +91,132 @@ export default function Home() {
         animate={{ opacity: 1 }}
         className="w-full"
       >
-        <MainHeroCarousel banners={displayBanners as any} />
+        <MainHeroCarousel banners={mainHeroBanners as any} />
       </motion.section>
 
-      {/* 4. Compact Infinite Auto-Scrolling Category Bar */}
-      <section className="bg-white border-b border-gray-100 py-2.5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative overflow-hidden h-[95px] sm:h-[110px] flex items-center mb-2.5">
-        <div className="w-full">
-          <AutoScrollCarousel speed={25} className="w-full relative z-0" itemClassName="gap-2.5 pr-2.5">
-            {sortedCategories.map((cat) => {
+      {/* Floating Banners (Floater Banners) */}
+      {floaterBanners.length > 0 && (
+        <section className="bg-white py-4 border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+          <div className="container mx-auto px-4">
+            <AutoScrollCarousel speed={25}>
+              {floaterBanners.map((banner) => (
+                <div key={banner.id} className="relative w-[300px] sm:w-[400px] h-[120px] rounded-xl overflow-hidden mx-2 shadow-sm border border-[#EAEAEA] shrink-0">
+                  <Link to={banner.buttonLink || '#'}>
+                    {banner.image ? (
+                      <img src={banner.image} alt={banner.name || 'Floater Banner'} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-white font-bold">{banner.name || 'Floater Banner'}</div>
+                    )}
+                  </Link>
+                </div>
+              ))}
+            </AutoScrollCarousel>
+          </div>
+        </section>
+      )}
+
+      {/* 4. Redesigned Premium Category Slider */}
+      <section className="bg-white border-b border-gray-100 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative mb-3">
+        <div className="container mx-auto px-4">
+          <div 
+            className="flex scrollbar-hide scroll-smooth"
+            style={{
+              display: 'flex',
+              gap: '16px',
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              paddingBottom: '4px'
+            }}
+          >
+            {sortedCategories.slice(0, 6).map((cat) => {
               const catImage = cat.iconImage || cat.bannerImage;
               return (
                 <Link
                   key={cat.id}
                   to={`/category/${cat.id}`}
-                  className="flex flex-col items-center justify-center shrink-0 w-[78px] sm:w-[88px] group transition-all duration-300 relative"
+                  className="relative shrink-0 group transition-all duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer block select-none"
+                  style={{
+                    width: '110px',
+                    height: '150px',
+                    borderRadius: '18px',
+                    overflow: 'hidden'
+                  }}
                   draggable={false}
                 >
-                  {/* Small round dynamic category image */}
-                  <div className="w-[52px] h-[52px] sm:w-[60px] sm:h-[60px] rounded-full overflow-hidden bg-gray-50/50 border border-gray-200/90 group-hover:border-black relative flex items-center justify-center transition-all duration-300 shadow-sm">
+                  <div className="w-full h-full relative bg-gray-100">
                     {catImage ? (
                       <img
                         src={catImage}
                         alt={cat.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         referrerPolicy="no-referrer"
                         draggable={false}
                       />
                     ) : (
-                      <ImageIcon className="w-5 h-5 text-gray-300" />
+                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
+                        <ImageIcon className="w-6 h-6 mb-1" />
+                        <span className="text-[8px] font-bold">NO IMAGE</span>
+                      </div>
                     )}
+                    
+                    {/* Bottom Black Transparent Overlay */}
+                    <div 
+                      className="absolute inset-x-0 bottom-0 py-2 cursor-pointer flex items-center justify-center text-center"
+                      style={{
+                        background: 'rgba(0,0,0,0.55)',
+                        height: '42px'
+                      }}
+                    >
+                      {/* Bold Uppercase Category Name in white */}
+                      <span 
+                        className="text-[10px] tracking-wider text-center line-clamp-2 px-1"
+                        style={{
+                          color: '#ffffff',
+                          fontWeight: 700,
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        {cat.name}
+                      </span>
+                    </div>
                   </div>
-                  {/* Category Title below image without descriptions or secondary fields */}
-                  <span className="text-[9px] font-black text-black uppercase tracking-wider text-center line-clamp-1 mt-1.5 select-none transition-colors duration-200 group-hover:text-purple-600">
-                    {cat.name}
-                  </span>
                 </Link>
               );
             })}
-          </AutoScrollCarousel>
+
+            {sortedCategories.length > 6 && (
+              <Link
+                key="view-all-cats"
+                to="/categories"
+                className="relative shrink-0 group transition-all duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-neutral-300 hover:border-black bg-neutral-50"
+                style={{
+                  width: '110px',
+                  height: '150px',
+                  borderRadius: '18px',
+                  overflow: 'hidden'
+                }}
+                draggable={false}
+              >
+                <div className="flex flex-col items-center justify-center p-3 text-center">
+                  <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center mb-1.5 shadow-md">
+                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-neutral-900 leading-tight">View All</span>
+                  <span className="text-[7.5px] text-neutral-400 font-bold mt-1 uppercase tracking-wider">{sortedCategories.length} Categories</span>
+                </div>
+              </Link>
+            )}
+          </div>
         </div>
       </section>
 
-      {/* 5. Flash Sale Redesign (Edge-to-Edge) */}
-      {flashSaleProducts.length > 0 && (
-        <section className="bg-white border-y border-red-50 py-4 mb-4 overflow-hidden select-none">
-          <div className="w-full">
-            <div className="flex items-center justify-between px-4 sm:px-6 mb-5">
-              <div className="flex items-center">
-                <div className="flex items-center gap-1.5">
-                  <div className="bg-gradient-to-br from-red-500 to-purple-600 p-1.5 rounded-lg shadow-lg shadow-red-500/10">
-                    <Zap className="w-3.5 h-3.5 text-white fill-white" />
-                  </div>
-                  <h2 className="text-sm font-black text-gray-900 uppercase tracking-tighter">Flash Sale</h2>
-                </div>
-                
-                <div className="ml-3">
-                  <FlashSaleTimer />
-                </div>
-              </div>
+      {/* 5. Modern Integrated Offer Sections */}
+      <FlashSaleSection products={flashSaleProducts} />
+      <TrendingSection products={trendingProducts} />
 
-              <Link 
-                to="/offers#flash-sale" 
-                className="h-9 px-4 bg-gray-50 hover:bg-gray-100 text-gray-800 rounded-xl font-black text-[10px] uppercase tracking-[0.15em] transition-all flex items-center justify-center border border-gray-200"
-              >
-                View All
-              </Link>
-            </div>
-            
-            <div className="flash-sale-products">
-              <AutoScrollCarousel speed={25} className="w-full relative z-0" itemClassName="gap-3 px-3">
-                {flashSaleProducts.map(prod => (
-                  <div key={`flash-${prod.id}`} className="w-[145px] sm:w-[165px] shrink-0 pointer-events-auto" draggable={false}>
-                    <CompactProductCard product={prod} />
-                  </div>
-                ))}
-              </AutoScrollCarousel>
-            </div>
-          </div>
-          
-          <style>{`
-            .flash-sale-products {
-              display: flex;
-              overflow-x: auto;
-              overflow-y: hidden;
-              scrollbar-width: none;
-              -ms-overflow-style: none;
-              white-space: nowrap;
-              touch-action: pan-x;
-            }
-            .flash-sale-products::-webkit-scrollbar {
-              display: none;
-            }
-          `}</style>
-        </section>
-      )}
-
-      {/* 6. Trending Products (Compact Grid) */}
-      {trendingProducts.length > 0 && (
-        <section className="py-4">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="bg-orange-500 p-1.5 rounded-lg shadow-sm shadow-orange-500/20">
-                  <TrendingUp className="w-4 h-4 text-white" />
-                </div>
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">Trending Items</h2>
-              </div>
-              <Link to="/offers#trending-items" className="text-[11px] font-bold text-blue-600 hover:underline">View All</Link>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {trendingProducts.map((prod, idx) => (
-                <CompactProductCard key={`trend-${prod.id}`} product={prod} rank={idx + 1} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* 7. Best Selling Section (Auto Horizontal Slider) */}
-      {bestSellingProducts.length > 0 && (
-        <section className="py-4 overflow-hidden">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="bg-black p-1.5 rounded-lg shadow-sm shadow-black/20">
-                  <Award className="w-4 h-4 text-white" />
-                </div>
-                <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">Best Selling</h2>
-              </div>
-              <Link to="/offers#best-selling" className="text-[11px] font-black text-gray-400 hover:text-black transition-colors uppercase tracking-[0.2em] px-3 py-1 bg-gray-100 rounded-lg">View All</Link>
-            </div>
-            
-            <div className="relative group/slider">
-              <div className="flex overflow-x-auto hide-scrollbar gap-4 pb-4 snap-x snap-mandatory touch-pan-x touch-pan-y">
-                <motion.div 
-                  className="flex gap-4"
-                  animate={{ x: [0, -1000] }}
-                  transition={{ 
-                    duration: 25, 
-                    repeat: Infinity, 
-                    ease: "linear",
-                  }}
-                >
-                  {displayBestSellingList.map((prod, idx) => (
-                    <div key={`best-sl-${prod.id}-${idx}`} className="w-[140px] max-w-[160px] shrink-0 snap-start">
-                      <CompactProductCard product={prod} />
-                    </div>
-                  ))}
-                </motion.div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+      {/* 12px ~ 18px Clean Spacing (mt-4 is 16px) */}
+      <div className="mt-4"></div>
+      <BestSellingSection products={bestSellingProducts} />
 
       {/* 8. Dynamic Category Sections */}
       {sortedCategories.map(cat => {
@@ -217,7 +224,7 @@ export default function Home() {
         if (catProducts.length === 0) return null;
         
         return (
-          <section key={`cat-sec-${cat.id}`} className="py-6 border-b border-neutral-100 last:border-b-0">
+          <section key={`cat-sec-${cat.id}`} className="py-2 border-b border-neutral-100 last:border-b-0">
             <div className="container mx-auto px-4">
               {/* FIRST ROW: Header */}
               <div className="flex items-center justify-between mb-4">

@@ -1,13 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   User, Lock, MapPin, Bell, Shield, CreditCard, Sliders, Package, 
   HelpCircle, LogOut, ChevronRight, Camera, Check, Plus, Trash2, 
   ArrowLeft, Smartphone, Laptop, Sparkles, AlertCircle, FileText, 
-  CheckCircle, Globe, Sun, Moon, Info, Send, ShoppingBag, Eye, EyeOff
+  CheckCircle, Globe, Sun, Moon, Info, Send, ShoppingBag, Eye, EyeOff,
+  Zap, Gift, Percent, Truck, Ticket, ClipboardList, Megaphone, Inbox, Search, Copy
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { cn } from '../lib/utils';
+import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
+import { useNotificationStore } from '../store/useNotificationStore';
+import { useCustomerStore } from '../store/useCustomerStore';
+import { bdAddressData, divisions } from '../data/addressData';
+import { cn, formatPrice } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import LogoutModal from '../components/ui/LogoutModal';
 
@@ -22,8 +27,8 @@ const dictionary = {
     securityDesc: "Secure your access codes and track dynamic sessions",
     addresses: "Saved Addresses",
     addressesDesc: "Configure primary shipping locations & delivery gates",
-    notifications: "Notification Controls",
-    notificationsDesc: "Customize system triggers and promotional notices",
+    notifications: "TAZU UPDATES",
+    notificationsDesc: "Exclusive campaigns, promo alerts, and coupons",
     privacy: "Privacy & Data Rights",
     privacyDesc: "Govern visibility and request your system archival record",
     payments: "Saved Payment Wallets",
@@ -51,8 +56,8 @@ const dictionary = {
     securityDesc: "অ্যাক্সেস কোড সুরক্ষিত রাখুন এবং লগইন সেশন ট্র্যাক করুন",
     addresses: "সংরক্ষিত ঠিকানা",
     addressesDesc: "শিপিং ঠিকানা এবং ডেলিভারি গেট সেটআপ করুন",
-    notifications: "নোটিফিকেশন কন্ট্রোল",
-    notificationsDesc: "সিস্টেম ট্রিগার এবং অফার নোটিফিকেশন কাস্টমাইজ করুন",
+    notifications: "তাজু আপডেট (TAZU UPDATES)",
+    notificationsDesc: "আমাদের রিয়েল-টাইম অফার এবং নোটিসসমূহ",
     privacy: "গোপনীয়তা ও ডেটা অধিকার",
     privacyDesc: "অ্যাকাউন্ট ভিজিবিলিটি পরিচালনা করুন এবং ডেটা ডাউনলোড করুন",
     payments: "সংরক্ষিত পেমেন্ট ওয়ালেট",
@@ -73,8 +78,360 @@ const dictionary = {
   }
 };
 
+interface UpdatesNotificationsViewProps {
+  themeMode: 'light' | 'dark' | 'auto';
+  triggerToast: (msg: string, isError?: boolean) => void;
+  navigate: ReturnType<typeof useNavigate>;
+}
+
+function UpdatesNotificationsView({ themeMode, triggerToast, navigate }: UpdatesNotificationsViewProps) {
+  const { notifications, markAsRead, markAllAsRead, deleteNotification, clearAll } = useNotificationStore();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'sale' | 'coupon' | 'info'>('all');
+  const [selectedNotifId, setSelectedNotifId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Filtering logic
+  const filteredNotifs = notifications.filter((notif) => {
+    const matchesSearch = notif.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         notif.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         notif.description.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (!matchesSearch) return false;
+
+    if (selectedFilter === 'all') return true;
+    if (selectedFilter === 'sale' && notif.type === 'flash_sale') return true;
+    if (selectedFilter === 'coupon' && (notif.type === 'coupon' || notif.couponCode)) return true;
+    if (selectedFilter === 'info' && ['launch', 'delivery', 'order', 'stock', 'festival', 'free_shipping', 'vip', 'custom'].includes(notif.type)) return true;
+    return true;
+  });
+
+  const selectedNotif = notifications.find(n => n.id === selectedNotifId);
+
+  const getPriorityBadge = (priority: 'urgent' | 'important' | 'offer' | 'normal') => {
+    switch(priority) {
+      case 'urgent':
+        return <span className="bg-red-500 text-white text-[8px] font-black tracking-wider px-2 py-0.5 rounded-none uppercase">URGENT</span>;
+      case 'important':
+        return <span className="bg-amber-500 text-white text-[8px] font-black tracking-wider px-2 py-0.5 rounded-none uppercase">IMPORTANT</span>;
+      case 'offer':
+        return <span className="bg-[#1877F2] text-white text-[8px] font-black tracking-wider px-2 py-0.5 rounded-none uppercase">OFFER</span>;
+      default:
+        return <span className="bg-zinc-500 text-white text-[8px] font-black tracking-wider px-2 py-0.5 rounded-none uppercase">NOTICE</span>;
+    }
+  };
+
+  const getIconForType = (type: string) => {
+    const baseClass = "w-5 h-5";
+    switch(type) {
+      case 'flash_sale':
+        return <Zap className={`${baseClass} text-amber-500`} />;
+      case 'coupon':
+        return <Ticket className={`${baseClass} text-purple-500`} />;
+      case 'free_shipping':
+        return <Truck className={`${baseClass} text-emerald-500`} />;
+      case 'vip':
+        return <Sparkles className={`${baseClass} text-indigo-500`} />;
+      case 'discount':
+        return <Percent className={`${baseClass} text-blue-500`} />;
+      case 'delivery':
+        return <Truck className={`${baseClass} text-orange-500`} />;
+      case 'order':
+        return <ClipboardList className={`${baseClass} text-[#1877F2]`} />;
+      default:
+        return <Megaphone className={`${baseClass} text-zinc-500`} />;
+    }
+  };
+
+  const copyToClipboard = (coupon?: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!coupon) return;
+    navigator.clipboard.writeText(coupon);
+    setCopiedId(coupon);
+    triggerToast(`Coupon "${coupon}" copied!`);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleCardClick = (notif: typeof notifications[0]) => {
+    setSelectedNotifId(notif.id);
+    markAsRead(notif.id);
+  };
+
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  return (
+    <div className={cn("bg-white rounded-[24px] p-5 sm:p-7 shadow-sm border border-gray-150/60 flex flex-col min-h-[500px]", themeMode === 'dark' && 'bg-neutral-950 border-neutral-800 shadow-none')}>
+      {/* Title & Stats Row */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-gray-100 gap-4 mb-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-black uppercase tracking-tight text-zinc-900">🔥 TAZU UPDATES</h2>
+            {unreadCount > 0 && (
+              <span className="bg-[#1877F2] text-white text-[9px] font-black px-2 py-0.5 rounded-full tracking-wider animate-pulse">
+                {unreadCount} NEW
+              </span>
+            )}
+          </div>
+          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Your luxury promotional campaign and instant offer center</p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {notifications.length > 0 && (
+            <>
+              <button 
+                onClick={() => {
+                  markAllAsRead();
+                  triggerToast("All notification alerts marked as read!");
+                }}
+                className="bg-zinc-50 hover:bg-zinc-100 dark:bg-neutral-900 dark:hover:bg-neutral-850 text-zinc-950 border border-gray-200 dark:border-neutral-850 text-[9px] font-black uppercase tracking-wider px-3 h-8 flex items-center transition-all"
+              >
+                Mark Read
+              </button>
+              <button 
+                onClick={() => {
+                  if (confirm("Are you sure you want to clear your updates inbox?")) {
+                    clearAll();
+                    triggerToast("Updates inbox cleared.");
+                  }
+                }}
+                className="bg-red-50/50 hover:bg-red-50 text-red-600 border border-red-100 text-[9px] font-black uppercase tracking-wider px-3 h-8 flex items-center transition-all"
+              >
+                Clear All
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Filters and Search Search Row */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-5">
+        <div className="md:col-span-4 relative">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+          <input 
+            type="text" 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search promo updates..."
+            className="w-full h-9 pl-9 pr-4 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all"
+          />
+        </div>
+        <div className="md:col-span-8 flex flex-wrap gap-1.5 items-center">
+          {[
+            { id: 'all', label: 'ALL NOTICES' },
+            { id: 'sale', label: 'FLASH SALES' },
+            { id: 'coupon', label: 'COUPONS' },
+            { id: 'info', label: 'UPDATES' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setSelectedFilter(tab.id as any)}
+              className={cn(
+                "text-[8px] font-extrabold tracking-widest uppercase px-3 py-2 rounded-lg border transition-all duration-150",
+                selectedFilter === tab.id 
+                  ? "bg-zinc-950 text-white border-zinc-950 font-black"
+                  : "bg-transparent text-gray-500 border-gray-150 hover:bg-gray-50"
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Notification List Container */}
+      <div className="flex-1 space-y-3 max-h-[460px] overflow-y-auto pr-1">
+        {filteredNotifs.length > 0 ? (
+          filteredNotifs.map((notif) => (
+            <div
+              key={notif.id}
+              onClick={() => handleCardClick(notif)}
+              className={cn(
+                "group border rounded-2xl p-4 transition-all duration-200 cursor-pointer relative overflow-hidden flex items-start gap-4 hover:shadow-sm",
+                notif.isRead 
+                  ? "bg-white border-gray-150 hover:border-gray-300" 
+                  : "bg-blue-50/30 border-[#1877F2]/20 hover:border-[#1877F2]/40"
+              )}
+            >
+              {/* Unread Visual Circle Indicator */}
+              {!notif.isRead && (
+                <span className="absolute top-4.5 right-4 w-2 h-2 rounded-full bg-[#1877F2] shrink-0" />
+              )}
+
+              {/* Left Icon Panel */}
+              <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 shadow-sm relative">
+                {getIconForType(notif.type)}
+              </div>
+
+              {/* Middle Message Container */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  {getPriorityBadge(notif.priority)}
+                  <h4 className={cn(
+                    "text-xs uppercase tracking-tight truncate",
+                    notif.isRead ? "text-zinc-800 font-bold" : "text-zinc-950 font-black"
+                  )}>
+                    {notif.title}
+                  </h4>
+                </div>
+
+                <p className="text-[11px] text-gray-500 leading-snug line-clamp-2 uppercase-none font-medium mb-2.5">
+                  {notif.message}
+                </p>
+
+                {/* Additional Coupon Copyable Segment */}
+                {notif.couponCode && (
+                  <div className="inline-flex items-center gap-2 bg-purple-50 border border-purple-100 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase text-purple-700 tracking-wider hover:bg-purple-100/70 transition-all shrink-0">
+                    <Ticket className="w-3.5 h-3.5" />
+                    <span>USE COUPON: {notif.couponCode}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => copyToClipboard(notif.couponCode, e)}
+                      className="ml-1 bg-white hover:bg-purple-100 text-purple-800 w-4 h-4 flex items-center justify-center rounded-md border border-purple-200 shadow-sm transition-all text-[8px]"
+                      title="Copy code"
+                    >
+                      {copiedId === notif.couponCode ? <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" /> : <Copy className="w-2.5 h-2.5 text-purple-600" />}
+                    </button>
+                  </div>
+                )}
+
+                {/* bottom metadata */}
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="text-[8px] text-gray-400 font-bold uppercase tracking-wider">
+                    {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(notif.createdAt))}
+                  </span>
+                  {notif.redirectLink && (
+                    <span className="text-[8px] text-[#1877F2] font-black uppercase tracking-widest flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                      TAP VALUE NOW <ChevronRight className="w-2.5 h-2.5" />
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Action/Delete and Chevron Option */}
+              <div className="flex flex-col items-end gap-3 self-center shrink-0">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteNotification(notif.id);
+                    triggerToast("Notification Alert deleted.");
+                  }}
+                  className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                  title="Delete update"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-zinc-600 transition-transform group-hover:translate-x-0.5" />
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-gray-100 rounded-2xl bg-gray-50/30">
+            <Inbox className="w-10 h-10 text-gray-300 stroke-[1.2] mb-3" />
+             <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">No promotional updates</span>
+             <span className="text-[9px] text-gray-400 mt-1 uppercase max-w-[240px]">We haven't launched any recent discount campaigns or custom announcements. Check back soon!</span>
+          </div>
+        )}
+      </div>
+
+      {/* Fully Interactive Slide-over Detailed Modal */}
+      <AnimatePresence>
+        {selectedNotifId && selectedNotif && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white dark:bg-neutral-900 rounded-[28px] max-w-md w-full overflow-hidden shadow-2xl border border-gray-100"
+            >
+              {selectedNotif.bannerImage && (
+                <div className="relative h-44 w-full bg-zinc-900 overflow-hidden">
+                  <img 
+                    src={selectedNotif.bannerImage} 
+                    alt={selectedNotif.title} 
+                    className="w-full h-full object-cover" 
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-5">
+                    <div className="flex flex-col gap-1.5">
+                      {getPriorityBadge(selectedNotif.priority)}
+                      <h3 className="text-sm font-black text-white uppercase tracking-tight leading-snug">{selectedNotif.title}</h3>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="p-6">
+                {!selectedNotif.bannerImage && (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      {getPriorityBadge(selectedNotif.priority)}
+                      <span className="text-[9px] text-gray-400 font-extrabold tracking-wider uppercase">— NOTICE CENTRIC</span>
+                    </div>
+                    <h3 className="text-zinc-950 font-black text-base uppercase tracking-tight">{selectedNotif.title}</h3>
+                  </div>
+                )}
+
+                {/* Full Description text area */}
+                <p className="text-xs text-zinc-500 font-semibold leading-relaxed mb-5">
+                  {selectedNotif.description || selectedNotif.message}
+                </p>
+
+                {/* Coupon Segment */}
+                {selectedNotif.couponCode && (
+                  <div className="bg-purple-50/50 border border-purple-100 rounded-xl p-4.5 flex flex-col gap-1.5 mb-5 text-center items-center">
+                    <span className="text-[8px] text-purple-400 font-black uppercase tracking-wider">COPY AND REAP VALUE AT CHECKOUT</span>
+                    <div className="flex items-center bg-white border border-purple-200.5 px-4 py-2 text-sm font-black uppercase tracking-widest text-purple-700 min-w-[170px] justify-between shadow-sm">
+                      <span>{selectedNotif.couponCode}</span>
+                      <button
+                        onClick={(e) => copyToClipboard(selectedNotif.couponCode, e)}
+                        className="bg-purple-700 hover:bg-purple-800 text-white select-none px-2.5 py-1 text-[8px] font-black uppercase rounded transition-colors"
+                      >
+                        {copiedId === selectedNotif.couponCode ? 'COPIED!' : 'COPY'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Expiry / Date Details */}
+                {selectedNotif.expiryDate && (
+                  <div className="flex items-center justify-center gap-1.5 text-[9px] text-red-500 font-black uppercase tracking-widest mb-5">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>Expires: {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(selectedNotif.expiryDate))}</span>
+                  </div>
+                )}
+
+                {/* CTAs */}
+                <div className="flex flex-col gap-2">
+                  {selectedNotif.redirectLink && (
+                    <button
+                      onClick={() => {
+                        setSelectedNotifId(null);
+                        navigate(selectedNotif.redirectLink || '/');
+                      }}
+                      className="w-full h-11 bg-zinc-950 hover:bg-zinc-800 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                    >
+                      Take Action <ChevronRight className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedNotifId(null)}
+                    className="w-full h-10 border border-gray-200 hover:bg-gray-50 text-zinc-650 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors"
+                  >
+                    Dismiss Update
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, updateUser, logout } = useAuthStore();
   
   // App-wide language settings (defaults to 'en')
@@ -82,7 +439,17 @@ export default function SettingsPage() {
   const t = dictionary[lang];
 
   // Active sub-page tab state. Null on mobile indicates settings main list is showing
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const getInitialTab = () => {
+    if (location.pathname === '/payment-methods') return 'payments';
+    if (location.pathname === '/help-center') return 'support';
+    if (location.pathname === '/account/dashboard') return 'personal';
+    return null;
+  };
+  const [activeTab, setActiveTab] = useState<string | null>(getInitialTab());
+
+  React.useEffect(() => {
+    setActiveTab(getInitialTab());
+  }, [location.pathname]);
 
   // States for general UI feedback
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -93,7 +460,28 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState(user?.phone || '01712345678');
   const [email, setEmail] = useState(user?.email || 'mdimtiaz.dev@gmail.com');
   const [gender, setGender] = useState(user?.gender || 'Male');
-  const [dob, setDob] = useState(user?.dob || '1998-10-15');
+  
+  // Parse special days from stored joined strings
+  const initialSpecialDays = useMemo(() => {
+    if (!user?.occasionName || !user?.specialDate) return [];
+    const names = user.occasionName.split(' | ');
+    const dates = user.specialDate.split(' | ');
+    return names.map((name, i) => {
+      // Convert DD-MM-YYYY back to YYYY-MM-DD for input[type="date"]
+      let d = dates[i] || '';
+      const parts = d.split('-');
+      if (parts.length === 3 && parts[2].length === 4) {
+        d = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+      return {
+        id: `sd-${i}-${Math.random().toString(36).substring(2, 5)}`,
+        name,
+        date: d
+      };
+    });
+  }, [user?.occasionName, user?.specialDate]);
+
+  const [specialDays, setSpecialDays] = useState(initialSpecialDays);
   const [profilePic, setProfilePic] = useState<string>(user?.profileImage || `https://ui-avatars.com/api/?name=${user?.name || 'Imtiaz'}&background=111&color=fff&size=200`);
   const [showPhotoSource, setShowPhotoSource] = useState(false);
   const photoGalleryRef = useRef<HTMLInputElement>(null);
@@ -124,7 +512,16 @@ export default function SettingsPage() {
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [addrForm, setAddrForm] = useState({
-    name: '', phone: '', division: 'Dhaka', district: 'Dhaka', area: '', fullAddress: '', landmark: '', isDefault: false, tag: 'HOME'
+    name: '', 
+    phone: '', 
+    division: '', 
+    district: '', 
+    upazila: '',
+    area: '', 
+    fullAddress: '', 
+    landmark: '', 
+    isDefault: false, 
+    tag: 'HOME'
   });
   // Live Map Picker Simulator
   const [mapLatitude, setMapLatitude] = useState(23.8103);
@@ -145,17 +542,32 @@ export default function SettingsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   // 6. Payments states
-  const [paymentMethods, setPaymentMethods] = useState([
-    { id: 'pay-1', type: 'bKash', details: '017****5678', isDefault: true },
-    { id: 'pay-2', type: 'Nagad', details: '019****1234', isDefault: false },
-    { id: 'pay-3', type: 'VISA Card', details: 'Ending in 4321', isDefault: false, holder: 'IMTIAZ KHAN' }
-  ]);
+  const customersStore = useCustomerStore.getState();
+  const currentCustomer = user ? customersStore.customers.find(c => c.id === user.id) : null;
+  const initialPayments = currentCustomer?.paymentMethods || [
+    { id: 'pay-1', type: 'bKash', details: '+8801XXXXXXX45', isDefault: true, holder: 'IMTIAZ KHAN' },
+    { id: 'pay-2', type: 'Nagad', details: '+8801XXXXXXX12', isDefault: false, holder: 'IMTIAZ KHAN' },
+    { id: 'pay-3', type: 'Card', details: '**** **** **** 4582', isDefault: false, holder: 'IMTIAZ KHAN' }
+  ];
+
+  const [paymentMethods, setPaymentMethods] = useState(initialPayments);
+
+  // Sync back to store whenever we change paymentMethods
+  React.useEffect(() => {
+    if (user?.id) {
+       useCustomerStore.getState().updateCustomer(user.id, { paymentMethods });
+    }
+  }, [paymentMethods, user?.id]);
+
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
-  const [newPayType, setNewPayType] = useState<'bKash' | 'Nagad' | 'Rocket' | 'VISA'>('bKash');
+  const [newPayType, setNewPayType] = useState<'bKash' | 'Nagad' | 'Rocket' | 'Card'>('bKash');
   const [newPayNumber, setNewPayNumber] = useState('');
+  const [newAccountName, setNewAccountName] = useState('');
+  const [newNickname, setNewNickname] = useState('');
   const [newCardNumber, setNewCardNumber] = useState('');
   const [newCardExpiry, setNewCardExpiry] = useState('');
   const [newCardHolder, setNewCardHolder] = useState('');
+  const [newCardCvv, setNewCardCvv] = useState('');
 
   // 7. Preferences States
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'auto'>('light');
@@ -168,7 +580,8 @@ export default function SettingsPage() {
     { id: 'TZM-9801', date: '2026-05-02', total: 12500.00, status: 'Returned' }
   ]);
   const [wishlistCount] = useState(14);
-  const [recentlyViewedCount] = useState(6);
+  const { getViewedProducts } = useRecentlyViewedStore();
+  const recentlyViewedCount = getViewedProducts().length;
 
   // 9. Support & FAQ accordion
   const [faqOpenIdx, setFaqOpenIdx] = useState<number | null>(null);
@@ -202,23 +615,69 @@ export default function SettingsPage() {
       triggerToast("Profile Image file size exceeds 2MB limit.", true);
       return;
     }
-    const url = URL.createObjectURL(file);
-    setProfilePic(url);
-    updateUser({ profileImage: url });
-    triggerToast("Profile photo updated successfully!");
-    setShowPhotoSource(false);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64Url = reader.result as string;
+      setProfilePic(base64Url);
+      updateUser({ profileImage: base64Url });
+
+      // Sync with customer record in useCustomerStore
+      if (user?.id) {
+        const customersStore = useCustomerStore.getState();
+        const currentCustomer = customersStore.customers.find(c => c.id === user?.id);
+        if (currentCustomer) {
+          customersStore.updateCustomer(user.id, { profileImage: base64Url });
+        }
+      }
+
+      triggerToast("Profile photo updated successfully!");
+      setShowPhotoSource(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Personal info save
   const handleSavePersonalInfo = (e: React.FormEvent) => {
     e.preventDefault();
+    const occasionJoined = specialDays.length > 0 
+      ? specialDays.map(d => d.name.trim()).join(' | ') 
+      : '';
+    
+    const datesJoined = specialDays.length > 0
+      ? specialDays.map(d => {
+          const parts = d.date.split('-');
+          if (parts.length === 3) {
+            return `${parts[2]}-${parts[1]}-${parts[0]}`; // DD-MM-YYYY
+          }
+          return d.date;
+        }).join(' | ')
+      : '';
+
     updateUser({
       name: fullName,
       phone: phone,
       email: email,
       gender: gender,
-      dob: dob
+      occasionName: occasionJoined,
+      specialDate: datesJoined
     });
+
+    // Sync with customer record in useCustomerStore
+    if (user?.id) {
+      const customersStore = useCustomerStore.getState();
+      const currentCustomer = customersStore.customers.find(c => c.id === user?.id);
+      if (currentCustomer) {
+        customersStore.updateCustomer(user.id, {
+          name: fullName,
+          phones: [phone],
+          emails: [email],
+          gender: gender,
+          occasionName: occasionJoined,
+          specialDate: datesJoined
+        });
+      }
+    }
+
     triggerToast(t.saveSuccess);
   };
 
@@ -248,7 +707,7 @@ export default function SettingsPage() {
   const handleSaveAddress = (e: React.FormEvent) => {
     e.preventDefault();
     if (!addrForm.name || !addrForm.phone || !addrForm.fullAddress) {
-      triggerToast("Please complete primary address fields.", true);
+      triggerToast("Please complete all required fields (Name, Phone, Full Address).", true);
       return;
     }
 
@@ -319,38 +778,42 @@ export default function SettingsPage() {
   // Add Payment Method logic
   const handleAddNewPayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPayType === 'VISA') {
-      if (!newCardNumber || !newCardHolder) {
-        triggerToast("Please fill in card details.", true);
+    if (newPayType === 'Card') {
+      if (!newCardNumber || !newCardHolder || !newCardExpiry || !newCardCvv) {
+        triggerToast("Please fill in all card details.", true);
         return;
       }
-      const lastFour = newCardNumber.trim().slice(-4) || '4321';
+      const lastFour = newCardNumber.trim().replace(/\s/g, '').slice(-4) || 'XXXX';
       const newPay = {
         id: 'pay-' + Math.random().toString(36).substring(2, 9),
-        type: 'VISA Card',
-        details: `Ending in ${lastFour}`,
+        type: 'Card',
+        details: `**** **** **** ${lastFour}`,
         isDefault: false,
         holder: newCardHolder.toUpperCase()
       };
       setPaymentMethods(prev => [...prev, newPay]);
     } else {
-      if (!newPayNumber) {
-        triggerToast("Please record wallet phone credentials.", true);
+      if (!newPayNumber || !newAccountName) {
+        triggerToast("Please provide wallet account info.", true);
         return;
       }
-      const shortNum = newPayNumber.trim().slice(-4);
+      const shortNum = newPayNumber.trim().slice(-2);
       const newPay = {
         id: 'pay-' + Math.random().toString(36).substring(2, 9),
         type: newPayType,
-        details: `01***${shortNum}`,
-        isDefault: false
+        details: `+8801XXXXXXX${shortNum}`,
+        isDefault: false,
+        holder: newAccountName.toUpperCase()
       };
       setPaymentMethods(prev => [...prev, newPay]);
     }
-    triggerToast(`${newPayType} gateway system attached.`);
+    triggerToast(`Payment method added securely.`);
     setShowAddPaymentModal(false);
     setNewPayNumber('');
+    setNewAccountName('');
+    setNewNickname('');
     setNewCardNumber('');
+    setNewCardCvv('');
     setNewCardHolder('');
     setNewCardExpiry('');
   };
@@ -368,7 +831,8 @@ export default function SettingsPage() {
       phone: phone,
       email: email,
       gender: gender,
-      dob: dob,
+      occasionName: user?.occasionName,
+      specialDate: user?.specialDate,
       savedAddressesCount: addresses.length,
       savedPaymentGateways: paymentMethods.map(p => ({ type: p.type, details: p.details })),
       systemLocale: lang,
@@ -696,27 +1160,91 @@ For customer support, call 09612-TAZU-MART.
                       </div>
                       <input 
                         type="email" 
-                        required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Email Address (Optional)"
                         className="w-full bg-gray-50 border border-gray-150/60 rounded-xl px-5 py-4 text-xs font-bold focus:outline-none focus:border-black transition-all"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-[0.15em] ml-1">Date of Birth *</label>
-                      <input 
-                        type="date" 
-                        required
-                        value={dob}
-                        onChange={(e) => setDob(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-150/60 rounded-xl px-5 py-4 text-xs font-bold focus:outline-none focus:border-black transition-all"
-                      />
+                    <div className="space-y-4 text-left pt-2 pb-2">
+                      <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                        <h3 className="text-[10px] font-black uppercase text-zinc-950 tracking-wider flex items-center gap-1.5">
+                          Special Day (Optional)
+                        </h3>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSpecialDays([...specialDays, { id: 'day_' + Math.random().toString(36).substring(2, 9), name: '', date: '' }]);
+                          }}
+                          className="flex items-center gap-1 text-[9px] font-black uppercase text-black hover:bg-gray-50 px-2 py-1 transition-all border border-gray-200 h-7"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Add More</span>
+                        </button>
+                      </div>
+
+                      {specialDays.length === 0 ? (
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-relaxed">
+                          No Special Days added yet.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {specialDays.map((day, idx) => (
+                            <div key={day.id} className="p-3 bg-gray-50 rounded-xl space-y-3 border border-gray-100">
+                              <div className="flex justify-between items-center pb-2 border-b border-gray-200/50">
+                                <span className="text-[9px] font-black text-black uppercase tracking-widest">Occasion #{idx + 1}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSpecialDays(specialDays.filter(item => item.id !== day.id));
+                                  }}
+                                  className="text-gray-400 hover:text-red-500 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                  <label className="block text-[9px] font-black text-black uppercase tracking-wider">Occasion Name</label>
+                                  <input
+                                    type="text"
+                                    value={day.name}
+                                    onChange={(e) => {
+                                      const updated = [...specialDays];
+                                      updated[idx].name = e.target.value;
+                                      setSpecialDays(updated);
+                                    }}
+                                    placeholder="e.g. Birthday"
+                                    className="w-full h-9 bg-white border border-gray-200 px-3 text-xs font-bold focus:outline-none focus:border-black"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="block text-[9px] font-black text-black uppercase tracking-wider">Sought Date</label>
+                                  <input
+                                    type="date"
+                                    value={day.date}
+                                    onChange={(e) => {
+                                      const updated = [...specialDays];
+                                      updated[idx].date = e.target.value;
+                                      setSpecialDays(updated);
+                                    }}
+                                    className="w-full h-9 bg-white border border-gray-200 px-2 text-xs font-bold focus:outline-none focus:border-black"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-black uppercase tracking-[0.15em] ml-1">Gender *</label>
+                    <label className="text-[10px] font-black text-black uppercase tracking-[0.15em] ml-1">Gender (Male / Female / Others)</label>
                     <div className="grid grid-cols-3 gap-3">
                       {['Male', 'Female', 'Other'].map((g) => (
                         <button
@@ -970,19 +1498,27 @@ For customer support, call 09612-TAZU-MART.
                               </span>
                             )}
                           </div>
-                          <p className="text-[10px] text-gray-500 font-bold leading-relaxed">
-                            Area: {addr.area}, {addr.district}, {addr.division}
-                          </p>
-                          <p className="text-xs text-black font-semibold mt-1">
-                            {addr.fullAddress}
-                          </p>
+                          <div className="space-y-1 bg-white p-3 rounded-xl border border-gray-150 inline-block w-full">
+                            <p className="text-[10.5px] text-zinc-600 font-bold flex items-center gap-1.5 uppercase tracking-wide">
+                              <span className="opacity-80">📍</span> Division: {addr.division}
+                            </p>
+                            <p className="text-[10.5px] text-zinc-600 font-bold flex items-center gap-1.5 uppercase tracking-wide">
+                              <span className="opacity-80">📍</span> District: {addr.district}
+                            </p>
+                            <p className="text-[10.5px] text-zinc-600 font-bold flex items-center gap-1.5 uppercase tracking-wide">
+                              <span className="opacity-80">📍</span> Thana: {addr.upazila || addr.area || 'N/A'}
+                            </p>
+                            <p className="text-[10.5px] text-black font-black flex items-start gap-1.5 uppercase tracking-wide mt-1.5 pt-1.5 border-t border-gray-100">
+                              <span className="opacity-80">🏠</span> Full Address: {addr.fullAddress}
+                            </p>
+                          </div>
                           {addr.landmark && (
-                            <p className="text-[9px] text-gray-400 italic font-semibold mt-0.5">
+                            <p className="text-[9px] text-gray-400 italic font-semibold mt-1 pl-1">
                               Landmark: {addr.landmark}
                             </p>
                           )}
-                          <p className="text-[10px] font-bold text-gray-500 mt-2">
-                            Contact Terminal: {addr.phone}
+                          <p className="text-[10px] font-bold text-gray-500 mt-2 pl-1 italic">
+                            Contact Link: {addr.phone}
                           </p>
                         </div>
 
@@ -1014,49 +1550,11 @@ For customer support, call 09612-TAZU-MART.
             {/* 4. NOTIFICATIONS SUB-VIEW              */}
             {/* ======================================= */}
             {activeTab === 'notifications' && (
-              <div className={cn("bg-white rounded-[24px] p-6 sm:p-8 shadow-sm border border-gray-150/60", themeMode === 'dark' && 'bg-neutral-950 border-neutral-800 shadow-none')}>
-                <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-6">
-                  <div>
-                    <h2 className="text-lg font-black uppercase tracking-tight">🔔 {t.notifications}</h2>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{t.notificationsDesc}</p>
-                  </div>
-                  <Bell className="w-6 h-6 text-gray-300" />
-                </div>
-
-                <div className="space-y-4">
-                  {/* Custom Toggles */}
-                  {[
-                    { label: "Order Tracing Updates", desc: "Critical parcel tracking status notifications on ship routes", state: notifOrder, set: setNotifOrder },
-                    { label: "Promotional Blast Alerts", desc: "Special luxury campaigns, limited discounts & voucher drop warnings", state: notifPromo, set: setNotifPromo },
-                    { label: "Flash Sale Countdown Triggers", desc: "Instant reminders when countdown timers expire for products", state: notifFlash, set: setNotifFlash },
-                    { label: "Courier Agent Dispatch Notices", desc: "Direct coordinate maps alerts when driver leaves package gates", state: notifDelivery, set: setNotifDelivery },
-                    { label: "Native Device Push Notifications", desc: "Synchronizes push tokens for prompt smartphone wakeups", state: notifPush, set: setNotifPush },
-                  ].map((notif, index) => (
-                    <div key={index} className="flex items-center justify-between p-4.5 bg-gray-50 rounded-2xl border border-gray-100">
-                      <div>
-                        <p className="text-xs font-black uppercase text-black leading-tight">{notif.label}</p>
-                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">{notif.desc}</p>
-                      </div>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          notif.set(!notif.state);
-                          triggerToast("Alert system configuration changed!");
-                        }}
-                        className={cn(
-                          "w-12 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ml-4",
-                          notif.state ? "bg-black" : "bg-gray-200"
-                        )}
-                      >
-                        <span className={cn(
-                          "absolute top-1 bg-white w-4 h-4 rounded-full transition-transform",
-                          notif.state ? "right-1" : "left-1"
-                        )} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <UpdatesNotificationsView 
+                themeMode={themeMode} 
+                triggerToast={triggerToast} 
+                navigate={navigate} 
+              />
             )}
 
             {/* ======================================= */}
@@ -1162,51 +1660,65 @@ For customer support, call 09612-TAZU-MART.
             {/* 6. PAYMENT METHODS SUB-VIEW            */}
             {/* ======================================= */}
             {activeTab === 'payments' && (
-              <div className={cn("bg-white rounded-[24px] p-6 sm:p-8 shadow-sm border border-gray-150/60", themeMode === 'dark' && 'bg-neutral-950 border-neutral-800 shadow-none')}>
+              <div className={cn("bg-white p-6 sm:p-8 flex flex-col min-h-0", themeMode === 'dark' && 'bg-neutral-950')}>
                 <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-6">
                   <div>
-                    <h2 className="text-lg font-black uppercase tracking-tight">💳 {t.payments}</h2>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">{t.paymentsDesc}</p>
+                    <h2 className="text-lg font-black uppercase tracking-tight text-black">Payment Methods</h2>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Manage your secure payment options</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowAddPaymentModal(true)}
-                    className="px-4 py-2.5 bg-black hover:bg-neutral-900 text-white font-black text-[9px] uppercase tracking-widest rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                    className="px-4 py-2 bg-black hover:bg-neutral-900 text-white font-bold text-[10px] uppercase tracking-widest transition-all flex items-center gap-1.5 cursor-pointer rounded-md"
                   >
-                    <Plus className="w-4 h-4" /> Add Payment Gateway
+                    + Add Payment Method
                   </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 flex-1">
                   {paymentMethods.map((pm) => (
-                    <div key={pm.id} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                    <div key={pm.id} className="relative p-5 bg-white border border-gray-200 flex items-center justify-between hover:shadow-[0_2px_10px_rgba(0,0,0,0.04)] transition-all">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-gray-150 font-black text-[10px] text-gray-800 shadow-sm uppercase tracking-wider">
+                        <div className="w-12 h-10 bg-gray-50 flex items-center justify-center border border-gray-100 text-[10px] font-black text-gray-800 uppercase tracking-wider rounded-sm">
                           {pm.type}
                         </div>
                         <div>
-                          <p className="text-xs font-black text-black uppercase">{pm.type} Gateway</p>
-                          <p className="text-[10px] text-gray-500 font-bold mt-0.5">{pm.details}</p>
-                          {pm.holder && <p className="text-[8.5px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">Cardholder: {pm.holder}</p>}
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-black font-sans">{pm.type}</p>
+                            <CheckCircle className="w-3 h-3 text-green-500" />
+                          </div>
+                          <p className="text-[11px] text-gray-500 font-medium font-sans mt-0.5">{pm.details}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
                         {pm.isDefault && (
-                          <span className="bg-black text-white text-[7.5px] font-black px-2 py-1 rounded uppercase tracking-wider">
-                            Primary Direct Cashout
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider border border-gray-200 px-2 py-0.5 rounded-sm">
+                            Default
                           </span>
                         )}
                         <button
                           type="button" 
-                          onClick={() => removePayment(pm.id)}
-                          className="p-2.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
+                          className="text-[10px] font-bold text-gray-400 hover:text-black uppercase tracking-widest transition-colors cursor-pointer px-2"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          Edit
+                        </button>
+                        <button
+                          type="button" 
+                          onClick={() => removePayment(pm.id)}
+                          className="text-[10px] font-bold text-red-500 hover:text-red-700 uppercase tracking-widest transition-colors cursor-pointer px-2"
+                        >
+                          Delete
                         </button>
                       </div>
                     </div>
                   ))}
+                </div>
+
+                <div className="mt-12 pt-6 border-t border-gray-100 text-center">
+                  <p className="text-[11px] text-gray-400 font-sans font-medium tracking-wide">
+                    Your assets are securely protected with us.
+                  </p>
                 </div>
               </div>
             )}
@@ -1623,28 +2135,61 @@ For customer support, call 09612-TAZU-MART.
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase tracking-wider text-black">Division *</label>
+                    <label className="text-[9px] font-black uppercase tracking-wider text-black">Division (Optional)</label>
                     <select 
-                      value={addrForm.division} onChange={(e) => setAddrForm({...addrForm, division: e.target.value})}
+                      value={addrForm.division} 
+                      onChange={(e) => {
+                        const div = e.target.value;
+                        setAddrForm({...addrForm, division: div, district: '', upazila: ''});
+                      }}
                       className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold cursor-pointer"
                     >
-                      {['Dhaka', 'Chittagong', 'Sylhet', 'Rajshahi', 'Khulna', 'Barisal', 'Rangpur'].map(div => <option key={div} value={div}>{div}</option>)}
+                      <option value="">Select Division</option>
+                      {divisions.map(div => <option key={div} value={div}>{div}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase tracking-wider text-black">District *</label>
-                    <input 
-                      type="text" required placeholder="e.g., Dhaka Central"
-                      value={addrForm.district} onChange={(e) => setAddrForm({...addrForm, district: e.target.value})}
-                      className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold"
-                    />
+                    <label className="text-[9px] font-black uppercase tracking-wider text-black">District (Optional)</label>
+                    <select 
+                      value={addrForm.district} 
+                      disabled={!addrForm.division}
+                      onChange={(e) => {
+                        const dist = e.target.value;
+                        setAddrForm({...addrForm, district: dist, upazila: ''});
+                      }}
+                      className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold cursor-pointer disabled:opacity-50"
+                    >
+                      <option value="">Select District</option>
+                      {addrForm.division && bdAddressData[addrForm.division as keyof typeof bdAddressData] && 
+                        Object.keys(bdAddressData[addrForm.division as keyof typeof bdAddressData]).map(dist => (
+                          <option key={dist} value={dist}>{dist}</option>
+                        ))
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase tracking-wider text-black">Thana / Upazila (Optional)</label>
+                    <select 
+                      value={addrForm.upazila} 
+                      disabled={!addrForm.district}
+                      onChange={(e) => setAddrForm({...addrForm, upazila: e.target.value})}
+                      className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold cursor-pointer disabled:opacity-50"
+                    >
+                      <option value="">Select Upazila</option>
+                      {addrForm.division && addrForm.district && bdAddressData[addrForm.division as keyof typeof bdAddressData]?.[addrForm.district]?.map(up => (
+                          <option key={up} value={up}>{up}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[9px] font-black uppercase tracking-wider text-black">Area / Location *</label>
+                    <label className="text-[9px] font-black uppercase tracking-wider text-black">Area / Union (Optional)</label>
                     <input 
-                      type="text" required placeholder="e.g., Banani, Gulshan"
+                      type="text" placeholder="e.g., Banani, Gulshan"
                       value={addrForm.area} onChange={(e) => setAddrForm({...addrForm, area: e.target.value})}
                       className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold"
                     />
@@ -1652,9 +2197,9 @@ For customer support, call 09612-TAZU-MART.
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black uppercase tracking-wider text-black">Street Address details *</label>
+                  <label className="text-[9px] font-black uppercase tracking-wider text-black">Full Address *</label>
                   <textarea 
-                    required placeholder="Apartment / Suite, Building, Street No. House Name"
+                    required placeholder="Apartment / Suite, Building, Street No, House / Road / Village"
                     value={addrForm.fullAddress} onChange={(e) => setAddrForm({...addrForm, fullAddress: e.target.value})}
                     className="w-full h-16 bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-semibold placeholder:text-gray-300"
                   />
@@ -1752,7 +2297,7 @@ For customer support, call 09612-TAZU-MART.
 
               {/* Toggle type tabs */}
               <div className="grid grid-cols-4 gap-2 bg-gray-100 p-1 rounded-xl">
-                {['bKash', 'Nagad', 'Rocket', 'VISA'].map((item) => (
+                {['bKash', 'Nagad', 'Rocket', 'Card'].map((item) => (
                   <button
                     key={item}
                     type="button"
@@ -1761,7 +2306,7 @@ For customer support, call 09612-TAZU-MART.
                     }}
                     className={cn(
                       "py-2 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                      newPayType === item ? "bg-black text-white font-black shadow" : "text-gray-400"
+                      newPayType === item ? "bg-black text-white font-black shadow" : "text-gray-400 hover:bg-gray-200"
                     )}
                   >
                     {item}
@@ -1770,14 +2315,14 @@ For customer support, call 09612-TAZU-MART.
               </div>
 
               <form onSubmit={handleAddNewPayment} className="space-y-4">
-                {newPayType === 'VISA' ? (
+                {newPayType === 'Card' ? (
                   <div className="space-y-4">
                     <div className="space-y-1.5">
                       <label className="text-[9px] font-black uppercase tracking-wider text-black">Card Number *</label>
                       <input 
                         type="text" required placeholder="e.g. 4321 0000 1234 4321" maxLength={19}
                         value={newCardNumber} onChange={(e) => setNewCardNumber(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold"
+                        className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold font-mono tracking-widest placeholder:tracking-normal focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
                       />
                     </div>
                     
@@ -1787,14 +2332,15 @@ For customer support, call 09612-TAZU-MART.
                         <input 
                           type="text" required placeholder="08/30" maxLength={5}
                           value={newCardExpiry} onChange={(e) => setNewCardExpiry(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold text-center"
+                          className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold text-center focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
                         />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-black uppercase tracking-wider text-black">CVV PIN *</label>
                         <input 
                           type="password" required placeholder="•••" maxLength={3}
-                          className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold text-center"
+                          value={newCardCvv} onChange={(e) => setNewCardCvv(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold text-center tracking-[0.5em] focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
                         />
                       </div>
                     </div>
@@ -1804,7 +2350,7 @@ For customer support, call 09612-TAZU-MART.
                       <input 
                         type="text" required placeholder="e.g. IMTIAZ KHAN"
                         value={newCardHolder} onChange={(e) => setNewCardHolder(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold uppercase"
+                        className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold uppercase focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
                       />
                     </div>
                   </div>
@@ -1815,14 +2361,23 @@ For customer support, call 09612-TAZU-MART.
                       <input 
                         type="text" required placeholder="e.g. 01712345678" maxLength={11}
                         value={newPayNumber} onChange={(e) => setNewPayNumber(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold"
+                        className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold font-mono tracking-widest placeholder:tracking-normal focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[9px] font-black uppercase tracking-wider text-black">Security PIN Verification *</label>
+                      <label className="text-[9px] font-black uppercase tracking-wider text-black">Account Name *</label>
                       <input 
-                        type="password" required placeholder="•••••" maxLength={5}
-                        className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold text-center"
+                        type="text" required placeholder="e.g. IMTIAZ KHAN"
+                        value={newAccountName} onChange={(e) => setNewAccountName(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold uppercase focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase tracking-wider text-black">Nickname (Optional)</label>
+                      <input 
+                        type="text" placeholder="e.g. Personal bKash"
+                        value={newNickname} onChange={(e) => setNewNickname(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-150 rounded-lg p-3 text-xs font-bold focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
                       />
                     </div>
                   </div>

@@ -28,12 +28,19 @@ export interface AppSettings {
   packagingLogo?: string;
 
   // 3. Business Address
-  businessAddress: string;
-  country: string;
-  division: string;
+  businessName: string;
+  contactPerson: string;
+  houseBuilding: string;
+  roadStreet: string;
+  areaThana: string;
   city: string;
+  division: string;
+  district: string;
   zipCode: string;
-  googleMapEmbed: string;
+  country: string;
+  phone: string;
+  email: string;
+  googleMapLink: string;
 
   // 4. Business Owner
   ownerName: string;
@@ -100,6 +107,23 @@ export interface AppSettings {
   cardGatewayLink?: string;
   cardInstruction?: string;
 
+  // Personal vs Merchant payments active switches
+  paymentPersonalActive: boolean;
+  paymentMerchantActive: boolean;
+
+  // Merchant structures
+  merchantGateway?: 'bkash' | 'nagad' | 'rocket' | 'sslcommerz' | 'other';
+  merchantName?: string;
+  merchantNumber?: string;
+  merchantApiKey?: string;
+  merchantApiSecret?: string;
+  merchantUsername?: string;
+  merchantPassword?: string;
+  merchantStoreId?: string;
+  merchantCallbackUrl?: string;
+  merchantSuccessUrl?: string;
+  merchantCancelUrl?: string;
+
   // 9. Email & Notifications
   smtpSettings: string;
   orderConfirmationEmail: boolean;
@@ -127,17 +151,34 @@ export interface AppSettings {
 
   // 12. Social Media Settings
   facebookUrl: string;
-  instagramUrl: string;
-  tiktokUrl: string;
-  youtubeUrl: string;
+  facebookEnabled: boolean;
+  facebookPageUrl: string;
+  facebookPageEnabled: boolean;
+  messengerUrl: string;
+  messengerEnabled: boolean;
   whatsappNumber: string;
-  telegramLink: string;
+  whatsappEnabled: boolean;
+  instagramUrl: string;
+  instagramEnabled: boolean;
+  youtubeUrl: string;
+  youtubeEnabled: boolean;
+  tiktokUrl: string;
+  tiktokEnabled: boolean;
+  telegramLink: string; // compatibility
+  telegramUrl: string;
+  telegramEnabled: boolean;
+  twitterUrl: string;
+  twitterEnabled: boolean;
+  linkedinUrl: string;
+  linkedinEnabled: boolean;
 
   // 13. Security Settings
   admin2fa: boolean;
   loginDeviceHistory: boolean;
   failedLoginProtection: boolean;
   ipRestriction: boolean;
+  adminEmail?: string;
+  adminPassword?: string;
 
   // 14. Website Appearance
   darkModeToggle: boolean;
@@ -167,6 +208,13 @@ export interface AppSettings {
 
   // 18. Backup & System
   autoBackup: boolean;
+  coin_rate_coin: number;
+  coin_rate_money: number;
+
+  // 19. Promotion & Offers
+  flashSaleEnabled: boolean;
+  flashSaleEndTime: string;
+  allowStackDiscount: boolean;
 }
 
 const defaultSettings: AppSettings = {
@@ -188,12 +236,19 @@ const defaultSettings: AppSettings = {
   footerSmallTextColor: '#B8B8B8',
   footerCopyrightColor: '#B8B8B8',
 
-  businessAddress: '123 Luxury Avenue, Gulshan 2',
-  country: 'Bangladesh',
-  division: 'Dhaka',
+  businessName: 'TAZU MART BD',
+  contactPerson: 'Admin',
+  houseBuilding: '39 কাজী ভবন',
+  roadStreet: '',
+  areaThana: '',
   city: 'Dhaka',
+  division: 'Dhaka',
+  district: 'Dhaka',
   zipCode: '1212',
-  googleMapEmbed: '',
+  country: 'Bangladesh',
+  phone: '+880 1711223344',
+  email: 'admin@tazumartbd.com',
+  googleMapLink: 'https://maps.google.com/?q=39+Kazi+Bhaban,Dhaka',
 
   ownerName: 'Admin Owner',
   ownerEmail: 'owner@tazumartbd.com',
@@ -253,6 +308,20 @@ const defaultSettings: AppSettings = {
   cardGatewayLink: '',
   cardInstruction: 'Please authorize card payment securely via our sandbox-integrated SSL connection gateway.',
 
+  paymentPersonalActive: true,
+  paymentMerchantActive: false,
+  merchantGateway: 'sslcommerz',
+  merchantName: 'bKash Merchant Pay',
+  merchantNumber: '01700990099',
+  merchantApiKey: 'bk_api_key_88abec97',
+  merchantApiSecret: 'bk_sec_9934bc76',
+  merchantUsername: 'tazumart_merchant',
+  merchantPassword: '••••••••',
+  merchantStoreId: 'tazum5019',
+  merchantCallbackUrl: 'https://ais-pre-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app/api/payment/callback',
+  merchantSuccessUrl: 'https://tazumart.bd/checkout/success',
+  merchantCancelUrl: 'https://tazumart.bd/checkout/cancel',
+
   smtpSettings: '',
   orderConfirmationEmail: true,
   smsNotification: true,
@@ -273,17 +342,34 @@ const defaultSettings: AppSettings = {
   googleAnalyticsCode: '',
   facebookPixelCode: '',
 
-  facebookUrl: '',
-  instagramUrl: '',
-  tiktokUrl: '',
-  youtubeUrl: '',
-  whatsappNumber: '',
-  telegramLink: '',
+  facebookUrl: 'https://facebook.com/tazumartbd',
+  facebookEnabled: true,
+  facebookPageUrl: 'https://facebook.com/tazumartbd.page',
+  facebookPageEnabled: true,
+  messengerUrl: 'https://m.me/tazumartbd',
+  messengerEnabled: true,
+  whatsappNumber: '+8801711223344',
+  whatsappEnabled: true,
+  instagramUrl: 'https://instagram.com/tazumartbd',
+  instagramEnabled: true,
+  youtubeUrl: 'https://youtube.com/tazumartbd/videos',
+  youtubeEnabled: false,
+  tiktokUrl: 'https://tiktok.com/@tazumartbd',
+  tiktokEnabled: false,
+  telegramLink: 'https://t.me/tazumartbd',
+  telegramUrl: 'https://t.me/tazumartbd',
+  telegramEnabled: true,
+  twitterUrl: 'https://twitter.com/tazumartbd',
+  twitterEnabled: false,
+  linkedinUrl: 'https://linkedin.com/company/tazumartbd',
+  linkedinEnabled: false,
 
   admin2fa: false,
   loginDeviceHistory: true,
   failedLoginProtection: true,
   ipRestriction: false,
+  adminEmail: 'admin.tazumartbd@gmail.com',
+  adminPassword: '8963885522',
 
   darkModeToggle: false,
   themeColor: '#000000',
@@ -308,18 +394,32 @@ const defaultSettings: AppSettings = {
   cloudStorageEnable: false,
 
   autoBackup: true,
+  coin_rate_coin: 100,
+  coin_rate_money: 1,
+
+  flashSaleEnabled: true,
+  flashSaleEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  allowStackDiscount: false,
 };
 
 interface SettingsState {
   settings: AppSettings;
+  draftSettings: AppSettings;
   updateSettings: (updates: Partial<AppSettings>) => void;
+  updateDraftSettings: (updates: Partial<AppSettings>) => void;
+  publishSettings: () => void;
+  resetDraftSettings: () => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       settings: defaultSettings,
+      draftSettings: defaultSettings,
       updateSettings: (updates) => set((state) => ({ settings: { ...state.settings, ...updates } })),
+      updateDraftSettings: (updates) => set((state) => ({ draftSettings: { ...state.draftSettings, ...updates } })),
+      publishSettings: () => set((state) => ({ settings: state.draftSettings })),
+      resetDraftSettings: () => set((state) => ({ draftSettings: state.settings })),
     }),
     {
       name: 'luxemart-settings-v2',

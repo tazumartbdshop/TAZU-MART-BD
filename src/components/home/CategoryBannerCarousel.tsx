@@ -118,13 +118,6 @@ export default function CategoryBannerCarousel({ category }: CategoryBannerCarou
           }}
         />
 
-        {/* Banner Content (Readable text) */}
-        <div className="absolute inset-x-0 bottom-0 p-5 md:p-8 flex flex-col justify-end z-[2] pointer-events-none">
-          <h3 className="text-white font-black text-xl md:text-3.5xl uppercase tracking-tight leading-tight uppercase drop-shadow-sm truncate">
-            {category.bannerName || `${category.name} collection`}
-          </h3>
-        </div>
-
         {/* Swipe indicator dots (if multiple images exist) */}
         {images.length > 1 && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[3] flex gap-2 p-1.5 p-1 px-2.5 bg-white/85 rounded-full shadow-sm">

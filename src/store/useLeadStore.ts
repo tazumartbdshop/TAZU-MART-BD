@@ -11,6 +11,7 @@ export interface Lead {
   total?: number;
   lastUpdated: string;
   status: 'Abandoned';
+  isRead?: boolean;
 }
 
 interface LeadState {
@@ -18,6 +19,8 @@ interface LeadState {
   addOrUpdateLead: (data: Partial<Lead> & { id: string }) => void;
   deleteLead: (id: string) => void;
   clearLeads: () => void;
+  markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
 }
 
 export const useLeadStore = create<LeadState>()(
@@ -33,12 +36,14 @@ export const useLeadStore = create<LeadState>()(
           updatedLeads[existingIndex] = {
             ...updatedLeads[existingIndex],
             ...data,
-            lastUpdated: now
+            lastUpdated: now,
+            isRead: false
           };
         } else {
           updatedLeads.unshift({
             status: 'Abandoned',
             lastUpdated: now,
+            isRead: false,
             ...data
           } as Lead);
         }
@@ -49,6 +54,12 @@ export const useLeadStore = create<LeadState>()(
         leads: state.leads.filter(l => l.id !== id)
       })),
       clearLeads: () => set({ leads: [] }),
+      markAsRead: (id) => set((state) => ({
+        leads: state.leads.map(l => l.id === id ? { ...l, isRead: true } : l)
+      })),
+      markAllAsRead: () => set((state) => ({
+        leads: state.leads.map(l => ({ ...l, isRead: true }))
+      })),
     }),
     {
       name: 'lead-storage',

@@ -1,5 +1,10 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { useEffect } from 'react';
 import { UserLayout } from './components/layout/UserLayout';
+import { useCategoryStore } from './store/useCategoryStore';
+import { useProductStore } from './store/useProductStore';
+import { useSearchStore } from './store/useSearchStore';
 import Home from './pages/Home';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -20,27 +25,53 @@ import Settings from './pages/Settings';
 import ReviewDetails from './pages/ReviewDetails';
 import Support from './pages/Support';
 import Offers from './pages/Offers';
+import OfferPage from './pages/OfferPage';
 import Games from './pages/Games';
 import DeliveryPoints from './pages/DeliveryPoints';
 import { ThemeInitializer } from './ThemeInitializer';
 
 import Categories from './pages/Categories';
+import Search from './pages/Search';
+import LiveWebsiteGenerator from './pages/generated/LiveWebsiteGenerator';
+import LiveWebsiteAdmin from './pages/generated/LiveWebsiteAdmin';
+import Wishlist from './pages/Wishlist';
+
+import AdminContentPages from './pages/admin/AdminContentPages';
+import DynamicLinkPage from './pages/DynamicLinkPage';
 
 export default function App() {
+  useEffect(() => {
+    const unsubCategories = useCategoryStore.getState().subscribe();
+    const unsubProducts = useProductStore.getState().subscribe();
+    const unsubSearches = useSearchStore.getState().subscribe();
+    return () => {
+      unsubCategories();
+      unsubProducts();
+      unsubSearches();
+    };
+  }, []);
+
   return (
     <Router>
+      <Toaster />
       <ThemeInitializer />
       <Routes>
+        <Route path="/site/:storeDomain/*" element={<LiveWebsiteGenerator />} />
+        <Route path="/site-admin/:storeDomain/*" element={<LiveWebsiteAdmin />} />
+        
         {/* User Facing Routes */}
         <Route path="/" element={<UserLayout />}>
           <Route index element={<Home />} />
           <Route path="category/:id" element={<CategoryPage />} />
+          <Route path="wishlist" element={<Wishlist />} />
           <Route path="product/:id" element={<Product />} />
           <Route path="product/:id/reviews" element={<ReviewDetails />} />
           <Route path="support" element={<Support />} />
           <Route path="offers" element={<Offers />} />
+          <Route path="offer-page" element={<OfferPage />} />
           <Route path="shop" element={<div className="container mx-auto py-24 text-center text-primary-900"><h1 className="text-4xl font-serif mb-4">All Products</h1><p className="text-gray-500">Shop all luxury items.</p></div>} />
           <Route path="categories" element={<Categories />} />
+          <Route path="search" element={<Search />} />
           <Route path="account" element={<Login />} />
           
           <Route path="cart" element={<Cart />} />
@@ -52,6 +83,10 @@ export default function App() {
           <Route path="checkout/success/:orderId" element={<OrderSuccess />} />
           <Route path="checkout/invoice/:orderId" element={<OrderInvoice />} />
           <Route path="orders" element={<Orders />} />
+
+          <Route path="admin/link-pages" element={<AdminContentPages />} />
+          {/* Dynamic Link Pages */}
+          <Route path=":slug" element={<DynamicLinkPage />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="account/dashboard" element={<Account />} />

@@ -5,29 +5,48 @@ import {
   ArrowLeft, Share2, Heart, Star, Minus, Plus, 
   ShieldCheck, Truck, RotateCcw, Box, Eye, Flame, 
   ChevronLeft, ChevronRight, CheckCircle2, ShoppingBag, 
-  Info, Sparkles, Loader2, ArrowRight
+  Info, Sparkles, Loader2, ArrowRight, Coins, Play
 } from 'lucide-react';
 import { formatPrice } from '../lib/utils';
 import { useCartStore } from '../store/useCartStore';
 import { useProductStore } from '../store/useProductStore';
-import { ProductCard } from '../components/ui/ProductCard';
+import { useOfferStore } from '../store/useOfferStore';
+import { getProductDiscountDetails } from '../lib/offerUtils';
+import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
+import { useWishlistStore } from '../store/useWishlistStore';
+import ProductCard from '../components/ui/ProductCard';
 import ProductReviews from '../components/product/ProductReviews';
+import BannerSlider from '../components/common/BannerSlider';
+import { pixelService } from '../utils/pixelService';
 
 export default function Product() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addItem, clearCart } = useCartStore();
   const { products } = useProductStore();
+  const { offers } = useOfferStore();
+  const { addViewedProduct } = useRecentlyViewedStore();
 
   const product = useMemo(() => products.find(p => p.id === id) || products[0], [products, id]);
+  
+  const bannerUrls = useMemo(() => {
+    if (!product || !product.banner_image) return [];
+    return product.banner_image.split(',').map((url: string) => url.trim()).filter(Boolean);
+  }, [product]);
+
+  const bannerItems = useMemo(() => {
+    return bannerUrls.map((url: string) => ({ url, link: '#' }));
+  }, [bannerUrls]);
   
   const [activeImage, setActiveImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'shipping' | 'returns'>('description');
   const [isOrdering, setIsOrdering] = useState(false);
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  const { toggleWishlist, isInWishlist } = useWishlistStore();
+  const isWishlisted = isInWishlist(product?.id || '');
   const [isShareSuccess, setIsShareSuccess] = useState(false);
+  const [wishlistToast, setWishlistToast] = useState<'added' | 'removed' | null>(null);
 
   // Dynamic gallery image setup
   const images = useMemo(() => {
@@ -58,6 +77,73 @@ export default function Product() {
     return list;
   }, [product]);
 
+  // Gallery Order supports [Video Thumbnail], [Image 1], [Image 2], [Image 3]
+  const galleryItems = useMemo(() => {
+    const list: { type: 'image' | 'video'; url: string; thumbnail: string }[] = [];
+    if (!product) return list;
+    
+    if (product.videoUrl || product.mediaUrl) {
+      const vUrl = product.videoUrl || product.mediaUrl || '';
+      let thumb = 'https://images.unsplash.com/photo-1461151304267-38535e780c79?w=500&auto=format&fit=crop&q=60';
+      
+      if (vUrl.includes('youtube.com') || vUrl.includes('youtu.be')) {
+        let videoId = '';
+        if (vUrl.includes('/shorts/')) {
+          const parts = vUrl.split('/shorts/');
+          videoId = parts[parts.length - 1]?.split(/[?#]/)[0] || '';
+        } else if (vUrl.includes('youtu.be/')) {
+          const parts = vUrl.split('youtu.be/');
+          videoId = parts[parts.length - 1]?.split(/[?#]/)[0] || '';
+        } else {
+          const match = vUrl.match(/[?&]v=([^&#]+)/);
+          videoId = match ? match[1] : '';
+        }
+        if (videoId) {
+          thumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        }
+      }
+      list.push({ type: 'video', url: vUrl, thumbnail: thumb });
+    }
+    
+    images.forEach(img => {
+      list.push({ type: 'image', url: img, thumbnail: img });
+    });
+    
+    return list;
+  }, [product, images]);
+
+  const getEmbedUrl = (url: string) => {
+    if (!url) return '';
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      let videoId = '';
+      if (url.includes('/shorts/')) {
+        const parts = url.split('/shorts/');
+        videoId = parts[parts.length - 1]?.split(/[?#]/)[0] || '';
+      } else if (url.includes('youtu.be/')) {
+        const parts = url.split('youtu.be/');
+        videoId = parts[parts.length - 1]?.split(/[?#]/)[0] || '';
+      } else {
+        const match = url.match(/[?&]v=([^&#]+)/);
+        videoId = match ? match[1] : '';
+      }
+      if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+    }
+    
+    if (url.includes('facebook.com') || url.includes('fb.watch') || url.includes('fb.com')) {
+      return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=0&autoplay=1`;
+    }
+    return '';
+  };
+
+  // Align activeImage state on initial load to show Product Image 1 (index 1) by default if video exists
+  useEffect(() => {
+    if (product && (product.videoUrl || product.mediaUrl)) {
+      setActiveImage(1);
+    } else {
+      setActiveImage(0);
+    }
+  }, [product]);
+
   // Gestures for swipe action on mobile
   const [touchStart, setTouchStart] = useState<number | null>(null);
 
@@ -72,10 +158,10 @@ export default function Product() {
     
     if (diff > 50) {
       // Swiped left, show next picture
-      setActiveImage((prev) => (prev + 1) % images.length);
+      setActiveImage((prev) => (prev + 1) % galleryItems.length);
     } else if (diff < -50) {
       // Swiped right, show prev picture
-      setActiveImage((prev) => (prev - 1 + images.length) % images.length);
+      setActiveImage((prev) => (prev - 1 + galleryItems.length) % galleryItems.length);
     }
     setTouchStart(null);
   };
@@ -107,6 +193,19 @@ export default function Product() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [product.id, groupedVariants]);
 
+  // Track product view history automatically inside the dynamic store
+  useEffect(() => {
+    if (product && product.id) {
+      addViewedProduct(product.id);
+      pixelService.trackProductView({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        category: product.category
+      });
+    }
+  }, [product, addViewedProduct]);
+
   // Variant custom pricing multipliers
   const extraPrice = useMemo(() => {
     let total = 0;
@@ -119,7 +218,11 @@ export default function Product() {
     return total;
   }, [selectedVariants, product.variants]);
 
-  const basePrice = product.discountPrice || product.price;
+  const discountDetails = useMemo(() => {
+    return getProductDiscountDetails(product, offers);
+  }, [product, offers]);
+
+  const basePrice = discountDetails.discountPrice;
   const currentPrice = basePrice + extraPrice;
   const originalTotal = product.price + extraPrice;
 
@@ -138,18 +241,39 @@ export default function Product() {
     return products.filter(p => p.category === product.category && p.id !== product.id).slice(0, 4);
   }, [products, product]);
 
+  const isOutOfStock = product.stock === 0;
+
   const handleAddToCart = () => {
+    if (isOutOfStock) {
+        alert("This product is currently out of stock");
+        return;
+    }
     const variantString = Object.entries(selectedVariants).map(([k,v]) => `${k}: ${v}`).join(', ');
+    const cartItemId = `${product.id}-${Object.values(selectedVariants).join('-')}`;
+    const cartItemName = `${product.name}${variantString ? ` - ${variantString}` : ''}`;
+    
     addItem({
-      id: `${product.id}-${Object.values(selectedVariants).join('-')}`,
-      name: `${product.name}${variantString ? ` - ${variantString}` : ''}`,
+      id: cartItemId,
+      name: cartItemName,
       price: currentPrice,
+      originalPrice: originalTotal,
       image: product.image,
       quantity: quantity,
+    });
+
+    pixelService.trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: currentPrice,
+      quantity: quantity
     });
   };
 
   const handleBuyNow = () => {
+    if (isOutOfStock) {
+        alert("This product is currently out of stock");
+        return;
+    }
     if (isOrdering) return;
     setIsOrdering(true);
     
@@ -160,10 +284,26 @@ export default function Product() {
     }, 400); 
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setIsShareSuccess(true);
-    setTimeout(() => setIsShareSuccess(false), 2000);
+  const handleShare = async () => {
+    const shareUrl = `${window.location.protocol}//${window.location.host}/product/${product.id}`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: product.name,
+          text: teaserHighlight,
+          url: shareUrl,
+        });
+      } catch (err) {
+        navigator.clipboard.writeText(shareUrl);
+        setIsShareSuccess(true);
+        setTimeout(() => setIsShareSuccess(false), 2000);
+      }
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      setIsShareSuccess(true);
+      setTimeout(() => setIsShareSuccess(false), 2000);
+    }
   };
 
   // Dynamic Trust Indicators Ticker
@@ -193,6 +333,20 @@ export default function Product() {
             Product link copied successfully
           </motion.div>
         )}
+
+        {wishlistToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -50, x: '-50%' }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-neutral-950 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 flex items-center gap-2 border border-neutral-800 shadow-xl"
+          >
+            <Heart className="w-3.5 h-3.5 text-red-500 fill-current animate-bounce" />
+            <span>
+              {wishlistToast === 'added' ? 'Product saved in wishlist' : 'Product removed from wishlist'}
+            </span>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Modern Compact Header (Dynamic status bar with soft blur effect) */}
@@ -219,104 +373,151 @@ export default function Product() {
               <Share2 className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => setIsWishlisted(!isWishlisted)}
+              onClick={() => {
+                toggleWishlist(product.id);
+                setWishlistToast(isWishlisted ? 'removed' : 'added');
+                setTimeout(() => setWishlistToast(null), 2000);
+              }}
               title="Wishlist"
-              className={`p-2 border transition-all active:scale-90 ${isWishlisted ? 'border-red-500 bg-red-50 text-red-650' : 'border-neutral-200 hover:bg-neutral-50 text-neutral-900'}`}
+              className={`p-2 border transition-all active:scale-95 duration-200 ${isWishlisted ? 'border-red-500 bg-red-50 text-red-600 shadow-[0_0_12px_rgba(239,68,68,0.12)]' : 'border-neutral-200 hover:bg-neutral-50 text-neutral-900'}`}
             >
-              <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-red-600 text-red-600' : ''}`} />
+              <Heart className={`w-4 h-4 transition-transform ${isWishlisted ? 'fill-red-600 text-red-600' : 'text-neutral-500 hover:text-red-500'}`} />
             </button>
           </div>
         </div>
       </div>
 
+      {/* 2. Product Banner Section */}
+      {bannerUrls.length > 0 && (
+        <section className="px-4 mt-4 -mb-2">
+          <div className="container mx-auto max-w-7xl">
+            <BannerSlider banners={bannerItems} />
+          </div>
+        </section>
+      )}
+
       {/* Main Container */}
       <div className="container mx-auto px-4 lg:px-8 max-w-7xl pb-12 pt-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-start">
           
-          {/* IMAGE GALLERY SECTION (Col-Span-6) */}
-          <div className="lg:col-span-6 space-y-4">
+          {/* IMAGE GALLERY SECTION (Col-Span-6) - Compact Balanced Visuals */}
+          <div className="lg:col-span-6 space-y-3">
             <div 
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
-              className="relative aspect-[4/5] sm:aspect-square bg-neutral-50 border border-neutral-200 overflow-hidden flex items-center justify-center select-none group"
+              className="relative aspect-square max-w-[390px] mx-auto w-full bg-neutral-50/50 border border-neutral-200/60 rounded-xl overflow-hidden flex items-center justify-center select-none p-2.5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all group"
             >
               {/* Overlay Tags */}
-              <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5 pointer-events-none">
-                {product.isNew && (
-                  <span className="bg-neutral-950 text-white text-[9px] font-black px-2.5 py-1 tracking-widest uppercase">
+              <div className="absolute top-3.5 left-3.5 z-10 flex flex-col gap-1.5 pointer-events-none">
+                {product.stock <= 0 && (
+                  <span className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 tracking-widest uppercase rounded">
+                    OUT OF STOCK
+                  </span>
+                )}
+                {!isOutOfStock && product.isNew && (
+                  <span className="bg-neutral-950 text-white text-[9px] font-black px-2 py-0.5 tracking-widest uppercase rounded">
                     NEW ARRIVAL
                   </span>
                 )}
-                {discountPercent > 0 && (
-                  <span className="bg-[#E2125B] text-white text-[9px] font-black px-2.5 py-1 tracking-widest uppercase">
+                {!isOutOfStock && discountPercent > 0 && (
+                  <span className="bg-[#E2125B] text-white text-[9px] font-black px-2 py-0.5 tracking-widest uppercase rounded">
                     -{discountPercent}% OFF
-                  </span>
-                )}
-                {product.stock <= 0 && (
-                  <span className="bg-amber-600 text-white text-[9px] font-black px-2.5 py-1 tracking-widest uppercase">
-                    OUT OF STOCK
                   </span>
                 )}
               </div>
 
               {/* Central Premium Main Display Image with smooth hover scaling */}
               <AnimatePresence mode="wait">
-                <motion.img 
-                  key={activeImage}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.35 }}
-                  src={images[activeImage]} 
-                  alt={product.name} 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  referrerPolicy="no-referrer"
-                />
+                {galleryItems[activeImage]?.type === 'video' ? (
+                  <motion.div
+                    key="video-player-main"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.25 }}
+                    className="w-full h-full aspect-square relative bg-black flex items-center justify-center p-0"
+                  >
+                    {getEmbedUrl(galleryItems[activeImage].url) ? (
+                      <iframe
+                        src={getEmbedUrl(galleryItems[activeImage].url)}
+                        title="Product Video Player"
+                        className="w-full h-full border-none absolute inset-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <video
+                        src={galleryItems[activeImage].url}
+                        className="w-full h-full border-none absolute inset-0 object-contain"
+                        controls
+                        autoPlay
+                      />
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.img 
+                    key={activeImage}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{ duration: 0.25 }}
+                    src={galleryItems[activeImage]?.url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60'} 
+                    alt={product.name} 
+                    className="w-full h-full object-contain p-1 transition-transform duration-500 group-hover:scale-[1.03]"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
               </AnimatePresence>
 
               {/* Minimal Left & Right Slider Arrows */}
               <button 
                 type="button"
-                onClick={() => setActiveImage((prev) => (prev - 1 + images.length) % images.length)}
-                className="absolute left-3 w-8 h-8 rounded-none bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all"
+                onClick={() => setActiveImage((prev) => (prev - 1 + galleryItems.length) % galleryItems.length)}
+                className="absolute left-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
               </button>
               <button 
                 type="button"
-                onClick={() => setActiveImage((prev) => (prev + 1) % images.length)}
-                className="absolute right-3 w-8 h-8 rounded-none bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all"
+                onClick={() => setActiveImage((prev) => (prev + 1) % galleryItems.length)}
+                className="absolute right-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
 
               {/* Compact Indicator Dots */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-1 bg-white/85 p-1 px-2 border border-neutral-200">
-                {images.map((_, idx) => (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-1 bg-white/80 p-0.5 px-1.5 border border-neutral-150 rounded-full">
+                {galleryItems.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveImage(idx)}
-                    className={`h-1.5 transition-all outline-none rounded-none ${activeImage === idx ? 'w-4 bg-black' : 'w-1.5 bg-neutral-300'}`}
+                    className={`h-1.5 transition-all outline-none rounded-full ${activeImage === idx ? 'w-3 text-black bg-black' : 'w-1.5 bg-neutral-300'}`}
                   />
                 ))}
               </div>
             </div>
             
-            {/* Dynamic Multi-Image Mini Strips */}
-            {images.length > 1 && (
-              <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-thin">
-                {images.map((img, idx) => (
+            {/* Dynamic Multi-Image Mini Strips - Comfortable Gallery Alignment */}
+            {galleryItems.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto justify-center pb-1 scrollbar-thin max-w-[390px] mx-auto">
+                {galleryItems.map((item, idx) => (
                   <button 
                     key={idx}
                     onClick={() => setActiveImage(idx)}
-                    className={`relative w-16 h-16 shrink-0 border transition-all bg-neutral-50 flex items-center justify-center ${activeImage === idx ? 'border-neutral-900 ring-1 ring-neutral-950' : 'border-neutral-200 hover:border-neutral-400'}`}
+                    className={`relative w-11 h-11 rounded-lg overflow-hidden shrink-0 border transition-all bg-neutral-100 flex items-center justify-center p-0.5 ${activeImage === idx ? 'border-neutral-950 ring-1 ring-neutral-950 shadow-sm' : 'border-neutral-200 hover:border-neutral-400'}`}
                   >
                     <img 
-                      src={img} 
+                      src={item.thumbnail} 
                       alt={`Thumbnail ${idx + 1}`} 
                       className="w-full h-full object-cover" 
                       referrerPolicy="no-referrer"
                     />
+                    {item.type === 'video' && (
+                      <div className="absolute inset-0 bg-black/45 flex items-center justify-center transition-opacity hover:bg-black/30">
+                        <Play className="w-5 h-5 text-white fill-white animate-pulse" />
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -368,22 +569,34 @@ export default function Product() {
               </div>
             </div>
 
-            {/* 3. Pricing Area - Single Line Compact Layout */}
-            <div className="py-2 px-3 border border-neutral-250 bg-neutral-50">
-              <div className="flex items-center gap-3.5 flex-wrap">
-                <span className="text-xl font-black text-neutral-950 tracking-tight">
-                  {formatPrice(currentPrice)}
-                </span>
-                
-                {discountPercent > 0 && (
-                  <>
-                    <span className="text-xs text-neutral-400 line-through font-bold tracking-tight">
-                      {formatPrice(originalTotal)}
+            {/* 3. Pricing Area - Single Line Compact Layout with Coins */}
+            <div className="py-3 px-4 border border-neutral-250 bg-neutral-50 rounded-xl">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3.5 flex-wrap">
+                  <span className="text-2xl font-black text-neutral-950 tracking-tight">
+                    {formatPrice(currentPrice)}
+                  </span>
+                  
+                  {discountPercent > 0 && (
+                    <div className="flex flex-col">
+                      <span className="text-xs text-neutral-400 line-through font-bold tracking-tight">
+                        {formatPrice(originalTotal)}
+                      </span>
+                      <span className="text-[#E2125B] text-[8.5px] font-black uppercase tracking-widest">
+                        SAVE {formatPrice(originalTotal - currentPrice)} ({discountPercent}% OFF)
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tazu Coins Label */}
+                {(product.coin_enabled ?? true) && (
+                  <div className="flex items-center gap-2 bg-orange-100/50 px-3 py-1.5 rounded-full border border-orange-200">
+                    <span className="text-[14px]">🪙</span>
+                    <span className="text-[11px] font-black uppercase text-orange-700 tracking-tight">
+                      {(product.reward_coins || 250) * quantity} Tazu Coins
                     </span>
-                    <span className="bg-[#E2125B]/10 text-[#E2125B] text-[8.5px] font-black px-1.5 py-0.5 border border-[#E2125B]/20 uppercase tracking-widest">
-                      SAVE {formatPrice(originalTotal - currentPrice)} ({discountPercent}% OFF)
-                    </span>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -440,7 +653,7 @@ export default function Product() {
               <div className="flex items-center gap-4">
                 
                 {/* Compact Rectangular Quantity Control */}
-                <div className="flex items-center border border-neutral-350 bg-white select-none">
+                <div className={`flex items-center border border-neutral-350 bg-white select-none ${isOutOfStock ? 'opacity-50 pointer-events-none' : ''}`}>
                   <button 
                     type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -461,7 +674,7 @@ export default function Product() {
                 </div>
 
                 <div className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider">
-                  {product.stock > 0 ? `${product.stock} units available` : 'Out of stock temporarily'}
+                  {isOutOfStock ? 'Currently out of stock' : `${product.stock} units available`}
                 </div>
               </div>
             </div>
@@ -471,24 +684,25 @@ export default function Product() {
               <button 
                 type="button"
                 onClick={handleAddToCart}
-                className="h-[52px] bg-white border border-neutral-900 text-neutral-900 font-black uppercase text-[11px] tracking-widest hover:bg-neutral-50 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+                disabled={isOutOfStock}
+                className={`h-[52px] bg-white border border-neutral-900 text-neutral-900 font-black uppercase text-[11px] tracking-widest hover:bg-neutral-50 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 ${isOutOfStock ? 'opacity-50 cursor-not-allowed border-neutral-400 text-neutral-400' : ''}`}
               >
                 <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
-                <span>Add to Cart</span>
+                <span>{isOutOfStock ? 'OUT OF STOCK' : 'Add to Cart'}</span>
               </button>
               
               <button 
                 type="button"
                 onClick={handleBuyNow}
-                disabled={isOrdering}
-                className="h-[52px] bg-neutral-950 text-white font-black uppercase text-[11px] tracking-widest hover:bg-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                disabled={isOrdering || isOutOfStock}
+                className={`h-[52px] bg-neutral-950 text-white font-black uppercase text-[11px] tracking-widest hover:bg-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${isOutOfStock ? 'bg-neutral-300 hover:bg-neutral-300 cursor-not-allowed' : ''}`}
               >
                 {isOrdering ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
-                    <span>BUY NOW DIRECT</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <span>{isOutOfStock ? 'NOT AVAILABLE' : 'BUY NOW DIRECT'}</span>
+                    {!isOutOfStock && <ArrowRight className="w-4 h-4" />}
                   </>
                 )}
               </button>
@@ -655,24 +869,25 @@ export default function Product() {
             <button 
               type="button"
               onClick={handleAddToCart}
-              className="flex-1 w-full bg-white hover:bg-gray-50 text-gray-900 border-2 border-gray-900 font-semibold h-11 px-4 rounded-lg text-sm transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none"
+              disabled={isOutOfStock}
+              className={`flex-1 w-full bg-white hover:bg-gray-50 text-gray-900 border-2 border-gray-900 font-semibold h-11 px-4 rounded-lg text-sm transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none ${isOutOfStock ? 'opacity-50 cursor-not-allowed border-gray-300 text-gray-400' : ''}`}
             >
                 <ShoppingBag className="w-4 h-4" />
-                <span>Add to Cart</span>
+                <span>{isOutOfStock ? 'OUT OF STOCK' : 'Add to Cart'}</span>
             </button>
 
             <button 
               type="button"
               onClick={handleBuyNow}
-              disabled={isOrdering}
-              className="flex-1 w-full bg-gray-950 hover:bg-gray-900 text-white font-semibold h-11 px-4 rounded-lg text-sm shadow-md shadow-gray-950/10 transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none"
+              disabled={isOrdering || isOutOfStock}
+              className={`flex-1 w-full bg-gray-950 hover:bg-gray-900 text-white font-semibold h-11 px-4 rounded-lg text-sm shadow-md shadow-gray-950/10 transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none ${isOutOfStock ? 'bg-gray-300 hover:bg-gray-300 cursor-not-allowed' : ''}`}
             >
                 {isOrdering ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
                     <Box className="w-4 h-4" />
-                    <span>Buy Now</span>
+                    <span>{isOutOfStock ? 'N/A' : 'Buy Now'}</span>
                   </>
                 )}
             </button>

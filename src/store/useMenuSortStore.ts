@@ -8,13 +8,19 @@ export interface MenuSortState {
   renamedMenus: Record<string, string>; // Map original name -> renamed name
   deletedMenus: string[]; // List of original names of deleted menus
   expandedMenus: Record<string, boolean>; // Persisted expanded state
+  updateAllSettings: (
+    mainMenu: string[] | null,
+    submenus: Record<string, string[]>,
+    renamed: Record<string, string>,
+    deleted: string[]
+  ) => void;
   saveOrders: (
     mainMenu: string[],
     submenus: Record<string, string[]>,
     members: string[]
   ) => void;
   renameMenu: (originalName: string, newName: string) => void;
-  deleteMenu: (menuName: string) => void;
+  toggleVisibility: (menuName: string) => void;
   resetToDefault: () => void;
 }
 
@@ -27,6 +33,14 @@ export const useMenuSortStore = create<MenuSortState>()(
       renamedMenus: {},
       deletedMenus: [],
       expandedMenus: {},
+      updateAllSettings: (mainMenu, submenus, renamed, deleted) => {
+        set({
+          mainMenuOrder: mainMenu,
+          submenuOrders: submenus,
+          renamedMenus: renamed,
+          deletedMenus: deleted
+        });
+      },
       saveOrders: (mainMenu, submenus, members) => {
         set({
           mainMenuOrder: mainMenu,
@@ -42,9 +56,11 @@ export const useMenuSortStore = create<MenuSortState>()(
           },
         }));
       },
-      deleteMenu: (menuName) => {
+      toggleVisibility: (menuName) => {
         set((state) => ({
-          deletedMenus: [...state.deletedMenus, menuName],
+          deletedMenus: state.deletedMenus.includes(menuName)
+            ? state.deletedMenus.filter((n) => n !== menuName)
+            : [...state.deletedMenus, menuName],
         }));
       },
       resetToDefault: () => {

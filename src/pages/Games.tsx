@@ -1424,7 +1424,7 @@ function ReviveAdOverlay({ config, onComplete, onClose }: { config: GameConfig, 
       <div className="w-full h-full relative">
          <video 
            ref={videoRef}
-           src={config.reviveAd.videoUrl} 
+           src={config.reviveAd.videoUrl || null} 
            autoPlay 
            className="w-full h-full object-cover" 
            onEnded={onComplete}

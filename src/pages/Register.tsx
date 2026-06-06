@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Mail, Lock, Smartphone, User, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Plus } from 'lucide-react';
+import { Mail, Lock, Smartphone, User, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Plus, Trash2, Calendar, X, Pencil, RotateCw, UploadCloud, MapPin, Building2, Home } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
+import { cn } from '../lib/utils';
+import { bdAddressData, divisions } from '../data/addressData';
+import { pixelService } from '../utils/pixelService';
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated } = useAuthStore();
-  const { addCustomer } = useCustomerStore();
+  const { addCustomer, customers } = useCustomerStore();
 
   const from = location.state?.from?.pathname || '/account/dashboard';
 
@@ -27,16 +31,40 @@ export default function Register() {
     fullName: '',
     phone: '',
     address: '',
+    division: '',
+    district: '',
+    upazila: '',
+    area: '',
+    postalCode: '',
     email: '',
     password: '',
     confirmPassword: '',
     occasionName: '',
     specialDate: '',
     profileImage: '',
+    gender: '',
   });
 
+  const [specialDays, setSpecialDays] = useState<{ id: string; name: string; date: string }[]>([]);
+
+  const [uploadedRawImage, setUploadedRawImage] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [rotation, setRotation] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => {
+        const copy = { ...prev };
+        delete copy[name];
+        return copy;
+      });
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,52 +72,171 @@ export default function Register() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, profileImage: reader.result as string }));
+        setUploadedRawImage(reader.result as string);
+        setZoom(1);
+        setPanX(0);
+        setPanY(0);
+        setRotation(0);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
-    if (value.length > 8) value = value.slice(0, 8); // Limit to 8 digits
-
-    let maskedValue = value;
-    if (value.length > 4) {
-      maskedValue = `${value.slice(0, 2)}-${value.slice(2, 4)}-${value.slice(4)}`;
-    } else if (value.length > 2) {
-      maskedValue = `${value.slice(0, 2)}-${value.slice(2)}`;
+  const handleEditExistingPhoto = () => {
+    if (formData.profileImage) {
+      setUploadedRawImage(formData.profileImage);
+      setZoom(1);
+      setPanX(0);
+      setPanY(0);
+      setRotation(0);
     }
+  };
 
-    setFormData(prev => ({ ...prev, specialDate: maskedValue }));
+  const handleDragStart = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    setIsDragging(true);
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setDragStart({ x: clientX - panX, y: clientY - panY });
+  };
+
+  const handleDragMove = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setPanX(clientX - dragStart.x);
+    setPanY(clientY - dragStart.y);
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
+  const cropImage = () => {
+    if (!uploadedRawImage) return;
+    const imgElement = new Image();
+    imgElement.src = uploadedRawImage;
+    imgElement.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const size = 300;
+      canvas.width = size;
+      canvas.height = size;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+
+      const scaleToFit = Math.min(192 / imgElement.width, 192 / imgElement.height);
+      const displayWidth = imgElement.width * scaleToFit;
+      const displayHeight = imgElement.height * scaleToFit;
+
+      const scaleCanvas = size / 192;
+
+      ctx.save();
+      // Translate to center to easily rotate and scale
+      ctx.translate(size / 2, size / 2);
+      ctx.rotate((rotation * Math.PI) / 180);
+      ctx.scale(zoom, zoom);
+      
+      // Calculate drawing coordinates centered
+      const drawX = (-displayWidth / 2 + panX) * scaleCanvas;
+      const drawY = (-displayHeight / 2 + panY) * scaleCanvas;
+
+      ctx.drawImage(
+        imgElement,
+        drawX,
+        drawY,
+        displayWidth * scaleCanvas,
+        displayHeight * scaleCanvas
+      );
+      ctx.restore();
+
+      const croppedUrl = canvas.toDataURL('image/jpeg', 0.92);
+      setFormData(prev => ({ ...prev, profileImage: croppedUrl }));
+      setUploadedRawImage(null);
+    };
   };
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
+    const newErrors: Record<string, string> = {};
+
     if (!formData.fullName.trim()) {
-      setError('Please enter your full name');
-      return;
+      newErrors.fullName = 'Please Enter Full Name';
     }
     if (!formData.phone.trim()) {
-      setError('Please enter your mobile number');
-      return;
+      newErrors.phone = 'Please Enter Mobile Number';
+    } else {
+      const phoneInUse = customers.some(c => c.phones.some(p => p.trim() === formData.phone.trim()));
+      if (phoneInUse) {
+        newErrors.phone = 'This mobile number is already registered';
+      }
+    }
+    if (formData.email.trim()) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        newErrors.email = 'Please enter a valid email address';
+      } else {
+        const emailInUse = customers.some(c => c.emails.some(e => e.toLowerCase().trim() === formData.email.toLowerCase().trim()));
+        if (emailInUse) {
+          newErrors.email = 'This email address is already registered';
+        }
+      }
     }
     if (!formData.password.trim()) {
-      setError('Please create a secure password');
-      return;
+      newErrors.password = 'Please create a secure password';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
     }
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
+    if (!formData.confirmPassword.trim()) {
+      newErrors.confirmPassword = 'Please repeat your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+    if (!formData.address.trim()) {
+      newErrors.address = 'Please Enter Full Address';
+    }
+    if (!formData.gender) {
+      newErrors.gender = 'Please Select Gender';
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+    // Validation for Special Days (made required if added)
+    if (specialDays.length > 0) {
+      for (const day of specialDays) {
+        if (!day.name.trim()) {
+          setError('Please fill Occasion Name for all added special event fields.');
+          return;
+        }
+        if (!day.date.trim()) {
+          setError('Please select a Date for all added special status fields.');
+          return;
+        }
+      }
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setError('Please fill in all mandatory fields correctly.');
       return;
     }
 
     setIsLoading(true);
     setError('');
+    setErrors({});
+
+    const occasionJoined = specialDays.length > 0 
+      ? specialDays.map(d => d.name.trim()).join(' | ') 
+      : '';
+    
+    const datesJoined = specialDays.length > 0
+      ? specialDays.map(d => {
+          const parts = d.date.split('-');
+          if (parts.length === 3) {
+            return `${parts[2]}-${parts[1]}-${parts[0]}`; // DD-MM-YYYY
+          }
+          return d.date;
+        }).join(' | ')
+      : '';
 
     setTimeout(() => {
       setIsLoading(false);
@@ -103,27 +250,51 @@ export default function Register() {
         password: formData.password,
         address: {
           country: 'Bangladesh',
-          city: '',
-          area: '',
+          city: formData.district,
+          area: formData.area || formData.upazila,
           street: formData.address.trim(),
+          division: formData.division,
+          district: formData.district,
+          upazila: formData.upazila,
+          zipCode: formData.postalCode,
         },
         profileImage: formData.profileImage,
-        occasionName: formData.occasionName,
-        specialDate: formData.specialDate,
+        gender: formData.gender,
+        occasionName: occasionJoined,
+        specialDate: datesJoined,
         socialLinks: [],
         status: 'Active' as const,
+        customerType: 'New' as const,
+        totalOrders: 0,
+        totalSpend: 0,
+        lastLogin: Date.now(),
+        totalLogins: 1,
       };
 
       addCustomer(newCustomer);
 
+      const latestCustomers = useCustomerStore.getState().customers;
+      const createdCustomer = latestCustomers[latestCustomers.length - 1];
+      const customerId = createdCustomer ? createdCustomer.id : 'cust_reg_' + Math.floor(Math.random() * 100000);
+
       // Login immediately into active session
       login({
-        id: 'cust_reg_' + Math.floor(Math.random() * 100000),
+        id: customerId,
         name: formData.fullName,
         email: formData.email ? formData.email.toLowerCase().trim() : '',
         phone: formData.phone.trim(),
-        role: 'customer'
+        role: 'customer',
+        gender: formData.gender,
+        address: formData.address.trim(),
+        division: formData.division,
+        district: formData.district,
+        upazila: formData.upazila,
+        profileImage: formData.profileImage,
+        occasionName: occasionJoined,
+        specialDate: datesJoined,
       });
+
+      pixelService.trackRegister(customerId);
 
       setTimeout(() => {
         navigate(from, { replace: true });
@@ -195,30 +366,77 @@ export default function Register() {
 
         {/* Signup Form */}
         <form onSubmit={handleRegister} className="space-y-4">
-          {/* Profile Picture Upload */}
+          {/* Profile Picture Upload - 1:1 Flat rectangle design */}
           <div className="space-y-2 text-left">
-            <div className="flex justify-between items-center ml-1 leading-none">
+            <div className="flex justify-between items-center ml-1">
               <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Profile Picture</label>
-              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Optional</span>
+              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Optional</span>
             </div>
-            
-            <label className="relative flex flex-col items-center justify-center w-full h-[130px] border-2 border-dashed border-neutral-300 rounded-[14px] bg-neutral-50 hover:bg-neutral-100 transition-all cursor-pointer overflow-hidden group">
-              {formData.profileImage ? (
-                <img src={formData.profileImage} alt="Profile Preview" className="w-full h-full object-cover" />
-              ) : (
-                <div className="flex flex-col items-center gap-2">
-                  <Plus className="w-8 h-8 text-neutral-400 group-hover:text-black transition-colors" />
-                  <span className="text-xs font-bold text-neutral-500 uppercase tracking-widest group-hover:text-black transition-colors">Upload Profile Photo</span>
-                </div>
-              )}
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-            </label>
+
+            <div className="flex gap-4 items-center">
+              <div 
+                onClick={(e) => {
+                  if (formData.profileImage) {
+                    e.preventDefault();
+                    handleEditExistingPhoto();
+                  }
+                }}
+                className="relative flex flex-col items-center justify-center w-24 h-24 border border-[#111111] bg-neutral-50 hover:bg-neutral-100 transition-all cursor-pointer overflow-hidden group shrink-0 rounded-none"
+              >
+                {formData.profileImage ? (
+                  <div className="relative w-full h-full group/preview">
+                    <img src={formData.profileImage} alt="Profile Preview" className="w-full h-full object-cover rounded-none" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/preview:opacity-100 flex items-center justify-center transition-all">
+                      <div className="p-1 px-1.5 bg-white text-black font-extrabold text-[8px] uppercase tracking-wider flex items-center gap-0.5 border border-black shadow-sm">
+                        <Pencil className="w-3 h-3 stroke-[2.5]" />
+                        <span>Edit</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="w-full h-full cursor-pointer flex flex-col items-center justify-center text-center p-2">
+                    <Plus className="w-6 h-6 text-neutral-400 group-hover:text-black transition-colors" />
+                    <span className="text-[9px] font-black text-neutral-500 uppercase tracking-widest group-hover:text-black transition-colors leading-none">UPLOAD</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                  </label>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <span className="block text-[11.5px] font-bold uppercase text-zinc-950 tracking-tight">1:1 Profile Photo</span>
+                <p className="text-[9px] text-gray-400 leading-normal uppercase">
+                  Adjust and alignment zoom crops live. Click square to browse mobile/PC files.
+                </p>
+                
+                {formData.profileImage && (
+                  <div className="flex items-center gap-2 pt-1 animate-fade-in">
+                    <button 
+                      type="button" 
+                      onClick={handleEditExistingPhoto}
+                      className="text-[9.5px] font-black text-purple-700 hover:text-white bg-purple-50 hover:bg-purple-700 transition-colors py-1 px-2.5 border border-purple-250 uppercase flex items-center gap-1 rounded-none"
+                    >
+                      <Pencil className="w-3 h-3 stroke-[2.5]" />
+                      <span>EDIT PHOTO</span>
+                    </button>
+                    
+                    <button 
+                      type="button" 
+                      onClick={() => setFormData(prev => ({ ...prev, profileImage: '' }))}
+                      className="text-[9.5px] font-black text-red-650 hover:text-white bg-red-50 hover:bg-red-600 transition-colors py-1 px-2 border border-red-200 uppercase flex items-center gap-1 rounded-none"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>CLEAR</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4">
             {/* Full Name */}
             <div className="space-y-1.5 text-left">
-              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Full Name</label>
+              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Full Name *</label>
               <div className="relative">
                 <input 
                   type="text" 
@@ -226,18 +444,29 @@ export default function Register() {
                   value={formData.fullName}
                   onChange={handleChange}
                   required 
-                  className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm font-semibold placeholder:text-neutral-300" 
+                  className={cn(
+                    "w-full h-[52px] bg-white border text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:ring-1 transition-all text-sm font-semibold placeholder:text-neutral-300",
+                    errors.fullName 
+                      ? "border-red-500 focus:border-red-650 focus:ring-red-650 bg-red-50/5" 
+                      : "border-[#E5E5E5] focus:border-black focus:ring-black"
+                  )}
                   placeholder="e.g. Imtiaz Khan"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
                   <User className="w-4.5 h-4.5" />
                 </span>
               </div>
+              {errors.fullName && (
+                <p className="text-[10px] font-bold text-red-600 ml-1 mt-0.5 uppercase tracking-wide flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                  <span>{errors.fullName}</span>
+                </p>
+              )}
             </div>
 
             {/* Mobile Number */}
             <div className="space-y-1.5 text-left">
-              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Mobile Number</label>
+              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Mobile Number *</label>
               <div className="relative">
                 <input 
                   type="tel" 
@@ -245,55 +474,58 @@ export default function Register() {
                   value={formData.phone}
                   onChange={handleChange}
                   required 
-                  className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm font-semibold placeholder:text-neutral-300" 
+                  className={cn(
+                    "w-full h-[52px] bg-white border text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:ring-1 transition-all text-sm font-semibold placeholder:text-neutral-300",
+                    errors.phone 
+                      ? "border-red-500 focus:border-red-650 focus:ring-red-650 bg-red-50/5" 
+                      : "border-[#E5E5E5] focus:border-black focus:ring-black"
+                  )}
                   placeholder="+880 1XXXXXXXXX"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
                   <Smartphone className="w-4.5 h-4.5" />
                 </span>
               </div>
+              {errors.phone && (
+                <p className="text-[10px] font-bold text-red-600 ml-1 mt-0.5 uppercase tracking-wide flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                  <span>{errors.phone}</span>
+                </p>
+              )}
             </div>
 
-            {/* Full Address */}
+            {/* Email Address */}
             <div className="space-y-1.5 text-left">
-              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Full Address</label>
-              <div className="relative">
-                <textarea 
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  required 
-                  rows={2}
-                  className="w-full bg-white border border-[#E5E5E5] text-neutral-900 px-4 py-3 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm font-semibold placeholder:text-neutral-300 resize-none" 
-                  placeholder="Enter your detailed delivery address"
-                />
-              </div>
-            </div>
-
-            {/* Email (Optional) */}
-            <div className="space-y-1.5 text-left">
-              <div className="flex justify-between items-center ml-1 leading-none">
-                <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Email Address</label>
-                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Optional</span>
-              </div>
+              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email Address (Optional)</label>
               <div className="relative">
                 <input 
                   type="email" 
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm font-semibold placeholder:text-neutral-300" 
+                  className={cn(
+                    "w-full h-[52px] bg-white border text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:ring-1 transition-all text-sm font-semibold placeholder:text-neutral-300",
+                    errors.email 
+                      ? "border-red-500 focus:border-red-650 focus:ring-red-650 bg-red-50/5" 
+                      : "border-[#E5E5E5] focus:border-black focus:ring-black"
+                  )}
                   placeholder="name@example.com"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
                   <Mail className="w-4.5 h-4.5" />
                 </span>
               </div>
+              {errors.email && (
+                <p className="text-[10px] font-bold text-red-600 ml-1 mt-0.5 uppercase tracking-wide flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                  <span>{errors.email}</span>
+                </p>
+              )}
             </div>
 
             {/* Password */}
             <div className="space-y-1.5 text-left">
-              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Password</label>
+              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Password *</label>
               <div className="relative">
                 <input 
                   type={showPassword ? 'text' : 'password'} 
@@ -301,18 +533,29 @@ export default function Register() {
                   value={formData.password}
                   onChange={handleChange}
                   required 
-                  className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-11 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm font-semibold placeholder:text-neutral-300" 
+                  className={cn(
+                    "w-full h-[52px] bg-white border text-neutral-900 pl-11 pr-11 rounded-[14px] focus:outline-none focus:ring-1 transition-all text-sm font-semibold placeholder:text-neutral-300",
+                    errors.password 
+                      ? "border-red-500 focus:border-red-650 focus:ring-red-650 bg-red-50/5" 
+                      : "border-[#E5E5E5] focus:border-black focus:ring-black"
+                  )}
                   placeholder="At least 6 characters"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
                   <Lock className="w-4.5 h-4.5" />
                 </span>
               </div>
+              {errors.password && (
+                <p className="text-[10px] font-bold text-red-600 ml-1 mt-0.5 uppercase tracking-wide flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                  <span>{errors.password}</span>
+                </p>
+              )}
             </div>
 
             {/* Confirm Password */}
             <div className="space-y-1.5 text-left">
-              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Confirm Password</label>
+              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Confirm Password *</label>
               <div className="relative">
                 <input 
                   type={showPassword ? 'text' : 'password'} 
@@ -320,7 +563,12 @@ export default function Register() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required 
-                  className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-11 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm font-semibold placeholder:text-neutral-300" 
+                  className={cn(
+                    "w-full h-[52px] bg-white border text-neutral-900 pl-11 pr-11 rounded-[14px] focus:outline-none focus:ring-1 transition-all text-sm font-semibold placeholder:text-neutral-300",
+                    errors.confirmPassword 
+                      ? "border-red-500 focus:border-red-650 focus:ring-red-650 bg-red-50/5" 
+                      : "border-[#E5E5E5] focus:border-black focus:ring-black"
+                  )}
                   placeholder="Repeat your password"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
@@ -335,41 +583,279 @@ export default function Register() {
                   {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
                 </button>
               </div>
+              {errors.confirmPassword && (
+                <p className="text-[10px] font-bold text-red-600 ml-1 mt-0.5 uppercase tracking-wide flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                  <span>{errors.confirmPassword}</span>
+                </p>
+              )}
             </div>
+
+            {/* Address Information Section */}
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center gap-2 border-b border-neutral-150 pb-2 mb-2">
+                <MapPin className="w-4 h-4 text-neutral-400" />
+                <h3 className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Address Information</h3>
+              </div>
+
+              {/* Division Dropdown */}
+              <div className="space-y-1.5 text-left">
+                <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Division (Optional)</label>
+                <select
+                  name="division"
+                  value={formData.division}
+                  onChange={(e) => {
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      division: e.target.value,
+                      district: '',
+                      upazila: ''
+                    }));
+                  }}
+                  className={cn(
+                    "w-full h-[52px] bg-white border text-neutral-900 px-4 rounded-[14px] focus:outline-none focus:ring-1 transition-all text-sm font-semibold",
+                    errors.division ? "border-red-500 focus:border-red-650 focus:ring-red-650" : "border-[#E5E5E5] focus:border-black"
+                  )}
+                >
+                  <option value="">Select Division</option>
+                  {divisions.map(div => <option key={div} value={div}>{div}</option>)}
+                </select>
+              </div>
+
+              {/* District Dropdown */}
+              <div className="space-y-1.5 text-left">
+                <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">District (Optional)</label>
+                <select
+                  name="district"
+                  value={formData.district}
+                  onChange={(e) => {
+                    setFormData(prev => ({ 
+                      ...prev, 
+                      district: e.target.value,
+                      upazila: ''
+                    }));
+                  }}
+                  disabled={!formData.division}
+                  className={cn(
+                    "w-full h-[52px] bg-white border text-neutral-900 px-4 rounded-[14px] focus:outline-none focus:ring-1 transition-all text-sm font-semibold disabled:opacity-50 disabled:bg-neutral-50",
+                    errors.district ? "border-red-500 focus:border-red-650 focus:ring-red-650" : "border-[#E5E5E5] focus:border-black"
+                  )}
+                >
+                  <option value="">Select District</option>
+                  {formData.division && bdAddressData[formData.division as keyof typeof bdAddressData] && 
+                    Object.keys(bdAddressData[formData.division as keyof typeof bdAddressData]).map(dist => (
+                      <option key={dist} value={dist}>{dist}</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              {/* Upazila Dropdown */}
+              <div className="space-y-1.5 text-left">
+                <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Upazila / Thana (Optional)</label>
+                <select
+                  name="upazila"
+                  value={formData.upazila}
+                  onChange={handleChange}
+                  disabled={!formData.district}
+                  className={cn(
+                    "w-full h-[52px] bg-white border text-neutral-900 px-4 rounded-[14px] focus:outline-none focus:ring-1 transition-all text-sm font-semibold disabled:opacity-50 disabled:bg-neutral-50",
+                    errors.upazila ? "border-red-500 focus:border-red-650 focus:ring-red-650" : "border-[#E5E5E5] focus:border-black"
+                  )}
+                >
+                  <option value="">Select Upazila</option>
+                  {formData.division && formData.district && bdAddressData[formData.division as keyof typeof bdAddressData]?.[formData.district]?.map(upz => (
+                      <option key={upz} value={upz}>{upz}</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              {/* Area & Postal Code Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Area / Union (Opt)</label>
+                  <input 
+                    type="text" 
+                    name="area"
+                    value={formData.area}
+                    onChange={handleChange}
+                    className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 px-4 rounded-[14px] focus:outline-none focus:border-black text-sm font-semibold placeholder:text-neutral-300"
+                    placeholder="e.g. Ward 5"
+                  />
+                </div>
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Postal Code (Opt)</label>
+                  <input 
+                    type="text" 
+                    name="postalCode"
+                    value={formData.postalCode}
+                    onChange={handleChange}
+                    className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 px-4 rounded-[14px] focus:outline-none focus:border-black text-sm font-semibold placeholder:text-neutral-300"
+                    placeholder="e.g. 1200"
+                  />
+                </div>
+              </div>
+
+              {/* Full Address */}
+              <div className="space-y-1.5 text-left">
+                <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Full Address *</label>
+                <div className="relative">
+                  <textarea 
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    required 
+                    rows={2}
+                    className={cn(
+                      "w-full bg-white border text-neutral-900 px-4 py-3 rounded-[14px] focus:outline-none focus:ring-1 transition-all text-sm font-semibold placeholder:text-neutral-300 resize-none",
+                      errors.address 
+                        ? "border-red-500 focus:border-red-650 focus:ring-red-650 bg-red-50/5" 
+                        : "border-[#E5E5E5] focus:border-black focus:ring-black"
+                    )}
+                    placeholder="Enter your detailed house/road information"
+                  />
+                </div>
+                {errors.address && (
+                  <p className="text-[10px] font-bold text-red-600 ml-1 mt-0.5 uppercase tracking-wide flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                    <span>{errors.address}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+          {/* Your Special Day - Dynamic multiplier list */}
+          <div className="space-y-4 text-left pt-2 pb-2">
+            <div className="flex justify-between items-center border-b border-[#111111]/10 pb-2">
+              <h3 className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-purple-600 shrink-0" />
+                <span>Special Day (Optional)</span>
+              </h3>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  const id = 'day_' + Math.random().toString(36).substring(2, 9);
+                  setSpecialDays([...specialDays, { id, name: '', date: '' }]);
+                }}
+                className="flex items-center gap-1 text-[10px] font-black uppercase text-purple-600 hover:text-purple-700 bg-purple-50 px-2.5 py-1 transition-all border border-purple-150 rounded-none h-7"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>+ Add More</span>
+              </button>
+            </div>
+
+            {specialDays.length === 0 ? (
+              <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider leading-relaxed pb-1">
+                No Special Days added yet. (Add custom dates to receive extra promo/reward benefits optionally)
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {specialDays.map((day, idx) => (
+                  <div key={day.id} className="p-3 border border-[#111111] bg-neutral-50/50 space-y-3 relative rounded-none">
+                    <div className="flex justify-between items-center pb-2 border-b border-[#111111]/10">
+                      <span className="text-[9px] font-bold text-purple-600 uppercase tracking-widest">Occasion #{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSpecialDays(specialDays.filter(item => item.id !== day.id));
+                        }}
+                        className="p-0.5 text-zinc-400 hover:text-red-600 transition-colors"
+                        title="Remove Day"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-[#111111] uppercase tracking-wider">Occasion Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={day.name}
+                          onChange={(e) => {
+                            const updated = [...specialDays];
+                            updated[idx].name = e.target.value;
+                            setSpecialDays(updated);
+                          }}
+                          placeholder="e.g. Birthday"
+                          className="w-full h-10 bg-white border border-[#E5E5E5] text-neutral-900 px-2.5 rounded-none focus:outline-none focus:border-black text-xs font-semibold"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-[9px] font-bold text-[#111111] uppercase tracking-wider">Sought Date</label>
+                        <input
+                          type="date"
+                          required
+                          value={day.date}
+                          onChange={(e) => {
+                            const updated = [...specialDays];
+                            updated[idx].date = e.target.value;
+                            setSpecialDays(updated);
+                          }}
+                          className="w-full h-10 bg-white border border-[#E5E5E5] text-neutral-900 px-2 rounded-none focus:outline-none focus:border-black text-xs font-semibold"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <p className="text-[9px] text-purple-600 font-bold uppercase tracking-wider leading-relaxed bg-purple-50/40 p-2.5 border border-purple-100">
+              * On this special day, verified customer group will receive unique discount rewards.
+            </p>
           </div>
 
-          {/* Your Special Day */}
-          <div className="space-y-4 text-left pt-2 pb-2">
-            <div className="flex justify-between items-center border-b border-neutral-100 pb-2">
-              <h3 className="text-sm font-bold text-neutral-900">Your Special Day</h3>
-              <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase">OPTIONAL</span>
+          {/* Gender Box */}
+          <div className="space-y-1.5 text-left pb-2">
+            <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Gender (Male / Female / Others)</label>
+            <div className="grid grid-cols-3 gap-2.5">
+              {[
+                { value: 'Male', label: 'Male' },
+                { value: 'Female', label: 'Female' },
+                { value: 'Others', label: 'Others' }
+              ].map((g) => {
+                const isSelected = formData.gender === g.value;
+                return (
+                  <button
+                    key={g.value}
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, gender: g.value }));
+                      if (errors.gender) {
+                        setErrors(prev => {
+                          const copy = { ...prev };
+                          delete copy.gender;
+                          return copy;
+                        });
+                      }
+                    }}
+                    className={cn(
+                      "h-[48px] flex items-center justify-center font-bold text-xs uppercase border transition-all duration-200 rounded-[12px]",
+                      isSelected 
+                        ? "border-neutral-950 bg-neutral-950 text-white shadow-sm"
+                        : errors.gender 
+                          ? "border-red-500 bg-white text-neutral-700 hover:bg-neutral-50"
+                          : "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50"
+                    )}
+                  >
+                    {g.label}
+                  </button>
+                );
+              })}
             </div>
-            
-            <div className="space-y-1.5">
-              <input 
-                type="text" 
-                name="occasionName"
-                value={formData.occasionName}
-                onChange={handleChange}
-                placeholder="e.g. Birthday / Anniversary"
-                className="w-full h-[58px] bg-white border border-[#ddd] pl-4 rounded-[8px] focus:outline-none focus:border-blue-500 transition-all text-base" 
-              />
-              <p style={{ fontSize: '13px', color: '#1565ff', marginTop: '8px', fontWeight: 500 }}>
-                On this special day you will get extra facilities.
+            {errors.gender && (
+              <p className="text-[10px] font-bold text-red-600 ml-1 mt-0.5 uppercase tracking-wide flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                <span>{errors.gender}</span>
               </p>
-            </div>
-            
-            <div className="space-y-1.5">
-              <input 
-                type="text" 
-                name="specialDate"
-                value={formData.specialDate}
-                onChange={handleDateChange}
-                placeholder="DD-MM-YYYY"
-                maxLength={10}
-                className="w-full h-[58px] bg-white border border-[#ddd] pl-4 rounded-[8px] focus:outline-none focus:border-blue-500 transition-all text-base" 
-              />
-            </div>
+            )}
+          </div>
+
           </div>
 
           {/* Button Submit */}
@@ -402,6 +888,182 @@ export default function Register() {
           <span>Secure SSL Registration</span>
         </div>
       </motion.div>
+
+      {/* Floating Crop Canvas Editor Portal Modal */}
+      {uploadedRawImage && (
+        <div className="fixed inset-0 bg-neutral-950/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 font-mono text-[#111111] animate-fade-in animate-duration-200">
+          <div className="bg-white border-2 border-black max-w-[360px] w-full p-6 space-y-4 rounded-none shadow-2xl relative">
+            
+            {/* Header */}
+            <div className="border-b border-black pb-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
+                  <Pencil className="w-3.5 h-3.5 text-purple-600 stroke-[3]" />
+                  <span>Profile Photo Editor</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setUploadedRawImage(null)}
+                  className="p-1 hover:bg-neutral-100 transition-colors border border-transparent hover:border-black rounded-none"
+                  title="Close Editor"
+                >
+                  <X className="w-4 h-4 text-black" />
+                </button>
+              </div>
+              <p className="text-[9px] text-gray-400 uppercase tracking-widest mt-1">
+                Drag to align, rotate, or zoom for the perfect 1:1 fit
+              </p>
+            </div>
+
+            {/* Viewport frame with crop lines */}
+            <div className="relative w-56 h-56 mx-auto border-2 border-black bg-neutral-950 overflow-hidden cursor-move select-none shadow-inner rounded-none group/viewport">
+              <div 
+                onMouseDown={handleDragStart}
+                onMouseMove={handleDragMove}
+                onMouseUp={handleDragEnd}
+                onMouseLeave={handleDragEnd}
+                onTouchStart={handleDragStart}
+                onTouchMove={handleDragMove}
+                onTouchEnd={handleDragEnd}
+                className="absolute inset-0 flex items-center justify-center text-center"
+              >
+                <img 
+                  src={uploadedRawImage} 
+                  alt="active crop element" 
+                  draggable={false}
+                  className="absolute origin-center select-none max-w-none pointer-events-none transition-all duration-75"
+                  style={{
+                    transform: `translate(calc(-50% + ${panX}px), calc(-50% + ${panY}px)) scale(${zoom}) rotate(${rotation}deg)`,
+                    top: '50%',
+                    left: '50%',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain'
+                  }}
+                />
+              </div>
+
+              {/* Crop Grid Guidelines overlay */}
+              <div className="absolute inset-4 border border-dashed border-white/40 pointer-events-none flex flex-col justify-between">
+                <div className="border-b border-dashed border-white/25 w-full h-[33%]" />
+                <div className="border-t border-dashed border-white/25 w-full h-[33%]" />
+              </div>
+              <div className="absolute inset-4 border border-dashed border-white/40 pointer-events-none flex justify-between">
+                <div className="border-r border-dashed border-white/25 h-full w-[33%]" />
+                <div className="border-l border-dashed border-white/25 h-full w-[33%]" />
+              </div>
+              <div className="absolute inset-0 border-[16px] border-black/65 pointer-events-none" />
+              <div className="absolute inset-0 border-2 border-black pointer-events-none" />
+            </div>
+
+            {/* Toolbar section: Zoom and Rotate */}
+            <div className="bg-neutral-50 p-3 border border-black space-y-3">
+              <div className="flex items-center justify-between text-[10px] font-black text-black uppercase tracking-wider">
+                <span>Zoom Scale ({zoom.toFixed(2)}x)</span>
+                <span className="text-[9px] text-purple-600 bg-purple-50 px-1.5 py-0.5 border border-purple-200">1:1 Locked</span>
+              </div>
+
+              {/* Slider zoom */}
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-bold text-gray-400">A-</span>
+                <input 
+                  type="range"
+                  min="0.8"
+                  max="4"
+                  step="0.05"
+                  value={zoom}
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                  className="flex-1 h-1 bg-gray-200 cursor-pointer accent-black uppercase"
+                />
+                <span className="text-[10px] font-bold text-gray-500">A+</span>
+              </div>
+
+              {/* Editor action strip: Rotate, choose new photo, reset */}
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-black/10">
+                <button
+                  type="button"
+                  onClick={() => setRotation(r => (r + 90) % 360)}
+                  className="h-8 border border-black hover:bg-neutral-150 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase text-black bg-white"
+                >
+                  <RotateCw className="w-3 h-3 text-purple-600" />
+                  <span>ROTATE</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('modal-alternate-upload');
+                    el?.click();
+                  }}
+                  className="h-8 border border-black hover:bg-neutral-150 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase text-black bg-white"
+                >
+                  <UploadCloud className="w-3.5 h-3.5 text-purple-600" />
+                  <span>RE-UPLOAD</span>
+                </button>
+                <input 
+                  type="file" 
+                  id="modal-alternate-upload" 
+                  accept="image/*" 
+                  className="hidden" 
+                  onChange={handleImageUpload} 
+                />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setZoom(1);
+                    setPanX(0);
+                    setPanY(0);
+                    setRotation(0);
+                  }}
+                  className="h-8 border border-black hover:bg-neutral-150 flex items-center justify-center text-[9px] font-black uppercase text-neutral-500 bg-white"
+                >
+                  RESET
+                </button>
+              </div>
+            </div>
+
+            {/* Quick manual nudge helpers for fine adjustments */}
+            <div className="grid grid-cols-4 gap-1 text-[9px] font-bold text-black uppercase">
+              <button type="button" onClick={() => setPanY(y => y - 5)} className="border border-black py-1 bg-white hover:bg-neutral-50">▲ Up</button>
+              <button type="button" onClick={() => setPanY(y => y + 5)} className="border border-black py-1 bg-white hover:bg-neutral-50">▼ Down</button>
+              <button type="button" onClick={() => setPanX(x => x - 5)} className="border border-black py-1 bg-white hover:bg-neutral-50">◀ Left</button>
+              <button type="button" onClick={() => setPanX(x => x + 5)} className="border border-black py-1 bg-white hover:bg-neutral-50">▶ Right</button>
+            </div>
+
+            {/* CTA action buttons */}
+            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-black/10">
+              <button 
+                type="button" 
+                onClick={() => setUploadedRawImage(null)}
+                className="h-10 border border-black text-[10px] font-black hover:bg-neutral-50 uppercase tracking-wider text-center"
+              >
+                Cancel
+              </button>
+              
+              <button 
+                type="button" 
+                onClick={() => {
+                  setFormData(prev => ({ ...prev, profileImage: '' }));
+                  setUploadedRawImage(null);
+                }}
+                className="h-10 border border-red-200 text-red-650 hover:bg-red-50 text-[10px] font-black uppercase tracking-wider text-center bg-red-50/20"
+              >
+                Remove
+              </button>
+
+              <button 
+                type="button" 
+                onClick={cropImage}
+                className="h-10 bg-purple-600 text-white text-[10px] font-black hover:bg-purple-700 uppercase tracking-wider text-center border border-black"
+              >
+                Save Photo
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Footer System Pages */}
       <div className="mt-6 flex justify-center gap-5 text-[10px] text-neutral-400 font-semibold">

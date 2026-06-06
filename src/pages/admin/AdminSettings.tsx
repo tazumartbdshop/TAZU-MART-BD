@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { 
   Store, Palette, MapPin, User, Users, ShoppingBag, 
   Truck, CreditCard, Bell, FileText, Search, Share2, 
-  Shield, Monitor, ShoppingCart, HeadphonesIcon, 
+  Shield, Monitor, ShoppingCart, HeadphonesIcon, Zap,
   Image as ImageIcon, Database, Menu, X, Plus, Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSettingsStore, AppSettings } from '../../store/useSettingsStore';
+import TemplateDraftBar from '../../components/admin/TemplateDraftBar';
+import { useCategoryStore } from '../../store/useCategoryStore';
+import { useProductStore } from '../../store/useProductStore';
+import { useCustomerStore } from '../../store/useCustomerStore';
+import { useOrderStore } from '../../store/useOrderStore';
 
 const SETTING_MODULES = [
-  { id: 'identity', name: 'Store Identity', icon: Store, desc: 'Store Name, Email, Tagline' },
-  { id: 'branding', name: 'Branding', icon: Palette, desc: 'Logos and Brand Colors' },
-  { id: 'address', name: 'Business Address', icon: MapPin, desc: 'Store Location Details' },
   { id: 'owner', name: 'Business Owner', icon: User, desc: 'Owner Information' },
   { id: 'login', name: 'Customer Login', icon: Users, desc: 'Registration & Login Config' },
   { id: 'order', name: 'Order Settings', icon: ShoppingBag, desc: 'Invoices & Tracking' },
@@ -20,21 +22,26 @@ const SETTING_MODULES = [
   { id: 'notification', name: 'Email & Notification', icon: Bell, desc: 'SMTP, SMS, Push' },
   { id: 'invoice', name: 'Invoice Management', icon: FileText, desc: 'Company Branding, Customization & Themes' },
   { id: 'seo', name: 'SEO Settings', icon: Search, desc: 'Meta tags & Tracking' },
-  { id: 'social', name: 'Social Media', icon: Share2, desc: 'Social Links & WhatsApp' },
   { id: 'security', name: 'Security', icon: Shield, desc: '2FA & Login Protection' },
   { id: 'appearance', name: 'Appearance', icon: Monitor, desc: 'Dark Mode, Font, Layout' },
   { id: 'checkout', name: 'Checkout', icon: ShoppingCart, desc: 'Guest Checkout & Requirements' },
   { id: 'support', name: 'Customer Support', icon: HeadphonesIcon, desc: 'Hotline, Chat, Email' },
   { id: 'media', name: 'File & Media', icon: ImageIcon, desc: 'Upload Limits & Types' },
+  { id: 'promotion', name: 'Promotion & Offers', icon: Zap, desc: 'Flash Sale, Discounts' },
   { id: 'system', name: 'Backup & System', icon: Database, desc: 'Backups & Cache' },
 ];
 
 export default function AdminSettings() {
-  const [activeTab, setActiveTab] = useState('identity');
+  const [activeTab, setActiveTab] = useState('owner');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { settings, updateSettings } = useSettingsStore();
+  const { settings, draftSettings, updateDraftSettings } = useSettingsStore();
 
-  const [formState, setFormState] = useState<AppSettings>(settings);
+  const categories = useCategoryStore((s) => s.categories);
+  const products = useProductStore((s) => s.products);
+  const customers = useCustomerStore((s) => s.customers);
+  const orders = useOrderStore((s) => s.orders);
+
+  const [formState, setFormState] = useState<AppSettings>(draftSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
@@ -46,12 +53,12 @@ export default function AdminSettings() {
 
   // Sync with global store on mount / store changes
   React.useEffect(() => {
-    setFormState(settings);
-  }, [settings]);
+    setFormState(draftSettings);
+  }, [draftSettings]);
 
   const activeModule = SETTING_MODULES.find(m => m.id === activeTab);
 
-  const isDirty = JSON.stringify(formState) !== JSON.stringify(settings);
+  const isDirty = JSON.stringify(formState) !== JSON.stringify(draftSettings);
 
   // Prompt before window close / page reload if dirty
   React.useEffect(() => {
@@ -74,7 +81,7 @@ export default function AdminSettings() {
     setIsSaving(true);
     // Premium 800ms state response delay
     await new Promise(resolve => setTimeout(resolve, 800));
-    updateSettings(formState);
+    updateDraftSettings(formState);
     setIsSaving(false);
     setShowToast(true);
     setTimeout(() => {
@@ -83,7 +90,7 @@ export default function AdminSettings() {
   };
 
   const handleCancel = () => {
-    setFormState(settings);
+    setFormState(draftSettings);
   };
 
   const handleTabChange = (tabId: string) => {
@@ -228,21 +235,28 @@ export default function AdminSettings() {
       );
       case 'address': return (
         <div className="space-y-6 max-w-3xl animate-in fade-in">
-          <Input label="Business Address" field="businessAddress" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Input label="Business Name" field="businessName" />
+            <Input label="Contact Person" field="contactPerson" />
+            <Input label="House / Building" field="houseBuilding" />
+            <Input label="Road / Street" field="roadStreet" />
+            <Input label="Area / Thana" field="areaThana" />
+            <Input label="City" field="city" />
+            <Input label="Division" field="division" />
+            <Input label="District" field="district" />
+            <Input label="ZIP Code" field="zipCode" />
             <Input label="Country" field="country" />
-            <Input label="Division / State" field="division" />
-            <Input label="City / District" field="city" />
-            <Input label="ZIP / Postal Code" field="zipCode" />
+            <Input label="Phone" field="phone" />
+            <Input label="Email" field="email" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-[#000000] mb-2">Google Map Location Embed (Iframe)</label>
+            <label className="block text-sm font-semibold text-[#000000] mb-2">Google Map Link</label>
             <textarea 
-              value={formState.googleMapEmbed} 
-              onChange={e => handleUpdate('googleMapEmbed', e.target.value)}
+              value={formState.googleMapLink} 
+              onChange={e => handleUpdate('googleMapLink', e.target.value)}
               rows={3} 
               className="w-full px-4 py-3 bg-gray-50 border border-[#EEEEEE] rounded-[10px] focus:outline-none focus:border-[#000000] transition-colors resize-none font-mono text-xs" 
-              placeholder="<iframe src='...'></iframe>"
+              placeholder="https://maps.google.com/..."
             />
           </div>
         </div>
@@ -391,25 +405,19 @@ export default function AdminSettings() {
           </div>
         </div>
       );
-      case 'social': return (
-        <div className="space-y-6 max-w-3xl animate-in fade-in grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 pt-2">
-          <Input label="Facebook URL" field="facebookUrl" />
-          <Input label="Instagram URL" field="instagramUrl" />
-          <Input label="TikTok URL" field="tiktokUrl" />
-          <Input label="YouTube URL" field="youtubeUrl" />
-          <Input label="WhatsApp Number" field="whatsappNumber" />
-          <Input label="Telegram Link" field="telegramLink" />
-        </div>
-      );
       case 'security': return (
         <div className="space-y-4 max-w-3xl animate-in fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-gray-100">
+            <Input label="Admin Login Email" field="adminEmail" />
+            <Input label="Admin Login Password" field="adminPassword" />
+          </div>
           <Toggle label="Admin 2FA (Two Factor Auth)" field="admin2fa" />
           <Toggle label="Login Device History" field="loginDeviceHistory" />
           <Toggle label="Failed Login Protection" field="failedLoginProtection" />
           <Toggle label="IP Restriction" field="ipRestriction" />
           <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button className="bg-gray-100 font-bold px-4 py-3 rounded-[10px] hover:bg-gray-200">Force Logout All Sessions</button>
-            <button className="bg-black text-white font-bold px-4 py-3 rounded-[10px] hover:bg-gray-900">Change Admin Password</button>
+            <button type="button" className="bg-gray-100 font-bold px-4 py-3 rounded-[10px] hover:bg-gray-200">Force Logout All Sessions</button>
+            <button type="button" className="bg-black text-white font-bold px-4 py-3 rounded-[10px] hover:bg-gray-900">Change Admin Password</button>
           </div>
         </div>
       );
@@ -460,19 +468,93 @@ export default function AdminSettings() {
           <Toggle label="Cloud Storage Enable (AWS S3)" field="cloudStorageEnable" />
         </div>
       );
-      case 'system': return (
+      case 'promotion': return (
         <div className="space-y-6 max-w-3xl animate-in fade-in">
-          <Toggle label="Auto Backup Database" field="autoBackup" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-             <button className="bg-black text-white font-bold px-4 py-4 rounded-[12px] hover:bg-gray-900 shadow-lg shadow-black/10 flex items-center justify-center gap-2">
-                <Database className="w-5 h-5" /> Export Database
-             </button>
-             <button className="bg-blue-50 text-blue-600 font-bold px-4 py-4 rounded-[12px] hover:bg-blue-100 flex items-center justify-center gap-2">
-                Restore System Backup
-             </button>
-             <button className="bg-gray-50 text-gray-700 border border-[#EEEEEE] font-bold px-4 py-4 rounded-[12px] hover:bg-gray-100 flex items-center justify-center gap-2 md:col-span-2">
-                Clear Application Cache
-             </button>
+           <Toggle label="Flash Sale Mode" field="flashSaleEnabled" />
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input label="Flash Sale End Time" field="flashSaleEndTime" type="datetime-local" />
+           </div>
+           <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest pl-4 border-l-2 border-zinc-100">
+             * Sets the global countdown timer for flash sale products.
+           </p>
+           
+           <div className="space-y-3 pt-4 border-t border-zinc-150">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-[#000000] font-sans">Double Discount Protection (Stack Rules)</h4>
+              <Toggle label="Allow Stack Discount (Campaign/Flash Sale + Coupons)" field="allowStackDiscount" />
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest pl-4 border-l-2 border-zinc-100 font-sans leading-relaxed">
+                * When ENABLED, customers can combine campaign list prices with active coupon code discounts.<br />
+                * When DISABLED / BLOCKED (Recommended), coupon discounts will not be applicable on lists that contain promo items.
+              </p>
+           </div>
+        </div>
+      );
+      case 'system': return (
+        <div className="space-y-8 max-w-4xl animate-in fade-in font-mono">
+          {/* Demo & Showcase Data Manager */}
+          <div className="bg-red-50/70 border border-red-300 p-6 space-y-4 rounded-none">
+             <div className="flex items-start gap-4">
+               <Database className="w-8 h-8 text-red-600 shrink-0 mt-0.5" />
+               <div>
+                 <h3 className="text-sm font-black text-red-900 uppercase tracking-widest font-mono">Demo Showcase Database</h3>
+                 <p className="text-xs text-red-700/80 mt-2 leading-relaxed">
+                    This website is pre-packaged with 20+ Categories, 250+ Products, 20+ Customers, and 50+ diverse Orders to fully test checkout, invoicing, tracking, and dashboard reporting out-of-the-box.
+                 </p>
+               </div>
+             </div>
+             
+             {/* Stats list */}
+             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white p-4 border border-red-200 font-mono">
+               <div className="text-center p-2 border-r border-red-100 last:border-0">
+                 <span className="block text-xl font-black text-red-600">{categories.filter(c => c.isDemo).length}</span>
+                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Demo Categories</span>
+               </div>
+               <div className="text-center p-2 border-r border-red-100 last:border-0">
+                 <span className="block text-xl font-black text-red-600">{products.filter(p => p.isDemo).length}</span>
+                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Demo Products</span>
+               </div>
+               <div className="text-center p-2 border-r border-red-100 last:border-0">
+                 <span className="block text-xl font-black text-red-600">{customers.filter(c => c.isDemo).length}</span>
+                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Demo Customers</span>
+               </div>
+               <div className="text-center p-2">
+                 <span className="block text-xl font-black text-red-600">{orders.filter(o => o.isDemo).length}</span>
+                 <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Demo Orders</span>
+               </div>
+             </div>
+
+             <div className="pt-2">
+               <button 
+                 type="button"
+                 onClick={() => {
+                   if (window.confirm('IRREVERSIBLE ACTION: Are you sure you want to completely purge all demo categories, demo products, demo customers, and demo orders from the store database? All of your non-demo database items will be preserved.')) {
+                     useCategoryStore.getState().clearDemoData();
+                     useProductStore.getState().clearDemoData();
+                     useCustomerStore.getState().clearDemoData();
+                     useOrderStore.getState().clearDemoData();
+                     alert('SUCCESS: All 20+ Categories, 200+ Products, 20+ Customers, and 50+ Orders have been successfully cleared from the database.');
+                   }
+                 }}
+                 className="px-5 py-3 bg-red-650 hover:bg-red-700 text-white border border-black font-mono text-[10px] font-bold uppercase tracking-widest cursor-pointer transition-colors"
+               >
+                 Remove Demo Data
+               </button>
+             </div>
+          </div>
+
+          <div className="border border-black p-6 space-y-6 bg-white">
+            <h3 className="text-xs font-black uppercase tracking-widest text-[#000000]">System Backups & Control</h3>
+            <Toggle label="Auto Backup Database" field="autoBackup" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+               <button className="bg-black text-white font-bold p-4 text-[10px] uppercase tracking-widest hover:bg-zinc-800 flex items-center justify-center gap-2 border border-black cursor-pointer transition-colors">
+                  <Database className="w-4 h-4 text-purple-400" /> Export Database
+               </button>
+               <button className="bg-gray-150 text-gray-700 border border-black font-bold p-4 text-[10px] uppercase tracking-widest hover:bg-gray-200 flex items-center justify-center gap-2 cursor-pointer transition-colors">
+                  Restore System Backup
+               </button>
+               <button className="bg-gray-50 text-gray-600 border border-[#DDD] font-bold p-4 text-[10px] uppercase tracking-widest hover:bg-gray-100 flex items-center justify-center gap-2 md:col-span-2 cursor-pointer transition-colors">
+                  Clear Application Cache
+               </button>
+            </div>
           </div>
         </div>
       );
@@ -482,6 +564,9 @@ export default function AdminSettings() {
 
   return (
     <div className="relative min-h-[70vh] flex flex-col md:flex-row gap-6">
+      {/* Draft Toolbar (Publish/Save/Reset) */}
+      <TemplateDraftBar />
+
       {/* Sidebar Navigation */}
       <div className="hidden md:block w-72 shrink-0 bg-white rounded-none border border-[#222] p-4 h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar">
          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-4 px-3 pt-2 font-mono">Settings Modules</h3>

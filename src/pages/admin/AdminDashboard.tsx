@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { 
   LayoutDashboard, 
   ShoppingBag, 
@@ -39,7 +40,8 @@ import {
   Lock,
   Palette,
   Star,
-  Puzzle
+  Puzzle,
+  Coins
 } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
@@ -57,19 +59,29 @@ import AdminStock from './AdminStock';
 import AdminCalculation from './AdminCalculation';
 import FlutterManager from './FlutterManager';
 import AdminPaymentMethods from './AdminPaymentMethods';
+import AdminPaymentMerchant from './AdminPaymentMerchant';
 import AdminPaymentList from './AdminPaymentList';
 import AdminLiveTracking from './AdminLiveTracking';
 import ModeratorManagement from './ModeratorManagement';
 import SecuritySettings from './SecuritySettings';
 import SIMLockSecurity from './SIMLockSecurity';
 import AdminBanners from './AdminBanners';
+import BannerListing from './BannerListing';
+import AdminBrandShowcase from './AdminBrandShowcase';
 import AdminGameControl from './AdminGameControl';
 import AdminSupportBanner from './AdminSupportBanner';
 import AdminThemeSettings from './AdminThemeSettings';
 import AdminSupport from './AdminSupport';
+import AdminAIControlCenter from './AdminAIControlCenter';
 import AdminReviews from './AdminReviews';
+import { AdminCoinControl } from './AdminCoinControl';
+import AdminBarControl from './AdminBarControl';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useModeratorStore } from '../../store/useModeratorStore';
+import { useOrderStore } from '../../store/useOrderStore';
+import { useCustomerStore } from '../../store/useCustomerStore';
+import { useSearchStore } from '../../store/useSearchStore';
+import { useLeadStore } from '../../store/useLeadStore';
 import { defaultNavItems } from '../../lib/adminMenus';
 import { useMenuSortStore } from '../../store/useMenuSortStore';
 import AdminMenuManagement from './AdminMenuManagement';
@@ -79,6 +91,21 @@ import AdminCourierCharges from './AdminCourierCharges';
 import AdminLoginInfo from './AdminLoginInfo';
 import AdminPromoCodes from './AdminPromoCodes';
 import AdminSiteManagement from './AdminSiteManagement';
+import AdminStoreIdentity from './AdminStoreIdentity';
+import AdminBranding from './AdminBranding';
+import AdminBusinessAddress from './AdminBusinessAddress';
+import AdminSocialLinks from './AdminSocialLinks';
+import AdminMarketingSetup from './AdminMarketingSetup';
+import AdminMarketingCenter from './AdminMarketingCenter';
+import AdminMarketingTracking from './AdminMarketingTracking';
+import AdminPushNotifications from './AdminPushNotifications';
+import AdminInfrastructure from './AdminInfrastructure';
+import AdminSearchListing from './AdminSearchListing';
+import AdminOffers from './AdminOffers';
+
+import { useProductStore } from '../../store/useProductStore';
+import { useBannerStore } from '../../store/useBannerStore';
+import MainHeroCarousel from '../../components/home/MainHeroCarousel';
 
 const salesData = [
   { name: 'Jan', revenue: 4000, orders: 240 },
@@ -106,6 +133,7 @@ interface NavItem {
 
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuthStore();
@@ -116,6 +144,18 @@ export default function AdminDashboard() {
     setUnlocked(false);
     logout();
     navigate('/login');
+  };
+
+  const toggleSidebar = () => {
+    if (window.innerWidth >= 768) {
+      const nextCollapsed = !isSidebarCollapsed;
+      setIsSidebarCollapsed(nextCollapsed);
+      if (nextCollapsed) {
+        setOpenMenu(null);
+      }
+    } else {
+      setSidebarOpen(!sidebarOpen);
+    }
   };
 
   const { mainMenuOrder, submenuOrders, renamedMenus = {}, deletedMenus = [] } = useMenuSortStore();
@@ -138,7 +178,14 @@ export default function AdminDashboard() {
     }
 
     items = items.map(item => {
-      let sortedSubItems = item.subItems ? item.subItems.map(sub => ({ ...sub })) : undefined;
+      let sortedSubItems = item.subItems 
+        ? item.subItems
+            .filter(sub => !deletedMenus.includes(`${item.name}:${sub.name}`))
+            .map(sub => ({ 
+              ...sub,
+              name: renamedMenus[`${item.name}:${sub.name}`] || sub.name
+            })) 
+        : undefined;
       
       if (sortedSubItems && sortedSubItems.length > 0) {
         const order = submenuOrders[item.name];
@@ -162,6 +209,53 @@ export default function AdminDashboard() {
     });
 
     return items;
+  };
+
+  const { orders, markAllAsRead: markOrdersRead } = useOrderStore();
+  const { customers, markAllAsRead: markCustomersRead } = useCustomerStore();
+  const { searches, markAllAsRead: markSearchesRead } = useSearchStore();
+  const { leads, markAllAsRead: markLeadsRead } = useLeadStore();
+
+  const getSubItemCount = (name: string): number => {
+    if (name === 'Incomplete Orders') return leads.filter(l => !l.isRead).length;
+    if (name === 'Complete Orders') return orders.filter(o => o.status === 'Delivered').length;
+    if (name === 'Customer Listing') return customers.filter(c => !c.isRead).length;
+    return 0;
+  };
+
+  const getMainItemCount = (name: string): number => {
+    if (name === 'Orders') return orders.filter(o => !o.isRead).length + leads.filter(l => !l.isRead).length;
+    if (name === 'Customers') return customers.filter(c => !c.isRead).length;
+    if (name === 'Search Listing') return searches.filter(s => !s.isRead).length;
+    return 0;
+  };
+
+  useEffect(() => {
+    if (location.pathname === '/admin/orders') {
+      markOrdersRead();
+    }
+    if (location.pathname === '/admin/orders/incomplete') {
+      markLeadsRead();
+    }
+    if (location.pathname.startsWith('/admin/customers')) {
+      markCustomersRead();
+    }
+    if (location.pathname === '/admin/search-listing') {
+      markSearchesRead();
+    }
+  }, [location.pathname, markOrdersRead, markCustomersRead, markSearchesRead, markLeadsRead]);
+
+  const getBadgeStyle = (name: string) => {
+    if (name === 'Orders' || name === 'Incomplete Orders' || name === 'Complete Orders') {
+      return 'bg-gradient-to-br from-rose-500 via-red-600 to-rose-700 shadow-[0_0_15px_rgba(225,29,72,0.4)] animate-pulse border border-white/10';
+    }
+    if (name === 'Customers' || name === 'Customer Listing' || name === 'Add Customer') {
+      return 'bg-gradient-to-br from-violet-500 via-purple-600 to-violet-700 shadow-[0_0_15px_rgba(147,51,234,0.4)] border border-white/10';
+    }
+    if (name === 'Search Listing') {
+      return 'bg-gradient-to-br from-cyan-500 via-blue-600 to-cyan-700 shadow-[0_0_15px_rgba(37,99,235,0.4)] animate-pulse border border-white/10';
+    }
+    return 'bg-red-600';
   };
 
   const navItems = getSortedNavItems();
@@ -214,76 +308,124 @@ export default function AdminDashboard() {
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+          className="fixed inset-0 bg-black/50 z-[95] md:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed md:sticky top-0 left-0 z-50 w-64 md:w-72 admin-sidebar bg-[#000000] text-white transform transition-transform duration-300 ease-in-out pb-[100px] md:pb-6 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="p-6 min-h-full flex flex-col">
-            <div className="flex justify-between items-start mb-10 shrink-0">
-              <div>
-                <h2 className="text-2xl font-sans font-black tracking-widest uppercase text-white mb-1">TAZU MART BD</h2>
-                <span className="text-[10px] font-black text-gray-500 tracking-[0.2em] uppercase">Enterprise Dashboard</span>
+      <aside 
+        className={`fixed md:sticky top-0 bottom-0 left-0 z-[100] h-screen admin-sidebar bg-[#000000] text-white shadow-2xl transition-all duration-300 ease-in-out overflow-hidden
+          ${sidebarOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full md:translate-x-0'}
+          ${!sidebarOpen && !isSidebarCollapsed ? 'md:w-72' : 'md:w-20'}
+        `}
+      >
+        <div className="h-full flex flex-col overflow-y-auto custom-scrollbar">
+            <div className={`p-6 mb-4 shrink-0 flex items-start transition-all duration-300 ${isSidebarCollapsed && !sidebarOpen ? 'justify-center p-4' : 'justify-between'}`}>
+              <div className={`${isSidebarCollapsed && !sidebarOpen ? 'hidden' : 'block'}`}>
+                <h2 className="text-xl font-sans font-black tracking-widest uppercase text-white mb-1">TAZU MART</h2>
+                <span className="text-[10px] font-black text-gray-500 tracking-[0.1em] uppercase">Admin Core</span>
               </div>
               <button onClick={() => setSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white mt-1">
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
           
-          <nav className="space-y-2 flex-grow">
+          <nav className="space-y-1 flex-grow">
             {filteredNavItems.map((item) => {
               const active = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
               const hasSubmenu = item.subItems && item.subItems.length > 0;
               const isExpanded = openMenu === item.name;
+              const showLabels = !isSidebarCollapsed || sidebarOpen;
 
               return (
                 <div key={item.name} className="flex flex-col gap-1">
                   {hasSubmenu ? (
                     <button
-                      onClick={() => toggleSubmenu(item.name)}
-                      className={`flex items-center justify-between px-4 py-3 rounded-none transition-colors w-full ${active && !isExpanded ? 'bg-white/10 text-white font-semibold' : 'text-gray-300 hover:bg-white/10 hover:text-white'}`}
+                      onClick={() => {
+                        if (!showLabels) {
+                          setIsSidebarCollapsed(false);
+                          setOpenMenu(item.name);
+                        } else {
+                          toggleSubmenu(item.name);
+                        }
+                      }}
+                      className={`flex items-center group px-6 py-4 rounded-none transition-all w-full border-l-[3px] 
+                        ${active && !isExpanded ? 'bg-white/10 text-white font-bold border-purple-500' : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent'}
+                        ${!showLabels ? 'justify-center px-0' : 'justify-between'}
+                      `}
                     >
-                      <div className="flex items-center gap-3">
-                        <item.icon className="w-5 h-5" />
-                        {item.name}
+                      <div className={`flex items-center ${!showLabels ? 'justify-center' : 'gap-4'}`}>
+                        <item.icon className={`w-[20px] h-[20px] transition-all duration-300 ${active && !isExpanded ? 'text-purple-400 scale-110' : 'text-current opacity-70 group-hover:opacity-100'}`} />
+                        {showLabels && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-bold uppercase tracking-tight">{item.name}</span>
+                            {getMainItemCount(item.name) > 0 && (
+                              <span className={`px-2 py-0.5 text-[9px] font-black text-white rounded-full ${getBadgeStyle(item.name)}`}>
+                                {getMainItemCount(item.name)}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                      {showLabels && (
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                      )}
                     </button>
                   ) : (
                     <Link 
                       to={item.path || '#'}
-                      onClick={() => setSidebarOpen(false)}
-                      className={`flex items-center justify-between px-4 py-3 rounded-none transition-colors ${active ? 'bg-white text-[#000000] font-semibold' : 'text-gray-300 hover:bg-white/10 hover:text-white'}`}
+                      onClick={() => {
+                        if (window.innerWidth < 768) setSidebarOpen(false);
+                      }}
+                      className={`flex items-center group px-6 py-4 rounded-none transition-all border-l-[3px] 
+                        ${active ? 'bg-white text-[#000000] font-black border-purple-600' : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent'}
+                        ${!showLabels ? 'justify-center px-0' : 'justify-between'}
+                      `}
                     >
-                      <div className="flex items-center gap-3">
-                        <item.icon className="w-5 h-5" />
-                        {item.name}
+                      <div className={`flex items-center ${!showLabels ? 'justify-center' : 'gap-4'}`}>
+                        <item.icon className={`w-[20px] h-[20px] transition-all duration-300 ${active ? 'text-purple-600 scale-110' : 'text-current opacity-70 group-hover:opacity-100'}`} />
+                        {showLabels && (
+                          <div className="flex items-center gap-2">
+                             <span className="text-[13px] font-bold uppercase tracking-tight">{item.name}</span>
+                             {getMainItemCount(item.name) > 0 && (
+                               <span className={`px-2 py-0.5 text-[9px] font-black text-white rounded-full ${getBadgeStyle(item.name)}`}>
+                                 {getMainItemCount(item.name)}
+                               </span>
+                             )}
+                          </div>
+                        )}
                       </div>
-                      {item.name === '🛠 Admin Management' && (
-                        <ChevronRight className="w-4 h-4" />
+                      {showLabels && item.name === '🛠 Admin Management' && (
+                        <ChevronRight className="w-3.5 h-3.5 opacity-40" />
                       )}
                     </Link>
                   )}
 
-                  {hasSubmenu && (
+                  {hasSubmenu && showLabels && (
                     <div 
-                       className="overflow-hidden transition-all duration-300 ease-in-out"
-                       style={{ maxHeight: isExpanded ? '400px' : '0px', opacity: isExpanded ? 1 : 0 }}
+                       className="overflow-hidden transition-all duration-500 ease-in-out"
+                       style={{ maxHeight: isExpanded ? `${item.subItems!.length * 50 + 20}px` : '0px', opacity: isExpanded ? 1 : 0 }}
                     >
-                      <div className="pl-[20px] pt-1 space-y-1">
+                      <div className="pl-6 py-2 flex flex-col gap-1 border-l border-white/10 ml-8 mt-1 mb-2">
                         {item.subItems!.map(subItem => {
                           const subActive = location.pathname === subItem.path;
                           return (
                             <Link
                               key={subItem.name}
                               to={subItem.path}
-                              onClick={() => setSidebarOpen(false)}
-                              className={`flex items-center gap-3 px-4 py-2.5 rounded-none text-sm transition-colors ${subActive ? 'bg-white text-[#000000] font-bold shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                              onClick={() => {
+                                if (window.innerWidth < 768) setSidebarOpen(false);
+                              }}
+                              className={`flex items-center gap-3 px-6 py-2.5 rounded-none text-[11px] transition-all group/sub ${subActive ? 'text-white font-bold' : 'text-gray-500 hover:text-white'}`}
                             >
-                              <subItem.icon className="w-4 h-4" />
-                              {subItem.name}
+                              <div className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${subActive ? 'bg-cyan-400 scale-125' : 'bg-gray-700 group-hover/sub:bg-gray-400'}`} />
+                              <span className="uppercase tracking-[0.15em] flex-1 font-semibold">{subItem.name}</span>
+                              {getSubItemCount(subItem.name) > 0 && (
+                                <span className={`px-2 py-0.5 text-[8px] font-black text-white rounded-full ${getBadgeStyle(subItem.name)}`}>
+                                  {getSubItemCount(subItem.name)}
+                                </span>
+                              )}
                             </Link>
                           );
                         })}
@@ -295,12 +437,14 @@ export default function AdminDashboard() {
             })}
           </nav>
           
-          <div className="mt-auto px-4 py-3 flex flex-col gap-4">
-             <Link to="/" className="text-gray-400 hover:text-white flex items-center gap-2 text-sm transition-colors font-medium">
-                ← Back to Store
+          <div className={`mt-auto p-6 flex flex-col gap-5 border-t border-white/5 transition-all ${isSidebarCollapsed && !sidebarOpen ? 'px-0 items-center' : ''}`}>
+             <Link to="/" className={`text-gray-500 hover:text-white flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
+                <Monitor className="w-5 h-5" />
+                {(!isSidebarCollapsed || sidebarOpen) && "Back to Store"}
              </Link>
-             <button onClick={handleLogout} className="text-red-400 hover:text-red-300 flex items-center gap-2 text-sm transition-colors font-medium text-left">
-                <LogOut className="w-4 h-4" /> Logout
+             <button onClick={handleLogout} className={`text-red-500/80 hover:text-red-400 flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all text-left ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
+                <LogOut className="w-5 h-5" />
+                {(!isSidebarCollapsed || sidebarOpen) && "End Session"}
              </button>
           </div>
         </div>
@@ -312,13 +456,13 @@ export default function AdminDashboard() {
         <header className="bg-white border-b border-[#EEEEEE] h-[72px] flex items-center justify-between px-4 sm:px-8 shrink-0 shadow-sm z-10 relative">
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => setSidebarOpen(true)}
-              className="md:hidden text-[#000000] hover:text-gray-600 focus:outline-none"
+              onClick={toggleSidebar}
+              className="p-2 text-[#000000] hover:bg-gray-100 rounded-lg transition-colors focus:outline-none"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-2xl font-sans text-[#000000] font-bold hidden sm:block capitalize">
-              {location.pathname === '/admin' ? 'Overview' : location.pathname.split('/').pop()}
+            <h1 className="text-lg md:text-2xl font-sans text-[#000000] font-bold hidden sm:block capitalize truncate max-w-[200px] md:max-w-none">
+              {location.pathname === '/admin' ? 'Dashboard Overview' : location.pathname.split('/').pop()?.replace(/-/g, ' ')}
             </h1>
           </div>
           <div className="flex items-center gap-4">
@@ -361,6 +505,7 @@ export default function AdminDashboard() {
            <Routes>
               <Route path="/" element={<PermissionGate moduleId="dashboard"><Overview /></PermissionGate>} />
               <Route path="/products/*" element={<PermissionGate moduleId="products"><AdminProducts /></PermissionGate>} />
+              <Route path="/offers/*" element={<PermissionGate moduleId="products"><AdminOffers /></PermissionGate>} />
               <Route path="/categories/*" element={<PermissionGate moduleId="categories"><AdminCategories /></PermissionGate>} />
               <Route path="/orders/*" element={<PermissionGate moduleId="orders"><AdminOrders /></PermissionGate>} />
               <Route path="/orders/incomplete" element={<PermissionGate moduleId="orders"><AdminIncompleteOrders /></PermissionGate>} />
@@ -372,6 +517,7 @@ export default function AdminDashboard() {
               <Route path="/management/security" element={<PermissionGate moduleId="roles" superAdminOnly><SecuritySettings /></PermissionGate>} />
               <Route path="/management/sim-lock" element={<PermissionGate moduleId="roles" superAdminOnly><SIMLockSecurity /></PermissionGate>} />
               <Route path="/payments" element={<PermissionGate moduleId="payments"><AdminPaymentMethods /></PermissionGate>} />
+              <Route path="/payments/merchant" element={<PermissionGate moduleId="payments"><AdminPaymentMerchant /></PermissionGate>} />
               <Route path="/payment-list" element={<PermissionGate moduleId="payments"><AdminPaymentList /></PermissionGate>} />
               <Route path="/login-info" element={<PermissionGate moduleId="analytics"><AdminLoginInfo /></PermissionGate>} />
               <Route path="/automation" element={<PermissionGate moduleId="settings"><AdminAutomation /></PermissionGate>} />
@@ -379,21 +525,49 @@ export default function AdminDashboard() {
               <Route path="/theme-settings" element={<PermissionGate moduleId="settings"><AdminThemeSettings /></PermissionGate>} />
               <Route path="/flutter-manager" element={<PermissionGate moduleId="settings"><FlutterManager /></PermissionGate>} />
               <Route path="/activity-logs" element={<PermissionGate moduleId="logs"><ComingSoon title="Activity Logs" /></PermissionGate>} />
-              <Route path="/banners" element={<PermissionGate moduleId="banners"><AdminBanners /></PermissionGate>} />
+              <Route path="/banner/create" element={<PermissionGate moduleId="banners"><AdminBanners /></PermissionGate>} />
+              <Route path="/banner/list" element={<PermissionGate moduleId="banners"><BannerListing /></PermissionGate>} />
+              <Route path="/brand-showcase" element={<PermissionGate moduleId="banners"><AdminBrandShowcase /></PermissionGate>} />
               <Route path="/management/site-management" element={<PermissionGate moduleId="dashboard"><AdminSiteManagement /></PermissionGate>} />
+              <Route path="/management/store-identity" element={<PermissionGate moduleId="dashboard"><AdminStoreIdentity /></PermissionGate>} />
+              <Route path="/management/branding" element={<PermissionGate moduleId="dashboard"><AdminBranding /></PermissionGate>} />
+              <Route path="/management/business-address" element={<PermissionGate moduleId="dashboard"><AdminBusinessAddress /></PermissionGate>} />
+              <Route path="/management/social-links" element={<PermissionGate moduleId="dashboard"><AdminSocialLinks /></PermissionGate>} />
               <Route path="/management/support-banner" element={<PermissionGate moduleId="dashboard"><AdminSupportBanner /></PermissionGate>} />
               <Route path="/support" element={<PermissionGate moduleId="support"><AdminSupport /></PermissionGate>} />
+              <Route path="/ai-control-center" element={<PermissionGate moduleId="settings"><AdminAIControlCenter /></PermissionGate>} />
               <Route path="/reviews" element={<PermissionGate moduleId="dashboard"><AdminReviews /></PermissionGate>} />
+              <Route path="/search-listing" element={<PermissionGate moduleId="products"><AdminSearchListing /></PermissionGate>} />
+              <Route path="/search-analytics" element={<PermissionGate moduleId="analytics"><AdminSearchListing /></PermissionGate>} />
+              <Route path="/analytics" element={<PermissionGate moduleId="analytics"><AdminAnalytics /></PermissionGate>} />
               <Route path="/menu-management" element={<PermissionGate moduleId="settings"><AdminMenuManagement /></PermissionGate>} />
               <Route path="/system-management" element={<PermissionGate moduleId="dashboard"><AdminManagementModule /></PermissionGate>} />
               <Route path="/management/bar-management" element={<PermissionGate moduleId="settings"><AdminMenuManagement /></PermissionGate>} />
               <Route path="/management/review-monitoring" element={<PermissionGate moduleId="dashboard"><AdminReviews /></PermissionGate>} />
               <Route path="/management/promo-codes" element={<PermissionGate moduleId="dashboard"><AdminPromoCodes /></PermissionGate>} />
+              <Route path="/management/push-notifications" element={<PermissionGate moduleId="dashboard"><AdminPushNotifications /></PermissionGate>} />
               <Route path="/management/banner-management" element={<PermissionGate moduleId="banners"><AdminBanners /></PermissionGate>} />
               <Route path="/management/popup-management" element={<PermissionGate moduleId="dashboard"><AdminPopupManagement /></PermissionGate>} />
               <Route path="/delivery/courier-api" element={<PermissionGate moduleId="orders"><AdminCourierAPI /></PermissionGate>} />
               <Route path="/delivery/courier-charge" element={<PermissionGate moduleId="orders"><AdminCourierCharges /></PermissionGate>} />
               <Route path="/game-control" element={<PermissionGate moduleId="dashboard"><AdminGameControl /></PermissionGate>} />
+              <Route path="/coin-control" element={<PermissionGate moduleId="dashboard"><AdminCoinControl /></PermissionGate>} />
+              <Route path="/bar-control" element={<PermissionGate moduleId="dashboard"><AdminBarControl /></PermissionGate>} />
+              <Route path="/marketing/facebook" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+              <Route path="/marketing/tiktok" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+              <Route path="/marketing/google" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+              <Route path="/marketing-center" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+               <Route path="/marketing/serverside" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+               <Route path="/marketing/website" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+               <Route path="/marketing/pinterest" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+               <Route path="/marketing/snapchat" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+               <Route path="/marketing/linkedin" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+               <Route path="/marketing/microsoft" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+               <Route path="/marketing/attribution" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+               <Route path="/marketing/testing" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+              <Route path="/marketing-tracking" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+              <Route path="/infrastructure" element={<PermissionGate moduleId="settings"><AdminInfrastructure /></PermissionGate>} />
+              <Route path="/infrastructure/*" element={<PermissionGate moduleId="settings"><AdminInfrastructure /></PermissionGate>} />
            </Routes>
         </div>
       </main>
@@ -401,20 +575,25 @@ export default function AdminDashboard() {
   );
 }
 
-function KPICard({ label, value, trend, icon: Icon, borderClass }: { label: string, value: string, trend: string, icon: any, borderClass: string }) {
+function KPICard({ label, value, trend, icon: Icon, borderClass, themeColor }: { label: string, value: string, trend: string, icon: any, borderClass: string, themeColor: string }) {
   return (
-    <div className={`bg-white p-4 lg:p-5 rounded-none border-l-[5px] ${borderClass} border border-[#EEEEEE] shadow-[0_4px_20px_rgb(0,0,0,0.02)] hover:-translate-y-1 transition-transform min-h-[130px] flex flex-col justify-between group`}>
-      <div className="flex justify-between items-start mb-2">
-        <div className="p-2 bg-gray-50 rounded-none group-hover:bg-black group-hover:text-white transition-all">
-          <Icon className="w-5 h-5 transition-colors" />
+    <div className={`bg-white p-4 lg:p-5 rounded-none border-l-[4px] ${borderClass} border border-[#EEEEEE] shadow-[0_2px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:-translate-y-1 transition-all duration-300 min-h-[140px] flex flex-col justify-between group relative overflow-hidden`}>
+      {/* Subtle Background Tint */}
+      <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-[0.03] transition-transform duration-500 group-hover:scale-150`} style={{ backgroundColor: themeColor }}></div>
+      
+      <div className="flex justify-between items-start mb-2 relative z-10">
+        <div className={`p-2.5 rounded-none transition-all duration-300`} style={{ backgroundColor: `${themeColor}10`, color: themeColor }}>
+           <Icon className="w-4.5 h-4.5" />
         </div>
-        <span className="flex items-center text-[10px] sm:text-xs font-black text-black bg-gray-50 px-2 py-0.5 rounded-none border border-gray-100">
+        <span className="flex items-center text-[10px] sm:text-[11px] font-black px-2 py-1 rounded-none border transition-colors duration-300" 
+              style={{ backgroundColor: `${themeColor}08`, borderColor: `${themeColor}20`, color: themeColor }}>
           {trend} <ArrowUpRight className="w-3 h-3 ml-0.5" />
         </span>
       </div>
-      <div>
-        <h3 className="text-[#666666] text-[10px] font-black uppercase tracking-widest mb-1">{label}</h3>
-        <div className="text-lg sm:text-xl md:text-2xl font-black text-[#000000] truncate">
+      
+      <div className="relative z-10">
+        <h3 className="text-gray-400 text-[9px] font-black uppercase tracking-[0.2em] mb-1.5">{label}</h3>
+        <div className="text-xl sm:text-2xl font-black text-[#000000] tracking-tighter truncate">
           {value}
         </div>
       </div>
@@ -422,15 +601,32 @@ function KPICard({ label, value, trend, icon: Icon, borderClass }: { label: stri
   );
 }
 
-const COLORS = ['#000000', '#333333', '#666666', '#999999'];
+const COLORS = ['#18181b', '#0ea5e9', '#a855f7', '#f43f5e'];
 const doughnutData = [
-  { name: 'Delivered', value: 480 },
-  { name: 'Processing', value: 240 },
-  { name: 'Pending', value: 180 },
-  { name: 'Cancelled', value: 120 },
+  { name: 'Delivered', value: 480, color: '#18181b' },
+  { name: 'Processing', value: 240, color: '#0ea5e9' },
+  { name: 'Pending', value: 180, color: '#a855f7' },
+  { name: 'Cancelled', value: 120, color: '#f43f5e' },
 ];
 
 function Overview() {
+  const { autoRankTrending, autoRankBestSellers } = useProductStore();
+  const [rankingStatus, setRankingStatus] = useState<string | null>(null);
+  const { banners: storeBanners } = useBannerStore();
+
+  const handleAutoRank = async (type: 'trending' | 'best') => {
+    setRankingStatus(type === 'trending' ? 'Ranking Trending...' : 'Ranking Best Sellers...');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (type === 'trending') autoRankTrending();
+    else autoRankBestSellers();
+    setRankingStatus('Ranking Updated ✓');
+    setTimeout(() => setRankingStatus(null), 3000);
+  };
+
+  const activeBanners = storeBanners.filter(b => b.status === 'active' && (b.image || b.bannerType === 'designed'));
+  
+  const displayBanners = activeBanners;
+
   return (
     <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8 hidden md:flex">
@@ -438,133 +634,206 @@ function Overview() {
            <h2 className="text-2xl font-sans font-bold text-[#000000]">Overview Analytics</h2>
            <p className="text-[#666666] text-sm mt-1">Here's what's happening with your store today.</p>
         </div>
-        <div className="flex bg-white border border-[#EEEEEE] rounded-none p-1 shadow-sm">
-          {['Weekly', 'Monthly', 'Yearly'].map((period, i) => (
-            <button key={period} className={`px-4 py-1.5 text-sm font-semibold rounded-none transition-colors ${i === 1 ? 'bg-[#000000] text-white' : 'text-[#666666] hover:bg-gray-50'}`}>
-              {period}
-            </button>
-          ))}
+        <div className="flex gap-4">
+           {rankingStatus && (
+             <span className="text-[10px] font-black text-purple-600 bg-purple-50 px-4 py-2 border border-purple-100 uppercase tracking-widest animate-pulse flex items-center">
+               {rankingStatus}
+             </span>
+           )}
+           <div className="flex bg-white border border-[#EEEEEE] rounded-none p-1 shadow-sm">
+             {['Weekly', 'Monthly', 'Yearly'].map((period, i) => (
+               <button key={period} className={`px-4 py-1.5 text-sm font-semibold rounded-none transition-colors ${i === 1 ? 'bg-[#000000] text-white' : 'text-[#666666] hover:bg-gray-50'}`}>
+                 {period}
+               </button>
+             ))}
+           </div>
         </div>
       </div>
 
-      <div className="space-y-6 lg:space-y-8 mb-8">
+      <motion.section 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="w-full mb-10 overflow-hidden"
+      >
+        <MainHeroCarousel banners={displayBanners as any} />
+      </motion.section>
+
+      <div className="space-y-6 lg:space-y-10 mb-10">
         {/* Sales Overview */}
-        <div className="bg-white p-6 rounded-none border border-[#EEEEEE] shadow-[0_4px_20px_rgb(0,0,0,0.02)]">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-sans font-bold text-[#000000]">Sales Overview</h3>
-            <button className="text-[#000000] font-semibold text-sm hover:underline">Download Report</button>
+        <div className="bg-white p-6 lg:p-8 rounded-none border border-neutral-100 shadow-[0_4px_25px_rgba(0,0,0,0.02)] relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-1 h-full bg-purple-600"></div>
+          <div className="flex justify-between items-center mb-8 relative z-10">
+            <div className="flex flex-col gap-1">
+              <h3 className="text-xl font-sans font-black text-[#0a0a0a] uppercase tracking-tighter">Marketplace Revenue</h3>
+              <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-[0.2em]">Real-time Transactional Flow</p>
+            </div>
+            <button className="text-[10px] bg-neutral-50 hover:bg-purple-50 text-neutral-900 px-4 py-2 border border-neutral-200 font-black hover:border-purple-200 transition-all uppercase tracking-widest active:scale-95">Download Analytics</button>
           </div>
-          <div className="h-[320px]">
+          <div className="h-[340px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={salesData}>
                 <defs>
                   <linearGradient id="colorRevenueOverview" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#000000" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#000000" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.15}/>
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEEEEE" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#666666', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#666666', fontSize: 12}} tickFormatter={(value) => `$${value}`} dx={-10} />
-                <RechartsTooltip contentStyle={{ borderRadius: '16px', border: '1px solid #EEEEEE', boxShadow: '0 4px 20px rgb(0,0,0,0.05)' }} />
-                <Area type="monotone" dataKey="revenue" stroke="#000000" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenueOverview)" />
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 10, fontWeight: 700}} dy={15} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 10, fontWeight: 700}} tickFormatter={(value) => `৳${value}`} dx={-10} />
+                <RechartsTooltip 
+                  contentStyle={{ 
+                    borderRadius: '0px', 
+                    border: '1px solid #f0f0f0', 
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
+                    padding: '12px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)'
+                  }} 
+                  itemStyle={{ fontSize: '12px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                  labelStyle={{ fontSize: '10px', color: '#9ca3af', marginBottom: '4px', fontWeight: '800' }}
+                />
+                <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenueOverview)" animationDuration={2000} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Order Statistics Chart & Stats side by side or stacked */}
-        <div className="bg-white p-6 rounded-none border border-[#EEEEEE] shadow-[0_4px_20px_rgb(0,0,0,0.02)] flex flex-col sm:flex-row gap-8 items-center justify-between">
-          <div className="w-full sm:w-[45%] h-[280px]">
-            <h3 className="text-lg font-sans font-bold text-[#000000] mb-2 text-center sm:text-left">Order Statistics</h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={doughnutData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={70}
-                  outerRadius={90}
-                  fill="#8884d8"
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {doughnutData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgb(0,0,0,0.08)' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="w-full sm:w-[45%] grid grid-cols-2 gap-4">
-            {doughnutData.map((item, i) => (
-              <div key={item.name} className="flex flex-col gap-1 bg-gray-50 p-4 rounded-none border border-[#EEEEEE]">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-none shrink-0" style={{ backgroundColor: COLORS[i] }}></span>
-                  <span className="text-sm font-semibold text-[#666666]">{item.name}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+          {/* Order Statistics */}
+          <div className="bg-white p-6 lg:p-8 rounded-none border border-neutral-100 shadow-[0_4px_25px_rgba(0,0,0,0.02)] relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-blue-600"></div>
+            <div className="mb-8">
+              <h3 className="text-lg font-sans font-black text-[#0a0a0a] uppercase tracking-tighter">Order Distribution</h3>
+              <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-[0.2em]">Fulfillment Analytics</p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row items-center gap-8 lg:gap-12">
+              <div className="w-full sm:w-[50%] h-[260px] relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={doughnutData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={85}
+                      fill="#8884d8"
+                      paddingAngle={8}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {doughnutData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      contentStyle={{ borderRadius: '0px', border: '1px solid #f0f0f0', boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }} 
+                      itemStyle={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center text for donut */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Total</span>
+                  <span className="text-2xl font-black text-neutral-900">1,020</span>
                 </div>
-                <span className="text-xl font-bold text-[#000000]">{item.value}</span>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Customer Growth Analytics */}
-        <div className="bg-white p-6 rounded-none border border-[#EEEEEE] shadow-[0_4px_20px_rgb(0,0,0,0.02)]">
-          <h3 className="text-lg font-sans font-bold text-[#000000] mb-6">Customer Growth Analytics</h3>
-          <div className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={salesData} barSize={40}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEEEEE" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#666666', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#666666', fontSize: 12}} dx={-10} />
-                <RechartsTooltip cursor={{fill: '#f8f8f8'}} contentStyle={{ borderRadius: '12px', border: '1px solid #EEEEEE', boxShadow: '0 4px 20px rgb(0,0,0,0.05)' }} />
-                <Bar dataKey="orders" fill="#000000" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+              <div className="w-full sm:w-[50%] grid grid-cols-2 gap-3">
+                {doughnutData.map((item, i) => (
+                  <div key={item.name} className="flex items-center justify-between p-3.5 bg-neutral-50/50 hover:bg-neutral-50 border-l-[3px] border-neutral-100 transition-all" style={{ borderLeftColor: item.color }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }}></div>
+                      <span className="text-[11px] font-black text-neutral-900 uppercase tracking-wider">{item.name}</span>
+                    </div>
+                    <span className="text-sm font-black text-neutral-900">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Customer Growth Analytics */}
+          <div className="bg-white p-6 lg:p-8 rounded-none border border-neutral-100 shadow-[0_4px_25px_rgba(0,0,0,0.02)] relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-cyan-600"></div>
+            <div className="mb-10 flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-sans font-black text-[#0a0a0a] uppercase tracking-tighter">Acquisition Velocity</h3>
+                <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-[0.2em]">New User Projections</p>
+              </div>
+              <Activity className="w-5 h-5 text-cyan-400 opacity-50" />
+            </div>
+            
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={salesData} barSize={32}>
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0891b2" stopOpacity={1}/>
+                      <stop offset="100%" stopColor="#0891b2" stopOpacity={0.7}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 10, fontWeight: 700}} dy={12} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 10, fontWeight: 700}} dx={-10} />
+                  <RechartsTooltip 
+                    cursor={{fill: '#f9fafb'}} 
+                    contentStyle={{ borderRadius: '0px', border: '1px solid #f0f0f0', boxShadow: '0 8px 25px rgba(0,0,0,0.06)' }}
+                    itemStyle={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase' }}
+                  />
+                  <Bar dataKey="orders" fill="url(#barGradient)" radius={[4, 4, 0, 0]} animationDuration={1500} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>
 
       {/* KPI Cards Grid */}
       <h3 className="text-lg font-sans font-black text-[#000000] mb-4 uppercase tracking-tighter">Enterprise Insights</h3>
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-8">
-         <KPICard label="Total Sales" value="BDT 854,200" trend="+18.2%" icon={DollarSign} borderClass="border-l-black" />
-         <KPICard label="Total Orders" value="1,254" trend="+12.4%" icon={ShoppingBag} borderClass="border-l-black" />
-         <KPICard label="Total Customers" value="842" trend="+8.5%" icon={Users} borderClass="border-l-black" />
-         <KPICard label="Total Revenue" value="BDT 1,240K" trend="+15.3%" icon={Activity} borderClass="border-l-black" />
-         <KPICard label="Total Reviews" value="3,842" trend="+9.8%" icon={Star} borderClass="border-l-black" />
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-10">
+         <KPICard label="Total Sales" value="BDT 854,200" trend="+18.2%" icon={DollarSign} borderClass="border-l-purple-600" themeColor="#9333ea" />
+         <KPICard label="Total Orders" value="1,254" trend="+12.4%" icon={ShoppingBag} borderClass="border-l-blue-600" themeColor="#2563eb" />
+         <KPICard label="Total Customers" value="842" trend="+8.5%" icon={Users} borderClass="border-l-cyan-600" themeColor="#0891b2" />
+         <KPICard label="Total Revenue" value="BDT 1,240K" trend="+15.3%" icon={Activity} borderClass="border-l-emerald-600" themeColor="#10b981" />
+         <KPICard label="Total Reviews" value="3,842" trend="+9.8%" icon={Star} borderClass="border-l-rose-600" themeColor="#e11d48" />
       </div>
 
       {/* Tables Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 mb-6">
         {/* Top Selling Products */}
-        <div className="bg-white rounded-none border border-[#222] overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-[#222] flex justify-between items-center shrink-0 bg-black text-white">
-            <h3 className="text-sm font-black uppercase tracking-widest">Top Selling Products</h3>
-            <button className="text-[10px] bg-white text-black px-3 py-1 font-black hover:bg-gray-100 transition-colors uppercase tracking-widest">View Details</button>
+        <div className="bg-white rounded-none border border-neutral-100 overflow-hidden flex flex-col shadow-[0_2px_15px_rgba(0,0,0,0.02)]">
+          <div className="p-6 border-b border-neutral-100 flex justify-between items-center shrink-0 bg-[#0a0a0a] text-white">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
+               <div className="w-1 h-3 bg-purple-500 rounded-full"></div> Main Marketplace Trends
+            </h3>
+            <button className="text-[9px] bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 font-black transition-all uppercase tracking-widest active:scale-95">View Trends</button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50 text-black text-[10px] uppercase tracking-[0.2em] font-black border-b border-[#222]">
-                  <th className="p-4">Product Name</th>
-                  <th className="p-4">Sales Amount</th>
-                  <th className="p-4 text-right">Sold Count</th>
+                <tr className="bg-neutral-50/50 text-neutral-400 text-[9px] uppercase tracking-[0.2em] font-black border-b border-neutral-100">
+                  <th className="p-5">Catalog Item</th>
+                  <th className="p-5">Value</th>
+                  <th className="p-5 text-right">Volume</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E5E5E5] text-sm">
+              <tbody className="divide-y divide-neutral-100 text-sm">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i} className="hover:bg-gray-50 transition-colors group">
-                    <td className="p-4 text-[#000000] font-medium flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-50 rounded-none border border-[#E5E5E5] shrink-0 group-hover:border-black transition-colors"></div>
-                      <span className="font-bold truncate text-[13px] uppercase tracking-tight">Luxury Perfume {i}</span>
+                  <tr key={i} className="hover:bg-neutral-50/50 transition-colors group">
+                    <td className="p-5 text-[#000000] font-medium flex items-center gap-4">
+                      <div className="w-11 h-11 bg-neutral-100 rounded-none border border-neutral-200 shrink-0 group-hover:border-purple-300 transition-colors relative overflow-hidden">
+                         <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 to-transparent"></div>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-black truncate text-[12px] uppercase tracking-wide text-neutral-900 group-hover:text-purple-600 transition-colors">Luxury Perfume {i}</span>
+                        <span className="text-[10px] text-neutral-400 font-bold tracking-widest uppercase mt-0.5">Fashion & Beauty</span>
+                      </div>
                     </td>
-                    <td className="p-4 text-[#000000] font-black text-[13px]">{formatPrice(15000 - i * 1000)}</td>
-                    <td className="p-4 text-right">
-                      <span className="bg-black text-white px-2 py-1 rounded-none font-black text-[10px] whitespace-nowrap uppercase tracking-tighter">{120 - i * 10} Units</span>
+                    <td className="p-5 text-neutral-900 font-black text-xs">{formatPrice(15000 - i * 1000)}</td>
+                    <td className="p-5 text-right">
+                      <span className="bg-neutral-950 text-white px-2.5 py-1 rounded-none font-black text-[9px] whitespace-nowrap uppercase tracking-widest group-hover:bg-purple-600 transition-colors shadow-sm">{120 - i * 10} Units</span>
                     </td>
                   </tr>
                 ))}
@@ -574,34 +843,36 @@ function Overview() {
         </div>
 
         {/* Recent Orders */}
-        <div className="bg-white rounded-none border border-[#222] overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-[#222] flex justify-between items-center shrink-0 bg-black text-white">
-            <h3 className="text-sm font-black uppercase tracking-widest">Recent Activity Logs</h3>
-            <button className="text-[10px] bg-white text-black px-3 py-1 font-black hover:bg-gray-100 transition-colors uppercase tracking-widest">View All</button>
+        <div className="bg-white rounded-none border border-neutral-100 overflow-hidden flex flex-col shadow-[0_2px_15px_rgba(0,0,0,0.02)]">
+          <div className="p-6 border-b border-neutral-100 flex justify-between items-center shrink-0 bg-[#0a0a0a] text-white">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
+               <div className="w-1 h-3 bg-cyan-500 rounded-full"></div> Recent Logistics Feed
+            </h3>
+            <button className="text-[9px] bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 font-black transition-all uppercase tracking-widest active:scale-95">All Activity</button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse border-y border-neutral-50/50">
               <thead>
-                <tr className="bg-gray-50 text-black text-[10px] uppercase tracking-[0.2em] font-black border-b border-[#222]">
-                  <th className="p-4">Order ID</th>
-                  <th className="p-4">Customer</th>
-                  <th className="p-4">Amount</th>
-                  <th className="p-4 text-right">Status</th>
+                <tr className="bg-neutral-50/50 text-neutral-400 text-[9px] uppercase tracking-[0.2em] font-black border-b border-neutral-100">
+                  <th className="p-5">Order Reference</th>
+                  <th className="p-5">Beneficiary</th>
+                  <th className="p-5">Total</th>
+                  <th className="p-5 text-right">Fulfillment</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E5E5E5] text-sm text-black">
+              <tbody className="divide-y divide-neutral-100 text-sm text-black">
                 {[1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i} className="hover:bg-gray-50 transition-colors group">
-                    <td className="p-4 text-black font-black whitespace-nowrap text-[13px]">#ORD-0{i}82</td>
-                    <td className="p-4 text-gray-500 font-bold whitespace-nowrap text-[13px]">Jane Smith</td>
-                    <td className="p-4 text-black font-black whitespace-nowrap text-[13px]">{formatPrice(12500)}</td>
-                    <td className="p-4 text-right">
-                      <span className={`px-2.5 py-1 text-[10px] font-black rounded-none border whitespace-nowrap uppercase tracking-tighter ${
-                        i === 1 ? 'bg-black text-white border-black' :
-                        i === 2 ? 'bg-zinc-800 text-white border-zinc-800' :
-                        i === 3 ? 'bg-zinc-600 text-white border-zinc-600' :
-                        i === 4 ? 'bg-zinc-400 text-white border-zinc-400' :
-                        'bg-white text-black border-black'
+                  <tr key={i} className="hover:bg-neutral-50/50 transition-colors group">
+                    <td className="p-5 text-neutral-900 font-black whitespace-nowrap text-xs group-hover:text-cyan-600 transition-colors">#ORD-0{i}82</td>
+                    <td className="p-5 text-neutral-500 font-bold whitespace-nowrap text-xs">Jane Smith</td>
+                    <td className="p-5 text-neutral-900 font-black whitespace-nowrap text-xs">{formatPrice(12500)}</td>
+                    <td className="p-5 text-right">
+                      <span className={`px-2.5 py-1.5 text-[9px] font-black rounded-none border whitespace-nowrap uppercase tracking-widest shadow-sm transition-all ${
+                        i === 1 ? 'bg-purple-600 text-white border-purple-600' :
+                        i === 2 ? 'bg-blue-600 text-white border-blue-600' :
+                        i === 3 ? 'bg-amber-500 text-white border-amber-500' :
+                        i === 4 ? 'bg-rose-500 text-white border-rose-500' :
+                        'bg-emerald-500 text-white border-emerald-500'
                       }`}>
                         {i === 1 ? 'Delivered' : i === 2 ? 'Processing' : i === 3 ? 'Pending' : i === 4 ? 'Cancelled' : 'Refunded'}
                       </span>

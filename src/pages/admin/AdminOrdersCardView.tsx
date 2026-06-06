@@ -40,50 +40,15 @@ import { useProductStore } from '../../store/useProductStore';
 import { formatPrice } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
+
 
 import PremiumOrderAdd from './PremiumOrderAdd';
+import { OrderActionSheet } from '../../components/admin/OrderActionSheet';
 
 // --- Sub-Components ---
 
-const DropdownMenu = ({ 
-  orderId, 
-  onTracking, 
-  onEdit,
-  onClose 
-}: { 
-  orderId: string; 
-  onTracking: () => void;
-  onEdit: () => void;
-  onClose: () => void;
-}) => {
-  const navigate = useNavigate();
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: -10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: -10 }}
-        className="absolute right-0 top-10 w-48 bg-white border border-gray-100 shadow-xl rounded-xl z-50 overflow-hidden"
-      >
-        <button 
-          onClick={() => { onEdit(); onClose(); }}
-          className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-50"
-        >
-          <Edit2 className="w-4 h-4 text-purple-600" />
-          Edit Order
-        </button>
-        <button 
-          onClick={() => { onTracking(); onClose(); }}
-          className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <Truck className="w-4 h-4 text-blue-500" />
-          Order Tracking
-        </button>
-      </motion.div>
-    </>
-  );
-};
+// We now use the premium OrderActionSheet component imported above instead of the simple DropdownMenu
 
 const TrackingSheet = ({ 
   order: initialOrder, 
@@ -353,17 +318,18 @@ export default function AdminOrdersCardView() {
                  <div className="relative">
                    <button 
                      onClick={() => setActiveMenu(activeMenu === order.id ? null : order.id)}
-                     className="p-1 text-gray-400 hover:text-black transition-colors"
+                     className="p-1 text-gray-400 hover:text-black transition-colors cursor-pointer"
                    >
                      <Menu className="w-5 h-5" />
                    </button>
                    <AnimatePresence>
                      {activeMenu === order.id && (
-                       <DropdownMenu 
-                         orderId={order.id}
-                         onTracking={() => setTrackingOrder(order)}
-                         onEdit={() => setEditingOrderId(order.id)}
+                       <OrderActionSheet 
+                         order={order}
+                         isOpen={activeMenu === order.id}
                          onClose={() => setActiveMenu(null)}
+                         onEdit={() => setEditingOrderId(order.id)}
+                         onTracking={() => setTrackingOrder(order)}
                        />
                      )}
                    </AnimatePresence>
@@ -388,9 +354,17 @@ export default function AdminOrdersCardView() {
 
                 {/* Information */}
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-black uppercase tracking-tight text-black truncate mb-1">
-                    {order.customerName}
-                  </h4>
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                    <h4 className="text-sm font-black uppercase tracking-tight text-black truncate leading-none">
+                      {order.customerName}
+                    </h4>
+                    {getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName }) >= 5 && <VerifiedTick />}
+                  </div>
+
+                  <div className="mb-2">
+                    <LoyaltyBadge count={getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName })} />
+                  </div>
+
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
                       <Phone className="w-3 h-3 shrink-0" />

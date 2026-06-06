@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { db } from '../lib/firebase';
+import { collection, addDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 export interface SupportTicket {
   id: string;
@@ -13,6 +15,39 @@ export interface SupportTicket {
   status: 'Pending' | 'Under Review' | 'Approved' | 'Closed' | 'In Review' | 'Solved';
   createdAt: string;
   address?: string;
+}
+
+export interface Broadcast {
+  id: string;
+  type: 'text' | 'image' | 'banner' | 'product' | 'offer' | 'coupon' | 'poll' | 'video' | 'category' | 'custom_campaign';
+  title: string;
+  content: string;
+  audience: 'all' | 'new' | 'vip' | 'active' | 'returning' | 'premium' | 'selected';
+  pinned: boolean;
+  createdAt: string;
+  imageUrl?: string;
+  productId?: string;
+  productName?: string;
+  productPrice?: number;
+  productDiscount?: number;
+  categoryName?: string;
+  offerPercentage?: number;
+  ctaText?: string;
+  ctaLink?: string;
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  startDate?: string;
+  endDate?: string;
+  status?: 'draft' | 'active' | 'scheduled' | 'expired';
+  opensCount?: number;
+  clicksCount?: number;
+  sentCount?: number;
+  likesCount?: number;
+  supportsCount?: number;
+  viewsCount?: number;
+  productClicks?: number;
+  categoryClicks?: number;
+  campaignClicks?: number;
+  purchasesCount?: number;
 }
 
 export interface ChatMessage {
@@ -36,6 +71,7 @@ export interface ChatSession {
   lastMessageAt: string;
   messages: ChatMessage[];
   status: 'open' | 'solved' | 'closed';
+  ticketNumber?: string;
 }
 
 export interface SupportSettings {
@@ -51,6 +87,7 @@ export interface SupportSettings {
 interface SupportState {
   tickets: SupportTicket[];
   sessions: ChatSession[];
+  broadcasts: Broadcast[];
   settings: SupportSettings;
   activeSessionId: string | null;
   currentCustomerSessionId: string; // The session ID representing the current browser customer
@@ -59,6 +96,10 @@ interface SupportState {
   addTicket: (ticket: Omit<SupportTicket, 'id' | 'status' | 'createdAt'>) => SupportTicket;
   updateTicketStatus: (ticketId: string, status: SupportTicket['status']) => void;
   deleteTicket: (ticketId: string) => void;
+  
+  addBroadcast: (broadcast: Omit<Broadcast, 'id' | 'createdAt'>) => void;
+  deleteBroadcast: (broadcastId: string) => void;
+  pinBroadcast: (broadcastId: string) => void;
 
   // Active session selector
   setActiveSession: (sessionId: string | null) => void;
@@ -85,70 +126,17 @@ const DEFAULT_SETTINGS: SupportSettings = {
   welcomeMessage: 'Hello and welcome to Tazu Mart Help Desk. Please type your query and we will assist you'
 };
 
-const SEED_SESSIONS: ChatSession[] = [
+const SEED_SESSIONS: ChatSession[] = [];
+
+const SEED_BROADCASTS: Broadcast[] = [
   {
-    id: 'SESS-2026-01',
-    customerName: 'Anik Rahman',
-    customerPhone: '+8801719876543',
-    customerOnline: true,
-    isTyping: false,
-    lastMessageAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    status: 'open',
-    messages: [
-      {
-        id: 'msg-1',
-        sender: 'customer',
-        text: 'Hello, my order #TM-9981 has not been delivered yet. It should have arrived yesterday.',
-        timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-        seen: true
-      },
-      {
-        id: 'msg-2',
-        sender: 'admin',
-        text: 'Hi Anik! Let me look into that for you immediately. I can see the rider is near your location.',
-        timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-        seen: true
-      },
-      {
-        id: 'msg-3',
-        sender: 'customer',
-        text: 'Oh great! Thank you so much for the quick checking.',
-        timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-        seen: false
-      }
-    ]
-  },
-  {
-    id: 'SESS-2026-02',
-    customerName: 'Sultana Razia',
-    customerPhone: '+8801812345678',
-    customerOnline: false,
-    isTyping: false,
-    lastMessageAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    status: 'solved',
-    messages: [
-      {
-        id: 'msg-4',
-        sender: 'customer',
-        text: 'Is Cash on Delivery available for Chittagong?',
-        timestamp: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
-        seen: true
-      },
-      {
-        id: 'msg-5',
-        sender: 'admin',
-        text: 'Yes Sultana, Cash on Delivery is eligible country-wide including Chittagong city!',
-        timestamp: new Date(Date.now() - 110 * 60 * 1000).toISOString(),
-        seen: true
-      },
-      {
-        id: 'msg-6',
-        sender: 'customer',
-        text: 'Prefect, I will place an order now.',
-        timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-        seen: true
-      }
-    ]
+    id: 'BC-1',
+    type: 'text',
+    title: '🔥 Flash Sale Started',
+    content: 'Get up to 50% off on electronics!',
+    audience: 'all',
+    pinned: true,
+    createdAt: new Date().toISOString()
   }
 ];
 
@@ -186,6 +174,7 @@ export const useSupportStore = create<SupportState>()(
     (set, get) => ({
       tickets: SEED_TICKETS,
       sessions: SEED_SESSIONS,
+      broadcasts: SEED_BROADCASTS,
       settings: DEFAULT_SETTINGS,
       activeSessionId: null,
       currentCustomerSessionId: 'SESS-CURRENT-USER',
@@ -218,6 +207,52 @@ export const useSupportStore = create<SupportState>()(
         }));
       },
 
+      addBroadcast: (broadcastInput) => {
+        const id = `BC-${Math.floor(1000 + Math.random() * 9000)}`;
+        const docRef = doc(db, 'broadcasts', id);
+        const newBC = { ...broadcastInput, id, createdAt: new Date().toISOString() };
+        
+        // Remove undefined fields for Firestore
+        const cleanBC = Object.fromEntries(
+          Object.entries(newBC).filter(([_, v]) => v !== undefined)
+        );
+
+        set((state) => ({
+          broadcasts: [newBC, ...state.broadcasts]
+        }));
+        setDoc(docRef, cleanBC).catch(err => console.error("Firestore addBroadcast failed:", err));
+      },
+
+      deleteBroadcast: (broadcastId) => {
+        set((state) => ({
+          broadcasts: state.broadcasts.filter((b) => b.id !== broadcastId)
+        }));
+        const docRef = doc(db, 'broadcasts', broadcastId);
+        deleteDoc(docRef).catch(err => console.error("Firestore deleteDoc failed:", err));
+      },
+
+      pinBroadcast: (broadcastId) => {
+        const broadcasts = get().broadcasts;
+        const found = broadcasts.find(b => b.id === broadcastId);
+        if (found) {
+          const newPinned = !found.pinned;
+          set((state) => ({
+            broadcasts: state.broadcasts.map((b) =>
+              b.id === broadcastId ? { ...b, pinned: newPinned } : b
+            )
+          }));
+          const docRef = doc(db, 'broadcasts', broadcastId);
+          
+          const updatedBC = { ...found, pinned: newPinned };
+          const cleanUpdatedBC = Object.fromEntries(
+            Object.entries(updatedBC).filter(([_, v]) => v !== undefined)
+          );
+
+          setDoc(docRef, cleanUpdatedBC, { merge: true })
+            .catch(err => console.error("Firestore pinBroadcast failed:", err));
+        }
+      },
+
       setActiveSession: (sessionId) => {
         set({ activeSessionId: sessionId });
         if (sessionId) {
@@ -225,7 +260,8 @@ export const useSupportStore = create<SupportState>()(
         }
       },
 
-      sendMessageToSession: (sessionId, sender, text, imageUrl, fileUrl, fileName) => {
+      sendMessageToSession: async (sessionId, sender, text, imageUrl, fileUrl, fileName) => {
+        console.log("!!! SENDING TO SESSION:", sessionId, "SENDER:", sender, "TEXT:", text);                
         const messageId = `msg-${Math.floor(100000 + Math.random() * 900000)}`;
         const newMessage: ChatMessage = {
           id: messageId,
@@ -240,23 +276,26 @@ export const useSupportStore = create<SupportState>()(
         };
 
         set((state) => {
+          console.log("!!! CURRENT SESSIONS:", state.sessions.map(s => s.id));
           const updatedSessions = state.sessions.map((sess) => {
             if (sess.id === sessionId) {
+              console.log("!!! SESSION MATCH", sess.id);
               const updatedMessages = [...sess.messages, newMessage];
               return {
                 ...sess,
                 messages: updatedMessages,
                 lastMessageAt: newMessage.timestamp,
-                // Keep customer online standard
                 customerOnline: sender === 'customer' ? true : sess.customerOnline
               };
             }
             return sess;
           });
 
-          // Check if session exists, if it is the user session and not created, create it.
           const sessionExists = updatedSessions.some(s => s.id === sessionId);
+          console.log("!!! SESSION EXISTS", sessionExists, "SESSION ID", sessionId, "CURRENT", state.currentCustomerSessionId);
+          
           if (!sessionExists && sessionId === state.currentCustomerSessionId) {
+            console.log("!!! CREATING NEW SESSION");
             const newSess: ChatSession = {
               id: sessionId,
               customerName: 'Anonymous Customer',
@@ -266,15 +305,38 @@ export const useSupportStore = create<SupportState>()(
               messages: [newMessage],
               status: 'open'
             };
-            return {
-              sessions: [...updatedSessions, newSess]
-            };
+            return { sessions: [...updatedSessions, newSess] };
           }
-
           return { sessions: updatedSessions };
         });
 
-        // Loop simulations of deliveryStatus: sent (600ms) -> delivered (1200ms) -> seen (2200ms)
+        try {
+          const conversationRef = doc(db, 'conversations', sessionId);
+          const msgData: Record<string, any> = {
+            id: newMessage.id,
+            sender: newMessage.sender,
+            timestamp: newMessage.timestamp,
+            seen: newMessage.seen,
+            createdAt: new Date(),
+          };
+          if (newMessage.text) msgData.text = newMessage.text;
+          if (newMessage.imageUrl) msgData.imageUrl = newMessage.imageUrl;
+          if (newMessage.fileUrl) msgData.fileUrl = newMessage.fileUrl;
+          if (newMessage.fileName) msgData.fileName = newMessage.fileName;
+
+          await addDoc(collection(conversationRef, 'messages'), msgData);
+
+          // Update main session details in Firestore as well for Admin sidebar real-time sync
+          await setDoc(conversationRef, {
+            id: sessionId,
+            lastMessageAt: newMessage.timestamp,
+            lastMessageText: newMessage.text || '📄 Attachment File',
+            customerOnline: sender === 'customer' ? true : undefined,
+          }, { merge: true });
+        } catch (error) {
+          console.error("FAILED TO SAVE TO FIRESTORE", error);
+        }
+        
         setTimeout(() => {
           set((state) => ({
             sessions: state.sessions.map((sess) => {
@@ -290,123 +352,6 @@ export const useSupportStore = create<SupportState>()(
             })
           }));
         }, 600);
-
-        setTimeout(() => {
-          set((state) => ({
-            sessions: state.sessions.map((sess) => {
-              if (sess.id === sessionId) {
-                return {
-                  ...sess,
-                  messages: sess.messages.map((m) =>
-                    m.id === messageId ? { ...m, deliveryStatus: 'delivered' } : m
-                  )
-                };
-              }
-              return sess;
-            })
-          }));
-        }, 1200);
-
-        setTimeout(() => {
-          set((state) => ({
-            sessions: state.sessions.map((sess) => {
-              if (sess.id === sessionId) {
-                return {
-                  ...sess,
-                  messages: sess.messages.map((m) =>
-                    m.id === messageId ? { ...m, deliveryStatus: 'seen' as const, seen: true } : m
-                  )
-                };
-              }
-              return sess;
-            })
-          }));
-        }, 2200);
-
-        // Auto-reply logic if customer sent a message and there is no previous admin reply in last 2 mins
-        if (sender === 'customer') {
-          const autoReplyText = get().settings.autoReplyMessage;
-          const currentSession = get().sessions.find(s => s.id === sessionId);
-          
-          if (autoReplyText && currentSession) {
-            // Typing indicator on
-            get().setTypingIndicator(sessionId, true);
-            setTimeout(() => {
-              get().setTypingIndicator(sessionId, false);
-              // Send auto reply message
-              const replyMsgId = `msg-auto-${Math.floor(100000 + Math.random() * 900000)}`;
-              const replyMsg: ChatMessage = {
-                id: replyMsgId,
-                sender: 'admin',
-                text: autoReplyText,
-                timestamp: new Date().toISOString(),
-                seen: false,
-                deliveryStatus: 'sending'
-              };
-              set((state) => ({
-                sessions: state.sessions.map((sess) =>
-                  sess.id === sessionId
-                    ? {
-                        ...sess,
-                        messages: [...sess.messages, replyMsg],
-                        lastMessageAt: replyMsg.timestamp
-                      }
-                    : sess
-                )
-              }));
-
-              // Also transition auto reply
-              setTimeout(() => {
-                set((state) => ({
-                  sessions: state.sessions.map((sess) => {
-                    if (sess.id === sessionId) {
-                      return {
-                        ...sess,
-                        messages: sess.messages.map((m) =>
-                          m.id === replyMsgId ? { ...m, deliveryStatus: 'sent' } : m
-                        )
-                      };
-                    }
-                    return sess;
-                  })
-                }));
-              }, 600);
-
-              setTimeout(() => {
-                set((state) => ({
-                  sessions: state.sessions.map((sess) => {
-                    if (sess.id === sessionId) {
-                      return {
-                        ...sess,
-                        messages: sess.messages.map((m) =>
-                          m.id === replyMsgId ? { ...m, deliveryStatus: 'delivered' } : m
-                        )
-                      };
-                    }
-                    return sess;
-                  })
-                }));
-              }, 1200);
-
-              setTimeout(() => {
-                set((state) => ({
-                  sessions: state.sessions.map((sess) => {
-                    if (sess.id === sessionId) {
-                      return {
-                        ...sess,
-                        messages: sess.messages.map((m) =>
-                          m.id === replyMsgId ? { ...m, deliveryStatus: 'seen' as const } : m
-                        )
-                      };
-                    }
-                    return sess;
-                  })
-                }));
-              }, 2200);
-
-            }, 1500);
-          }
-        }
       },
 
       setTypingIndicator: (sessionId, isTyping) => {
@@ -450,16 +395,52 @@ export const useSupportStore = create<SupportState>()(
       },
 
       createNewSession: (name, phone) => {
-        const id = `SESS-CURRENT-USER`;
+        const cleanPhoneInput = phone.replace(/[+\s-]+/g, '');
+        const foundSession = get().sessions.find(s => s.customerPhone.replace(/[+\s-]+/g, '') === cleanPhoneInput);
+        const ticketNumber = foundSession?.ticketNumber || `SUP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+        
+        if (foundSession) {
+          set({ currentCustomerSessionId: foundSession.id });
+          const sessRef = doc(db, 'conversations', foundSession.id);
+          setDoc(sessRef, {
+            id: foundSession.id,
+            customerName: name,
+            customerPhone: phone,
+            customerOnline: true,
+            lastMessageAt: new Date().toISOString(),
+            status: 'open',
+            ticketNumber: ticketNumber
+          }, { merge: true }).catch(err => console.error("Firestore sync error:", err));
+          return foundSession.id;
+        }
+
+        const id = `SESS-CHAT-${cleanPhoneInput || Date.now()}`;
         const sessionExists = get().sessions.some((s) => s.id === id);
         
+        // Write/update metadata in Firestore so the admin instantly lists it!
+        try {
+          const sessRef = doc(db, 'conversations', id);
+          setDoc(sessRef, {
+            id,
+            customerName: name,
+            customerPhone: phone,
+            customerOnline: true,
+            lastMessageAt: new Date().toISOString(),
+            status: 'open',
+            ticketNumber: ticketNumber
+          }, { merge: true }).catch(err => console.error("Firestore sync error:", err));
+        } catch(e) {
+          console.error("Firestore setDoc failed:", e);
+        }
+
         if (sessionExists) {
           set((state) => ({
             sessions: state.sessions.map(s => 
               s.id === id 
-                ? { ...s, customerName: name, customerPhone: phone, customerOnline: true, status: 'open' }
+                ? { ...s, customerName: name, customerPhone: phone, customerOnline: true, status: 'open', ticketNumber }
                 : s
-            )
+            ),
+            currentCustomerSessionId: id
           }));
         } else {
           const newSess: ChatSession = {
@@ -468,19 +449,13 @@ export const useSupportStore = create<SupportState>()(
             customerPhone: phone,
             customerOnline: true,
             lastMessageAt: new Date().toISOString(),
-            messages: [
-              {
-                id: 'welcome-msg',
-                sender: 'admin',
-                text: get().settings.welcomeMessage,
-                timestamp: new Date().toISOString(),
-                seen: true
-              }
-            ],
-            status: 'open'
+            messages: [],
+            status: 'open',
+            ticketNumber
           };
           set((state) => ({
-            sessions: [...state.sessions, newSess]
+            sessions: [...state.sessions, newSess],
+            currentCustomerSessionId: id
           }));
         }
         return id;
@@ -493,7 +468,7 @@ export const useSupportStore = create<SupportState>()(
       }
     }),
     {
-      name: 'tazumart-support-storage'
+      name: 'tazumart-support-storage-v2'
     }
   )
 );

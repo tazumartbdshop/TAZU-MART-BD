@@ -430,7 +430,7 @@ export default function AdminGameControl() {
                        {/* Video Player Mockup */}
                        <div className="bg-gray-100 rounded-[12px] border border-gray-200 overflow-hidden group relative shadow-inner h-[240px]">
                           <video 
-                            src={config.reviveAd.videoUrl} 
+                            src={config.reviveAd.videoUrl || null} 
                             className="w-full h-full object-cover"
                             poster={config.reviveAd.thumbnailUrl}
                           />

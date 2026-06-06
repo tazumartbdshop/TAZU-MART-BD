@@ -4,10 +4,13 @@ import { formatPrice } from '../../lib/utils';
 import { useOrderStore } from '../../store/useOrderStore';
 import AdminOrdersCardView from './AdminOrdersCardView';
 import PremiumOrderAdd from './PremiumOrderAdd';
+import AdminFakeOrderControl from './AdminFakeOrderControl';
 import { InvoiceView } from '../../components/checkout/InvoiceView';
+import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
+
 
 function AdminOrderList() {
-  const { orders, updateOrderStatus } = useOrderStore();
+  const { orders, updateOrderStatus, markAsRead } = useOrderStore();
   const [activeTab, setActiveTab] = useState('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any>(null);
@@ -33,6 +36,9 @@ function AdminOrderList() {
   };
 
   const toggleExpand = (id: string) => {
+    if (expandedId !== id) {
+      markAsRead(id);
+    }
     setExpandedId(expandedId === id ? null : id);
   };
 
@@ -75,14 +81,21 @@ function AdminOrderList() {
                 id={`order-row-${order.id}`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-black text-white font-black flex items-center justify-center text-xs shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-black text-white font-black flex items-center justify-center text-xs shrink-0 relative">
                     {index + 1}
+                    {!order.isRead && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 border-2 border-white rounded-full"></span>
+                    )}
                   </div>
                   <div>
-                    <h4 className="font-extrabold text-[#000000] text-sm sm:text-base">
+                    <h4 className="font-extrabold text-[#000000] text-sm sm:text-base flex items-center gap-1.5 flex-wrap">
                       {order.customerName}
+                      {getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName }) >= 5 && <VerifiedTick />}
                     </h4>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <div className="mt-1">
+                      <LoyaltyBadge count={getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName })} />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
                       {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(order.date))}
                     </p>
                   </div>
@@ -115,7 +128,13 @@ function AdminOrderList() {
                     <div className="space-y-2">
                       <div>
                         <span className="text-gray-500 block text-xs">Customer Name</span>
-                        <p className="font-bold text-black">{order.customerName}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <p className="font-bold text-black">{order.customerName}</p>
+                          {getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName }) >= 5 && <VerifiedTick />}
+                        </div>
+                        <div className="mt-1">
+                          <LoyaltyBadge count={getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName })} />
+                        </div>
                       </div>
                       <div>
                         <span className="text-gray-500 block text-xs">Mobile Number</span>
@@ -188,6 +207,39 @@ function AdminOrderList() {
 
                   <hr className="border-gray-250" />
 
+                  {/* Bill Pricing breakdown with Promo codes */}
+                  <div className="space-y-2">
+                    <h4 className="font-extrabold text-[10px] uppercase tracking-wider text-gray-400">Order Pricing Summary</h4>
+                    <div className="bg-white border border-gray-150 p-3 rounded-lg space-y-1.5 text-xs">
+                      <div className="flex justify-between items-center text-gray-500">
+                        <span>Subtotal</span>
+                        <span className="font-semibold text-black">{formatPrice(order.subtotal || (order.total - (order.deliveryCharge || 0) + (order.discount?.amount || 0)))}</span>
+                      </div>
+                      {order.promoCodeUsed && (
+                        <div className="flex justify-between items-center text-emerald-600">
+                          <span>Promo Code Used</span>
+                          <span className="font-extrabold uppercase tracking-widest text-[10px] bg-emerald-50 px-2 py-0.5 border border-emerald-200">{order.promoCodeUsed}</span>
+                        </div>
+                      )}
+                      {order.discount?.amount > 0 && (
+                        <div className="flex justify-between items-center text-emerald-600">
+                          <span>Discount Applied</span>
+                          <span className="font-extrabold font-mono">-{formatPrice(order.discount.amount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-gray-500">
+                        <span>Delivery Fee</span>
+                        <span className="font-semibold text-black">{formatPrice(order.deliveryCharge || 0)}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-1.5 border-t border-gray-100 font-bold text-gray-900">
+                        <span>Final Total</span>
+                        <span className="text-black font-black text-sm">{formatPrice(order.total)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <hr className="border-gray-250" />
+
                   {/* Order Date & Custom formatting */}
                   <div>
                     <span className="text-gray-500 block text-xs">Order Date & Time</span>
@@ -253,6 +305,7 @@ export default function AdminOrders() {
       <Route path="/complete" element={<AdminOrderList />} />
       <Route path="/add" element={<PremiumOrderAdd />} />
       <Route path="/edit/:id" element={<PremiumOrderAdd />} />
+      <Route path="/fake-control" element={<AdminFakeOrderControl />} />
     </Routes>
   );
 }

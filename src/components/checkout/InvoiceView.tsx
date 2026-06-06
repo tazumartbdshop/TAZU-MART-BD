@@ -20,32 +20,73 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
   const grandTotal = order.total;
   const currency = settings.currencySymbol || '৳';
 
-  const downloadInvoice = () => {
+  const downloadInvoice = async () => {
     const element = document.getElementById("invoice");
+    if (!element) return;
+    
     const opt = {
-      margin: 10,
+      margin: 5,
       filename: `invoice-${settings.invoicePrefix || 'INV-'}${order.orderId}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    } as const;
-    html2pdf().set(opt).from(element).save();
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+    };
+    
+    try {
+      await html2pdf().set(opt).from(element).save();
+      alert('Invoice Downloaded Successfully');
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      alert('Failed to download invoice');
+    }
+  };
+
+  const printInvoice = () => {
+    window.print();
+  };
+
+  const shareInvoice = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Invoice ${order.orderId}`,
+          text: `Here is your invoice for order ${order.orderId}`,
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      alert('Sharing not supported on this browser');
+    }
   };
 
   return (
     <div className={`min-h-screen p-4 font-sans text-[14px] text-black overflow-x-hidden ${settings.invoiceTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-[#FFFFFF] text-black'}`}>
       <div className="max-w-[190mm] mx-auto">
         {/* Buttons - Hidden on print */}
-        <div className="flex gap-4 justify-center mb-10 no-print">
+        <div className="flex gap-4 justify-center mb-10 no-print flex-wrap">
           <button
             onClick={downloadInvoice}
-            className="bg-black text-white px-8 py-3 rounded-md text-sm font-bold border border-black transition-all"
+            className="bg-black text-white px-6 py-3 rounded-md text-sm font-bold border border-black transition-all hover:bg-neutral-800"
           >
             Download Invoice
           </button>
           <button
+            onClick={printInvoice}
+            className="bg-white text-black border border-black px-6 py-3 rounded-md text-sm font-bold transition-all hover:bg-neutral-100"
+          >
+            Print
+          </button>
+          <button
+            onClick={shareInvoice}
+            className="bg-white text-black border border-black px-6 py-3 rounded-md text-sm font-bold transition-all hover:bg-neutral-100"
+          >
+            Share
+          </button>
+          <button
             onClick={onBack}
-            className="bg-white text-black border border-black px-8 py-3 rounded-md text-sm font-bold transition-all"
+            className="bg-white text-black border border-black px-6 py-3 rounded-md text-sm font-bold transition-all hover:bg-neutral-100"
           >
             Back to Home
           </button>
@@ -59,10 +100,10 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
           style={{ width: "100%", maxWidth: "190mm", minHeight: "277mm", padding: "10mm", backgroundColor: settings.invoiceTheme === 'dark' ? '#1f2937' : '#FFFFFF', color: settings.invoiceTheme === 'dark' ? '#ffffff' : '#000000' }}
         >
           {/* Header */}
-          <div className="border-b border-gray-300 pb-6 mb-6">
+          <div className="border-b pb-6 mb-6" style={{ borderColor: '#d1d5db' }}>
             <div className="flex items-center gap-3 mb-2">
               {settings.invoiceLogo ? (
-                <img src={settings.invoiceLogo} alt="Logo" className="w-10 h-10 object-contain" />
+                <img src={settings.invoiceLogo || null} alt="Logo" className="w-10 h-10 object-contain" />
               ) : (
                 <div className="w-10 h-10 bg-black rounded flex items-center justify-center text-white font-black text-lg">TM</div>
               )}
@@ -76,7 +117,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
 
           {/* Customer Details */}
           <div className="mb-6">
-            <h2 className="text-[18px] font-bold uppercase mb-2 border-b border-gray-300 pb-1">Customer Details</h2>
+            <h2 className="text-[18px] font-bold uppercase mb-2 border-b pb-1" style={{ borderColor: '#d1d5db' }}>Customer Details</h2>
             <div className="space-y-1">
                 <p><strong>Name:</strong> {order.customerName}</p>
                 <p><strong>Phone:</strong> {order.mobileNumber}</p>
@@ -86,7 +127,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
 
           {/* Invoice Details */}
           <div className="mb-6">
-            <h2 className="text-[18px] font-bold uppercase mb-2 border-b border-gray-300 pb-1">Order Details</h2>
+            <h2 className="text-[18px] font-bold uppercase mb-2 border-b pb-1" style={{ borderColor: '#d1d5db' }}>Order Details</h2>
             <div className="space-y-1">
               <p><strong>Invoice ID:</strong> {settings.invoicePrefix || 'INV-'}{order.orderId}</p>
               <p><strong>Date:</strong> {new Date(order.createdAt).toLocaleDateString()}</p>
@@ -97,9 +138,9 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
 
           {/* Product List */}
           <div className="w-full mb-6">
-            <h2 className="text-[16px] font-bold uppercase mb-3 border-b border-gray-300 pb-1">Products</h2>
+            <h2 className="text-[16px] font-bold uppercase mb-3 border-b pb-1" style={{ borderColor: '#d1d5db' }}>Products</h2>
             {order.items.map((p: any, i: number) => (
-              <div key={i} className="w-full border border-gray-300 rounded-md p-2 mb-2 box-border text-[13px]">
+              <div key={i} className="w-full border rounded-md p-2 mb-2 box-border text-[13px]" style={{ borderColor: '#d1d5db' }}>
                 <div className="flex justify-between">
                   <span className="font-semibold">Product</span>
                   <span className="text-right ml-2">{p.name}</span>
@@ -123,15 +164,21 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
           {/* Summary */}
           <div className="w-full mb-10">
             <div className="flex justify-between py-1"><span>Subtotal</span><span>{currency}{subtotal}</span></div>
+            {order.discount?.amount > 0 && (
+              <div className="flex justify-between py-1" style={{ color: '#059669' }}>
+                <span>Coupon Discount</span>
+                <span>-{currency}{order.discount.amount}</span>
+              </div>
+            )}
             <div className="flex justify-between py-1"><span>Delivery Fee</span><span>{currency}{deliveryCharge}</span></div>
-            <div className="flex justify-between py-2 border-t border-gray-300 mt-2">
+            <div className="flex justify-between py-2 border-t mt-2" style={{ borderColor: '#d1d5db' }}>
               <span className="font-black uppercase text-[16px]">Grand Total</span>
               <span className="grand-total font-black text-[20px]">{currency}{grandTotal}</span>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="mt-16 text-center border-t border-gray-300 pt-5">
+          <div className="mt-16 text-center border-t pt-5" style={{ borderColor: '#d1d5db' }}>
             <p className="font-bold">{settings.invoiceFooterText}</p>
             <p className="mt-1 text-[12px]">{settings.returnPolicy}</p>
           </div>

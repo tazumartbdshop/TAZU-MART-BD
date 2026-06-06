@@ -11,12 +11,17 @@ import {
   Music2, 
   MessageCircle,
   ChevronRight,
-  Clock
+  Clock,
+  Send,
+  Linkedin,
+  MessageSquare
 } from 'lucide-react';
 import { getFlutterConfig, FlutterConfig } from '../../services/flutterService';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 export function Footer() {
   const [config, setConfig] = useState<FlutterConfig | null>(null);
+  const { settings } = useSettingsStore();
 
   useEffect(() => {
     async function load() {
@@ -57,11 +62,15 @@ export function Footer() {
   const SocialIcon = ({ platform, className }: { platform: string, className?: string }) => {
     switch (platform.toLowerCase()) {
       case 'facebook': return <Facebook className={className} />;
+      case 'facebookpage': return <Facebook className={className} />;
+      case 'messenger': return <MessageSquare className={className} />;
       case 'instagram': return <Instagram className={className} />;
       case 'twitter': return <Twitter className={className} />;
       case 'youtube': return <Youtube className={className} />;
       case 'tiktok': return <Music2 className={className} />;
       case 'whatsapp': return <MessageCircle className={className} />;
+      case 'telegram': return <Send className={className} />;
+      case 'linkedin': return <Linkedin className={className} />;
       default: return null;
     }
   };
@@ -97,19 +106,56 @@ export function Footer() {
             <p className="text-sm leading-relaxed max-w-xs" style={{ color: mutedColor }}>
               {description.short}
             </p>
-            <div className="flex gap-4 pt-2">
-              {socialLinks.filter(l => l.enabled).map((link) => (
-                <a 
-                  key={link.platform}
-                  href={link.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  style={{ color: socialIconColor }}
-                  className="w-9 h-9 rounded-none border border-current flex items-center justify-center opacity-60 hover:opacity-100 transition-all hover:-translate-y-1"
-                >
-                  <SocialIcon platform={link.platform} className="w-[18px] h-[18px]" />
-                </a>
-              ))}
+            <div className="flex flex-wrap gap-4 pt-2">
+              {(() => {
+                const activeSocialLinks = [];
+                if (settings.facebookEnabled && settings.facebookUrl) {
+                  activeSocialLinks.push({ platform: 'facebook', url: settings.facebookUrl });
+                }
+                if (settings.facebookPageEnabled && settings.facebookPageUrl) {
+                  activeSocialLinks.push({ platform: 'facebookpage', url: settings.facebookPageUrl });
+                }
+                if (settings.messengerEnabled && settings.messengerUrl) {
+                  activeSocialLinks.push({ platform: 'messenger', url: settings.messengerUrl });
+                }
+                if (settings.whatsappEnabled && settings.whatsappNumber) {
+                  const num = settings.whatsappNumber.replace(/\+/g, '').replace(/\s/g, '');
+                  const url = num.startsWith('http') ? num : `https://wa.me/${num}`;
+                  activeSocialLinks.push({ platform: 'whatsapp', url });
+                }
+                if (settings.instagramEnabled && settings.instagramUrl) {
+                  activeSocialLinks.push({ platform: 'instagram', url: settings.instagramUrl });
+                }
+                if (settings.youtubeEnabled && settings.youtubeUrl) {
+                  activeSocialLinks.push({ platform: 'youtube', url: settings.youtubeUrl });
+                }
+                if (settings.tiktokEnabled && settings.tiktokUrl) {
+                  activeSocialLinks.push({ platform: 'tiktok', url: settings.tiktokUrl });
+                }
+                const telLink = settings.telegramUrl || settings.telegramLink;
+                if (settings.telegramEnabled && telLink) {
+                  activeSocialLinks.push({ platform: 'telegram', url: telLink });
+                }
+                if (settings.twitterEnabled && settings.twitterUrl) {
+                  activeSocialLinks.push({ platform: 'twitter', url: settings.twitterUrl });
+                }
+                if (settings.linkedinEnabled && settings.linkedinUrl) {
+                  activeSocialLinks.push({ platform: 'linkedin', url: settings.linkedinUrl });
+                }
+
+                return activeSocialLinks.map((link, idx) => (
+                  <a 
+                    key={link.platform + idx}
+                    href={link.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ color: socialIconColor }}
+                    className="w-9 h-9 rounded-none border border-current flex items-center justify-center opacity-60 hover:opacity-100 transition-all hover:-translate-y-1"
+                  >
+                    <SocialIcon platform={link.platform} className="w-[18px] h-[18px]" />
+                  </a>
+                ));
+              })()}
             </div>
           </div>
 

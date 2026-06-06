@@ -1,44 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 export default function FlashSaleTimer() {
+  const { settings } = useSettingsStore();
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
-    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-    
-    const getNextEndTime = () => {
+    const calculateTimeLeft = () => {
       const now = new Date().getTime();
-      let endTime = localStorage.getItem("flashSaleEnd");
-
-      if (!endTime || now > Number(endTime)) {
-        endTime = (now + TWENTY_FOUR_HOURS).toString();
-        localStorage.setItem("flashSaleEnd", endTime);
-      }
-      return Number(endTime);
-    };
-
-    let endTime = getNextEndTime();
-
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      let distance = endTime - now;
+      const endTime = new Date(settings.flashSaleEndTime).getTime();
+      const distance = endTime - now;
 
       if (distance <= 0) {
-        endTime = now + TWENTY_FOUR_HOURS;
-        localStorage.setItem("flashSaleEnd", endTime.toString());
-        distance = TWENTY_FOUR_HOURS;
+        return { hours: 0, minutes: 0, seconds: 0 };
       }
 
-      const h = Math.floor((distance / (1000 * 60 * 60)) % 24);
+      const h = Math.floor((distance / (1000 * 60 * 60)));
       const m = Math.floor((distance / (1000 * 60)) % 60);
       const s = Math.floor((distance / 1000) % 60);
 
-      setTimeLeft({ hours: h, minutes: m, seconds: s });
+      return { hours: h, minutes: m, seconds: s };
+    };
+
+    setTimeLeft(calculateTimeLeft());
+    const interval = setInterval(() => {
+      setTimeLeft(calculateTimeLeft());
     }, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [settings.flashSaleEndTime]);
 
   const formatNumber = (num: number) => num.toString().padStart(2, '0');
 

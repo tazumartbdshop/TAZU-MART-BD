@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   User, Package, Wallet, Coins, Gift, Heart, Ticket, MapPin, 
   RefreshCcw, Share2, HelpCircle, MessageSquare, Star, 
@@ -10,15 +10,26 @@ import {
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useOrderStore } from '../store/useOrderStore';
+import { useProductStore } from '../store/useProductStore';
+import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
 import { formatPrice, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import LogoutModal from '../components/ui/LogoutModal';
+import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../lib/loyalty';
 
 export default function Account() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const { orders } = useOrderStore();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // Compute successful completed orders
+  const completedCount = getCompletedOrdersCount(orders, {
+    email: user?.email,
+    phone: user?.phone,
+    name: user?.name,
+  });
+
 
   const stats = {
     balance: 2450.50,
@@ -61,47 +72,68 @@ export default function Account() {
     { label: 'LOGOUT', icon: LogOut, path: null, action: () => setShowLogoutModal(true), isLogout: true },
   ];
 
-  const recentlyViewed = [
-    { id: 1, name: 'Premium Wireless Headphones', price: 129.99, image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=200' },
-    { id: 2, name: 'Smart Watch Series 7', price: 299.00, image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=200' },
-    { id: 3, name: 'Leather Minimalist Wallet', price: 45.00, image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?auto=format&fit=crop&q=80&w=200' },
-    { id: 4, name: 'Cotton Crew Neck T-Shirt', price: 25.00, image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&q=80&w=200' },
-  ];
+  const { products } = useProductStore();
+  const { getViewedProducts, clearViewedProducts } = useRecentlyViewedStore();
+
+  const viewedIds = getViewedProducts();
+  const recentlyViewed = useMemo(() => {
+    // Map viewed product IDs to real products, maintaining chronological order
+    return viewedIds
+      .map((id) => products.find((p) => p.id === id))
+      .filter((p): p is NonNullable<typeof p> => !!p);
+  }, [viewedIds, products]);
 
   return (
-    <div className="bg-[#F8F9FE] min-h-screen pb-24 font-sans">
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="bg-[#F8F9FE] min-h-screen pb-24 font-sans"
+    >
       {/* 1. Profile Section */}
       <div className="bg-white pt-12 pb-14 px-6 border-b border-gray-100">
         <div className="max-w-4xl mx-auto flex items-center justify-between relative z-10">
           <div className="flex items-center gap-5">
             <div className="relative">
-              <div className="w-20 h-20 rounded-full border-2 border-gray-100 overflow-hidden shadow-sm">
-                <img 
-                  src={`https://ui-avatars.com/api/?name=${user?.name}&background=111&color=fff&size=200`} 
-                  alt="Profile" 
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <button className="absolute bottom-0 right-0 bg-white p-1.5 rounded-full shadow-lg text-gray-900 border border-gray-100">
-                <Camera className="w-4 h-4" />
-              </button>
+              {user?.profileImage ? (
+                <div className="w-20 h-20 rounded-full border-2 border-purple-600/30 overflow-hidden shadow-md">
+                  <img 
+                    src={user.profileImage} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="w-20 h-20 rounded-full border-2 border-gray-100 overflow-hidden shadow-sm">
+                    <img 
+                      src={`https://ui-avatars.com/api/?name=${user?.name || 'Imtiaz'}&background=111&color=fff&size=200`} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => navigate('/settings')}
+                    className="absolute bottom-0 right-0 bg-white p-1.5 rounded-full shadow-lg text-gray-900 border border-gray-100 hover:bg-neutral-50 transition-colors"
+                    title="Upload Profile Pic"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
+                </>
+              )}
             </div>
             <div className="text-gray-900">
-              <h2 className="text-2xl font-bold leading-none mb-1">{user?.name}</h2>
+              <h2 className="text-2xl font-bold leading-none mb-1 flex items-center gap-1.5 flex-wrap">
+                {user?.name}
+                {completedCount >= 5 && <VerifiedTick />}
+              </h2>
               <p className="text-gray-400 text-sm font-medium">{user?.email}</p>
               <div className="flex items-center gap-2 mt-2">
-                <span className="bg-gray-100 text-[10px] uppercase font-bold tracking-tight px-2 py-0.5 rounded">Gold Member</span>
+                <LoyaltyBadge count={completedCount} />
               </div>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <button className="p-2.5 bg-gray-50 rounded-xl text-gray-900 hover:bg-gray-100 transition-all">
-              <Settings className="w-6 h-6" />
-            </button>
-            <button className="p-2.5 bg-gray-50 rounded-xl text-gray-900 hover:bg-gray-100 transition-all relative">
-              <Bell className="w-6 h-6" />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-            </button>
           </div>
         </div>
       </div>
@@ -198,25 +230,66 @@ export default function Account() {
         </section>
 
         {/* 5. Recently Viewed */}
-        <section className="bg-white py-6">
+        <section className="bg-white py-6 border-t border-gray-100">
           <div className="px-6 flex items-center justify-between mb-4">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-900">Recently Viewed</h3>
-            <button className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Clear All</button>
-          </div>
-          <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar px-6">
-            {recentlyViewed.map((item) => (
-              <div 
-                key={item.id}
-                className="min-w-[120px] bg-white group cursor-pointer"
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-900">Recently Viewed</h3>
+            {recentlyViewed.length > 0 && (
+              <button 
+                onClick={() => clearViewedProducts()}
+                className="text-[10px] font-black text-red-500 uppercase tracking-widest hover:text-red-700 transition-colors"
               >
-                <div className="aspect-square overflow-hidden mb-2 bg-gray-50">
-                  <img src={item.image} alt={item.name} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all" />
-                </div>
-                <h5 className="text-[9px] font-bold text-gray-400 uppercase tracking-tight line-clamp-1 group-hover:text-gray-900">{item.name}</h5>
-                <p className="text-gray-900 font-bold text-xs mt-1">{formatPrice(item.price)}</p>
-              </div>
-            ))}
+                Clear All
+              </button>
+            )}
           </div>
+          
+          {recentlyViewed.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-none snap-x snap-mandatory px-6 scroll-smooth">
+              {recentlyViewed.map((item) => {
+                const hasDiscount = item.discountPrice !== undefined && item.discountPrice < item.price;
+                return (
+                  <div 
+                    key={item.id}
+                    onClick={() => navigate(`/product/${item.id}`)}
+                    className="min-w-[130px] max-w-[130px] bg-white group cursor-pointer flex flex-col snap-start shrink-0"
+                  >
+                    <div className="aspect-square w-full overflow-hidden mb-2 rounded bg-gray-50 border border-gray-100 flex items-center justify-center relative">
+                      <img 
+                        src={item.image || null} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        referrerPolicy="no-referrer"
+                      />
+                      {hasDiscount && (
+                        <span className="absolute top-1.5 left-1.5 bg-red-600 text-white text-[8px] font-black uppercase px-1.5 py-0.5 tracking-wider rounded-none">
+                          -{Math.round(((item.price - item.discountPrice!) / item.price) * 100)}%
+                        </span>
+                      )}
+                    </div>
+                    <h5 className="text-[10px] font-black text-gray-500 uppercase tracking-tight line-clamp-2 leading-snug min-h-[30px] group-hover:text-gray-900 transition-colors">
+                      {item.name}
+                    </h5>
+                    <div className="mt-1 flex items-baseline gap-1 mr-1 flex-wrap">
+                      <span className="text-gray-950 font-black text-xs">
+                        {formatPrice(hasDiscount ? item.discountPrice! : item.price)}
+                      </span>
+                      {hasDiscount && (
+                        <span className="text-[9px] text-gray-400 line-through font-bold">
+                          {formatPrice(item.price)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 px-6 text-center">
+              <Eye className="w-8 h-8 text-gray-300 stroke-[1.5] mb-2" />
+              <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">No recently viewed products</p>
+              <p className="text-[10px] text-gray-400 mt-1 max-w-[200px]">Products you browse will appear here dynamically.</p>
+            </div>
+          )}
         </section>
 
         {/* Branding Footer */}
@@ -231,6 +304,6 @@ export default function Account() {
         isOpen={showLogoutModal} 
         onClose={() => setShowLogoutModal(false)} 
       />
-    </div>
+    </motion.div>
   );
 }

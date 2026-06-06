@@ -93,9 +93,14 @@ interface ButtonConfig {
 
 interface ThemeState {
   theme: ThemeConfig;
+  draftTheme: ThemeConfig;
   updateTheme: (updates: Partial<ThemeConfig>) => void;
+  updateDraftTheme: (updates: Partial<ThemeConfig>) => void;
   updateButton: (type: keyof ThemeConfig['buttons'], updates: Partial<ButtonConfig>) => void;
+  updateDraftButton: (type: keyof ThemeConfig['buttons'], updates: Partial<ButtonConfig>) => void;
+  publishTheme: () => void;
   resetTheme: () => void;
+  resetDraftTheme: () => void;
 }
 
 const defaultConfig: ThemeConfig = {
@@ -173,8 +178,12 @@ export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
       theme: defaultConfig,
+      draftTheme: defaultConfig,
       updateTheme: (updates) => set((state) => ({
         theme: { ...state.theme, ...updates }
+      })),
+      updateDraftTheme: (updates) => set((state) => ({
+        draftTheme: { ...state.draftTheme, ...updates }
       })),
       updateButton: (type, updates) => set((state) => ({
         theme: {
@@ -185,7 +194,18 @@ export const useThemeStore = create<ThemeState>()(
           }
         }
       })),
+      updateDraftButton: (type, updates) => set((state) => ({
+        draftTheme: {
+          ...state.draftTheme,
+          buttons: {
+            ...state.draftTheme.buttons,
+            [type]: { ...state.draftTheme.buttons[type], ...updates }
+          }
+        }
+      })),
+      publishTheme: () => set((state) => ({ theme: state.draftTheme })),
       resetTheme: () => set({ theme: defaultConfig }),
+      resetDraftTheme: () => set((state) => ({ draftTheme: state.theme })),
     }),
     {
       name: 'theme-storage',

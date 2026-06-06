@@ -182,6 +182,25 @@ export default function AdminSiteManagement() {
             </div>
           </SectionCard>
 
+          {/* Link Pages Management */}
+          <div className="bg-white border border-zinc-200 p-6 shadow-sm">
+             <div className="flex items-center justify-between mb-4">
+               <div className="flex items-center gap-3">
+                 <div className="p-2 bg-black text-white">
+                   <Code className="w-5 h-5" />
+                 </div>
+                 <h3 className="font-black text-black uppercase tracking-wider text-sm">Link Pages Management</h3>
+               </div>
+               <button 
+                 onClick={() => window.location.href = '/admin/link-pages'}
+                 className="px-4 py-2 bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800"
+               >
+                 Manage Pages
+               </button>
+             </div>
+             <p className="text-zinc-500 text-xs font-medium">Manage dynamic footer pages, content, design, and SEO.</p>
+          </div>
+
         </div>
 
         {/* Preview Side */}

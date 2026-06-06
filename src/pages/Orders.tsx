@@ -5,6 +5,7 @@ import { formatPrice, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useOrderStore } from '../store/useOrderStore';
 import { useNavigate } from 'react-router-dom';
+import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../lib/loyalty';
 
 const STATUS_COLORS: Record<string, string> = {
   'Placed': 'bg-yellow-100 text-yellow-700 border border-yellow-200',
@@ -374,7 +375,13 @@ export default function Orders() {
                         <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-primary-900"><User className="w-4 h-4" /></div>
                         <div>
                           <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest block">Customer</span>
-                          <p className="text-xs font-bold text-gray-800">{trackedOrder.customer.name}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-xs font-bold text-gray-800">{trackedOrder.customer.name}</p>
+                            {getCompletedOrdersCount(storeOrders, { phone: trackedOrder.customer.phone, name: trackedOrder.customer.name }) >= 5 && <VerifiedTick />}
+                          </div>
+                          <div className="mt-1">
+                            <LoyaltyBadge count={getCompletedOrdersCount(storeOrders, { phone: trackedOrder.customer.phone, name: trackedOrder.customer.name })} />
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">

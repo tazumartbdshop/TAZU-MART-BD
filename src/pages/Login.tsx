@@ -6,12 +6,16 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useModeratorStore } from '../store/useModeratorStore';
 import { useLoginHistoryStore } from '../store/useLoginHistoryStore';
-
-// ADMIN CREDENTIALS
-const ADMIN_EMAIL = "admin.tazumartbd@gmail.com"; 
-const ADMIN_PASSWORD = "896388";
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useWebsitesStore } from '../store/useWebsitesStore';
+import { cn } from '../lib/utils';
+import { pixelService } from '../utils/pixelService';
 
 export default function Login() {
+  const { settings } = useSettingsStore();
+  const ADMIN_EMAIL = (settings.adminEmail && settings.adminEmail !== "admin@tazumart.com" ? settings.adminEmail : "admin.tazumartbd@gmail.com").toLowerCase().trim();
+  const ADMIN_PASSWORD = settings.adminPassword && settings.adminPassword !== "12345678" ? settings.adminPassword : "8963885522";
+
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
@@ -24,13 +28,14 @@ export default function Login() {
   const { customers } = useCustomerStore();
 
   const from = location.state?.from?.pathname || '/account/dashboard';
+  const adminFrom = location.state?.from?.pathname || '/admin';
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
       if (user?.role === 'admin') {
-        navigate('/admin', { replace: true });
+        navigate(adminFrom, { replace: true });
       } else {
-        navigate('/account/dashboard', { replace: true });
+        navigate(from, { replace: true });
       }
     }
   }, [isAuthenticated, navigate, user, isLoading]);
@@ -49,58 +54,85 @@ export default function Login() {
       setIsLoading(false);
       
       const normalizedIdentifier = identifier.toLowerCase().trim();
+      const isEmail = normalizedIdentifier.includes('@');
 
-      // Check Admin
-      if (normalizedIdentifier === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-        useLoginHistoryStore.getState().addLoginEvent({
-          name: 'Super Admin',
-          email: ADMIN_EMAIL,
-          method: 'Manual Login',
-          password: password,
-        });
-        login({
-          id: 'admin_primary',
-          name: 'Super Admin',
-          email: ADMIN_EMAIL,
-          role: 'admin',
-          permissions: ['all'] // Admin has all permissions
-        });
-        navigate('/admin');
-        return;
-      }
+      // Check Dynamic Website Admin First
+      if (isEmail) {
+        const websites = useWebsitesStore.getState().websites;
+        const matchedSite = websites.find(w => w.admin_email.toLowerCase().trim() === normalizedIdentifier && w.admin_password === password);
+        
+        if (matchedSite) {
+          useLoginHistoryStore.getState().addLoginEvent({
+            name: matchedSite.website_name + ' Admin',
+            email: matchedSite.admin_email,
+            method: 'Manual Login',
+            password: password,
+          });
+          login({
+            id: 'admin_' + matchedSite.domain,
+            name: matchedSite.website_name + ' Admin',
+            email: matchedSite.admin_email,
+            role: 'admin',
+            permissions: ['all']
+          });
+          navigate(`/site-admin/${matchedSite.domain}`);
+          return;
+        }
 
-      // Check Real Moderators
-      const moderator = useModeratorStore.getState().getModeratorByEmail(normalizedIdentifier);
-      if (moderator && moderator.password === password && moderator.status === 'Active') {
-        useLoginHistoryStore.getState().addLoginEvent({
-          name: moderator.name,
-          email: moderator.email,
-          method: 'Manual Login',
-          password: password,
-        });
-        login({
-          id: moderator.id,
-          name: moderator.name,
-          email: moderator.email,
-          role: 'moderator',
-          permissions: moderator.permissions
-        });
-        navigate('/admin');
-        return;
+        // Check Admin
+        if (normalizedIdentifier === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+          useLoginHistoryStore.getState().addLoginEvent({
+            name: 'Super Admin',
+            email: ADMIN_EMAIL,
+            method: 'Manual Login',
+            password: password,
+          });
+          login({
+            id: 'admin_primary',
+            name: 'Super Admin',
+            email: ADMIN_EMAIL,
+            role: 'admin',
+            permissions: ['all'] // Admin has all permissions
+          });
+          navigate('/admin');
+          return;
+        }
+
+        // Check Real Moderators (Also treated as Admin role for access)
+        const moderator = useModeratorStore.getState().getModeratorByEmail(normalizedIdentifier);
+        if (moderator && moderator.password === password && moderator.status === 'Active') {
+          useLoginHistoryStore.getState().addLoginEvent({
+            name: moderator.name,
+            email: moderator.email,
+            method: 'Manual Login',
+            password: password,
+          });
+          login({
+            id: moderator.id,
+            name: moderator.name,
+            email: moderator.email,
+            role: 'admin', // Treated as admin role for access separation
+            permissions: moderator.permissions
+          });
+          navigate('/admin');
+          return;
+        }
       }
 
       // Check Real Customers from store
       const customer = customers.find(c => {
-        const emailMatch = c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier);
-        const phoneMatch = c.phones.some(p => p.trim() === normalizedIdentifier);
-        return (emailMatch || phoneMatch) && c.password === password;
+        if (isEmail) {
+          return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier) && c.password === password;
+        } else {
+          return c.phones.some(p => p.trim() === normalizedIdentifier) && c.password === password;
+        }
       });
 
       if (customer) {
         useLoginHistoryStore.getState().addLoginEvent({
           name: customer.name,
           email: customer.emails[0] || '',
-          method: 'Manual Login',
+          method: isEmail ? 'Manual Login (Email)' : 'Manual Login (Mobile)',
           password: password,
           profileImage: customer.profileImage,
         });
@@ -112,11 +144,12 @@ export default function Login() {
           role: 'customer',
           profileImage: customer.profileImage,
         });
+        pixelService.trackLogin(customer.id);
         navigate('/account/dashboard');
         return;
       }
 
-      setError('The credentials you entered do not match our secure records. Please try again.');
+      setError('Invalid credentials.');
     }, 1200);
   };
 
@@ -137,7 +170,7 @@ export default function Login() {
               <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm select-none">
                 T
               </div>
-              <span className="text-base font-bold tracking-tight text-neutral-950 uppercase">Tazu Mart</span>
+              <span className="text-base font-bold tracking-tight text-neutral-950 uppercase">Tazu Mart BD</span>
             </Link>
             
             <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center border border-neutral-100 mb-4 text-emerald-600">
@@ -191,7 +224,7 @@ export default function Login() {
             <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm select-none">
               T
             </div>
-            <span className="text-base font-black tracking-tight text-neutral-950 uppercase">Tazu Mart</span>
+            <span className="text-base font-black tracking-tight text-neutral-950 uppercase">Tazu Mart BD</span>
           </Link>
           <h2 className="text-lg font-bold text-neutral-900 leading-tight">Welcome Back</h2>
           <p className="text-xs text-neutral-500 mt-1">Sign in to continue shopping securely.</p>
@@ -212,7 +245,9 @@ export default function Login() {
         {/* Input Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-1.5 text-left">
-            <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email or Phone Number</label>
+            <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">
+              Email or Mobile Number
+            </label>
             <div className="relative">
               <input 
                 type="text" 
@@ -220,16 +255,10 @@ export default function Login() {
                 onChange={(e) => setIdentifier(e.target.value)}
                 required 
                 className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm font-semibold placeholder:text-neutral-300" 
-                placeholder="name@example.com or phone"
+                placeholder="Enter Email or Phone Number"
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 transition-colors pointer-events-none">
-                {isEmailInput ? (
-                  <Mail className="w-4.5 h-4.5 text-neutral-600" />
-                ) : isPhoneInput ? (
-                  <Smartphone className="w-4.5 h-4.5 text-neutral-600" />
-                ) : (
-                  <User className="w-4.5 h-4.5 text-neutral-400" />
-                )}
+                <Mail className="w-4.5 h-4.5 text-neutral-600" />
               </span>
             </div>
           </div>
@@ -251,7 +280,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required 
                 className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-11 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm font-semibold placeholder:text-neutral-300" 
-                placeholder="••••••••"
+                placeholder="Enter Password"
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
                 <Lock className="w-4.5 h-4.5" />

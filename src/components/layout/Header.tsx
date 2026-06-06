@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { 
   Search, ShoppingCart, Heart, User, Menu, X, 
   ChevronRight, Grid, ClipboardList, Bell, Tag, 
@@ -7,6 +7,7 @@ import {
   MapPin, Eye, Package, LogIn
 } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
+import { useWishlistStore } from '../../store/useWishlistStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -14,20 +15,28 @@ import { useSiteManagementStore } from '../../store/useSiteManagementStore';
 import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import LogoutModal from '../ui/LogoutModal';
+import SearchDrawer from './SearchDrawer';
 import { Facebook, Code, Store, ArrowRight } from 'lucide-react';
 
 export function Header() {
+  const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSearchDrawerOpen, setIsSearchDrawerOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isBangla, setIsBangla] = useState(false);
   const cartCount = useCartStore((state) => state.getCartCount());
+  const wishlistCount = useWishlistStore((state) => state.wishlistIds.length);
   const { categories } = useCategoryStore();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { settings } = useSettingsStore();
 
   const { data: siteData, fetchSettings } = useSiteManagementStore();
+
+  useEffect(() => {
+    setIsSearchDrawerOpen(false);
+  }, [location]);
 
   const activeCategories = [...categories]
     .filter(c => c.status === 'Active')
@@ -72,42 +81,67 @@ export function Header() {
   return (
     <>
       <header className={cn(
-        'sticky top-0 w-full z-50 transition-all duration-300 bg-white border-b border-gray-100 pt-[calc(14px+env(safe-area-inset-top,0px))] pb-2 md:pt-4 md:pb-3',
+        'sticky top-0 w-full z-50 transition-all duration-300 bg-navbar-bg border-b border-theme-border',
         isScrolled ? 'shadow-sm' : ''
       )}>
-        <div className="container mx-auto px-4 h-[68px] md:h-[76px] flex items-center justify-between relative">
-          {/* Left: Hamburger */}
-          <button 
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-3 -ml-3 text-primary-900 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center"
-          >
-            <Menu className="w-6 h-6 mt-[4px]" />
-          </button>
+        {/* 1️⃣ Thin premium headline text */}
+        <div className="w-full bg-navbar-bg text-navbar-text border-b border-theme-border pt-[calc(10px+env(safe-area-inset-top,0px))] pb-2.5 text-center select-none font-sans">
+          <p className="text-[10px] font-bold tracking-[0.25em] uppercase opacity-80">
+            TAZU MART BD PREMIUM STORE
+          </p>
+        </div>
 
-          {/* Center: Logo */}
-          <Link to="/" className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-            <div className="w-9 h-9 bg-purple-600 rounded-lg flex items-center justify-center text-white font-sans font-black text-xl shadow-lg shadow-purple-600/20 overflow-hidden shrink-0">
-              {settings.storeLogo ? (
-                <img src={settings.storeLogo} alt="Logo" className="w-full h-full object-contain transition-all duration-300" referrerPolicy="no-referrer" />
-              ) : (
-                'T'
-              )}
-            </div>
-            <span className="font-display font-black text-xl text-gray-900 tracking-tighter uppercase whitespace-nowrap">TAZU <span className="text-purple-600">MART</span></span>
-          </Link>
+        {/* 2️⃣ Logo/Header row */}
+        <div className="container mx-auto px-4 h-14 md:h-16 flex items-center justify-between">
+          {/* Group 1: Menu + Logo */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 -ml-2 text-navbar-text hover:bg-neutral-50/10 rounded-full transition-colors flex items-center justify-center shrink-0"
+            >
+              <Menu className="w-5.5 h-5.5" />
+            </button>
 
-          {/* Right: Icons */}
-          <div className="flex items-center gap-1 sm:gap-2">
-            <Link to="/wishlist" className="p-2 text-primary-900 hover:bg-gray-100 rounded-full transition-colors">
+            <Link to="/" className="flex items-center gap-1.5 shrink-0">
+              <div className="w-7.5 h-7.5 md:w-8.5 md:h-8.5 bg-theme-secondary rounded flex items-center justify-center text-theme-bg font-sans font-black text-base md:text-lg overflow-hidden shrink-0">
+                 {settings.storeLogo ? (
+                   <img src={settings.storeLogo || null} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                 ) : (
+                   'T'
+                 )}
+              </div>
+              <span className="font-display font-black text-[13px] xs:text-sm md:text-lg text-navbar-text tracking-tighter uppercase whitespace-nowrap">
+                TAZU MART <span className="font-black">BD</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* Group 2: Mini Search (Flexible Center) */}
+          <div className="flex-1 px-2 sm:px-6 flex justify-center sm:justify-start">
+            <button 
+              onClick={() => setIsSearchDrawerOpen(true)}
+              className="flex items-center gap-2 h-9 px-3.5 rounded-full bg-neutral-100/50 dark:bg-white/5 border border-theme-border/40 shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all hover:bg-neutral-100 dark:hover:bg-white/10 active:scale-95 group w-full max-w-[140px] sm:max-w-[280px]"
+            >
+              <Search className="w-3.5 h-3.5 text-navbar-text/60 group-hover:text-navbar-text transition-colors shrink-0" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-navbar-text/50 group-hover:text-navbar-text transition-colors truncate">Search...</span>
+            </button>
+          </div>
+
+          {/* Group 3: Icons (Wishlist + Cart) */}
+          <div className="flex items-center gap-0.5 sm:gap-2 shrink-0">
+            <Link to="/wishlist" className="p-2 text-navbar-text hover:bg-neutral-50/10 rounded-full transition-colors relative flex items-center justify-center">
               <Heart className="w-5 h-5" />
+              {wishlistCount > 0 && (
+                <span className="absolute top-1 right-1 bg-red-600 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-theme-bg animate-scaleIn">
+                  {wishlistCount}
+                </span>
+              )}
             </Link>
-            <Link to="/account" className="p-2 text-primary-900 hover:bg-gray-100 rounded-full transition-colors hidden sm:block">
-              <User className="w-5 h-5" />
-            </Link>
-            <Link to="/cart" className="p-2 text-primary-900 hover:bg-gray-100 rounded-full transition-colors relative">
+
+            <Link to="/cart" className="p-2 text-navbar-text hover:bg-neutral-50/10 rounded-full transition-colors relative flex items-center justify-center">
               <ShoppingCart className="w-5 h-5" />
               {cartCount > 0 && (
-                <span className="absolute top-1 right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border-2 border-white">
+                <span className="absolute top-1 right-1 bg-theme-secondary text-theme-bg text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-theme-bg">
                   {cartCount}
                 </span>
               )}
@@ -115,22 +149,13 @@ export function Header() {
           </div>
         </div>
 
-        {/* Global Search Bar below header (Mobile & Desktop) */}
-        <div className="bg-white px-4 pb-1 pt-1">
-          <div className="container mx-auto">
-            <div className="relative group">
-              <input
-                type="text"
-                placeholder="Search products, categories..."
-                className="w-full bg-gray-50 border border-gray-200 text-sm h-10 px-4 rounded-full pl-4 pr-10 focus:outline-none focus:border-primary-900 focus:bg-white transition-all shadow-sm"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-900 transition-colors">
-                <Search className="w-4 h-4" />
-              </div>
-            </div>
-          </div>
-        </div>
       </header>
+
+      {/* Global Search Drawer (Mobile) */}
+      <SearchDrawer 
+        isOpen={isSearchDrawerOpen} 
+        onClose={() => setIsSearchDrawerOpen(false)} 
+      />
 
       {/* Mobile Menu Overlay */}
       <AnimatePresence>
@@ -142,7 +167,7 @@ export function Header() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
             />
             
             {/* Drawer */}
@@ -151,20 +176,20 @@ export function Header() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-80 bg-white z-[70] flex flex-col shadow-2xl h-screen overflow-hidden"
+              className="fixed inset-0 left-0 w-80 bg-white z-[110] flex flex-col shadow-2xl h-screen overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Drawer Header */}
               <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
                 <Link to="/" className="flex items-center gap-1.5" onClick={() => setIsMobileMenuOpen(false)}>
-                  <div className="w-9 h-9 bg-purple-600 rounded-lg flex items-center justify-center text-white font-black text-2xl overflow-hidden">
+                  <div className="w-9 h-9 bg-neutral-950 rounded flex items-center justify-center text-white font-black text-xl overflow-hidden">
                     {settings.storeLogo ? (
-                      <img src={settings.storeLogo} alt="Logo" className="w-full h-full object-contain transition-all duration-300" referrerPolicy="no-referrer" />
+                      <img src={settings.storeLogo || null} alt="Logo" className="w-full h-full object-contain transition-all duration-300" referrerPolicy="no-referrer" />
                     ) : (
                       'T'
                     )}
                   </div>
-                  <span className="font-display font-black text-xl text-gray-900 tracking-tighter uppercase">TAZU <span className="text-purple-600">MART</span></span>
+                  <span className="font-display font-black text-xl text-neutral-950 tracking-tighter uppercase">TAZU MART <span className="font-black">BD</span></span>
                 </Link>
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
                   <X className="w-6 h-6" />
@@ -182,7 +207,7 @@ export function Header() {
                   >
                     <div className="w-14 h-14 rounded-full bg-primary-100 border-4 border-white shadow-sm flex items-center justify-center overflow-hidden shrink-0">
                        {isAuthenticated && user?.profileImage ? (
-                         <img src={user.profileImage} alt="" className="w-full h-full object-cover" />
+                         <img src={user.profileImage || null} alt="" className="w-full h-full object-cover" />
                        ) : (
                          <User className="w-8 h-8 text-primary-900" />
                        )}
@@ -213,7 +238,7 @@ export function Header() {
                           <div className="flex items-center gap-4">
                              <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center group-hover:bg-white transition-colors border border-gray-100 overflow-hidden">
                                 {cat.iconImage ? (
-                                  <img src={cat.iconImage} alt="" className="w-full h-full object-contain p-1.5" />
+                                  <img src={cat.iconImage || null} alt="" className="w-full h-full object-contain p-1.5" />
                                 ) : (
                                   <Grid className="w-4 h-4 text-primary-900" />
                                 )}
@@ -242,7 +267,7 @@ export function Header() {
                         { name: 'My Orders', icon: ClipboardList, path: '/orders' },
                         { name: 'Wishlist', icon: Heart, path: '/wishlist' },
                         { name: 'My Addresses', icon: MapPin, path: '/account' },
-                        { name: 'Recently Viewed', icon: Eye, path: '/recently-viewed' },
+                        { name: 'Recently Viewed', icon: Eye, path: '/account/dashboard' },
                       ].map((item) => (
                         <Link 
                           key={item.name} 
@@ -252,6 +277,11 @@ export function Header() {
                         >
                           <item.icon className="w-4 h-4 text-gray-400 group-hover:text-primary-900" />
                           <span className="text-sm font-bold text-gray-700 group-hover:text-primary-900">{item.name}</span>
+                          {item.name === 'Wishlist' && wishlistCount > 0 && (
+                            <span className="ml-auto bg-red-100 text-red-600 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                              {wishlistCount}
+                            </span>
+                          )}
                         </Link>
                       ))}
                    </div>

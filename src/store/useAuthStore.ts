@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { useCustomerStore } from './useCustomerStore';
+
 type UserRole = 'customer' | 'admin' | 'moderator';
 
 export interface User {
@@ -16,10 +18,18 @@ export interface User {
   country?: string;
   division?: string;
   district?: string;
+  city?: string; // Added city
+  upazila?: string; // Added upazila
+  area?: string; // Added area
+  houseRoad?: string; // Added houseRoad
+  street?: string; // Added street
   zipCode?: string;
+  postalCode?: string; // Added postalCode
   landmark?: string;
   profileImage?: string;
   language?: string;
+  occasionName?: string;
+  specialDate?: string;
   interests?: string[]; // Shopping interests
   marketingEmail?: boolean;
   permissions?: string[];
@@ -38,7 +48,13 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       isAuthenticated: false,
-      login: (user) => set({ user, isAuthenticated: true }),
+      login: (user) => {
+        set({ user, isAuthenticated: true });
+        // Sync customer data
+        setTimeout(() => {
+          useCustomerStore.getState().syncCustomerFromAuth(user);
+        }, 500);
+      },
       logout: () => set({ user: null, isAuthenticated: false }),
       updateUser: (updatedUser) => set((state) => ({
         user: state.user ? { ...state.user, ...updatedUser } : null

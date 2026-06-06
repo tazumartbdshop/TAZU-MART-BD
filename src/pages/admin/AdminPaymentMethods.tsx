@@ -400,26 +400,74 @@ export default function AdminPaymentMethods() {
         </div>
       )}
 
+      {/* Mutual Exclusive Warnings */}
+      {settings.paymentMerchantActive && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 font-mono text-xs text-amber-900 uppercase space-y-1">
+          <div className="flex items-center gap-2 font-black">
+            <AlertCircle className="w-4.5 h-4.5 text-amber-600 shrink-0" />
+            <span>সতর্কতা / warning: Payment Merchant বর্তমানে Active আছে।</span>
+          </div>
+          <p className="font-sans font-bold text-[11px] text-amber-850">
+            Payment Personal Active করতে চাইলে প্রথমে Payment Merchant Disable করুন। আপনি নিচে Toggle টিতে চাপ দিলে Payment Merchant স্বয়ংক্রিয়ভাবে বন্ধ হয়ে যাবে।
+          </p>
+        </div>
+      )}
+
       {/* Hero Header */}
       <div className="bg-white border border-neutral-200 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-black text-neutral-950 uppercase tracking-widest flex items-center gap-2">
-            💳 PAYMENT GATES & METHOD SERVICES
-          </h2>
-          <p className="text-xs text-neutral-500 mt-1 uppercase font-semibold">
+          <div className="flex items-center gap-3">
+            <CreditCard className="w-6 h-6 text-purple-650" />
+            <h2 className="text-xl font-black text-neutral-950 uppercase tracking-widest leading-none">
+              💳 PAYMENT PERSONAL (MANUAL)
+            </h2>
+          </div>
+          <p className="text-xs text-neutral-500 mt-1.5 uppercase font-semibold">
             Dynamically adjust transaction modes, instructions, logo images, and payment states instantly.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSaveAll}
-          className="bg-neutral-950 hover:bg-black text-white border border-neutral-950 h-11 px-6 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2"
-        >
-          <Save className="w-4 h-4 text-emerald-400" />
-          <span>Save All Settings</span>
-        </button>
+        <div className="flex items-center gap-4">
+          {/* Master Toggle */}
+          <div className="flex items-center gap-2 border border-neutral-200 px-4 py-2 bg-neutral-50">
+            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">SYSTEM ACTIVATION</span>
+            <button
+              type="button"
+              onClick={() => {
+                const newActive = !settings.paymentPersonalActive;
+                updateSettings({
+                  paymentPersonalActive: newActive,
+                  // If enabling Personal, Merchant must be disabled automatically
+                  paymentMerchantActive: newActive ? false : settings.paymentMerchantActive
+                });
+                triggerFeedback(newActive ? "Payment Personal ACTIVED & Merchant disabled" : "Payment Personal Deactived");
+              }}
+              className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
+                settings.paymentPersonalActive 
+                  ? 'bg-emerald-600 text-white' 
+                  : 'bg-zinc-200 text-zinc-550'
+              }`}
+            >
+              {settings.paymentPersonalActive ? '● ACTIVE' : '○ INACTIVE'}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSaveAll}
+            className="bg-neutral-900 hover:bg-black text-white border border-neutral-950 h-10 px-6 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2"
+          >
+            <Save className="w-4 h-4 text-emerald-400" />
+            <span>Save All Settings</span>
+          </button>
+        </div>
       </div>
+
+      {!settings.paymentPersonalActive && (
+        <div className="bg-rose-50/70 border border-rose-150 p-4 text-rose-800 text-xs font-mono uppercase tracking-wide">
+          ⚠️ NOTICE: Payment Personal system is currently set to INACTIVE. Customers won't see personal accounts at Checkout.
+        </div>
+      )}
 
       {/* Gateway System Sections */}
       <div className="space-y-6">

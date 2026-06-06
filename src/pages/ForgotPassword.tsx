@@ -16,14 +16,11 @@ export default function ForgotPassword() {
     setIsLoading(true);
     setError('');
 
-    // Simulate link sending
+    // Simulate link/OTP sending
     setTimeout(() => {
       setIsLoading(false);
-      if (email.includes('@')) {
-        setIsSent(true);
-      } else {
-        setError('Please enter a valid email address.');
-      }
+      // Simple check: if it contains @, it's email, otherwise assume mobile
+      setIsSent(true);
     }, 1500);
   };
 
@@ -54,7 +51,7 @@ export default function ForgotPassword() {
                     </Link>
                     <h2 className="text-lg font-bold text-neutral-900 leading-tight">Reset Password</h2>
                     <p className="text-xs text-neutral-500 mt-1">
-                      Enter your address below to authorize password recovery securely.
+                      Enter your email or mobile number below to authorize password recovery.
                     </p>
                   </div>
 
@@ -67,15 +64,15 @@ export default function ForgotPassword() {
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                      <div className="text-left space-y-1.5">
-                        <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email Address</label>
+                        <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email or Mobile Number</label>
                         <div className="relative">
                            <input 
-                              type="email" 
+                              type="text" 
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
                               required 
                               className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all text-sm font-semibold placeholder:text-neutral-300" 
-                              placeholder="name@example.com"
+                              placeholder="name@example.com or 017..."
                            />
                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
                              <Mail className="w-4.5 h-4.5 text-neutral-400" />
@@ -92,7 +89,7 @@ export default function ForgotPassword() {
                            {isLoading ? (
                               <Loader2 className="w-5 h-5 animate-spin text-white" />
                            ) : (
-                              <span>SEND RECOVERY LINK</span>
+                              <span>RESET PASSWORD</span>
                            )}
                         </button>
 

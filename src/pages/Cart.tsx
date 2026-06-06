@@ -59,7 +59,7 @@ export default function Cart() {
                     <Trash2 className="w-4 h-4" />
                   </button>
                   <div className="w-24 h-24 bg-gray-50 rounded-lg overflow-hidden shrink-0 border border-gray-100">
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover mix-blend-multiply" />
+                    <img src={item.image || null} alt={item.name} className="w-full h-full object-cover mix-blend-multiply" />
                   </div>
                   <div>
                     <h3 className="font-serif font-semibold text-primary-900 line-clamp-2 md:pr-0 pr-6 text-sm md:text-base">{item.name}</h3>

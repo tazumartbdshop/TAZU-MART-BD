@@ -3,9 +3,16 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Calendar, Flame, Timer, Sparkles, AlertCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { usePopupStore, getPopupStatus, PopupConfig } from '../../store/usePopupStore';
+import { usePopupOfferStore } from '../../store/usePopupOfferStore';
+import { useProductStore } from '../../store/useProductStore';
 
 export function StorefrontPopup() {
   const { popupCampaigns } = usePopupStore();
+  const { 
+    popupOffers, incrementViews, incrementBuyNowClicks, incrementSkipClicks 
+  } = usePopupOfferStore();
+  const { products } = useProductStore();
+
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -13,6 +20,53 @@ export function StorefrontPopup() {
   const location = useLocation();
   const navigate = useNavigate();
   const rotationTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // New welcome popup state/logic
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const welcomedRef = useRef<string | null>(null);
+
+  // Check category product context
+  const pathMatch = location.pathname.match(/\/product\/([^/]+)/);
+  let viewedProductCategory: string | null = null;
+  if (pathMatch) {
+    const viewedProductId = pathMatch[1];
+    const viewedProduct = products.find(p => p?.id === viewedProductId);
+    if (viewedProduct) {
+      viewedProductCategory = viewedProduct.category;
+    }
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const activeOffer = popupOffers.find(offer => {
+    if (offer.status !== 'Published') return false;
+    if (todayStr < offer.startDate || todayStr > offer.endDate) return false;
+    
+    // Category targeting condition
+    if (offer.categoryId) {
+      return viewedProductCategory === offer.categoryId;
+    }
+    return true;
+  });
+
+  const welcomeDismissed = sessionStorage.getItem('welcome_popup_offer_dismissed_session') === 'true';
+
+  useEffect(() => {
+    if (activeOffer && !welcomeDismissed) {
+      setWelcomeOpen(true);
+    } else {
+      setWelcomeOpen(false);
+    }
+  }, [activeOffer, welcomeDismissed, location.pathname]);
+
+  // Record views strictly once per active campaign session load
+  useEffect(() => {
+    if (welcomeOpen && activeOffer && welcomedRef.current !== activeOffer.id) {
+      welcomedRef.current = activeOffer.id;
+      incrementViews(activeOffer.id).catch(err => console.error(err));
+    }
+  }, [welcomeOpen, activeOffer]);
+
+
 
   // 1. Filter and prioritize popups
   // Priority: 1. Active (general), 2. Scheduled, 3. Expiring Soon (Ends in < 24 hrs)
@@ -124,6 +178,113 @@ export function StorefrontPopup() {
       if (rotationTimerRef.current) clearTimeout(rotationTimerRef.current);
     };
   }, [isOpen, currentIdx, eligiblePopups.length, activePopup]);
+
+  const handleWelcomeClose = async () => {
+    if (!activeOffer) return;
+    setWelcomeOpen(false);
+    sessionStorage.setItem('welcome_popup_offer_dismissed_session', 'true');
+    await incrementSkipClicks(activeOffer.id).catch(err => console.error(err));
+  };
+
+  const handleWelcomeActionClick = async () => {
+    if (!activeOffer) return;
+    setWelcomeOpen(false);
+    sessionStorage.setItem('welcome_popup_offer_dismissed_session', 'true');
+    await incrementBuyNowClicks(activeOffer.id).catch(err => console.error(err));
+    if (activeOffer.productId) {
+      navigate(`/product/${activeOffer.productId}`);
+    } else {
+      navigate('/shop');
+    }
+  };
+
+  if (welcomeOpen && activeOffer) {
+    return (
+      <AnimatePresence>
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4">
+          
+          {/* Backdrop screen overlay */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={handleWelcomeClose}
+            className="absolute inset-0 bg-black/65 backdrop-blur-xs"
+          />
+
+          {/* Central Modal Container */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 150 }}
+            className="relative w-full max-w-[340px] sm:max-w-[370px] bg-white rounded-3xl overflow-hidden shadow-2xl border border-neutral-200/50 flex flex-col items-center z-10 p-0"
+          >
+            {/* Top Close (X) mark button overlay */}
+            <button
+              onClick={handleWelcomeClose}
+              className="absolute top-2.5 right-2.5 z-30 bg-neutral-900/60 text-white hover:bg-neutral-900 duration-200 p-1.5 rounded-full cursor-pointer border border-white/10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Fire header bar matching Daraz mega banner orange pattern */}
+            <div className="w-full bg-[#f57224] py-2 px-4 text-center text-[10px] font-black tracking-widest text-white flex justify-center items-center gap-1.5 uppercase shrink-0 select-none">
+              <Flame className="w-3.5 h-3.5 fill-white animate-bounce" /> {activeOffer.subtitle || 'MEGA SURPRISE SALE'}
+            </div>
+
+            {/* Banner image 1:1 Square display */}
+            <div className="w-full aspect-square bg-neutral-50 overflow-hidden relative shrink-0 border-b border-neutral-100">
+              <img 
+                src={activeOffer.bannerUrl} 
+                alt={activeOffer.title} 
+                className="w-full h-full object-cover" 
+                referrerPolicy="no-referrer"
+              />
+            </div>
+
+            {/* Details Content text block */}
+            <div className="p-5 text-center w-full bg-white select-none">
+              <h2 className="font-sans font-black uppercase text-sm leading-tight tracking-tight text-neutral-900 mb-1">
+                {activeOffer.title}
+              </h2>
+
+              {/* Daraz simulated Coupon voucher indicator */}
+              <div className="bg-orange-50 text-[#f57224] font-black text-xs py-1.5 px-3.5 rounded-xl border border-dashed border-[#f57224] max-w-xs mx-auto my-3 flex flex-col items-center justify-center">
+                <span className="text-[8px] font-bold text-neutral-800 tracking-wide uppercase">COUPON CODE HOOK</span>
+                <span>{activeOffer.categoryId ? 'Category Targeted Surprise' : 'Welcome Storewide Deal'}</span>
+              </div>
+
+              <p className="text-neutral-550 text-xs font-semibold leading-relaxed max-w-[270px] mx-auto">
+                {activeOffer.description}
+              </p>
+            </div>
+
+            {/* Bottom Actions Buttons */}
+            <div className="flex gap-3 px-5 pb-5 w-full shrink-0">
+              {/* Secondary CTA Skip Deal */}
+              <button
+                onClick={handleWelcomeClose}
+                className="flex-1 h-[44px] bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-200 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all cursor-pointer active:scale-95"
+              >
+                {activeOffer.secondaryButtonText}
+              </button>
+
+              {/* Primary CTA Buy Now */}
+              <button
+                onClick={handleWelcomeActionClick}
+                className="flex-1 h-[44px] bg-[#EE0000] text-white rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all shadow-md hover:bg-red-700 cursor-pointer active:scale-95 text-center flex items-center justify-center"
+              >
+                {activeOffer.primaryButtonText}
+              </button>
+            </div>
+
+          </motion.div>
+
+        </div>
+      </AnimatePresence>
+    );
+  }
 
   if (!isOpen || !activePopup) return null;
 

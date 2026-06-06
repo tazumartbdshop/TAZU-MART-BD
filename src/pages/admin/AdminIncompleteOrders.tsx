@@ -10,7 +10,7 @@ import { formatPrice } from '../../lib/utils';
 
 export default function AdminIncompleteOrders() {
   const navigate = useNavigate();
-  const { leads, deleteLead } = useLeadStore();
+  const { leads, deleteLead, markAsRead } = useLeadStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Demo Data for Preview if no real leads are captured
@@ -53,6 +53,9 @@ export default function AdminIncompleteOrders() {
   const displayLeads = leads.length > 0 ? leads : demoLeads;
 
   const toggleExpand = (id: string) => {
+    if (expandedId !== id) {
+      markAsRead(id);
+    }
     setExpandedId(expandedId === id ? null : id);
   };
 
@@ -109,8 +112,11 @@ export default function AdminIncompleteOrders() {
                 className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-yellow-100 text-yellow-850 font-black flex items-center justify-center text-xs shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-yellow-100 text-yellow-850 font-black flex items-center justify-center text-xs shrink-0 relative">
                     {index + 1}
+                    {!lead.isRead && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 border-2 border-white rounded-full"></span>
+                    )}
                   </div>
                   <div>
                     <h4 className="font-extrabold text-black text-sm sm:text-base font-sans">

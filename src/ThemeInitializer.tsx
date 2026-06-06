@@ -1,5 +1,9 @@
 import React, { useEffect } from 'react';
 import { useThemeStore } from './store/useThemeStore';
+import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from './lib/firebase';
+import { useBannerStore, Banner } from './store/useBannerStore';
+import { useCategoryStore } from './store/useCategoryStore';
 
 /**
  * ThemeInitializer injected into the App root to apply dynamic styling 
@@ -49,10 +53,20 @@ export const ThemeInitializer: React.FC = () => {
     root.style.setProperty('--card-name-color', theme.productNameColor);
     root.style.setProperty('--card-price-color', theme.priceColor);
     root.style.setProperty('--card-shadow', theme.cardShadow);
+    root.style.setProperty('--wishlist-icon-color', theme.wishlistIconColor);
+    root.style.setProperty('--rating-star-color', theme.ratingStarColor);
+    root.style.setProperty('--grid-spacing', `${theme.gridSpacing}px`);
+
+    // Banner
+    root.style.setProperty('--banner-overlay', theme.bannerOverlayColor);
+    root.style.setProperty('--banner-text', theme.bannerTextColor);
+    root.style.setProperty('--banner-button', theme.bannerButtonColor);
 
     // Footer
     root.style.setProperty('--footer-bg', theme.footerBg);
     root.style.setProperty('--footer-text', theme.footerText);
+    root.style.setProperty('--footer-link', theme.footerLinkColor);
+    root.style.setProperty('--footer-icon', theme.footerIconColor);
 
     // Mode
     if (theme.mode === 'dark') {
@@ -74,6 +88,63 @@ export const ThemeInitializer: React.FC = () => {
     // If we had a font loader, we'd use it here. 
     // For now, we assume fonts are imported in index.css
   }, [theme.fontFamily, theme.headingFont]);
+
+  // Subscribe to real-time Banners & Draft Banners from Firestore
+  useEffect(() => {
+    const bannersRef = collection(db, 'banners');
+    const qLive = query(bannersRef, orderBy('order', 'asc'));
+    const unsubscribeLive = onSnapshot(qLive, (snapshot) => {
+      const liveList: Banner[] = [];
+      snapshot.forEach((doc) => {
+        liveList.push({ id: doc.id, ...doc.data() } as Banner);
+      });
+      useBannerStore.getState().setBanners(liveList);
+      
+      if (snapshot.empty) {
+        useBannerStore.getState().seedDefaultBanner();
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'banners');
+    });
+
+    const draftRef = collection(db, 'banners_draft');
+    const qDraft = query(draftRef, orderBy('order', 'asc'));
+    const unsubscribeDraft = onSnapshot(qDraft, (snapshot) => {
+      const draftList: Banner[] = [];
+      snapshot.forEach((doc) => {
+        draftList.push({ id: doc.id, ...doc.data() } as Banner);
+      });
+      
+      // Only set drafts from DB if the admin hasn't started doing local changes
+      if (!useBannerStore.getState().hasUnsavedChanges) {
+        useBannerStore.getState().setDraftBanners(draftList);
+      }
+      
+      if (snapshot.empty) {
+        useBannerStore.getState().seedDefaultBanner();
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'banners_draft');
+    });
+
+    const unsubscribeCategories = useCategoryStore.getState().subscribe();
+
+    const unsubscribeSliderConfig = onSnapshot(doc(db, 'settings', 'slider_config'), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        useBannerStore.getState().updateSliderConfigLocal(!!data.autoSlide, Number(data.duration || 5));
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'settings/slider_config');
+    });
+
+    return () => {
+      unsubscribeLive();
+      unsubscribeDraft();
+      unsubscribeCategories();
+      unsubscribeSliderConfig();
+    };
+  }, []);
 
   return null;
 };

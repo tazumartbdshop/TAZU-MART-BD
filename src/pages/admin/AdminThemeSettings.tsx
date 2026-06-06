@@ -28,10 +28,20 @@ import {
   Sparkles,
   ArrowRight,
   BellRing,
-  Shield
+  Shield,
+  Loader2
 } from 'lucide-react';
 import { useThemeStore, ThemeConfig } from '../../store/useThemeStore';
 import { motion, AnimatePresence } from 'framer-motion';
+
+import { ThemePreviewContainer } from '../../components/admin/ThemePreviewContainer';
+import Home from '../../pages/Home';
+import { Header } from '../../components/layout/Header';
+import { Footer } from '../../components/layout/Footer';
+import Product from '../../pages/Product';
+import { CompactProductCard } from '../../components/product/CompactProductCard';
+import { products as mockProducts } from '../../data/mockData';
+import TemplateDraftBar from '../../components/admin/TemplateDraftBar';
 
 const PRESET_THEMES = [
   { name: 'Black & White Pro', primary: '#000000', secondary: '#ffffff' },
@@ -43,7 +53,12 @@ const PRESET_THEMES = [
 ];
 
 export default function AdminThemeSettings() {
-  const { theme, updateTheme, resetTheme, updateButton } = useThemeStore();
+  const { 
+    draftTheme: theme, 
+    updateDraftTheme: updateTheme, 
+    updateDraftButton: updateButton,
+    resetDraftTheme: resetTheme
+  } = useThemeStore();
   const [activeTab, setActiveTab] = useState('colors');
   const [previewMode, setPreviewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [isSaving, setIsSaving] = useState(false);
@@ -77,6 +92,9 @@ export default function AdminThemeSettings() {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-8 pb-32 font-sans relative">
+      {/* Draft Toolbar (Publish/Save/Reset) */}
+      <TemplateDraftBar />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -118,7 +136,7 @@ export default function AdminThemeSettings() {
               </div>
 
               <div className="p-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
-                 <AnimatePresence mode="wait">
+                    <AnimatePresence mode="wait">
                     <motion.div
                       key={activeTab}
                       initial={{ opacity: 0, x: -10 }}
@@ -293,49 +311,63 @@ export default function AdminThemeSettings() {
              previewMode === 'tablet' ? 'max-w-[800px] aspect-[4/3] rounded-[32px] border-[10px] border-[#0a0a0a]' : 
              'w-full min-h-[800px] rounded-none border border-gray-300'
            }`}>
-             <div className="w-full h-full bg-white overflow-y-auto custom-scrollbar flex flex-col pt-1" style={{ backgroundColor: theme.backgroundColor, fontFamily: theme.fontFamily }}>
-                
-                <AnimatePresence mode="wait">
-                  {currentTab.preview === 'home' && <HomePreview theme={theme} />}
-                  {currentTab.preview === 'header' && <HeaderPreview theme={theme} />}
-                  {currentTab.preview === 'product' && <ProductPagePreview theme={theme} />}
-                  {currentTab.preview === 'buttons' && <ButtonPanelPreview theme={theme} />}
-                  {currentTab.preview === 'footer' && <FooterPreview theme={theme} />}
-                </AnimatePresence>
-
-             </div>
+              <ThemePreviewContainer theme={theme}>
+                <div className="flex flex-col min-h-full">
+                  <Header />
+                  <main className="flex-1 overflow-x-hidden">
+                    <AnimatePresence mode="wait">
+                      {activeTab === 'product' ? (
+                        <div key="product-preview" className="animate-in fade-in duration-500">
+                          <Product />
+                        </div>
+                      ) : activeTab === 'buttons' ? (
+                        <ButtonPanelPreview theme={theme} />
+                      ) : (
+                        <div key="home-preview" className="animate-in fade-in duration-500">
+                          <Home />
+                        </div>
+                      )}
+                    </AnimatePresence>
+                  </main>
+                  <Footer />
+                </div>
+              </ThemePreviewContainer>
            </div>
 
            {/* Contextual Save Bar under Preview */}
            <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between bg-black p-6 shadow-2xl"
+            className="flex items-center justify-between bg-neutral-950 p-6 border border-white/5 shadow-2xl"
            >
               <div className="flex items-center gap-4">
-                 <div className="w-12 h-12 bg-white/5 flex items-center justify-center text-white/50 border border-white/10">
-                    <Save className="w-5 h-5" />
+                 <div className="w-14 h-14 bg-white/5 flex items-center justify-center text-white/40 border border-white/10">
+                    <Save className="w-6 h-6" />
                  </div>
                  <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-widest text-white">Save {currentTab.name}</h4>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight">Apply changes to live website environment</p>
+                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-white">Theme Configuration</h4>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1">Staged changes for {currentTab.name}</p>
                  </div>
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-col gap-2 w-full max-w-[200px]">
                  <button 
-                  onClick={resetTheme}
-                  className="px-6 py-3 border border-white/20 text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="w-full h-11 border border-white/20 bg-transparent text-white text-[10px] font-black uppercase tracking-[0.15em] hover:bg-white/5 transition-all flex items-center justify-center gap-2 group"
                  >
+                   <Save className="w-3.5 h-3.5 text-gray-500 group-hover:text-white transition-colors" />
                    Save Changes
                  </button>
                  <button 
                     onClick={handleSave}
                     disabled={isSaving}
-                    className={`px-12 py-3 bg-purple-600 text-white text-xs font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 hover:scale-105 active:scale-95 ${isSaving ? 'opacity-50' : 'shadow-xl shadow-purple-900/40'}`}
+                    className={`w-full h-11 bg-purple-600 text-white text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 hover:bg-purple-500 active:scale-95 shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:shadow-[0_0_30px_rgba(147,51,234,0.5)] ${isSaving ? 'opacity-50' : ''}`}
                   >
-                    {isSaving ? 'Applying...' : saveSuccess ? (
-                      <>APPLIED SUCCESS <CheckCircle2 className="w-4 h-4" /></>
+                    {isSaving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : saveSuccess ? (
+                      <>APPLIED <CheckCircle2 className="w-4 h-4" /></>
                     ) : (
                       <>APPLY THEME <ArrowRight className="w-4 h-4" /></>
                     )}
@@ -348,242 +380,40 @@ export default function AdminThemeSettings() {
   );
 }
 
-// --- Preview Components ---
-
-function HeaderPreview({ theme }: { theme: ThemeConfig }) {
-  return (
-    <div className="p-8 space-y-12 min-h-full">
-       <div className="space-y-4">
-          <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 border-b border-gray-100 pb-2 mb-8">Standard Header Layout</p>
-          <header className="px-6 py-5 flex items-center justify-between shadow-sm transition-all" style={{ backgroundColor: theme.navbarBg, color: theme.navbarTextColor, borderColor: theme.borderColor, borderWidth: 1 }}>
-             <div className="flex items-center gap-4">
-                <Menu className="w-6 h-6" style={{ color: theme.menuIconColor }} />
-                <span className="font-black tracking-tighter text-xl uppercase" style={{ color: theme.navbarTextColor, fontFamily: theme.headingFont }}>TAZU MART</span>
-             </div>
-             <div className="flex items-center gap-6">
-                <div className="hidden md:flex items-center gap-3 px-4 py-2" style={{ backgroundColor: theme.searchBoxColor }}>
-                   <Search className="w-4 h-4" style={{ color: theme.searchPlaceholderColor }} />
-                   <span className="text-[10px] font-bold" style={{ color: theme.searchPlaceholderColor }}>Search premium products...</span>
-                </div>
-                <div className="flex items-center gap-4">
-                   <BellRing className="w-5 h-5" style={{ color: theme.notificationIconColor }} />
-                   <div className="relative">
-                      <ShoppingCart className="w-5 h-5" style={{ color: theme.cartIconColor }} />
-                      <span className="absolute -top-2 -right-2 w-4 h-4 bg-purple-600 text-[8px] text-white flex items-center justify-center rounded-full font-black">2</span>
-                   </div>
-                </div>
-             </div>
-          </header>
-       </div>
-
-       <div className="bg-gray-50/50 p-12 border border-dashed border-gray-200 text-center">
-          <Layout className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Main Layout Area</p>
-       </div>
-    </div>
-  );
-}
-
-function HomePreview({ theme }: { theme: ThemeConfig }) {
-  return (
-    <div className="space-y-0 min-h-full flex flex-col">
-       {/* Small Mock Header */}
-       <header className="px-6 py-4 flex items-center justify-between border-b" style={{ backgroundColor: theme.navbarBg, borderColor: theme.borderColor }}>
-          <span className="font-black tracking-tighter text-sm uppercase" style={{ color: theme.navbarTextColor, fontFamily: theme.headingFont }}>TAZU MART</span>
-          <ShoppingCart className="w-4 h-4" style={{ color: theme.cartIconColor }} />
-       </header>
-
-       {/* Banner Section */}
-       <div className="relative aspect-[16/7] w-full" style={{ backgroundColor: theme.primaryColor }}>
-          <div className="absolute inset-0" style={{ background: theme.bannerGradient }}></div>
-          <div className="absolute inset-0" style={{ backgroundColor: theme.bannerOverlayColor }}></div>
-          <div className="absolute inset-0 flex flex-col items-start justify-center px-8 gap-4">
-             <span className="text-[10px] font-black text-white bg-purple-600 px-3 py-1 uppercase tracking-widest">Flash Offer 2026</span>
-             <h2 className="text-3xl font-black uppercase tracking-tighter leading-none" style={{ color: theme.bannerTextColor, fontFamily: theme.headingFont }}>URBAN LUXURY<br/>COLLECTION</h2>
-             <button className="px-6 py-3 font-black uppercase tracking-widest text-[10px] shadow-2xl transition-transform hover:scale-105" style={{ backgroundColor: theme.buttons.shopNow.bg, color: theme.buttons.shopNow.textColor, borderRadius: theme.buttons.shopNow.radius }}>EXPLORE NOW</button>
-          </div>
-       </div>
-
-       {/* Categories */}
-       <div className="p-8">
-          <div className="flex items-center justify-between mb-6">
-             <h3 className="text-sm font-black uppercase tracking-tight" style={{ color: theme.textColor, fontFamily: theme.headingFont }}>Quick Categories</h3>
-             <ArrowRight className="w-4 h-4" />
-          </div>
-          <div className="grid grid-cols-4 gap-4">
-             {[1,2,3,4].map(i => (
-               <div key={i} className="space-y-2 text-center">
-                  <div className="aspect-square bg-gray-100 rounded-full border border-gray-200"></div>
-                  <p className="text-[8px] font-black uppercase tracking-widest opacity-60">Category {i}</p>
-               </div>
-             ))}
-          </div>
-       </div>
-
-       {/* Products */}
-       <div className="p-8 flex-1">
-          <div className="flex items-center justify-between mb-6">
-             <h3 className="text-sm font-black uppercase tracking-tight" style={{ color: theme.textColor, fontFamily: theme.headingFont }}>Trending Sale</h3>
-          </div>
-          <div className="grid grid-cols-2 gap-6" style={{ gap: theme.gridSpacing }}>
-            {[1, 2].map((i) => (
-              <div 
-                key={i} 
-                className={`group transition-all ${theme.cardHoverAnimation ? 'hover:-translate-y-2' : ''}`}
-                style={{ 
-                  backgroundColor: theme.cardBg, 
-                  borderRadius: theme.cardRadius, 
-                  boxShadow: theme.cardShadow,
-                  border: `1px solid ${theme.borderColor}`
-                }}
-              >
-                  <div className="aspect-square bg-gray-100 relative overflow-hidden" style={{ borderRadius: `${theme.cardRadius}px ${theme.cardRadius}px 0 0` }}>
-                    <div className="absolute top-2 left-2 px-2 py-1 text-[8px] font-black text-white bg-green-500 uppercase">Save 50%</div>
-                    <Heart className="absolute top-2 right-2 w-4 h-4 text-gray-300" style={{ color: theme.wishlistIconColor }} />
-                  </div>
-                  <div className="p-4 space-y-2 text-center">
-                    <div className="flex items-center justify-center gap-0.5">
-                        {[1,2,3,4,5].map(s => <Star key={s} className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" style={{ color: theme.ratingStarColor }} />)}
-                    </div>
-                    <h3 className="text-[10px] font-bold uppercase truncate" style={{ color: theme.productNameColor }}>Essential Urban Tee</h3>
-                    <p className="text-xs font-black" style={{ color: theme.priceColor }}>BDT 1,290</p>
-                    <button 
-                      className={`w-full py-2.5 font-black uppercase text-[8px] tracking-widest ${theme.buttonHoverZoom ? 'hover:scale-105 active:scale-95' : ''}`} 
-                      style={{ 
-                        backgroundColor: theme.buttons.addToCart.bg, 
-                        color: theme.buttons.addToCart.textColor,
-                        borderRadius: theme.buttons.addToCart.radius
-                      }}
-                    >
-                      ADD TO CART
-                    </button>
-                  </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Mobile Navbar Mock */}
-        <div className="mt-12 bg-white border-t p-4 flex items-center justify-between" style={{ backgroundColor: theme.navbarBg, borderColor: theme.borderColor }}>
-           {[Layout, Search, ShoppingCart, Smartphone].map((Icon, idx) => (
-             <div key={idx} className="flex flex-col items-center gap-1 opacity-60">
-                <Icon className="w-5 h-5" style={{ color: theme.navbarTextColor }} />
-             </div>
-           ))}
-        </div>
-    </div>
-  );
-}
-
-function ProductPagePreview({ theme }: { theme: ThemeConfig }) {
-  return (
-    <div className="p-8 space-y-8 min-h-full">
-       <header className="py-4 border-b flex items-center justify-between" style={{ borderColor: theme.borderColor }}>
-          <ChevronRight className="w-5 h-5 rotate-180" />
-          <Heart className="w-5 h-5 text-gray-300" />
-       </header>
-
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
-          <div className="aspect-[4/5] bg-gray-50 border border-gray-100 flex items-center justify-center rounded-xl overflow-hidden shadow-sm">
-             <ImageIcon className="w-16 h-16 text-gray-200" />
-          </div>
-          <div className="space-y-6">
-             <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                   <div className="flex gap-0.5">
-                      {[1,2,3,4,5].map(s => <Star key={s} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />)}
-                   </div>
-                   <span className="text-[10px] font-bold text-gray-400">(128 Reviews)</span>
-                </div>
-                <h2 className="text-2xl font-black uppercase tracking-tight" style={{ color: theme.textColor, fontFamily: theme.headingFont }}>SMART WATCH SERIES 8 PRO</h2>
-             </div>
-
-             <div className="flex items-center gap-4">
-                <span className="text-xl font-black" style={{ color: theme.priceColor }}>BDT 4,500</span>
-                <span className="text-sm font-bold text-gray-300 line-through">BDT 9,000</span>
-                <span className="bg-green-500 text-white px-2 py-0.5 text-[10px] font-black">50% OFF</span>
-             </div>
-
-             <p className="text-[11px] font-bold text-gray-400 leading-relaxed uppercase">
-                Premium high-tech smart watch with 1.9 inch AMOLED display, health sensors, and global connectivity. 
-             </p>
-
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t" style={{ borderColor: theme.borderColor }}>
-                <button 
-                  className={`w-full py-4 text-[10px] font-black uppercase tracking-widest shadow-xl transition-all ${theme.buttonHoverZoom ? 'hover:scale-105 active:scale-95' : ''}`}
-                  style={{ backgroundColor: theme.buttons.addToCart.bg, color: theme.buttons.addToCart.textColor, borderRadius: theme.buttons.addToCart.radius }}
-                >
-                  ADD TO CART
-                </button>
-                <button 
-                  className={`w-full py-4 text-[10px] font-black uppercase tracking-widest shadow-xl transition-all ${theme.buttonHoverZoom ? 'hover:scale-105 active:scale-95' : ''}`}
-                  style={{ backgroundColor: theme.buttons.buyNow.bg, color: theme.buttons.buyNow.textColor, borderRadius: theme.buttons.buyNow.radius }}
-                >
-                  BUY NOW
-                </button>
-             </div>
-          </div>
-       </div>
-    </div>
-  );
-}
+// --- Custom Preview Panels (Keep only needed ones) ---
 
 function ButtonPanelPreview({ theme }: { theme: ThemeConfig }) {
+  const sampleProduct = mockProducts[0];
+  
   return (
-    <div className="p-12 space-y-12 min-h-full bg-gray-50/50">
-       <h3 className="text-xs font-black uppercase tracking-widest text-black border-b border-gray-100 pb-3">Website Action Buttons</h3>
+    <div className="p-12 space-y-12 min-h-full bg-theme-bg">
+       <h3 className="text-xs font-black uppercase tracking-widest text-theme-text border-b border-theme-border pb-3">Theme Generated Buttons</h3>
        
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          {Object.entries(theme.buttons).map(([key, config]) => (
-            <div key={key} className="space-y-4 p-8 bg-white border border-[#EEEEEE] shadow-sm text-center">
-               <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-6">{key.replace(/([A-Z])/g, ' $1')} Style</p>
-               <button 
-                className={`px-10 py-5 text-sm font-black uppercase tracking-widest shadow-2xl transition-all mx-auto block ${theme.buttonHoverZoom ? 'hover:scale-110 active:scale-90' : ''}`}
-                style={{ backgroundColor: config.bg, color: config.textColor, borderRadius: `${config.radius}px`, boxShadow: config.shadow, border: config.borderColor !== 'transparent' ? `2px solid ${config.borderColor}` : 'none' }}
-               >
-                  {key.toUpperCase()} BUTTON
-               </button>
-               <div className="mt-8 flex justify-center gap-4">
-                  <div className="text-[8px] font-black text-gray-300 uppercase">Shadow: {config.shadow !== 'none' ? 'Active' : 'Off'}</div>
-                  <div className="text-[8px] font-black text-gray-300 uppercase">Zoom: {theme.buttonHoverZoom ? 'On' : 'Off'}</div>
-               </div>
-            </div>
-          ))}
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="p-8 border border-theme-border flex flex-col items-center gap-6">
+             <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Primary Action</p>
+             <button className="btn-primary px-12 py-4 text-xs font-black uppercase tracking-widest">Shop Now</button>
+          </div>
+          <div className="p-8 border border-theme-border flex flex-col items-center gap-6">
+             <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Secondary Action</p>
+             <button className="btn-secondary px-12 py-4 text-xs font-black uppercase tracking-widest">Learn More</button>
+          </div>
+          <div className="p-8 border border-theme-border flex flex-col items-center gap-6">
+             <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Add to Cart</p>
+             <button className="btn-add-to-cart px-10 py-3 text-[10px] font-black uppercase tracking-widest">Add to Cart</button>
+          </div>
+          <div className="p-8 border border-theme-border flex flex-col items-center gap-6">
+             <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Buy Now</p>
+             <button className="btn-buy-now px-10 py-3 text-[10px] font-black uppercase tracking-widest">Buy Now</button>
+          </div>
        </div>
-    </div>
-  );
-}
 
-function FooterPreview({ theme }: { theme: ThemeConfig }) {
-  return (
-    <div className="min-h-full flex flex-col items-center justify-center">
-       <footer className="w-full h-full p-20 text-center space-y-12" style={{ backgroundColor: theme.footerBg, color: theme.footerText }}>
-          <div className="space-y-4">
-             <h2 className="text-3xl font-black tracking-tighter uppercase" style={{ color: theme.footerText, fontFamily: theme.headingFont }}>TAZU MART</h2>
-             <p className="max-w-md mx-auto text-[10px] font-bold uppercase tracking-widest opacity-60 leading-relaxed">
-                Premium E-commerce experience with curated collections for the modern lifestyle. Fast delivery and global support.
-             </p>
+       <div className="pt-12">
+          <h3 className="text-xs font-black uppercase tracking-widest text-theme-text border-b border-theme-border pb-3 mb-6">Product Card Context</h3>
+          <div className="max-w-[250px] mx-auto">
+             <CompactProductCard product={sampleProduct} />
           </div>
-
-          <div className="flex flex-wrap justify-center gap-12 text-[11px] font-black uppercase tracking-[0.2em]">
-             {['Categories', 'Flash Sale', 'Account', 'Order Logs', 'Support'].map(link => (
-                <span key={link} className="hover:scale-110 transition-transform cursor-pointer" style={{ color: theme.footerLinkColor }}>{link}</span>
-             ))}
-          </div>
-
-          <div className="flex justify-center gap-8 border-t border-white/10 pt-12">
-             {[Smartphone, Heart, Zap, Shield].map((Icon, idx) => (
-                <div key={idx} className="w-12 h-12 bg-white/5 flex items-center justify-center transition-colors group cursor-pointer">
-                   <Icon className="w-5 h-5 group-hover:scale-110 transition-transform" style={{ color: theme.footerIconColor }} />
-                </div>
-             ))}
-          </div>
-
-          <div className="space-y-2 pt-8 opacity-40">
-             <p className="text-[9px] font-black uppercase tracking-widest text-[#9ca3af]">Powered by Admin Dashboard Pro</p>
-             <p className="text-[8px] font-bold uppercase tracking-widest">© 2026 TAZU MART GLOBAL LLC. ALL RIGHTS RESERVED.</p>
-          </div>
-       </footer>
+       </div>
     </div>
   );
 }

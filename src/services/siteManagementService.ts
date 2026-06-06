@@ -1,3 +1,26 @@
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
+export interface LinkPage {
+  id: string;
+  name: string;
+  slug: string;
+  enabled: boolean;
+  title: string;
+  description: string;
+  content: string;
+  image: string;
+  banner: string;
+  titleColor: string;
+  contentColor: string;
+  backgroundColor: string;
+  buttonColor: string;
+  fontSize: string;
+  seoTitle: string;
+  seoDescription: string;
+  seoKeywords: string;
+}
+
 export interface SiteManagementData {
   developer_button_name: string;
   developer_link: string;
@@ -12,6 +35,8 @@ export interface SiteManagementData {
   facebook_button_name: string;
   facebook_link: string;
   facebook_status: boolean;
+
+  linkPages: LinkPage[];
   
   updated_at?: number;
 }
@@ -31,7 +56,8 @@ const DEFAULT_DATA: SiteManagementData = {
   
   facebook_button_name: 'Facebook Updates',
   facebook_link: 'https://facebook.com/page-name',
-  facebook_status: true
+  facebook_status: true,
+  linkPages: []
 };
 
 export const siteManagementService = {
@@ -55,5 +81,36 @@ export const siteManagementService = {
       updated_at: Date.now()
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  },
+
+  async getLinkPages(): Promise<LinkPage[]> {
+    const q = query(collection(db, 'link_pages'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LinkPage));
+  },
+
+  async saveLinkPage(page: LinkPage): Promise<void> {
+    // Implement save logic, maybe add/update doc
+    // For simplicity, using setDoc with id
+    import('firebase/firestore').then(({ doc, setDoc }) => {
+        setDoc(doc(db, 'link_pages', page.id || page.slug), page);
+    });
+  },
+
+  async getLinkPageBySlug(slug: string): Promise<LinkPage | null> {
+    try {
+      const q = query(collection(db, 'link_pages'), where('slug', '==', slug), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        return null;
+      }
+      
+      const doc = querySnapshot.docs[0];
+      return { id: doc.id, ...doc.data() } as LinkPage;
+    } catch (e) {
+      console.error('Error fetching link page:', e);
+      return null;
+    }
   }
 };

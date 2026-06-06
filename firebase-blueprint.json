@@ -47,9 +47,109 @@
         "skipTime": { "type": "number" }
       },
       "required": ["videoUrl", "title", "duration", "skipTime"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Represents a support chat thread",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["customerId", "customerName", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Represents a single chat message",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["senderId", "text", "timestamp"]
+    },
+    "Broadcast": {
+      "title": "Broadcast",
+      "description": "Represents a promotional broadcast or notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string" },
+        "audience": { "type": "string" },
+        "pinned": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "bannerImage": { "type": "string" }
+      },
+      "required": ["title", "content", "createdAt"]
+    },
+    "LinkPage": {
+      "title": "Link Page",
+      "description": "Dynamic CMS footer page",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "content": { "type": "string" },
+        "image": { "type": "string" },
+        "banner": { "type": "string" },
+        "titleColor": { "type": "string" },
+        "contentColor": { "type": "string" },
+        "backgroundColor": { "type": "string" },
+        "buttonColor": { "type": "string" },
+        "fontSize": { "type": "string" },
+        "seoTitle": { "type": "string" },
+        "seoDescription": { "type": "string" },
+        "seoKeywords": { "type": "string" }
+      },
+      "required": ["name", "slug", "title", "content"]
+    },
+    "InfrastructureSettings": {
+      "title": "Infrastructure Settings",
+      "description": "Enterprise configuration for domains, hosting, DNS, SSL, servers, CDN, and SMTP connectivity",
+      "type": "object",
+      "properties": {
+        "primaryDomain": { "type": "string" },
+        "secondaryDomain": { "type": "string" },
+        "redirectDomain": { "type": "string" },
+        "wwwStatus": { "type": "string" },
+        "hostingProvider": { "type": "string" },
+        "hostingIp": { "type": "string" },
+        "hostingHostname": { "type": "string" },
+        "hostingPanelUrl": { "type": "string" },
+        "ns1": { "type": "string" },
+        "ns2": { "type": "string" },
+        "ns3": { "type": "string" },
+        "ns4": { "type": "string" },
+        "sslProvider": { "type": "string" },
+        "sslExpiry": { "type": "string" },
+        "sslStatus": { "type": "string" },
+        "serverApiEndpoint": { "type": "string" },
+        "serverPort": { "type": "string" },
+        "serverSecretKey": { "type": "string" },
+        "cdnProvider": { "type": "string" },
+        "cdnUrl": { "type": "string" },
+        "smtpHost": { "type": "string" },
+        "smtpPort": { "type": "string" },
+        "smtpSender": { "type": "string" }
+      },
+      "required": ["primaryDomain", "hostingIp"]
     }
   },
   "firestore": {
+    "/infrastructure/config": {
+      "schema": "InfrastructureSettings",
+      "description": "Global enterprise infrastructure settings"
+    },
     "/game_config/settings": {
       "schema": "GameSettings",
       "description": "Global game configuration"
@@ -61,6 +161,22 @@
     "/ad_config/revive": {
       "schema": "ReviveAd",
       "description": "Revive ad settings"
+    },
+    "/conversations/{conversationId}": {
+      "schema": "Conversation",
+      "description": "Support chat threads"
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a conversation"
+    },
+    "/broadcasts/{broadcastId}": {
+      "schema": "Broadcast",
+      "description": "Announcements and offers broadcasts"
+    },
+    "/link_pages/{pageId}": {
+      "schema": "LinkPage",
+      "description": "CMS generated pages"
     }
   }
 }

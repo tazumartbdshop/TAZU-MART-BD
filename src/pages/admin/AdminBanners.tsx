@@ -1,465 +1,614 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Plus, 
-  Trash2, 
-  ArrowUp, 
-  ArrowDown, 
-  Image as ImageIcon, 
-  Upload, 
-  ChevronDown, 
-  Layout, 
-  Eye, 
-  Smartphone, 
-  Monitor,
-  CheckCircle2,
-  AlertCircle,
-  Search,
-  ExternalLink,
-  ChevronRight,
-  MoreVertical,
-  X
-} from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Upload, Layers, ArrowLeft, Search, X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
 import { useProductStore } from '../../store/useProductStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { db } from '../../lib/firebase';
+import { doc, setDoc, deleteDoc, collection } from 'firebase/firestore';
 
-const BUTTON_TEXT_OPTIONS = [
-  'Shop Now', 'Visit Now', 'Buy Now', 'Explore', 'Order Now', 'View Product', 'Check Offer', 'Limited Deal'
-];
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
 
-const RATIO_CLASS = "aspect-[16/6]";
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: null,
+      email: null,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 export default function AdminBanners() {
-  const { banners, updateBanner, addBanner, removeBanner, reorderBanners, setBanners } = useBannerStore();
-  const { products } = useProductStore();
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const { banners } = useBannerStore();
+  const products = useProductStore((state) => state.products) || [];
+  
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('editId');
+  const initialAction = searchParams.get('action');
+  const navigate = useNavigate();
 
-  // Monitor if last banner is filled to add a new one automatically
+  // Form Fields State
+  const [name, setName] = useState('');
+  const [buttonText, setButtonText] = useState('Shop Now');
+  const [buttonLink, setButtonLink] = useState('');
+  const [connectedProductId, setConnectedProductId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  // Hidden file input ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-fill form state when editing
   useEffect(() => {
-    const lastBanner = banners[banners.length - 1];
-    if (lastBanner && (lastBanner.image || lastBanner.name)) {
-      addBanner();
-    }
-  }, [banners, addBanner]);
+    // Clear form when in "Add Mode"
+    setName('');
+    setButtonText('Shop Now');
+    setButtonLink('');
+    setConnectedProductId('');
+  }, [banners]);
 
-  const handleSave = () => {
-    setIsSaving(true);
-    // In a real app, this would hit an API
-    setTimeout(() => {
-      setIsSaving(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    }, 1000);
+  // Handle drag events
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleImageFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleImageFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleImageFiles = async (files: File[]) => {
+    setIsSubmitting(true);
+    let successCount = 0;
+
+    // Use a single Firestore batch to commit all banners at once
+    const { writeBatch, collection, doc } = await import('firebase/firestore');
+    const batch = writeBatch(db);
+
+    try {
+      const currentBannersLength = useBannerStore.getState().banners.length;
+
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) {
+          toast.error(`❌ ${file.name} is not an image!`);
+          continue;
+        }
+        
+        try {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const img = new Image();
+              img.onload = () => {
+                const targetRatio = 21 / 9;
+                const targetWidth = 1920;
+                const targetHeight = targetWidth / targetRatio;
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return reject('Canvas context not found');
+                
+                // object-fit: cover logic
+                const imgRatio = img.width / img.height;
+                let drawWidth = targetWidth;
+                let drawHeight = targetHeight;
+                let offsetX = 0;
+                let offsetY = 0;
+                
+                if (imgRatio > targetRatio) {
+                  drawWidth = img.height * targetRatio * (targetWidth / (img.height * targetRatio));
+                  // wait, simpler object-fit cover math
+                  drawWidth = img.width * (targetHeight / img.height);
+                  drawHeight = targetHeight;
+                  if (drawWidth < targetWidth) {
+                      drawWidth = targetWidth;
+                      drawHeight = img.height * (targetWidth / img.width);
+                  }
+                } else {
+                  drawWidth = targetWidth;
+                  drawHeight = img.height * (targetWidth / img.width);
+                  if (drawHeight < targetHeight) {
+                      drawHeight = targetHeight;
+                      drawWidth = img.width * (targetHeight / img.height);
+                  }
+                }
+                
+                offsetX = (targetWidth - drawWidth) / 2;
+                offsetY = (targetHeight - drawHeight) / 2;
+                
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, targetWidth, targetHeight);
+                ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                
+                resolve(canvas.toDataURL('image/jpeg', 0.85));
+              };
+              img.onerror = reject;
+              if (typeof e.target?.result === 'string') {
+                img.src = e.target.result;
+              }
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          const targetId = doc(collection(db, 'banners')).id;
+          const currentOrder = currentBannersLength + successCount;
+
+          const bannerData = {
+            id: targetId,
+            image: base64,
+            name: name || file.name.split('.')[0],
+            buttonText,
+            buttonLink,
+            buttonEnabled: !!buttonText && !!buttonLink,
+            connectedProductId,
+            isCustomButtonText: true,
+            locations: ['homepage-hero'],
+            bannerSize: 'hero',
+            status: 'active' as const,
+            order: currentOrder,
+            bannerType: 'uploaded' as const,
+            createdDate: new Date().toISOString()
+          };
+
+          batch.set(doc(db, 'banners', targetId), bannerData);
+          batch.set(doc(db, 'banners_draft', targetId), bannerData);
+          successCount++;
+        } catch (innerErr) {
+          console.error(innerErr);
+          toast.error(`❌ Failed to process ${file.name}`);
+        }
+      }
+
+      if (successCount > 0) {
+        await batch.commit();
+        toast.success(`🎉 ${successCount} banners published successfully!`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('❌ Failed to bulk upload banners');
+    }
+
+    setIsSubmitting(false);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCancel = () => {
+    navigate('/admin/banner/list');
+  };
+
+  const handleEditClick = (banner: Banner, action?: string) => {
+    let url = `/admin/banner/create?editId=${banner.id}`;
+    if (action) {
+      url += `&action=${action}`;
+    }
+    navigate(url);
+  };
+
+  const handleDeleteBanner = async (bannerId: string) => {
+    try {
+      useBannerStore.getState().removeBanner(bannerId);
+      useBannerStore.getState().removeDraftBanner(bannerId);
+      toast.success("✅ Banner deleted successfully!");
+    } catch (err) {
+      toast.error("❌ Failed to delete banner");
+    }
+  };
+
+  const handleSeqDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', index.toString());
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleSeqDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    if (!isNaN(dragIndex) && dragIndex !== dropIndex) {
+      useBannerStore.getState().reorderBanners(dragIndex, dropIndex);
+    }
+  };
+
+  const handleSeqDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-32 font-sans">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black uppercase tracking-tight text-gray-900 leading-none">Banner Management</h2>
-          <p className="text-[10px] text-gray-400 mt-2 uppercase font-bold tracking-widest flex items-center gap-2">
-            <Layout className="w-3 h-3 text-purple-600" /> Professional Dynamic E-commerce Banner System
+    <div id="admin-banner-control" className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 font-sans pb-24">
+      {/* Hero Header Card */}
+      <header className="bg-neutral-900 border border-neutral-800 text-white rounded-xl p-6 shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none translate-x-12 translate-y-12">
+          <Layers className="w-64 h-64" />
+        </div>
+        <div className="space-y-2 relative z-10">
+          <div className="flex items-center gap-2">
+            <span className="p-1 px-2.5 bg-neutral-800 rounded-full text-[10px] uppercase font-mono tracking-widest text-zinc-300">SYSTEM CORE</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-[10px] uppercase text-emerald-400 font-mono">REAL-TIME DB LINK ACTIVE</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => navigate('/admin/banner/list')}
+              className="p-1.5 hover:bg-neutral-800 text-zinc-400 hover:text-white rounded-lg transition-colors mr-1"
+              title="Back to Banner Listing"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-2xl font-black uppercase tracking-wider font-mono">
+              Upload Banners
+            </h1>
+          </div>
+          <p className="text-zinc-400 text-xs max-w-2xl uppercase font-mono tracking-wide">
+            Configure and bulk upload new slideshow banners.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-           <div className="flex bg-gray-100 p-1 rounded-sm border border-gray-200">
-              <button className="px-3 py-1.5 bg-white text-[10px] font-black uppercase tracking-widest text-black shadow-sm flex items-center gap-2">
-                <Monitor className="w-3 h-3" /> Desktop
-              </button>
-              <button className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                <Smartphone className="w-3 h-3" /> Mobile
-              </button>
-           </div>
+      </header>
+
+      {/* Single Columns Form Container */}
+      <section className="bg-white border border-zinc-200 rounded-xl p-8 shadow-sm space-y-6">
+        <div className="border-b border-zinc-100 pb-3 flex justify-between items-center">
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-wider text-neutral-900">
+              ➕ Create Mode: Insert Banners
+            </h2>
+            <p className="text-[10px] text-zinc-400 uppercase font-black tracking-widest mt-0.5">Fill out all configurations below</p>
+          </div>
+          <button 
+            onClick={handleCancel}
+            className="px-3 py-1.5 text-xs bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-colors uppercase font-mono rounded-lg"
+          >
+            Cancel & Go Back
+          </button>
         </div>
-      </div>
 
-      <div className="space-y-8">
-        <AnimatePresence mode="popLayout">
-          {banners.map((banner, index) => (
-            <BannerFormBlock 
-              key={banner.id}
-              banner={banner}
-              index={index}
-              totalBanners={banners.length}
-              products={products}
-              onUpdate={(updates) => updateBanner(banner.id, updates)}
-              onRemove={() => removeBanner(banner.id)}
-              onMoveUp={() => index > 0 && reorderBanners(index, index - 1)}
-              onMoveDown={() => index < banners.length - 1 && reorderBanners(index, index + 1)}
-            />
-          ))}
-        </AnimatePresence>
-      </div>
+        <div className="space-y-6">
+          {/* 1. Banner Image Upload (Required) */}
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-wider text-neutral-800 block">
+              ১. Banner Image Upload <span className="text-rose-500 font-bold">*</span>
+            </label>
 
-      {/* Floating Save Bar */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 z-50">
-        <motion.div 
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="bg-black/95 backdrop-blur-md border border-white/10 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex items-center justify-between"
-        >
-          <div className="hidden sm:block">
-             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">System Ready</p>
-             <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-tight">Active Config v2.4</p>
+            <div 
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all aspect-[21/9] sm:aspect-[4/1] max-h-64 w-full ${
+                dragActive 
+                  ? 'border-neutral-900 bg-neutral-50 scale-[0.99]' 
+                  : 'border-zinc-200 bg-zinc-50/50 hover:border-zinc-400 hover:bg-zinc-50'
+              }`}
+            >
+              <input 
+                type="file"
+                multiple
+                ref={fileInputRef}
+                onChange={handleFileInputChange}
+                accept="image/*"
+                className="hidden"
+                id="banner-image-uploader"
+              />
+              <Upload className="w-8 h-8 text-neutral-400 mb-2" />
+              <span className="text-[11px] font-black uppercase text-black">Drag Multiple Images Here or Browse</span>
+              <span className="text-[9px] text-zinc-400 uppercase tracking-wider mt-1 font-bold font-mono">Hero Banner Ratio Recommended</span>
+            </div>
           </div>
 
-          <button 
-            onClick={handleSave}
-            disabled={isSaving}
-            className={`px-12 py-3 bg-purple-600 text-white text-xs font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 hover:translate-y-[-2px] active:translate-y-[0px] ${isSaving ? 'opacity-50' : 'hover:shadow-[0_10px_20px_rgba(147,51,234,0.3)]'}`}
+          {/* 2. Banner Title (Optional) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-black uppercase tracking-wider text-neutral-800 block">
+              ২. Banner Title <span className="text-zinc-400 font-bold">(Optional)</span>
+            </label>
+            <input 
+              type="text"
+              id="banner-title-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. SUMMER APPARELS 50% FLAT"
+              className="w-full border border-zinc-200 px-3 py-2.5 text-xs font-bold uppercase outline-none focus:border-black rounded-lg h-11 bg-white"
+            />
+          </div>
+
+          {/* 3. Banner Button Text (Optional) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-black uppercase tracking-wider text-neutral-800 block">
+              ৩. Banner Button Text <span className="text-zinc-400 font-bold">(Optional)</span>
+            </label>
+            <input 
+              type="text"
+              id="banner-btn-text-input"
+              value={buttonText}
+              onChange={(e) => setButtonText(e.target.value)}
+              placeholder="e.g. SHOP NOW"
+              className="w-full border border-zinc-200 px-3 py-2.5 text-xs font-bold uppercase outline-none focus:border-black rounded-lg h-11 bg-white"
+            />
+          </div>
+
+          {/* 4. Banner Link Selector & Link (Optional) */}
+          <div className="space-y-3 border-t border-zinc-150 pt-4">
+            <label className="text-xs font-black uppercase tracking-wider text-neutral-800 block">
+              ৪. Banner Navigation Link <span className="text-zinc-400 font-bold">(Optional)</span>
+            </label>
+            
+            {/* Optional Product Shortcut Quick Selector */}
+            <div className="space-y-1.5 relative">
+              <span className="text-[9px] font-mono tracking-wider font-extrabold text-neutral-400 block uppercase">Product Selection Shortcut</span>
+              
+              <ProductSearchDropdown 
+                products={products} 
+                value={connectedProductId} 
+                onChange={(val) => {
+                  setConnectedProductId(val);
+                  if (val) {
+                    setButtonLink(`/product/${val}`);
+                  } else {
+                    setButtonLink('');
+                  }
+                }}
+              />
+            </div>
+
+            {/* Raw link path input */}
+            <div className="space-y-1.5">
+              <span className="text-[9px] font-mono tracking-wider font-extrabold text-neutral-400 block uppercase font-mono">Custom Action Redirection Path</span>
+              <input 
+                type="text"
+                id="banner-redirect-path"
+                value={buttonLink}
+                onChange={(e) => setButtonLink(e.target.value)}
+                placeholder="e.g. /product/product-id-here or /shop or custom URL"
+                className="w-full border border-zinc-200 px-3 py-2.5 text-xs font-bold uppercase outline-none focus:border-black rounded-lg h-11 bg-white"
+              />
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* Main Sequence Panel below Upload */}
+      {banners.length >= 2 && (
+        <section className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm space-y-4">
+          <div className="border-b border-zinc-100 pb-2">
+            <h2 className="text-sm font-black uppercase tracking-wider text-neutral-900">
+              🗂️ Banner Sequence ({banners.length})
+            </h2>
+            <p className="text-[10px] text-zinc-400 uppercase font-black tracking-widest mt-0.5">Drag to reorder</p>
+          </div>
+          
+          <div className="flex items-center justify-between text-[10px] font-mono font-black text-zinc-400 uppercase tracking-widest px-2">
+            <span>← First Slide</span>
+            <span>Horizontal Scroll Area</span>
+          </div>
+          
+          <div 
+            className="flex overflow-x-auto gap-3 pb-4 snap-x pt-2"
+            style={{ scrollBehavior: 'smooth' }}
           >
-            {isSaving ? 'Processing...' : saveSuccess ? (
-              <>SAVED SUCCESSFULLY <CheckCircle2 className="w-4 h-4" /></>
-            ) : (
-              <>SAVE ALL BANNERS <ChevronRight className="w-4 h-4" /></>
-            )}
-          </button>
-        </motion.div>
+            {banners.map((banner, index) => (
+              <BannerThumbnailItem 
+                key={banner.id}
+                banner={banner}
+                index={index}
+                onDelete={() => handleDeleteBanner(banner.id)}
+                onDragStart={(e) => handleSeqDragStart(e, index)}
+                onDrop={(e) => handleSeqDrop(e, index)}
+                onDragOver={handleSeqDragOver}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+interface BannerThumbnailItemProps {
+  banner: Banner;
+  index: number;
+  onDelete: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+}
+
+const BannerThumbnailItem: React.FC<BannerThumbnailItemProps> = ({ 
+  banner, 
+  index, 
+  onDelete, 
+  onDragStart, 
+  onDrop, 
+  onDragOver 
+}) => {
+  // Pad the index with 0 for single digits
+  const formatIndex = (idx: number) => (idx + 1).toString().padStart(2, '0');
+
+  return (
+    <div 
+      className="shrink-0 w-32 snap-center relative group select-none cursor-grab active:cursor-grabbing"
+      draggable
+      onDragStart={onDragStart}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+    >
+      <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col h-full shadow-sm">
+        
+        {/* Top absolute actions */}
+        <button 
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-sm hover:bg-rose-600 scale-90 z-20"
+          title="Remove Banner"
+        >
+          ✕
+        </button>
+
+        {/* Thumbnail Image */}
+        <div 
+          className="aspect-[21/9] w-full bg-neutral-950 overflow-hidden relative border-b border-zinc-150 flex items-center justify-center cursor-pointer pointer-events-none"
+        >
+          {banner.image ? (
+            <img 
+              src={banner.image} 
+              alt={banner.name || 'Banner'} 
+              className="w-full h-full object-cover" 
+            />
+          ) : (
+            <div className="text-[10px] text-zinc-500 font-black uppercase">No Image</div>
+          )}
+        </div>
+
+        {/* Meta */}
+        <div className="p-1.5 bg-zinc-50 border-t border-zinc-100 flex justify-center items-center">
+          <span className="text-[9px] font-black text-neutral-900 uppercase tracking-widest bg-zinc-200 px-2 py-0.5 rounded-full">
+            {formatIndex(index)}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-function BannerFormBlock({ banner, index, totalBanners, products, onUpdate, onRemove, onMoveUp, onMoveDown }: any) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [productSearch, setProductSearch] = useState('');
-  const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+// ---- Additional Components below ----
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onUpdate({ image: reader.result as string });
-      };
-      reader.readAsDataURL(file);
+interface ProductSearchDropdownProps {
+  products: any[];
+  value: string;
+  onChange: (val: string) => void;
+}
+
+const ProductSearchDropdown: React.FC<ProductSearchDropdownProps> = ({ products, value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
     }
-  };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  const selectedProduct = products.find((p: any) => p.id === banner.connectedProductId);
-  const filteredProducts = products.filter((p: any) => 
-    p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
-    p.sku.toLowerCase().includes(productSearch.toLowerCase())
+  const selectedProduct = products.find(p => p.id === value);
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(query.toLowerCase()) || 
+    (p.sku && p.sku.toLowerCase().includes(query.toLowerCase()))
   );
 
   return (
-    <motion.div 
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className={`bg-white border ${banner.image || banner.name ? 'border-[#EEEEEE]' : 'border-dashed border-gray-300'} shadow-sm group relative overflow-hidden`}
-    >
-      {/* Header / Numbering */}
-      <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
-        <div className="flex items-center gap-4">
-           <div className={`w-8 h-8 ${banner.image || banner.name ? 'bg-black' : 'bg-gray-200'} text-white flex items-center justify-center font-black text-xs`}>
-             {index + 1}
-           </div>
-           <h3 className={`text-xs font-black uppercase tracking-widest ${banner.image || banner.name ? 'text-black' : 'text-gray-400'}`}>
-             Banner {index + 1} {banner.name && `• ${banner.name}`}
-           </h3>
-        </div>
-        
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-           <button 
-            onClick={onMoveUp}
-            disabled={index === 0}
-            className="p-2 text-gray-400 hover:text-black disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
-           >
-             <ArrowUp className="w-4 h-4" />
-           </button>
-           <button 
-            onClick={onMoveDown}
-            disabled={index === totalBanners - 1}
-            className="p-2 text-gray-400 hover:text-black disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
-           >
-             <ArrowDown className="w-4 h-4" />
-           </button>
-           <button 
-            onClick={onRemove}
-            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-           >
-             <Trash2 className="w-4 h-4" />
-           </button>
+    <div className="relative" ref={containerRef}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full border border-zinc-200 px-3 py-2.5 rounded-lg text-xs font-bold uppercase bg-white cursor-pointer h-11 flex justify-between items-center transition-colors hover:border-black"
+      >
+        <span className="truncate pr-2">
+          {selectedProduct ? `${selectedProduct.name} (৳${selectedProduct.price})` : '-- Click to Preselect Product --'}
+        </span>
+        <div className="flex items-center gap-1">
+          {selectedProduct && (
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange('');
+                setQuery('');
+              }}
+              className="p-1 hover:bg-zinc-100 rounded-full"
+              title="Clear Selection"
+            >
+              <X className="w-3.5 h-3.5 text-zinc-500 hover:text-red-500" />
+            </div>
+          )}
+          <span className="text-[10px] text-zinc-400">▼</span>
         </div>
       </div>
 
-      <div className="p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Form Left */}
-          <div className="space-y-8">
-            {/* Image Upload */}
-            <div className="space-y-3">
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Banner Wide Image (16:6)</label>
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className={`group/upload relative overflow-hidden bg-[#F9F9FB] border-2 border-dashed border-[#EEEEEE] hover:border-purple-300 transition-all cursor-pointer ${RATIO_CLASS} flex flex-col items-center justify-center`}
-              >
-                {banner.image ? (
-                  <>
-                    <img src={banner.image} alt="Preview" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/upload:opacity-100 transition-opacity flex items-center justify-center">
-                       <div className="bg-white/10 backdrop-blur-md px-6 py-3 border border-white/20 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                         <Upload className="w-3.5 h-3.5" /> RE-UPLOAD IMAGE
-                       </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center p-8">
-                    <div className="w-16 h-16 bg-white border border-gray-100 shadow-sm flex items-center justify-center mx-auto mb-4 group-hover/upload:scale-110 transition-transform">
-                       <Upload className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 mb-1">Upload Banner Image</p>
-                    <p className="text-[9px] text-gray-400 uppercase font-bold">JPG, PNG, WEBP • Max 2MB</p>
-                  </div>
-                )}
-                <input 
-                  ref={fileInputRef}
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleImageUpload} 
-                  className="hidden" 
-                />
-              </div>
-            </div>
-
-            {/* Banner Name & Status */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Banner Title Name</label>
-                <input 
-                  type="text" 
-                  value={banner.name}
-                  onChange={(e) => onUpdate({ name: e.target.value })}
-                  placeholder="e.g. Summer Collection"
-                  className="w-full px-4 py-3 bg-[#F9F9FB] border border-[#EEEEEE] focus:outline-none focus:border-purple-500 font-bold text-xs"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Current Status</label>
-                <div className="flex bg-[#F9F9FB] p-1 border border-[#EEEEEE]">
-                  {(['active', 'draft', 'hidden'] as const).map((s) => (
-                    <button 
-                      key={s}
-                      onClick={() => onUpdate({ status: s })}
-                      className={`flex-1 py-2 text-[8px] font-black uppercase tracking-widest transition-all ${banner.status === s ? 'bg-black text-white shadow-lg' : 'text-gray-400 hover:text-black'}`}
-                    >
-                      {s}
-                    </button>
-                  ))}
+      {isOpen && (
+        <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-zinc-200 rounded-lg shadow-lg z-50 overflow-hidden">
+          <div className="p-2 border-b border-zinc-100 flex items-center gap-2 bg-zinc-50">
+            <Search className="w-4 h-4 text-zinc-400" />
+            <input 
+              type="text"
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search product by name or SKU..."
+              className="w-full bg-transparent text-xs outline-none uppercase font-bold"
+            />
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {filteredProducts.length > 0 ? (
+              filteredProducts.map(p => (
+                <div 
+                  key={p.id}
+                  onClick={() => {
+                    onChange(p.id);
+                    setIsOpen(false);
+                    setQuery('');
+                  }}
+                  className={`p-3 text-xs cursor-pointer hover:bg-zinc-100 transition-colors uppercase font-bold flex items-center justify-between ${
+                    value === p.id ? 'bg-zinc-100 border-l-2 border-black' : ''
+                  }`}
+                >
+                  <span className="truncate pr-4">{p.name} <span className="text-zinc-500 font-mono text-[10px] ml-1">{p.sku && `[${p.sku}]`}</span></span>
+                  <span className="text-emerald-600 font-black">৳{p.price}</span>
                 </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-xs text-zinc-500 uppercase font-bold">
+                No Products Found
               </div>
-            </div>
-
-            {/* Action Button Toggle */}
-            <div className="bg-gray-50/50 border border-gray-100 p-6 space-y-6">
-               <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                     <div className={`p-1.5 ${banner.buttonEnabled ? 'bg-purple-600' : 'bg-gray-300'} text-white rounded-xs`}>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                     </div>
-                     <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-black">Action Button</h4>
-                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight">Enable clickable button on banner</p>
-                     </div>
-                  </div>
-                  <button 
-                    onClick={() => onUpdate({ buttonEnabled: !banner.buttonEnabled })}
-                    className={`relative w-10 h-5 transition-colors focus:outline-none ${banner.buttonEnabled ? 'bg-purple-600' : 'bg-gray-300'} rounded-full p-1`}
-                  >
-                    <div className={`w-3 h-3 bg-white rounded-full transition-transform ${banner.buttonEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
-                  </button>
-               </div>
-
-               {banner.buttonEnabled && (
-                  <motion.div 
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    className="space-y-6 pt-4 border-t border-gray-100"
-                  >
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Button Text</label>
-                          <div className="relative">
-                            <select 
-                              value={banner.isCustomButtonText ? 'custom' : banner.buttonText}
-                              onChange={(e) => {
-                                if (e.target.value === 'custom') {
-                                  onUpdate({ isCustomButtonText: true });
-                                } else {
-                                  onUpdate({ buttonText: e.target.value, isCustomButtonText: false });
-                                }
-                              }}
-                              className="w-full px-4 py-3 bg-white border border-[#EEEEEE] focus:outline-none focus:border-purple-500 font-bold text-xs appearance-none pr-10"
-                            >
-                              {BUTTON_TEXT_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              <option value="custom">Custom Text...</option>
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                          </div>
-                        </div>
-
-                        {banner.isCustomButtonText && (
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Custom Button Text</label>
-                            <input 
-                              type="text" 
-                              value={banner.buttonText}
-                              onChange={(e) => onUpdate({ buttonText: e.target.value })}
-                              className="w-full px-4 py-4 bg-white border border-[#EEEEEE] focus:outline-none focus:border-purple-500 font-bold text-xs"
-                              autoFocus
-                            />
-                          </div>
-                        )}
-                     </div>
-
-                     <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Select Website Product (Redirect Link)</label>
-                        <div className="relative">
-                           <button 
-                            onClick={() => setIsProductPickerOpen(!isProductPickerOpen)}
-                            className={`w-full px-4 py-3 bg-white border border-[#EEEEEE] text-left flex items-center justify-between font-bold text-xs ${banner.connectedProductId ? 'text-black' : 'text-gray-400'}`}
-                           >
-                             <div className="flex items-center gap-2 truncate">
-                                {selectedProduct && (
-                                  <img src={selectedProduct.image} className="w-5 h-5 object-cover rounded-xs border border-gray-100" />
-                                )}
-                                {selectedProduct ? selectedProduct.name : 'Select a product to connect...'}
-                             </div>
-                             <ChevronDown className="w-4 h-4 text-gray-400" />
-                           </button>
-
-                           <AnimatePresence>
-                              {isProductPickerOpen && (
-                                <>
-                                  <div className="fixed inset-0 z-10" onClick={() => setIsProductPickerOpen(false)}></div>
-                                  <motion.div 
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: 10 }}
-                                    className="absolute bottom-full mb-2 left-0 right-0 max-h-[300px] overflow-hidden bg-white border border-gray-200 shadow-2xl z-20 flex flex-col"
-                                  >
-                                    <div className="p-3 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
-                                       <Search className="w-3.5 h-3.5 text-gray-400" />
-                                       <input 
-                                        type="text" 
-                                        placeholder="Search products..."
-                                        value={productSearch}
-                                        onChange={(e) => setProductSearch(e.target.value)}
-                                        className="bg-transparent border-none focus:outline-none text-xs font-bold w-full"
-                                        autoFocus
-                                       />
-                                    </div>
-                                    <div className="overflow-y-auto flex-1">
-                                       {filteredProducts.length > 0 ? (
-                                         filteredProducts.map((p: any) => (
-                                           <button 
-                                            key={p.id}
-                                            onClick={() => {
-                                              onUpdate({ connectedProductId: p.id });
-                                              setIsProductPickerOpen(false);
-                                            }}
-                                            className="w-full p-3 flex items-center gap-3 hover:bg-purple-50 transition-all border-b border-gray-50 text-left"
-                                           >
-                                              <img src={p.image} className="w-8 h-8 object-cover border border-gray-100" />
-                                              <div>
-                                                <p className="text-[10px] font-black text-gray-900 leading-tight truncate">{p.name}</p>
-                                                <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">SKU: {p.sku}</p>
-                                              </div>
-                                           </button>
-                                         ))
-                                       ) : (
-                                          <div className="p-8 text-center">
-                                            <AlertCircle className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase">No products found</p>
-                                          </div>
-                                       )}
-                                    </div>
-                                  </motion.div>
-                                </>
-                              )}
-                           </AnimatePresence>
-                        </div>
-                     </div>
-                  </motion.div>
-               )}
-            </div>
-          </div>
-
-          {/* Live Preview Column */}
-          <div className="flex flex-col">
-            <div className="flex items-center justify-between mb-3 px-1">
-               <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Mini Live Preview</label>
-               <span className="text-[8px] font-black uppercase tracking-widest bg-gray-100 px-2 py-0.5 border border-gray-200 rounded-full">REAL-TIME</span>
-            </div>
-            
-            <div className={`bg-gray-50 border border-gray-200 p-8 flex items-center justify-center flex-1`}>
-               <div className={`w-full relative shadow-2xl overflow-hidden ${RATIO_CLASS} bg-white group/preview`}>
-                  {banner.image ? (
-                    <img src={banner.image} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-[#FAFAFA] flex items-center justify-center border-4 border-white">
-                       <ImageIcon className="w-12 h-12 text-gray-100" />
-                    </div>
-                  )}
-
-                  {/* Overlay Content */}
-                  <div className="absolute inset-x-8 bottom-8 flex flex-col items-start gap-3">
-                     {banner.name && (
-                        <motion.div 
-                          initial={{ x: -20, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          className="bg-black text-white px-4 py-2 font-black uppercase tracking-tighter text-sm md:text-lg shadow-xl"
-                        >
-                          {banner.name}
-                        </motion.div>
-                     )}
-                     
-                     {banner.buttonEnabled && banner.buttonText && (
-                        <motion.button 
-                          initial={{ y: 20, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          className="px-6 py-2.5 bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-purple-900/40 hover:scale-105 transition-transform"
-                        >
-                          {banner.buttonText}
-                        </motion.button>
-                     )}
-                  </div>
-
-                  {/* Connected Info Badge */}
-                  {selectedProduct && (
-                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 border border-gray-200 flex items-center gap-2 shadow-lg">
-                       <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                       <span className="text-[8px] font-black text-black uppercase tracking-widest">LINKED TO {selectedProduct.sku}</span>
-                    </div>
-                  )}
-               </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="p-4 bg-gray-50 border border-gray-100 flex items-center gap-3">
-                    <Monitor className="w-4 h-4 text-gray-400 font-black" />
-                    <div>
-                       <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Desktop Scaling</p>
-                       <p className="text-[10px] font-bold text-gray-900">Adaptive (16:6)</p>
-                    </div>
-                 </div>
-                 <div className="p-4 bg-gray-50 border border-gray-100 flex items-center gap-3">
-                    <Smartphone className="w-4 h-4 text-gray-400 font-black" />
-                    <div>
-                       <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Mobile Scaling</p>
-                       <p className="text-[10px] font-bold text-gray-900">Fluid Optimized</p>
-                    </div>
-                 </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
-      </div>
-    </motion.div>
+      )}
+    </div>
   );
-}
+};

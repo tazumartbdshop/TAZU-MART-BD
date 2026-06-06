@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { generateDemoOrders, generateDemoProducts, generateDemoCustomers } from '../utils/demoDataGenerator';
 
 export interface OrderItem {
   productId: string;
@@ -27,7 +28,7 @@ export interface Order {
   cityArea?: string;
   postalCode?: string;
   deliveryMode: 'Express Delivery' | 'Standard Delivery';
-  paymentMethod: 'bKash' | 'Nagad' | 'Rocket' | 'Card';
+  paymentMethod: string;
   status: 'Placed' | 'Confirmed' | 'Processing' | 'Shipping' | 'Delivered' | 'Cancelled' | 'Pending' | 'Packaging' | 'Returned';
   statusHistory: { status: string; timestamp: number; updatedBy?: string }[];
   status_updated_at: number;
@@ -46,10 +47,24 @@ export interface Order {
   total: number;
   date: number;
   notes?: string;
+  isRead?: boolean;
+  isDemo?: boolean;
+  promoCodeUsed?: string;
   courier?: {
     name: string;
     trackingId?: string;
     status?: string;
+  };
+  utmParams?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_content?: string;
+    utm_term?: string;
+    referrer?: string;
+    landingPage?: string;
+    firstTouch?: string;
+    lastTouch?: string;
   };
 }
 
@@ -60,92 +75,15 @@ interface OrderState {
   updateOrderStatus: (id: string, status: Order['status']) => void;
   updatePaymentStatus: (id: string, paymentStatus: Order['paymentStatus']) => void;
   deleteOrder: (id: string) => void;
+  markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
+  clearDemoData: () => void;
 }
 
-const initialOrders: Order[] = [
-  {
-    id: '1',
-    orderId: 'ORD-684521',
-    billId: 'BILL-195666',
-    productLink: 'https://tazumart.bd/order/ORD-684521',
-    customerName: 'Rahim Ahmed',
-    mobileNumber: '01711111111',
-    fullAddress: 'Dhaka, Bangladesh',
-    deliveryMode: 'Standard Delivery',
-    paymentMethod: 'bKash',
-    status: 'Pending',
-    statusHistory: [{ status: 'Pending', timestamp: 1779626400000 }], // 21 May 2026
-    paymentStatus: 'Unpaid',
-    type: 'Online',
-    items: [
-      { productId: 'p1', name: 'Premium Leather Shoes', price: 6280, quantity: 2, variant: 'Brown', image: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=500&auto=format&fit=crop&q=60' }
-    ],
-    subtotal: 12560,
-    discount: { type: 'fixed', value: 0, amount: 0 },
-    tax: { percent: 0, amount: 0 },
-    deliveryCharge: 0,
-    paidAmount: 0,
-    dueAmount: 12560,
-    total: 12560,
-    date: 1779626400000,
-    status_updated_at: 1779626400000,
-  },
-  {
-    id: '2',
-    orderId: 'ORD-548785',
-    billId: 'BILL-295666',
-    productLink: 'https://tazumart.bd/order/ORD-548785',
-    customerName: 'Karim Hasan',
-    mobileNumber: '01711111112',
-    email: 'karim@gmail.com',
-    fullAddress: 'Chattogram, Bangladesh',
-    deliveryMode: 'Standard Delivery',
-    paymentMethod: 'Nagad',
-    status: 'Confirmed',
-    statusHistory: [{ status: 'Confirmed', timestamp: 1779540000000 }], 
-    paymentStatus: 'Paid',
-    type: 'Online',
-    items: [
-      { productId: 'p2', name: 'Smart Fitness Band', price: 4200, quantity: 2, variant: 'Black', image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&auto=format&fit=crop&q=60' }
-    ],
-    subtotal: 8400,
-    discount: { type: 'fixed', value: 0, amount: 0 },
-    tax: { percent: 0, amount: 0 },
-    deliveryCharge: 0,
-    paidAmount: 8400,
-    dueAmount: 0,
-    total: 8400,
-    date: 1779540000000,
-    status_updated_at: 1779540000000,
-  },
-  {
-    id: '3',
-    orderId: 'ORD-987654',
-    billId: 'BILL-395666',
-    productLink: 'https://tazumart.bd/order/ORD-987654',
-    customerName: 'Sadia Islam',
-    mobileNumber: '01711111113',
-    fullAddress: 'Sylhet, Bangladesh',
-    deliveryMode: 'Standard Delivery',
-    paymentMethod: 'Card',
-    status: 'Pending',
-    statusHistory: [{ status: 'Pending', timestamp: 1779453600000 }], 
-    paymentStatus: 'Unpaid',
-    type: 'Online',
-    items: [
-      { productId: 'p3', name: 'Bluetooth Earbuds', price: 2950, quantity: 1, variant: 'White', image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=500&auto=format&fit=crop&q=60' }
-    ],
-    subtotal: 2950,
-    discount: { type: 'fixed', value: 0, amount: 0 },
-    tax: { percent: 0, amount: 0 },
-    deliveryCharge: 0,
-    paidAmount: 0,
-    dueAmount: 2950,
-    total: 2950,
-    date: 1779453600000,
-    status_updated_at: 1779453600000,
-  }
-];
+// Generate matching data sets
+const demoProducts = generateDemoProducts();
+const demoCustomers = generateDemoCustomers();
+const initialOrders: Order[] = generateDemoOrders(demoProducts, demoCustomers);
 
 export const useOrderStore = create<OrderState>((set) => ({
   orders: initialOrders,
@@ -160,10 +98,11 @@ export const useOrderStore = create<OrderState>((set) => ({
       id: Math.random().toString(36).substring(2, 9),
       orderId,
       billId: `BILL-${nextBillNum}`,
-      productLink: `https://tazumart.bd/order/${orderId}`,
+      productLink: `https://luxemart.bd/order/${orderId}`,
       date: now,
       status_updated_at: now,
       statusHistory: [{ status: orderPayload.status, timestamp: now, updatedBy: 'Admin' }],
+      isRead: false,
     };
     set((state) => ({ orders: [newOrder, ...state.orders] }));
     return newOrder;
@@ -195,5 +134,14 @@ export const useOrderStore = create<OrderState>((set) => ({
   })),
   deleteOrder: (id) => set((state) => ({
     orders: state.orders.filter(o => o.id !== id)
-  }))
+  })),
+  markAsRead: (id) => set((state) => ({
+    orders: state.orders.map(o => o.id === id ? { ...o, isRead: true } : o)
+  })),
+  markAllAsRead: () => set((state) => ({
+    orders: state.orders.map(o => ({ ...o, isRead: true }))
+  })),
+  clearDemoData: () => set((state) => ({
+    orders: state.orders.filter(o => !o.isDemo)
+  })),
 }));
