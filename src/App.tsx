@@ -5,6 +5,7 @@ import { UserLayout } from './components/layout/UserLayout';
 import { useCategoryStore } from './store/useCategoryStore';
 import { useProductStore } from './store/useProductStore';
 import { useSearchStore } from './store/useSearchStore';
+import { useOrderStore } from './store/useOrderStore';
 import Home from './pages/Home';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -44,10 +45,14 @@ export default function App() {
     const unsubCategories = useCategoryStore.getState().subscribe();
     const unsubProducts = useProductStore.getState().subscribe();
     const unsubSearches = useSearchStore.getState().subscribe();
+    const unsubOrders = useOrderStore.getState().subscribeOrders();
+    const unsubTrackingStatuses = useOrderStore.getState().subscribeTrackingStatuses();
     return () => {
       unsubCategories();
       unsubProducts();
       unsubSearches();
+      unsubOrders();
+      unsubTrackingStatuses();
     };
   }, []);
 

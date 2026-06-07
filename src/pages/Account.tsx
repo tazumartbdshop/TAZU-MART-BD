@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
-import { useOrderStore } from '../store/useOrderStore';
+import { useOrderStore, Order } from '../store/useOrderStore';
 import { useProductStore } from '../store/useProductStore';
 import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
 import { formatPrice, cn } from '../lib/utils';
@@ -17,11 +17,48 @@ import { motion, AnimatePresence } from 'motion/react';
 import LogoutModal from '../components/ui/LogoutModal';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../lib/loyalty';
 
+const getStatusIcon = (statusName: string) => {
+  const norm = statusName.toLowerCase();
+  if (norm.includes('placed') || norm.includes('order')) return Package;
+  if (norm.includes('pending') || norm.includes('pay')) return Wallet;
+  if (norm.includes('process')) return Settings;
+  if (norm.includes('confirm')) return Shield;
+  if (norm.includes('package') || norm.includes('pack')) return Warehouse;
+  if (norm.includes('ship') || norm.includes('transit')) return Truck;
+  if (norm.includes('deliver') || norm.includes('complete')) return CheckCircle2;
+  if (norm.includes('cancel')) return LogOut;
+  if (norm.includes('return')) return RefreshCcw;
+  return Users;
+};
+
 export default function Account() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const { orders } = useOrderStore();
+  const { orders, trackingStatuses } = useOrderStore();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [selectedTrackOrderId, setSelectedTrackOrderId] = useState<string | null>(null);
+  const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+
+  // Dynamically filter matching orders for the logged-in customer by phone or email
+  const userOrders = useMemo(() => {
+    if (!user) return [];
+    return orders.filter(o => 
+      (user.phone && o.mobileNumber === user.phone) || 
+      (user.email && o.email === user.email)
+    );
+  }, [orders, user]);
+
+  // Auto-select latest order for tracking highlight
+  React.useEffect(() => {
+    if (userOrders.length > 0 && !selectedTrackOrderId) {
+      setSelectedTrackOrderId(userOrders[0].id);
+    }
+  }, [userOrders, selectedTrackOrderId]);
+
+  const activeTrackingOrder = useMemo(() => {
+    return userOrders.find(o => o.id === selectedTrackOrderId) || userOrders[0] || null;
+  }, [userOrders, selectedTrackOrderId]);
 
   // Compute successful completed orders
   const completedCount = getCompletedOrdersCount(orders, {
@@ -29,7 +66,6 @@ export default function Account() {
     phone: user?.phone,
     name: user?.name,
   });
-
 
   const stats = {
     balance: 2450.50,
@@ -44,24 +80,11 @@ export default function Account() {
     navigate('/login');
   };
 
-  // Dynamically count orders matching this registered user's phone number!
-  const userOrders = user && user.phone 
-    ? orders.filter(o => o.mobileNumber === user.phone) 
-    : [];
-
-  const toPayCount = userOrders.filter(o => o.status === 'Placed' || o.status === 'Pending').length;
-  const toShipCount = userOrders.filter(o => o.status === 'Confirmed' || o.status === 'Processing' || o.status === 'Packaging').length;
-  const toReceiveCount = userOrders.filter(o => o.status === 'Shipping').length;
-  const toReviewCount = userOrders.filter(o => o.status === 'Delivered').length;
-  const returnedCount = userOrders.filter(o => o.status === 'Returned').length;
-
-  const orderStatuses = [
-    { label: 'To Pay', icon: Wallet, count: toPayCount },
-    { label: 'To Ship', icon: Warehouse, count: toShipCount },
-    { label: 'To Receive', icon: Truck, count: toReceiveCount },
-    { label: 'To Review', icon: MessageSquare, count: toReviewCount },
-    { label: 'Returns', icon: RefreshCcw, count: returnedCount },
-  ];
+  // Map state filter based on active badge selection
+  const filteredOrders = useMemo(() => {
+    if (!activeFilter) return userOrders;
+    return userOrders.filter(o => o.status.toLowerCase() === activeFilter.toLowerCase());
+  }, [userOrders, activeFilter]);
 
   const accountOptions = [
     { label: 'TAZU MART GAMES', icon: Gamepad2, path: '/games' },
@@ -83,6 +106,19 @@ export default function Account() {
       .filter((p): p is NonNullable<typeof p> => !!p);
   }, [viewedIds, products]);
 
+  // Color mapping configuration for localized badges
+  const STATUS_COLORS: Record<string, string> = {
+    'Placed': 'bg-yellow-50 text-yellow-700 border-yellow-200',
+    'Pending': 'bg-amber-50 text-amber-700 border-amber-200',
+    'Processing': 'bg-cyan-50 text-cyan-700 border-cyan-200',
+    'Confirmed': 'bg-blue-50 text-blue-700 border-blue-200',
+    'Packaging': 'bg-purple-50 text-purple-700 border-purple-200',
+    'Shipping': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    'Delivered': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    'Cancelled': 'bg-red-50 text-red-700 border-red-200',
+    'Returned': 'bg-orange-50 text-orange-700 border-orange-200',
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -98,7 +134,7 @@ export default function Account() {
             <div className="relative">
               {user?.profileImage ? (
                 <div className="w-20 h-20 rounded-full border-2 border-purple-600/30 overflow-hidden shadow-md">
-                  <img 
+                   <img 
                     src={user.profileImage} 
                     alt="Profile" 
                     className="w-full h-full object-cover"
@@ -174,21 +210,182 @@ export default function Account() {
               All Orders <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="grid grid-cols-5 py-4 px-2">
-            {orderStatuses.map((status, i) => (
-              <button key={i} className="flex flex-col items-center gap-2 group">
-                <div className="relative">
-                  <status.icon className="w-5 h-5 text-gray-400 group-hover:text-gray-900 transition-colors" />
-                  {status.count > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 bg-gray-900 text-white text-[7px] font-bold w-3.5 h-3.5 flex items-center justify-center">
-                      {status.count}
+
+          {/* Active Track Order Selector if multiple orders exist */}
+          {userOrders.length > 1 && (
+            <div className="px-4 py-2 border-b border-gray-50 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span className="text-[9px] font-black uppercase text-gray-505 tracking-wider">Select Order to Track:</span>
+              <select 
+                value={selectedTrackOrderId || ""} 
+                onChange={(e) => setSelectedTrackOrderId(e.target.value)}
+                className="text-[10px] font-bold uppercase bg-white border border-gray-200 rounded px-2.5 py-1 text-gray-800 focus:outline-none"
+              >
+                {userOrders.map(o => (
+                  <option key={o.id} value={o.id}>
+                    #{o.orderId || o.id} ({o.status} - {new Date(o.date).toLocaleDateString()})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Dynamic Status Cards with Horizontal Scroll and Active Highlight */}
+          <div className="flex gap-3 overflow-x-auto pb-4 pt-3 px-4 scroll-smooth no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            {trackingStatuses.map((status, i) => {
+              const count = userOrders.filter(o => o.status.toLowerCase() === status.toLowerCase()).length;
+              const isTrackingActive = activeTrackingOrder && activeTrackingOrder.status.toLowerCase() === status.toLowerCase();
+              const isFilteredActive = activeFilter && activeFilter.toLowerCase() === status.toLowerCase();
+              const IconComp = getStatusIcon(status);
+
+              return (
+                <button
+                  key={i}
+                  onClick={() => setActiveFilter(prev => prev === status ? null : status)}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-2 px-4 py-3 border rounded-xl cursor-pointer transition-all shrink-0 min-w-[95px] relative",
+                    isTrackingActive 
+                      ? "bg-[#111111] text-white border-black ring-2 ring-black shadow-lg scale-102"
+                      : isFilteredActive
+                        ? "bg-slate-200 text-slate-900 border-slate-300 font-extrabold scale-102"
+                        : "bg-white text-gray-500 border-gray-100 hover:bg-neutral-50 hover:border-gray-300"
+                  )}
+                >
+                  {/* Black Badge Counter */}
+                  {count > 0 && (
+                    <span className={cn(
+                      "absolute -top-1.5 -right-1.5 text-[8.5px] font-black w-5 h-5 rounded-full flex items-center justify-center border transition-colors",
+                      isTrackingActive 
+                        ? "bg-white text-black border-black" 
+                        : "bg-black text-white border-white"
+                    )}>
+                      {count}
                     </span>
                   )}
-                </div>
-                <span className="text-[8px] font-bold uppercase tracking-tight text-gray-400 group-hover:text-gray-900">{status.label}</span>
-              </button>
-            ))}
+
+                  <IconComp className={cn(
+                    "w-5 h-5 transition-colors",
+                    isTrackingActive 
+                      ? "text-white" 
+                      : isFilteredActive
+                        ? "text-slate-900" 
+                        : "text-gray-400"
+                  )} />
+
+                  <span className={cn(
+                    "text-[9px] uppercase tracking-wider font-extrabold text-center block max-w-[85px] truncate",
+                    isTrackingActive ? "text-white" : "text-inherit"
+                  )}>
+                    {status}
+                  </span>
+                  
+                  {isTrackingActive && (
+                    <span className="text-[7px] bg-white/10 text-emerald-400 font-black px-1.5 py-0.5 rounded uppercase tracking-widest mt-0.5 animate-pulse">
+                      Active
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
+
+          {/* Dynamic filtered orders checklist */}
+          <AnimatePresence mode="popLayout">
+            {activeFilter && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-gray-50/50 border-t border-gray-100 p-4"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                    Showing {activeFilter} Orders ({filteredOrders.length})
+                  </h4>
+                  <button 
+                    onClick={() => setActiveFilter(null)}
+                    className="text-[9px] font-black text-red-500 uppercase tracking-widest hover:text-red-700"
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+
+                {filteredOrders.length > 0 ? (
+                  <div className="space-y-3">
+                    {filteredOrders.map((order) => (
+                      <div 
+                        key={order.id}
+                        className="bg-white p-4 border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.01)] flex flex-col gap-3 transition-shadow hover:shadow-[0_4px_12px_rgba(0,0,0,0.02)]"
+                      >
+                        <div className="flex items-center justify-between pb-2 border-b border-gray-50 flex-wrap gap-2">
+                          <div>
+                            <span className="text-[11px] font-black text-gray-900">#{order.orderId || order.id}</span>
+                            <span className="text-[8px] text-gray-400 font-bold uppercase ml-2 select-none">
+                              {new Date(order.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                            </span>
+                          </div>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border",
+                            STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'
+                          )}>
+                            {order.status}
+                          </span>
+                        </div>
+
+                        {/* Items list detail preview */}
+                        <div className="space-y-2">
+                          {order.items?.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-3">
+                              {item.image && (
+                                <img 
+                                  src={item.image} 
+                                  alt={item.name} 
+                                  className="w-10 h-10 object-cover border border-gray-100"
+                                  referrerPolicy="no-referrer"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <h5 className="text-[10px] font-bold text-gray-850 truncate">{item.name}</h5>
+                                <p className="text-[8px] font-black text-gray-400 uppercase tracking-tight">
+                                  Qty: {item.quantity} {item.variant !== 'Default' && `• ${item.variant}`}
+                                </p>
+                              </div>
+                              <span className="text-[10px] font-bold text-gray-900">{formatPrice(item.price * item.quantity)}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Order action footer control bar */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-50 flex-wrap gap-2">
+                          <span className="text-[10px] font-bold text-gray-500">
+                            Total: <span className="font-black text-black">{formatPrice(order.total)}</span>
+                          </span>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => setTrackingOrder(order)}
+                              className="text-[9px] font-black bg-black text-white px-3 py-1.5 uppercase tracking-wider hover:bg-neutral-800 transition-colors cursor-pointer"
+                            >
+                              Track Order
+                            </button>
+                            <Link 
+                              to={`/checkout/invoice/${order.id}`}
+                              className="text-[9px] font-black border border-gray-200 text-gray-500 px-3 py-1.5 uppercase tracking-wider hover:bg-gray-50 hover:text-black transition-colors"
+                            >
+                              Invoice
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white py-8 px-4 text-center border border-gray-100">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No matching orders found</p>
+                    <p className="text-[9px] text-gray-400 mt-1">There are currently no orders with this status filter.</p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
 
         {/* 4. Accountability Section - NEW STRUCTURE */}
@@ -304,6 +501,124 @@ export default function Account() {
         isOpen={showLogoutModal} 
         onClose={() => setShowLogoutModal(false)} 
       />
+
+      {/* Dynamic 9-Stage Tracking Modal Overlay */}
+      <AnimatePresence>
+        {trackingOrder && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-[24px] w-full max-w-xl max-h-[85vh] overflow-y-auto shadow-2xl p-6 relative font-sans"
+            >
+              <button 
+                onClick={() => setTrackingOrder(null)}
+                className="absolute top-4 right-4 bg-gray-100 hover:bg-gray-200 text-gray-500 rounded-full p-2 transition-colors cursor-pointer"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="flex items-center gap-3 border-b border-gray-100 pb-4 mb-6">
+                <Package className="w-6 h-6 text-black" />
+                <div>
+                  <h3 className="text-md font-black text-gray-900 tracking-tight uppercase">Order Tracker</h3>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none mt-1">ID: #{trackingOrder.orderId || trackingOrder.id}</p>
+                </div>
+              </div>
+
+              {/* Order quick overview */}
+              <div className="grid grid-cols-2 gap-4 bg-gray-50 rounded-2xl p-4 mb-6 text-[10px]">
+                <div>
+                  <span className="text-gray-455 font-bold uppercase block text-[8px] tracking-wide mb-0.5">Date Placed</span>
+                  <span className="font-extrabold text-gray-900">{new Date(trackingOrder.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+                <div>
+                  <span className="text-gray-455 font-bold uppercase block text-[8px] tracking-wide mb-0.5">Total Paid</span>
+                  <span className="font-extrabold text-gray-950">{formatPrice(trackingOrder.total)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-455 font-bold uppercase block text-[8px] tracking-wide mb-0.5">Payment Method</span>
+                  <span className="font-extrabold text-gray-900 uppercase">{trackingOrder.paymentMethod}</span>
+                </div>
+                <div>
+                  <span className="text-gray-455 font-bold uppercase block text-[8px] tracking-wide mb-0.5">Courier Channel</span>
+                  <span className="font-extrabold text-gray-900 uppercase">{trackingOrder.courier?.name || 'Pathao'}</span>
+                </div>
+              </div>
+
+              {/* Cancelled/Returned alerts */}
+              {trackingOrder.status === 'Cancelled' && (
+                <div className="bg-red-50 text-red-700 text-[10px] font-black px-4 py-3 rounded-xl border border-red-100 mb-6 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
+                  THIS ORDER HAS BEEN CANCELLED BY THE MERCHANT.
+                </div>
+              )}
+              {trackingOrder.status === 'Returned' && (
+                <div className="bg-orange-50 text-orange-700 text-[10px] font-black px-4 py-3 rounded-xl border border-orange-100 mb-6 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-pulse" />
+                  THIS ORDER HAS BEEN RETURNED TO THE WAREHOUSE.
+                </div>
+              )}
+
+              {/* Custom Timeline Tracks */}
+              <div className="space-y-6 relative pl-3">
+                <div className="absolute left-[19px] top-6 bottom-6 w-[2px] bg-gray-100" />
+                
+                {[
+                  { name: 'Placed', label: 'Order Submitted', desc: 'Securely submitted by customer.' },
+                  { name: 'Pending', label: 'Payment Pending', desc: 'Awaiting checkout authorization.' },
+                  { name: 'Processing', label: 'Processing spec', desc: 'Preparing item inventory checks.' },
+                  { name: 'Confirmed', label: 'Order Confirmed', desc: 'Authorized and queued for dispatch.' },
+                  { name: 'Packaging', label: 'Package Assembled', desc: 'Wrapped in high-fidelity protective sleeves.' },
+                  { name: 'Shipping', label: 'In Transit', desc: 'Dispatched via trusted express courier service.' },
+                  { name: 'Delivered', label: 'Completed', desc: 'Successfully received at designated location.' },
+                ].map((step, idx) => {
+                  const isCompleted = trackingOrder.statusHistory?.some(sh => sh.status.toLowerCase() === step.name.toLowerCase());
+                  const isCurrent = trackingOrder.status.toLowerCase() === step.name.toLowerCase();
+                  const matchLog = trackingOrder.statusHistory?.find(sh => sh.status.toLowerCase() === step.name.toLowerCase());
+                  const logTime = matchLog ? new Date(matchLog.timestamp).toLocaleString('en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : null;
+
+                  return (
+                    <div key={idx} className="relative pl-10 flex items-start justify-between min-h-[45px]">
+                      {/* Dynamic glowing bullet indicator */}
+                      <div className={cn(
+                        "absolute left-0 w-8 h-8 rounded-full border-4 border-white shadow-sm flex items-center justify-center z-10 transition-all duration-300",
+                        isCompleted ? "bg-black text-white" : isCurrent ? "bg-black text-white animate-pulse" : "bg-gray-100 text-gray-400"
+                      )}>
+                        {isCompleted ? (
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                        ) : (
+                          <span className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 pr-3">
+                        <h4 className={cn(
+                          "text-[10px] font-black uppercase tracking-wider leading-none",
+                          isCompleted ? "text-gray-950" : "text-gray-400"
+                        )}>
+                          {step.label}
+                          {isCurrent && <span className="text-[7px] bg-black text-white rounded px-1 ml-2 font-black">ACTIVE</span>}
+                        </h4>
+                        <p className="text-[9px] text-gray-400 mt-1">{step.desc}</p>
+                      </div>
+
+                      {logTime && (
+                        <span className="text-[8px] font-bold text-gray-900 bg-gray-100 px-1.5 py-0.5 whitespace-nowrap select-none shrink-0 self-start">
+                          {logTime}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -54,22 +54,13 @@ import { useNavigate } from 'react-router-dom';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
 
 // Profile images fallback logic
-const getAvatarImage = (id: string, name: string, customerProfileImage?: string) => {
+const getAvatarImage = (id: string, customerProfileImage?: string) => {
   if (customerProfileImage) return customerProfileImage;
   const PROFILE_IMAGES: Record<string, string> = {
     'TAZU-MART-BD-OFFICIAL': 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=120&fit=crop&q=80',
     'TAZU-MART-BD': 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=120&fit=crop&q=80',
   };
-  if (PROFILE_IMAGES[id]) return PROFILE_IMAGES[id];
-  const charCode = name.charCodeAt(0) || 0;
-  const ids = [
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&fit=crop&q=80'
-  ];
-  return ids[charCode % ids.length];
+  return PROFILE_IMAGES[id] || null;
 };
 
 
@@ -87,7 +78,12 @@ export default function AdminSupport() {
     solveSession,
     updateTicketStatus,
     deleteTicket,
-    updateSettings
+    updateSettings,
+    updateSessionStatus,
+    assignSessionModerator,
+    updateSessionNotes,
+    toggleBlockPhone,
+    subscribeTickets
   } = useSupportStore();
 
   const { orders } = useOrderStore();
@@ -101,6 +97,14 @@ export default function AdminSupport() {
   const [replyInput, setReplyInput] = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [activeModalView, setActiveModalView] = useState<'addresses' | 'tickets' | 'activity' | 'block' | null>(null);
+
+  // Advanced Support Desk state
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'open' | 'solved' | 'closed'>('all');
+  const [localNotes, setLocalNotes] = useState('');
+
+  // Moderators constant
+  const MODERATORS = ['Unassigned', 'Mamun (Support Admin)', 'Liza (Mod)', 'Sajid (Mod)'];
 
   // Find customer profile for sessions
   const getCustomerForSession = (session: ChatSession) => {
@@ -142,9 +146,20 @@ export default function AdminSupport() {
     setWelcomeMessage(settings.welcomeMessage || 'Welcome to TAZU MART BD.');
   }, [settings]);
 
+  useEffect(() => {
+    const unsub = subscribeTickets();
+    return () => unsub();
+  }, [subscribeTickets]);
+
+
+
   // Combine active customer problem sessions from Firestore, sorted by last message time
   const allSessions = useMemo(() => {
-    const customerChats = sessions.filter(s => s.id !== 'TAZU-MART-BD-OFFICIAL');
+    // Only show sessions that have at least one message or lastMessageText (prevent phantom rows of non-active users)
+    const customerChats = sessions.filter(s => 
+      s.id !== 'TAZU-MART-BD-OFFICIAL' && 
+      (s.lastMessageText || (s.messages && s.messages.length > 0))
+    );
     
     return [...customerChats].sort((a, b) => {
       const timeA = new Date(a.lastMessageAt).getTime();
@@ -153,11 +168,70 @@ export default function AdminSupport() {
     });
   }, [sessions]);
 
+  // Apply search query & status filters
+  const filteredSessions = useMemo(() => {
+    let result = allSessions;
+
+    // Use a persona-aware deduplication to ensure "One Customer = One Conversation"
+    // Priority Key: Clean Phone > Email > ID
+    const uniqueMap = new Map<string, ChatSession>();
+    result.forEach(s => {
+      const cleanPhone = s.customerPhone?.replace(/[+\s-]+/g, '').replace(/^880/, '0');
+      const email = s.customerEmail?.toLowerCase().trim();
+      const uid = s.customerUid;
+      
+      const key = uid 
+        ? `u_${uid}`
+        : ((cleanPhone && cleanPhone.length >= 10 && cleanPhone !== 'NA' && cleanPhone !== 'Unknown')
+            ? `p_${cleanPhone}`
+            : (email ? `e_${email}` : s.id));
+      
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, s);
+      } else {
+        // Keep the one with latest activity (newest message)
+        const existing = uniqueMap.get(key)!;
+        if (new Date(s.lastMessageAt) > new Date(existing.lastMessageAt)) {
+          uniqueMap.set(key, s);
+        }
+      }
+    });
+    result = Array.from(uniqueMap.values());
+
+    if (statusFilter !== 'all') {
+      result = result.filter(s => {
+        const sStatus = s.status || 'open';
+        // group 'open' and 'pending' for user friendliness if needed, or check strictly
+        if (statusFilter === 'pending') return sStatus === 'pending' || sStatus === 'open';
+        return sStatus === statusFilter;
+      });
+    }
+
+    if (sessionSearch.trim()) {
+      const q = sessionSearch.toLowerCase().trim();
+      result = result.filter(s => 
+        (s.customerName || '').toLowerCase().includes(q) || 
+        (s.customerPhone || '').includes(q)
+      );
+    }
+
+    return result;
+  }, [allSessions, statusFilter, sessionSearch]);
+
   // Find currently active chat session
   const currentChat = useMemo(() => {
     if (!activeSessionId) return null;
     return sessions.find(s => s.id === activeSessionId) || null;
   }, [activeSessionId, sessions]);
+
+  // Sync local notes when chat switches
+  useEffect(() => {
+    if (currentChat) {
+      setLocalNotes(currentChat.internalNotes || '');
+    } else {
+      setLocalNotes('');
+    }
+  }, [currentChat?.id]);
 
   // Auto scroll to bottom of chat
   useEffect(() => {
@@ -250,7 +324,7 @@ export default function AdminSupport() {
 
   const activeAnnouncementsCount = banners ? banners.length : 3;
   const runningOffersCount = offers ? offers.length : 5;
-  const openSupportTickets = tickets ? tickets.filter(t => t.status !== 'Closed' && t.status !== 'Solved').length : 2;
+  const openSupportTickets = tickets ? tickets.filter(t => t.status !== 'Closed' && t.status !== 'Resolved').length : 2;
 
   return (
     <div className="py-6 px-4 md:px-8 max-w-[1550px] w-full mx-auto space-y-6 font-sans text-left">
@@ -373,8 +447,8 @@ export default function AdminSupport() {
              className={`${activeSessionId ? 'hidden md:flex' : 'flex'} w-full md:w-[360px] lg:w-[410px] shrink-0 border-r border-gray-200 flex-col bg-transparent h-full`}
               id="chats-sidebar-panel"
             >
-              {/* Inbox Header & Search Bar */}
-              <div className="px-5 py-4 border-b border-gray-200 bg-transparent shrink-0">
+              {/* Inbox Header & Search Bar with Status Filters */}
+              <div className="px-5 py-4 border-b border-gray-200 bg-transparent shrink-0 space-y-3">
                 <div className="flex justify-between items-center">
                   <h3 className="text-base font-black uppercase tracking-wider text-gray-950">
                     MESSENGER
@@ -386,21 +460,67 @@ export default function AdminSupport() {
                      Reset Select
                   </button>
                 </div>
+
+                {/* SEARCH INPUT BAR */}
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 text-xs">
+                    🔍
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search Customer..."
+                    className="w-full pl-8 bg-zinc-50 border border-zinc-200 focus:bg-white text-[11px] font-bold rounded-xl py-2 focus:ring-1 focus:ring-purple-600 focus:border-purple-600 outline-none text-left"
+                    value={sessionSearch}
+                    onChange={(e) => setSessionSearch(e.target.value)}
+                  />
+                  {sessionSearch && (
+                    <button 
+                      onClick={() => setSessionSearch('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 text-xs hover:text-slate-900 cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                {/* STATUS FILTER ROW CHIPS */}
+                <div className="flex gap-1 overflow-x-auto no-scrollbar scrollbar-none pb-0.5">
+                  {(['all', 'pending', 'open', 'solved', 'closed'] as const).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      onClick={() => setStatusFilter(st)}
+                      className={`px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wide rounded-lg border transition-all shrink-0 cursor-pointer ${
+                        statusFilter === st 
+                          ? 'bg-slate-900 border-slate-900 text-white shadow-xs' 
+                          : 'bg-white border-zinc-200 text-slate-500 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
               </div>
               
               {/* Vertical Scroll of Threads */}
               <div className="flex-grow overflow-y-auto divide-y divide-gray-200 custom-scrollbar relative">
-                 {allSessions.map((session, index) => {
+                 {filteredSessions.length === 0 ? (
+                   <div className="p-8 text-center text-gray-400 uppercase text-[10px] font-bold tracking-wider">
+                     No matches with filters
+                   </div>
+                 ) : filteredSessions.map((session, index) => {
                    const isSelected = session.id === activeSessionId;
                    const isOfficial = session.isOfficial || session.id === 'TAZU-MART-BD-OFFICIAL';
                    const lastMsg = session.messages ? session.messages[session.messages.length - 1] : null;
                    const customer = getCustomerForSession(session);
                    
                    // Find actual unread count
-                   const unread = isOfficial ? 0 : (session.unreadCount ?? session.messages?.filter((m: any) => m.sender === 'customer' && !m.seen).length ?? 0);
+                   const unread = isOfficial ? 0 : (session.unreadCount || 0);
                    
                    // Dynamic profile picture fallback
-                   const profilePicture = getAvatarImage(session.id, customer?.name || session.customerName, customer?.profileImage);
+                   const displayName = customer?.name || (session.customerName === 'Anonymous Customer' ? (session.customerPhone || 'Unknown') : session.customerName);
+                   const profilePicture = getAvatarImage(session.id, customer?.profileImage || (session.customerAvatar as string));
+                   const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
                    const isOnline = session.customerOnline;
 
                    return (
@@ -419,13 +539,22 @@ export default function AdminSupport() {
                        >
                           {/* Circular Profile Avatar (50px) with Status Indicator */}
                           <div className="relative shrink-0" style={{ width: '50px', height: '50px' }}>
-                             <img 
-                               src={profilePicture} 
-                               alt={customer?.name || session.customerName} 
-                               className="w-full h-full object-cover border border-gray-200" 
-                               style={{ borderRadius: '50%' }}
-                               referrerPolicy="no-referrer"
-                             />
+                             {profilePicture ? (
+                               <img 
+                                 src={profilePicture} 
+                                 alt={displayName} 
+                                 className="w-full h-full object-cover border border-gray-200" 
+                                 style={{ borderRadius: '50%' }}
+                                 referrerPolicy="no-referrer"
+                               />
+                             ) : (
+                               <div 
+                                 className="w-full h-full flex items-center justify-center bg-zinc-100 border border-zinc-200 text-zinc-900 font-black text-sm"
+                                 style={{ borderRadius: '50%' }}
+                               >
+                                 {initials || '?'}
+                               </div>
+                             )}
                              {/* Online dot indicator bottom right status */}
                              <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isOnline ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
                           </div>
@@ -435,7 +564,7 @@ export default function AdminSupport() {
                              <div className="flex justify-between items-center gap-1">
                                 <h4 className="text-xs font-extrabold text-gray-900 uppercase flex items-center gap-1.5 min-w-0 flex-1">
                                    <span className="truncate block" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                     {customer?.name || session.customerName}
+                                     {displayName}
                                    </span>
                                    {isOfficial && (
                                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 bg-blue-500 text-white rounded-full shrink-0" title="Verified Account">
@@ -445,20 +574,15 @@ export default function AdminSupport() {
                                      </span>
                                    )}
                                 </h4>
-                                {lastMsg && (
-                                   <span className="text-[9px] text-gray-400 font-mono shrink-0">
-                                      {new Date(lastMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                   </span>
-                                )}
+                                <span className="text-[9px] text-gray-400 font-mono shrink-0">
+                                   {new Date(session.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                </span>
                              </div>
 
                              <p className="text-[11.5px] text-gray-500 truncate pr-6 mt-0.5 leading-normal">
-                                {lastMsg ? (
+                                {session.lastMessageText ? (
                                    <span>
-                                      {lastMsg.sender === 'admin' ? (
-                                         <span className="bg-purple-100 text-purple-700 text-[8px] font-black px-1 py-0.2 rounded uppercase mr-1">You</span>
-                                      ) : null}
-                                      {lastMsg.text || '📄 Attachment Media File'}
+                                      {session.lastMessageText}
                                    </span>
                                 ) : (
                                    <span className="text-gray-400 italic">No messages</span>
@@ -494,7 +618,10 @@ export default function AdminSupport() {
            <div className={`${activeSessionId ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full bg-white relative`} id="chat-stream-workspace">
               
               {currentChat ? (
-                <div className="flex flex-col h-full bg-white">
+                <div className="flex flex-row h-full w-full bg-white min-w-0" id="messenger-dual-pane-system">
+                   
+                   {/* LEFT CHAT CHANNELS STREAM */}
+                   <div className="flex-1 flex flex-col h-full min-w-0 relative bg-white border-r border-zinc-200">
                    
                    {/* DYNAMIC TOP BAR HEADER */}
                    <div className="px-5 py-3.5 bg-white border-b border-gray-150 flex items-center justify-between shrink-0" id="chat-panel-top-bar">
@@ -510,25 +637,36 @@ export default function AdminSupport() {
 
                          {(() => {
                             const customer = getCustomerForSession(currentChat);
-                            const profilePicture = getAvatarImage(currentChat.id, customer?.name || currentChat.customerName, customer?.profileImage);
+                            const displayName = customer?.name || (currentChat.customerName === 'Anonymous Customer' ? (currentChat.customerPhone || 'Unknown') : currentChat.customerName);
+                            const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+                            const profilePicture = getAvatarImage(currentChat.id, customer?.profileImage || (currentChat.customerAvatar as string));
                             
                             return (
                               <>
-                                <div className="relative w-10 h-10">
-                                   <img 
-                                     src={profilePicture} 
-                                     alt={customer?.name || currentChat.customerName} 
-                                     className="w-10 h-10 object-cover" 
-                                     style={{ borderRadius: '50%' }}
-                                     referrerPolicy="no-referrer"
-                                   />
+                                <div className="relative w-10 h-10 shrink-0">
+                                   {profilePicture ? (
+                                     <img 
+                                       src={profilePicture} 
+                                       alt={displayName} 
+                                       className="w-10 h-10 object-cover" 
+                                       style={{ borderRadius: '50%' }}
+                                       referrerPolicy="no-referrer"
+                                     />
+                                   ) : (
+                                     <div 
+                                       className="w-10 h-10 flex items-center justify-center bg-zinc-100 border border-zinc-200 text-zinc-900 font-black text-xs"
+                                       style={{ borderRadius: '50%' }}
+                                     >
+                                       {initials || '?'}
+                                     </div>
+                                   )}
                                    <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${currentChat.customerOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`}></span>
                                 </div>
                                 
                                 <div className="min-w-0">
                                    <div className="flex items-center gap-1.5">
                                       <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 truncate">
-                                        {customer?.name || currentChat.customerName}
+                                        {displayName}
                                       </h4>
                                       {currentChat.isOfficial && (
                                         <span className="inline-flex items-center justify-center w-3.5 h-3.5 bg-blue-500 text-white rounded-full p-0.5" title="Verified Account">
@@ -658,22 +796,33 @@ export default function AdminSupport() {
                       {currentChat.messages.map((msg: any) => {
                         const isCustomer = msg.sender === 'customer';
                         const customerProfile = getCustomerForSession(currentChat);
-                        const avatarPic = getAvatarImage(currentChat.id, customerProfile?.name || currentChat.customerName, customerProfile?.profileImage);
+                        const profilePicture = getAvatarImage(currentChat.id, customerProfile?.profileImage || (currentChat.customerAvatar as string));
+                        const displayName = customerProfile?.name || (currentChat.customerName === 'Anonymous Customer' ? (currentChat.customerPhone || 'Unknown') : currentChat.customerName);
+                        const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
 
                         return (
                           <div 
                             key={msg.id}
                             className={`flex ${isCustomer ? 'justify-start' : 'justify-end'} gap-2.5 items-end`}
                           >
-                             {/* Customer Avatar bubble on left for received responses */}
+                       {/* Customer Avatar bubble on left for received responses */}
                              {isCustomer && (
-                                <img 
-                                  src={avatarPic} 
-                                  alt="" 
-                                  className="w-7 h-7 object-cover shrink-0" 
-                                  style={{ borderRadius: '50%' }}
-                                  referrerPolicy="no-referrer"
-                                />
+                                profilePicture ? (
+                                  <img 
+                                    src={profilePicture} 
+                                    alt="" 
+                                    className="w-7 h-7 object-cover shrink-0" 
+                                    style={{ borderRadius: '50%' }}
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div 
+                                    className="w-7 h-7 flex items-center justify-center bg-zinc-100 border border-zinc-200 text-zinc-900 font-black text-[9px] shrink-0"
+                                    style={{ borderRadius: '50%' }}
+                                  >
+                                    {initials || '?'}
+                                  </div>
+                                )
                              )}
 
                              <div className={`max-w-[75%] w-fit break-words [word-break:break-word] [overflow-wrap:anywhere] whitespace-pre-wrap rounded-2xl p-3 text-left relative text-xs shadow-custom ${
@@ -734,12 +883,29 @@ export default function AdminSupport() {
                       {/* Typing indicator simulator */}
                       {(currentChat.isTyping || activeTypingSessions[currentChat.id]) && (
                         <div className="flex justify-start items-center gap-2 pb-2">
-                           <img 
-                             src={getAvatarImage(currentChat.id, getCustomerForSession(currentChat)?.name || currentChat.customerName, getCustomerForSession(currentChat)?.profileImage)} 
-                             alt="" 
-                             className="w-7 h-7 object-cover animate-pulse" 
-                             style={{ borderRadius: '50%' }}
-                           />
+                           {(() => {
+                             const customer = getCustomerForSession(currentChat);
+                             const displayName = customer?.name || (currentChat.customerName === 'Anonymous Customer' ? (currentChat.customerPhone || 'Unknown') : currentChat.customerName);
+                             const initials = displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+                             const profilePicture = getAvatarImage(currentChat.id, customer?.profileImage || (currentChat.customerAvatar as string));
+                             
+                             return profilePicture ? (
+                               <img 
+                                 src={profilePicture} 
+                                 alt="" 
+                                 className="w-7 h-7 object-cover animate-pulse" 
+                                 style={{ borderRadius: '50%' }}
+                                 referrerPolicy="no-referrer"
+                               />
+                             ) : (
+                               <div 
+                                 className="w-7 h-7 flex items-center justify-center bg-zinc-100 border border-zinc-200 text-zinc-900 font-black text-[9px] animate-pulse"
+                                 style={{ borderRadius: '50%' }}
+                               >
+                                 {initials || '?'}
+                               </div>
+                             );
+                           })()}
                            
                            {/* Pulsing indicator style dots */}
                            <div className="bg-gray-100 border border-gray-200 text-gray-500 px-3 py-2 rounded-2xl rounded-bl-none flex items-center gap-1.5 shadow-sm">
@@ -881,7 +1047,168 @@ export default function AdminSupport() {
                            <SendHorizontal className="w-4 h-4" />
                         </button>
                       </form>
-                   </div>
+                    </div>
+                  </div>
+
+                  {/* PREMIUM RIGHT WORKSPACE CONTROL DRAWER */}
+                  <div className="w-[300px] shrink-0 hidden lg:flex flex-col bg-slate-50 p-5 space-y-5 border-l border-gray-150 h-full overflow-y-auto overflow-x-hidden text-left" id="customer-identity-workspace-drawer" style={{ backgroundColor: '#fafafa' }}>
+                     
+                     {/* Identity Section: Customer Profile */}
+                     <div className="space-y-3 pb-4 border-b border-gray-150">
+                        <div className="flex items-center gap-3">
+                           <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white text-lg font-black shrink-0">
+                              {currentChat.customerName?.[0]?.toUpperCase() || 'C'}
+                           </div>
+                           <div className="overflow-hidden">
+                              <h3 className="text-sm font-black text-gray-950 truncate uppercase">{currentChat.customerName}</h3>
+                              <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1">
+                                 <Phone className="w-3 h-3" /> {currentChat.customerPhone}
+                              </p>
+                           </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                           <div className="bg-white border border-zinc-200 p-2 rounded-xl text-center">
+                              <span className="block text-[8px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Total Orders</span>
+                              <span className="text-sm font-black text-slate-900 leading-none">{getCustomerOrderCount(currentChat.customerPhone)}</span>
+                           </div>
+                           <div className="bg-white border border-zinc-200 p-2 rounded-xl text-center">
+                              <span className="block text-[8px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1">Trust Status</span>
+                              <span className={`text-[10px] font-black leading-none ${currentChat.isBlocked ? 'text-red-600' : 'text-emerald-600'} uppercase`}>
+                                 {currentChat.isBlocked ? 'Blocked' : 'Verified'}
+                              </span>
+                           </div>
+                        </div>
+                     </div>
+                     
+                     {/* Workspace Section 1: Session Status control */}
+                     <div className="space-y-2">
+                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-widest block font-sans">Session Operations Dashboard</span>
+                        <h4 className="text-xs font-bold text-gray-950 uppercase text-left font-sans">Update Ticket Status</h4>
+                        
+                        <div className="grid grid-cols-2 gap-1.5 pt-1">
+                           {(['open', 'pending', 'solved', 'closed']).map((st) => (
+                             <button
+                               key={st}
+                               type="button"
+                               onClick={() => updateSessionStatus(currentChat.id, st as any)}
+                               className={`px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-widest rounded-lg border text-center transition-all cursor-pointer font-sans ${currentChat.status === st ? 'bg-slate-900 border-slate-900 text-white shadow-xs' : 'bg-white border-zinc-200 text-slate-500 hover:bg-zinc-50'}`}
+                             >
+                               {st}
+                             </button>
+                           ))}
+                        </div>
+                     </div>
+
+                     {/* Workspace Section 2: Assigned Moderator */}
+                     <div className="space-y-2 border-t border-gray-150 pt-4">
+                        <h4 className="text-xs font-bold text-gray-950 uppercase text-left font-sans">Assigned Moderator Worker</h4>
+                        
+                        <select
+                          className="w-full bg-white border border-zinc-200 rounded-xl px-3 py-2 text-[11px] font-bold text-gray-700 outline-none focus:ring-1 focus:ring-purple-600 focus:border-purple-600 font-sans"
+                          value={currentChat.assignedModerator || 'Unassigned'}
+                          onChange={(e) => assignSessionModerator(currentChat.id, e.target.value)}
+                        >
+                          {MODERATORS.map((mod) => (
+                            <option key={mod} value={mod}>{mod}</option>
+                          ))}
+                        </select>
+                        
+                        {currentChat.assignedModerator && currentChat.assignedModerator !== 'Unassigned' && (
+                          <div className="text-[10px] font-medium text-purple-650 bg-purple-50 p-2 rounded-lg border border-purple-100 uppercase tracking-wide text-left font-sans">
+                            ✓ Currently Assigned to {currentChat.assignedModerator}
+                          </div>
+                        )}
+                     </div>
+
+                     {/* Workspace Section 3: Internal Support Notes */}
+                     <div className="space-y-2 border-t border-gray-150 pt-4">
+                        <div className="flex justify-between items-center">
+                          <h4 className="text-xs font-bold text-gray-950 uppercase text-left font-sans">Internal Agent Notes</h4>
+                          <span className="text-[8px] font-black uppercase text-zinc-400 bg-zinc-150 px-1 py-0.2 rounded font-sans">Private</span>
+                        </div>
+                        
+                        <textarea
+                          placeholder="Write private notes/resolutions about this customer inquiry..."
+                          className="w-full bg-white border border-zinc-200 rounded-xl p-3 text-[11px] font-semibold text-gray-700 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-purple-600 focus:ring-purple-600 select-text font-sans"
+                          rows={4}
+                          value={localNotes}
+                          onChange={(e) => setLocalNotes(e.target.value)}
+                        />
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateSessionNotes(currentChat.id, localNotes);
+                            alert("Central session notes updated successfully!");
+                          }}
+                          className="w-full px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white hover:text-amber-400 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all shadow-sm cursor-pointer border border-transparent font-sans"
+                        >
+                          Update / Save Notes
+                        </button>
+                     </div>
+
+                     {/* Workspace Section 4: Security & Moderation block */}
+                     <div className="space-y-2 border-t border-gray-150 pt-4">
+                        <h4 className="text-xs font-bold text-gray-950 uppercase text-left font-sans">Trust & Safety Actions</h4>
+                        
+                        {currentChat.isBlocked ? (
+                          <div className="p-3 bg-red-50 border border-red-150 rounded-xl space-y-2 text-left">
+                            <p className="text-[10px] font-bold text-red-650 uppercase tracking-wide leading-snug font-sans">⚠️ This number is currently restricted/blocked onto the Support desk.</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                toggleBlockPhone(currentChat.customerPhone, currentChat.id);
+                                alert("Restrictions lifted for the customer's phone connection!");
+                              }}
+                              className="w-full text-center py-1.5 bg-red-600 hover:bg-red-700 text-white text-[9.5px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer font-sans"
+                            >
+                              Unblock Customer
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl space-y-2 text-left">
+                            <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide leading-none font-sans">✓ Customer profile is verified and active.</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                toggleBlockPhone(currentChat.customerPhone, currentChat.id);
+                                alert("Permanently restricted support access for this customer's mobile connection.");
+                              }}
+                              className="w-full text-center py-1.5 bg-zinc-900 hover:bg-slate-950 text-white hover:text-red-400 text-[9.5px] font-black uppercase tracking-widest rounded-lg transition-all cursor-pointer font-sans"
+                            >
+                              Restrict / Block User
+                            </button>
+                          </div>
+                        )}
+                     </div>
+
+                     {/* Workspace Section 5: Log Archiver & Export */}
+                     <div className="space-y-2 border-t border-gray-150 pt-4 pb-2">
+                        <h4 className="text-xs font-bold text-gray-950 uppercase text-left font-sans">Data Logging Archive</h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const notesStr = currentChat.internalNotes ? '\nInternal Notes: ' + currentChat.internalNotes : '';
+                            const modStr = currentChat.assignedModerator ? '\nAssigned Moderator: ' + currentChat.assignedModerator : '';
+                            let log = 'TAZU MART SUPPORT CHAT EXTRACT LOGGER\n======================================\nSession ID: ' + currentChat.id + '\nCustomer Name: ' + currentChat.customerName + '\nCustomer Phone: ' + currentChat.customerPhone + '\nSession Status: ' + currentChat.status + modStr + notesStr + '\n\nCHAT STREAM MESSAGES:\n---------------------\n';
+                            currentChat.messages.forEach(m => {
+                              log += '[' + new Date(m.timestamp).toLocaleString() + '] ' + m.sender.toUpperCase() + ': ' + (m.text || '[Attachment/Media]') + '\n';
+                            });
+                            const blob = new Blob([log], { type: 'text/plain;charset=utf-8' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'chat_log_' + currentChat.id + '_' + currentChat.customerPhone + '.txt';
+                            a.click();
+                          }}
+                          className="w-full py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border border-zinc-200 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 font-sans"
+                        >
+                          📥 Export Chat Session
+                        </button>
+                     </div>
+
+                  </div>
 
                 </div>
               ) : (
@@ -949,10 +1276,10 @@ export default function AdminSupport() {
                                <p className="text-[9px] text-gray-400 font-mono mt-0.5">{ticket.phoneNumber}</p>
                             </div>
 
-                            <div className="md:col-span-4">
+                            <div className="md:col-span-4 text-left">
                                <p className="text-[9px] text-purple-650 font-black uppercase tracking-wider block">{ticket.category || 'Support Request'}</p>
                                <p className="text-xs text-gray-600 font-medium truncate uppercase mt-0.5">
-                                  {ticket.subject}
+                                  {ticket.details.slice(0, 60)}...
                                </p>
                             </div>
 
@@ -1000,22 +1327,33 @@ export default function AdminSupport() {
                               </div>
 
                               <div className="space-y-3.5">
-                                 <h5 className="text-[10px] font-black uppercase tracking-widest text-gray-900 border-b pb-1">Refund & Context Information</h5>
+                                 <h5 className="text-[10px] font-black uppercase tracking-widest text-gray-900 border-b pb-1">Problem Information</h5>
                                  
-                                 <div className="grid grid-cols-3 py-1 border-b border-gray-50">
-                                    <span className="text-[9px] font-black text-gray-400 uppercase">Order Ref</span>
-                                    <span className="col-span-2 text-xs font-mono font-bold text-gray-900 uppercase">#{ticket.orderId || "No Information"}</span>
-                                 </div>
                                  <div className="grid grid-cols-3 py-1 border-b border-gray-50">
                                     <span className="text-[9px] font-black text-gray-400 uppercase">Category</span>
                                     <span className="col-span-2 text-xs font-bold text-gray-950 uppercase">{ticket.category || "No Information"}</span>
                                  </div>
                                  <div className="grid grid-cols-3 py-1">
-                                    <span className="text-[9px] font-black text-gray-400 uppercase">Problem Text</span>
+                                    <span className="text-[9px] font-black text-gray-400 uppercase">Description</span>
                                     <div className="col-span-2 text-xs font-medium text-gray-800 bg-gray-50 border border-gray-200 p-3 rounded-xl leading-relaxed whitespace-pre-wrap select-text">
-                                       {ticket.message}
+                                       {ticket.details}
                                     </div>
                                  </div>
+                                 {ticket.attachmentUrl && (
+                                   <div className="grid grid-cols-3 py-1 border-t border-gray-50 mt-2">
+                                      <span className="text-[9px] font-black text-gray-400 uppercase">Attachment</span>
+                                      <div className="col-span-2">
+                                         <a 
+                                           href={ticket.attachmentUrl} 
+                                           target="_blank" 
+                                           rel="noreferrer"
+                                           className="text-[10px] font-bold text-indigo-600 hover:underline flex items-center gap-1.5"
+                                         >
+                                           <Paperclip className="w-3 h-3" /> {ticket.attachmentName || 'View Attachment'}
+                                         </a>
+                                      </div>
+                                   </div>
+                                 )}
                               </div>
                            </div>
 
@@ -1028,8 +1366,8 @@ export default function AdminSupport() {
                                  <span className="text-[10px] font-bold text-gray-500">Currently: <strong className="text-black uppercase underline">{ticket.status}</strong></span>
                               </div>
 
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                 {(['Pending', 'Under Review', 'Approved', 'Closed'] as const).map(st => {
+                              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                 {(['Open', 'Pending', 'In Review', 'Resolved', 'Closed'] as const).map(st => {
                                    const isSelected = ticket.status === st;
                                    return (
                                      <button
@@ -1037,7 +1375,7 @@ export default function AdminSupport() {
                                        key={st}
                                        onClick={() => {
                                           updateTicketStatus(ticket.id, st);
-                                       }}
+                                        }}
                                        className={`py-2 px-3 text-[9px] font-black uppercase transition-all rounded-lg border text-center ${
                                          isSelected 
                                            ? 'bg-black text-white border-black shadow-xs' 
@@ -1277,17 +1615,19 @@ export default function AdminSupport() {
                             <div className="flex justify-between items-start mb-2">
                                <div>
                                   <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">#{ticket.id}</span>
-                                  <h4 className="text-xs font-black text-zinc-900 uppercase tracking-tight group-hover:text-purple-600 truncate max-w-[300px]">{ticket.subject}</h4>
+                                  <h4 className="text-xs font-black text-zinc-900 uppercase tracking-tight group-hover:text-purple-600 truncate max-w-[300px]">{ticket.category}</h4>
                                </div>
                                <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
-                                 ticket.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-100' :
-                                 ticket.status === 'Solved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                 ticket.status === 'Open' ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                 ticket.status === 'Pending' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                 ticket.status === 'In Review' ? 'bg-purple-50 text-purple-700 border-purple-100' :
+                                 ticket.status === 'Resolved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
                                  'bg-zinc-100 text-zinc-600 border-zinc-200'
                                }`}>
                                  {ticket.status}
                                </span>
                             </div>
-                            <p className="text-[11px] text-zinc-500 font-medium line-clamp-1 mb-3">{ticket.message}</p>
+                            <p className="text-[11px] text-zinc-500 font-medium line-clamp-1 mb-3">{ticket.details}</p>
                             <div className="flex justify-between items-center bg-zinc-50 p-2 rounded-xl border border-zinc-100">
                                <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">{new Date(ticket.createdAt).toLocaleDateString()}</span>
                                <div className="flex items-center gap-1.5">
@@ -1344,7 +1684,7 @@ export default function AdminSupport() {
                            type: 'Commerce'
                          })),
                          ...customerTickets.map(t => ({
-                           event: `Ticket Submitted: ${t.subject}`,
+                           event: `Ticket Submitted: ${t.category}`,
                            timestamp: new Date(t.createdAt),
                            icon: <AlertCircle className="w-3 h-3" />,
                            color: 'bg-purple-500',
