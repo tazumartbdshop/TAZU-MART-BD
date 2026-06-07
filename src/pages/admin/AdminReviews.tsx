@@ -115,13 +115,42 @@ export default function AdminReviews() {
   };
 
   // Submission handler
-  const handleAddNewReview = (e: React.FormEvent) => {
+  const handleAddNewReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formCustomerName.trim() || !formReviewText.trim()) return;
 
-    const finalMedia = [...formMediaUrls];
-    if (formVideoUrl.trim()) {
-      finalMedia.push(formVideoUrl.trim());
+    let finalVideoUrl = formVideoUrl.trim();
+    if (finalVideoUrl.startsWith('data:')) {
+      try {
+        const { uploadImage } = await import('../../lib/imageUtils');
+        const res = await fetch(finalVideoUrl);
+        const blob = await res.blob();
+        finalVideoUrl = await uploadImage(blob, 'reviews', `video-${Date.now()}`);
+      } catch (err) {
+        console.error('Failed to upload video:', err);
+      }
+    }
+
+    const uploadedMediaUrls = await Promise.all(
+      formMediaUrls.map(async (url) => {
+        if (url.startsWith('data:')) {
+          try {
+            const { uploadImage } = await import('../../lib/imageUtils');
+            const res = await fetch(url);
+            const blob = await res.blob();
+            return await uploadImage(blob, 'reviews', `image-${Date.now()}`);
+          } catch (err) {
+            console.error('Failed to upload image:', err);
+            return url;
+          }
+        }
+        return url;
+      })
+    );
+
+    const finalMedia = [...uploadedMediaUrls];
+    if (finalVideoUrl) {
+      finalMedia.push(finalVideoUrl);
     }
 
     addReview({

@@ -36,8 +36,12 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  const errorMsg = JSON.stringify(errInfo);
+  if (errInfo.error.includes('Quota limit exceeded')) {
+    console.warn("Firestore Quota Exceeded.");
+  } else {
+    console.error('Firestore Error: ', errorMsg);
+  }
 }
 
 export default function AdminBanners() {
@@ -100,8 +104,8 @@ export default function AdminBanners() {
     setIsSubmitting(true);
     let successCount = 0;
 
-    // Use a single Firestore batch to commit all banners at once
     const { writeBatch, collection, doc } = await import('firebase/firestore');
+    const { uploadImage } = await import('../../lib/imageUtils');
     const batch = writeBatch(db);
 
     try {
@@ -114,7 +118,7 @@ export default function AdminBanners() {
         }
         
         try {
-          const base64 = await new Promise<string>((resolve, reject) => {
+          const bannerBlob = await new Promise<Blob>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (e) => {
               const img = new Image();
@@ -129,7 +133,6 @@ export default function AdminBanners() {
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return reject('Canvas context not found');
                 
-                // object-fit: cover logic
                 const imgRatio = img.width / img.height;
                 let drawWidth = targetWidth;
                 let drawHeight = targetHeight;
@@ -137,8 +140,6 @@ export default function AdminBanners() {
                 let offsetY = 0;
                 
                 if (imgRatio > targetRatio) {
-                  drawWidth = img.height * targetRatio * (targetWidth / (img.height * targetRatio));
-                  // wait, simpler object-fit cover math
                   drawWidth = img.width * (targetHeight / img.height);
                   drawHeight = targetHeight;
                   if (drawWidth < targetWidth) {
@@ -161,7 +162,10 @@ export default function AdminBanners() {
                 ctx.fillRect(0, 0, targetWidth, targetHeight);
                 ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
                 
-                resolve(canvas.toDataURL('image/jpeg', 0.85));
+                canvas.toBlob((blob) => {
+                  if (blob) resolve(blob);
+                  else reject('Blob creation failed');
+                }, 'image/jpeg', 0.85);
               };
               img.onerror = reject;
               if (typeof e.target?.result === 'string') {
@@ -172,12 +176,15 @@ export default function AdminBanners() {
             reader.readAsDataURL(file);
           });
 
+          // Upload to storage
+          const downloadUrl = await uploadImage(bannerBlob, 'banners', file.name);
+
           const targetId = doc(collection(db, 'banners')).id;
           const currentOrder = currentBannersLength + successCount;
 
           const bannerData = {
             id: targetId,
-            image: base64,
+            image: downloadUrl,
             name: name || file.name.split('.')[0],
             buttonText,
             buttonLink,

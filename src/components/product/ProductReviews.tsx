@@ -136,7 +136,7 @@ export default function ProductReviews() {
   const [validationError, setValidationError] = useState<string | null>(null);
 
   // Form Submission
-  const handleSubmitReview = (e: React.FormEvent) => {
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
 
@@ -153,10 +153,39 @@ export default function ProductReviews() {
       return;
     }
 
+    let finalVideoUrl = videoUrlInput.trim();
+    if (finalVideoUrl.startsWith('data:')) {
+      try {
+        const { uploadImage } = await import('../../lib/imageUtils');
+        const res = await fetch(finalVideoUrl);
+        const blob = await res.blob();
+        finalVideoUrl = await uploadImage(blob, 'reviews', `video-${Date.now()}`);
+      } catch (err) {
+        console.error('Failed to upload video:', err);
+      }
+    }
+
+    const uploadedMediaUrls = await Promise.all(
+      attachedMedia.map(async (url) => {
+        if (url.startsWith('data:')) {
+          try {
+            const { uploadImage } = await import('../../lib/imageUtils');
+            const res = await fetch(url);
+            const blob = await res.blob();
+            return await uploadImage(blob, 'reviews', `image-${Date.now()}`);
+          } catch (err) {
+            console.error('Failed to upload image:', err);
+            return url;
+          }
+        }
+        return url;
+      })
+    );
+
     // Combine any images and videos
-    const finalMedia = [...attachedMedia];
-    if (videoUrlInput.trim()) {
-      finalMedia.push(videoUrlInput.trim());
+    const finalMedia = [...uploadedMediaUrls];
+    if (finalVideoUrl) {
+      finalMedia.push(finalVideoUrl);
     }
 
     addReview({

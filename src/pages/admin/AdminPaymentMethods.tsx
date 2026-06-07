@@ -90,15 +90,18 @@ export default function AdminPaymentMethods() {
     }));
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, methodId: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card') => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, methodId: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      handleInputChange(methodId, 'logo', reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { uploadImage } = await import('../../lib/imageUtils');
+      const url = await uploadImage(file, 'payment-logos', `logo-${methodId}-${Date.now()}`);
+      handleInputChange(methodId, 'logo', url);
+    } catch (err) {
+      console.error('Failed to upload image:', err);
+      alert('Failed to upload logo');
+    }
   };
 
   const handleApplyPreset = (methodId: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card') => {

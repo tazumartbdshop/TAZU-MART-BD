@@ -133,16 +133,30 @@ export default function AdminFakeOrderControl() {
   }, [detectedSuspects, abandonedCheckouts, fakeReports]);
 
   // Handle Mark Fake Submit
-  const handleMarkFakeSubmit = (e: React.FormEvent) => {
+  const handleMarkFakeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reportingOrder) return;
+
+    let evidenceUrl = evidenceBase64;
+    if (evidenceBase64 && evidenceBase64.startsWith('data:')) {
+      try {
+        const { uploadImage } = await import('../../lib/imageUtils');
+        const res = await fetch(evidenceBase64);
+        const blob = await res.blob();
+        evidenceUrl = await uploadImage(blob, 'fake-reports', `evidence-${reportingOrder.orderId}-${Date.now()}`);
+      } catch (err) {
+        console.error('Failed to upload evidence', err);
+        alert('Failed to upload evidence document');
+        return;
+      }
+    }
 
     // 1. Database Save
     addFakeReport({
       orderId: reportingOrder.orderId,
       reason: fakeReason,
       notes: fakeNotes,
-      evidenceImage: evidenceBase64
+      evidenceImage: evidenceUrl
     });
 
     // 2. Order Status -> Cancelled

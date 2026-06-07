@@ -29,6 +29,8 @@ export default function AddCategory() {
   });
 
   const [bannerImages, setBannerImages] = useState<string[]>([]);
+  const [bannerFiles, setBannerFiles] = useState<(File | string)[]>([]);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [sliderSettings, setSliderSettings] = useState({
     autoScroll: false,
     manualScroll: true,
@@ -61,7 +63,9 @@ export default function AddCategory() {
           metaDescription: category.metaDescription || '',
           keywords: category.keywords || ''
         });
-        setBannerImages(category.bannerImages && category.bannerImages.length > 0 ? category.bannerImages : (category.bannerImage ? [category.bannerImage] : []));
+        const imgs = category.bannerImages && category.bannerImages.length > 0 ? category.bannerImages : (category.bannerImage ? [category.bannerImage] : []);
+        setBannerImages(imgs);
+        setBannerFiles(imgs);
         if (category.sliderSettings) {
            setSliderSettings(category.sliderSettings);
         }
@@ -97,6 +101,7 @@ export default function AddCategory() {
     if (!files) return;
     setBannerError(null);
     const newBanners = [...bannerImages];
+    const newFiles = [...bannerFiles];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -111,8 +116,10 @@ export default function AddCategory() {
       }
       const url = URL.createObjectURL(file);
       newBanners.push(url);
+      newFiles.push(file);
     }
     setBannerImages(newBanners);
+    setBannerFiles(newFiles);
   };
 
   const processThumbnailFile = (files: FileList | null) => {
@@ -130,6 +137,7 @@ export default function AddCategory() {
     }
     const url = URL.createObjectURL(file);
     setFormData(prev => ({ ...prev, iconImage: url }));
+    setThumbnailFile(file);
   };
 
   const removeBannerImage = (index: number) => {
@@ -138,6 +146,7 @@ export default function AddCategory() {
       URL.revokeObjectURL(target);
     }
     setBannerImages(bannerImages.filter((_, i) => i !== index));
+    setBannerFiles(bannerFiles.filter((_, i) => i !== index));
   };
 
   const removeThumbnailImage = () => {
@@ -145,6 +154,7 @@ export default function AddCategory() {
       URL.revokeObjectURL(formData.iconImage);
     }
     setFormData(prev => ({ ...prev, iconImage: '' }));
+    setThumbnailFile(null);
   };
 
   const [isLoading, setIsLoading] = useState(false);
@@ -153,25 +163,40 @@ export default function AddCategory() {
     if (!formData.name.trim()) return;
     
     setIsLoading(true);
-
-    const payload = {
-      name: formData.name,
-      slug: formData.slug || formData.name.toLowerCase().trim().replace(/\s+/g, '-'),
-      bannerName: formData.bannerName || formData.name,
-      bannerImage: bannerImages[0] || '',
-      bannerImages: bannerImages,
-      sliderSettings: sliderSettings,
-      iconImage: formData.iconImage,
-      description: formData.description,
-      displayOrder: Number(formData.displayOrder) || 1,
-      status: formData.status,
-      showOnHomepage: formData.showOnHomepage,
-      metaTitle: formData.metaTitle,
-      metaDescription: formData.metaDescription,
-      keywords: formData.keywords
-    };
+    const { uploadImage } = await import('../../lib/imageUtils');
 
     try {
+        // Upload thumbnail if changed
+        let iconUrl = formData.iconImage;
+        if (thumbnailFile) {
+          iconUrl = await uploadImage(thumbnailFile, 'categories', `icon-${formData.slug}`);
+        }
+
+        // Upload all new banners
+        const finalBannerUrls = await Promise.all(
+          bannerFiles.map(async (fileOrUrl) => {
+            if (typeof fileOrUrl === 'string') return fileOrUrl;
+            return await uploadImage(fileOrUrl, 'categories', `banner-${formData.slug}-${Math.random().toString(36).substring(7)}`);
+          })
+        );
+
+        const payload = {
+          name: formData.name,
+          slug: formData.slug || formData.name.toLowerCase().trim().replace(/\s+/g, '-'),
+          bannerName: formData.bannerName || formData.name,
+          bannerImage: finalBannerUrls[0] || '',
+          bannerImages: finalBannerUrls,
+          sliderSettings: sliderSettings,
+          iconImage: iconUrl,
+          description: formData.description,
+          displayOrder: Number(formData.displayOrder) || 1,
+          status: formData.status,
+          showOnHomepage: formData.showOnHomepage,
+          metaTitle: formData.metaTitle,
+          metaDescription: formData.metaDescription,
+          keywords: formData.keywords
+        };
+
         if (isEditing && id) {
           await updateCategory(id, payload);
         } else {
@@ -371,8 +396,11 @@ export default function AddCategory() {
                                     if (file) {
                                       const url = URL.createObjectURL(file);
                                       const newImages = [...bannerImages];
+                                      const newFiles = [...bannerFiles];
                                       newImages[idx] = url;
+                                      newFiles[idx] = file;
                                       setBannerImages(newImages);
+                                      setBannerFiles(newFiles);
                                     }
                                   };
                                   input.click();

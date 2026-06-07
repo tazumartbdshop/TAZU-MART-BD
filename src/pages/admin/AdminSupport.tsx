@@ -963,12 +963,17 @@ export default function AdminSupport() {
                         type="file" 
                         accept="image/*"
                         ref={replyImageRef}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const reader = new FileReader();
-                            reader.onload = () => setReplyImage(reader.result as string);
-                            reader.readAsDataURL(file);
+                            const { uploadImage } = await import('../../lib/imageUtils');
+                            try {
+                              const url = await uploadImage(file, 'chat-images', `admin-reply-${Date.now()}`);
+                              setReplyImage(url);
+                            } catch (error) {
+                              console.error('Error uploading image:', error);
+                              alert('Failed to upload image');
+                            }
                           }
                         }}
                         className="hidden" 
@@ -976,10 +981,17 @@ export default function AdminSupport() {
                       <input 
                         type="file" 
                         ref={replyFileRef}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            setReplyFile({ name: file.name, url: '#file-mock' });
+                            const { uploadImage } = await import('../../lib/imageUtils');
+                            try {
+                              const url = await uploadImage(file, 'chat-images', `admin-file-${Date.now()}`);
+                              setReplyFile({ name: file.name, url });
+                            } catch (error) {
+                              console.error('Error uploading file:', error);
+                              alert('Failed to upload file');
+                            }
                           }
                         }}
                         className="hidden" 

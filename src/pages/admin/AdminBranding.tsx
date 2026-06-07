@@ -6,13 +6,16 @@ import {
   Sparkles, 
   Trash2,
   Lock,
-  Compass
+  Compass,
+  Loader2
 } from 'lucide-react';
 import { useSettingsStore, AppSettings } from '../../store/useSettingsStore';
+import { toast } from 'react-hot-toast';
 
 export default function AdminBranding() {
   const { settings, updateSettings, updateDraftSettings } = useSettingsStore();
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState<string | null>(null);
 
   // Form states loaded from store
   const [storeLogo, setStoreLogo] = useState(settings.storeLogo || '');
@@ -52,6 +55,25 @@ export default function AdminBranding() {
     if (field === 'secondaryColor') setSecondaryColor(value);
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, field: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(field);
+    const { uploadImage } = await import('../../lib/imageUtils');
+    
+    try {
+      const downloadUrl = await uploadImage(file, 'branding', `${field}_${Date.now()}`);
+      handleUpdate(field, downloadUrl);
+      toast.success('Asset uploaded successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload branding asset');
+    } finally {
+      setIsUploading(null);
+    }
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     const updates = {
@@ -72,31 +94,30 @@ export default function AdminBranding() {
 
   const ImageUpload = ({ label, value, field }: { label: string, value: string, field: string }) => (
     <div className="bg-neutral-50 p-4 border border-neutral-200 flex flex-col sm:flex-row items-center gap-4">
-      <div className="w-16 h-16 bg-white border border-neutral-200 flex items-center justify-center overflow-hidden shrink-0 select-none">
+      <div className="w-16 h-16 bg-white border border-neutral-200 flex items-center justify-center overflow-hidden shrink-0 select-none relative">
         {value ? (
           <img src={value} alt="" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
         ) : (
           <ImageIcon className="w-6 h-6 text-neutral-400" />
+        )}
+        {isUploading === field && (
+          <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+            <Loader2 className="w-4 h-4 animate-spin text-black" />
+          </div>
         )}
       </div>
 
       <div className="flex-1 w-full text-center sm:text-left">
         <span className="block text-[10.5px] font-black uppercase text-neutral-800 mb-1.5 tracking-wider">{label}</span>
         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-          <label className="bg-neutral-900 hover:bg-black text-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none">
-            Upload
+          <label className={`bg-neutral-900 hover:bg-black text-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest cursor-pointer select-none flex items-center gap-2 ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+            {isUploading === field ? 'Uploading...' : 'Upload'}
             <input 
               type="file" 
               accept="image/*" 
               className="hidden" 
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = () => handleUpdate(field, reader.result as string);
-                  reader.readAsDataURL(file);
-                }
-              }} 
+              disabled={isUploading !== null}
+              onChange={(e) => handleFileSelect(e, field)} 
             />
           </label>
           {value && (

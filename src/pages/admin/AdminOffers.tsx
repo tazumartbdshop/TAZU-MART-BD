@@ -60,8 +60,9 @@ function AllOffersView() {
     if (!file) return;
     setIsUpdatingBanner(true);
     try {
-      const resizedUrl = await resizeImage(file);
-      await setDoc(doc(db, 'settings', 'offers_page_banner'), { imageUrl: resizedUrl });
+      const { uploadImage } = await import('../../lib/imageUtils');
+      const downloadUrl = await uploadImage(file, 'banners', `offers-banner-${Date.now()}`);
+      await setDoc(doc(db, 'settings', 'offers_page_banner'), { imageUrl: downloadUrl });
       toast.success("✅ Offers page banner uploaded!");
     } catch (err) {
       console.error(err);
@@ -819,8 +820,9 @@ function OfferFormView() {
                     if (files) {
                       Array.from(files).forEach(async (file: File) => {
                         try {
-                          const resizedUrl = await resizeImage(file);
-                          setBanners(prev => [...prev, { url: resizedUrl, link: '#' }]);
+                          const { uploadImage } = await import('../../lib/imageUtils');
+                          const downloadUrl = await uploadImage(file, 'banners', `offers-banner-${Date.now()}`);
+                          setBanners(prev => [...prev, { url: downloadUrl, link: '#' }]);
                         } catch (err) {
                           console.error("Error processing image:", err);
                         }

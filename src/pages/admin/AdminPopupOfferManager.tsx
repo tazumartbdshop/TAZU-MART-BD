@@ -239,13 +239,27 @@ export default function AdminPopupOfferManager() {
       return;
     }
 
+    let finalBannerUrl = bannerUrl;
+    if (bannerUrl.startsWith('data:')) {
+      try {
+        const { uploadImage } = await import('../../lib/imageUtils');
+        const res = await fetch(bannerUrl);
+        const blob = await res.blob();
+        finalBannerUrl = await uploadImage(blob, 'popups', `popup-${Date.now()}.jpg`);
+      } catch (err) {
+        console.error('Upload failed', err);
+        setValidationError('Failed to upload image to the server');
+        return;
+      }
+    }
+
     const payload = {
       title,
       subtitle,
       description,
       productId,
       categoryId,
-      bannerUrl,
+      bannerUrl: finalBannerUrl,
       primaryButtonText: primaryButtonText || 'Buy Now',
       secondaryButtonText: secondaryButtonText || 'Skip Deal',
       startDate,

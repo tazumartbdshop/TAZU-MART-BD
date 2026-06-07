@@ -38,19 +38,24 @@ export default function AdminBrandShowcase() {
     triggerToast('⚡ Core Brand Showcase Header settings modified successfully.');
   };
 
-  const handleImageFileChange = (slideId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (slideId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
         triggerToast('❌ Error: Image file must be under 5MB.');
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        updateSlide(slideId, { image: reader.result as string });
+      
+      const { uploadImage } = await import('../../lib/imageUtils');
+      try {
+        triggerToast('⏳ Uploading brand media to cloud storage...');
+        const downloadUrl = await uploadImage(file, 'brands', `showcase-${slideId}-${Date.now()}`);
+        updateSlide(slideId, { image: downloadUrl });
         triggerToast('✅ Slide brand banner asset successfully uploaded!');
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error(err);
+        triggerToast('❌ Error: Cloud upload failed. Please try again.');
+      }
     }
   };
 

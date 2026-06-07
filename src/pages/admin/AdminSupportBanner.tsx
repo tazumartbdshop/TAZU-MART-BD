@@ -93,13 +93,50 @@ export default function AdminSupportBanner() {
                 </button>
               </div>
 
-              <InputField 
-                label="Banner Image URL" 
-                value={draftBanner.banner_image || ''} 
-                onChange={(v) => handleChange('banner_image', v)}
-                icon={ImageIcon}
-                placeholder="https://images.unsplash.com/..."
-              />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                  <ImageIcon className="w-3 h-3" /> Banner Image
+                </label>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <input 
+                      type="text"
+                      value={draftBanner.banner_image || ''} 
+                      onChange={(e) => handleChange('banner_image', e.target.value)}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 text-sm focus:outline-none focus:border-black focus:bg-white transition-all rounded-none font-bold"
+                    />
+                  </div>
+                  <div className="shrink-0">
+                    <input
+                      type="file"
+                      id="banner-upload"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const { uploadImage } = await import('../../lib/imageUtils');
+                          try {
+                            const url = await uploadImage(file, 'banners', `support-banner-${Date.now()}`);
+                            handleChange('banner_image', url);
+                          } catch (error) {
+                            console.error('Error uploading image:', error);
+                            setError('Failed to upload image');
+                            setTimeout(() => setError(null), 3000);
+                          }
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="banner-upload"
+                      className="h-full px-4 flex items-center justify-center bg-black text-white hover:bg-zinc-800 cursor-pointer transition-colors text-[10px] font-black uppercase tracking-widest"
+                    >
+                      Upload
+                    </label>
+                  </div>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <InputField 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, doc, setDoc, deleteDoc, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore';
 
 export interface FlutterBanner {
@@ -56,7 +56,7 @@ export const useFlutterBannerStore = create<FlutterBannerStore>((set, get) => ({
       });
       set({ flutterBanners: list, isLoaded: true });
     }, (error) => {
-      console.error("Firestore onSnapshot error for flutterBanners:", error);
+      handleFirestoreError(error, OperationType.GET, 'flutterBanners');
     });
     return unsubscribe;
   },

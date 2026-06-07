@@ -146,12 +146,17 @@ export default function AdminSettings() {
               type="file" 
               accept="image/*" 
               className="hidden" 
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (file) {
-                  const reader = new FileReader();
-                  reader.onload = () => handleUpdate(field, reader.result as string);
-                  reader.readAsDataURL(file);
+                  const { uploadImage } = await import('../../lib/imageUtils');
+                  try {
+                    const url = await uploadImage(file, 'banners', `settings-${field}-${Date.now()}`);
+                    handleUpdate(field, url);
+                  } catch (err) {
+                    console.error('Failed to upload image:', err);
+                    alert('Image upload failed');
+                  }
                 }
               }} 
             />

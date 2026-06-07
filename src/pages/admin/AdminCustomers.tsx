@@ -721,40 +721,102 @@ function AdminCustomerAdd() {
       return;
     }
 
-    // Prepare Occasion strings separated by '|' separators
-    const occasionJoined = specialDays.length > 0 
-      ? specialDays.map(d => d.name.trim()).join(' | ') 
-      : '';
-    
-    const datesJoined = specialDays.length > 0
-      ? specialDays.map(d => {
-          const parts = d.date.split('-');
-          if (parts.length === 3 && parts[0].length === 4) {
-            // YYYY-MM-DD -> DD-MM-YYYY format
-            return `${parts[2]}-${parts[1]}-${parts[0]}`;
-          }
-          return d.date;
-        }).join(' | ')
-      : '';
+    const saveCustomer = async () => {
+      // Prepare Occasion strings separated by '|' separators
+      const occasionJoined = specialDays.length > 0 
+        ? specialDays.map(d => d.name.trim()).join(' | ') 
+        : '';
+      
+      const datesJoined = specialDays.length > 0
+        ? specialDays.map(d => {
+            const parts = d.date.split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+              // YYYY-MM-DD -> DD-MM-YYYY format
+              return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+            return d.date;
+          }).join(' | ')
+        : '';
 
-    const { confirmPassword, ...payload } = formData;
-    if (id && !payload.password) {
-      delete (payload as any).password;
-    }
+      const { confirmPassword, ...payload } = formData;
+      if (id && !payload.password) {
+        delete (payload as any).password;
+      }
 
-    const finalPayload = {
-      ...payload,
-      occasionName: occasionJoined,
-      specialDate: datesJoined
+      const finalPayload = {
+        ...payload,
+        occasionName: occasionJoined,
+        specialDate: datesJoined
+      };
+
+      if (id) {
+        await updateCustomer(id, finalPayload as any);
+      } else {
+        await addCustomer(finalPayload as any);
+      }
+
+      navigate('/admin/customers');
     };
 
-    if (id) {
-      updateCustomer(id, finalPayload as any);
-    } else {
-      addCustomer(finalPayload as any);
-    }
+    // If profile image is a data URL (newly cropped), upload it
+    if (formData.profileImage && formData.profileImage.startsWith('data:')) {
+      const uploadAndSave = async () => {
+        try {
+          const { uploadImage } = await import('../../lib/imageUtils');
+          const res = await fetch(formData.profileImage);
+          const blob = await res.blob();
+          const downloadUrl = await uploadImage(blob, 'customers', `avatar-${Date.now()}.jpg`);
+          
+          setFormData(prev => {
+            const next = { ...prev, profileImage: downloadUrl };
+            // We use the local version of finalPayload construction within saveCustomer
+            // but we need to ensure the payload includes the NEW downloadUrl.
+            // Simplified: update state then call save logic with the NEW value.
+            return next;
+          });
+          
+          // Re-derive payload with the new URL for immediate save
+          const occasionJoined = specialDays.length > 0 
+            ? specialDays.map(d => d.name.trim()).join(' | ') 
+            : '';
+          
+          const datesJoined = specialDays.length > 0
+            ? specialDays.map(d => {
+                const parts = d.date.split('-');
+                if (parts.length === 3 && parts[0].length === 4) {
+                  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
+                return d.date;
+              }).join(' | ')
+            : '';
 
-    navigate('/admin/customers');
+          const { confirmPassword, ...payload } = formData;
+          if (id && !payload.password) {
+            delete (payload as any).password;
+          }
+
+          const finalPayload = {
+            ...payload,
+            profileImage: downloadUrl,
+            occasionName: occasionJoined,
+            specialDate: datesJoined
+          };
+
+          if (id) {
+            await updateCustomer(id, finalPayload as any);
+          } else {
+            await addCustomer(finalPayload as any);
+          }
+          navigate('/admin/customers');
+        } catch (err) {
+          console.error(err);
+          setErrors({ submit: 'Failed to upload image. Please try again.' });
+        }
+      };
+      uploadAndSave();
+    } else {
+      saveCustomer();
+    }
   };
 
   return (

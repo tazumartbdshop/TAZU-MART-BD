@@ -242,6 +242,18 @@ export default function Register() {
       : '';
 
     try {
+      let finalProfileImage = formData.profileImage;
+      if (finalProfileImage?.startsWith('data:')) {
+        try {
+          const { uploadImage } = await import('../lib/imageUtils');
+          const res = await fetch(finalProfileImage);
+          const blob = await res.blob();
+          finalProfileImage = await uploadImage(blob, 'user-profiles', `user-${Date.now()}.jpg`);
+        } catch (err) {
+          console.error('Failed to upload image:', err);
+        }
+      }
+
       const signupEmail = formData.email ? formData.email.toLowerCase().trim() : `${formData.phone.trim()}@tazumart.com`;
       
       let firebaseUser;
@@ -280,7 +292,7 @@ export default function Register() {
           upazila: formData.upazila,
           area: formData.area,
           postalCode: formData.postalCode,
-          profileImage: formData.profileImage || '',
+          profileImage: finalProfileImage || '',
           occasionName: occasionJoined,
           specialDate: datesJoined,
         });
@@ -304,7 +316,7 @@ export default function Register() {
           upazila: formData.upazila,
           zipCode: formData.postalCode,
         },
-        profileImage: formData.profileImage,
+        profileImage: finalProfileImage || undefined,
         gender: formData.gender,
         occasionName: occasionJoined,
         specialDate: datesJoined,
@@ -345,7 +357,9 @@ export default function Register() {
       }, 1800);
 
     } catch (err: any) {
-      console.error(err);
+      if (err.code !== 'auth/operation-not-allowed' && err.code !== 'auth/email-already-in-use' && err.code !== 'auth/weak-password') {
+        console.error(err);
+      }
       setIsLoading(false);
       if (err.code === 'auth/operation-not-allowed') {
         setError("Firebase 'Email/Password' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Email/Password' and enable it.");

@@ -221,6 +221,7 @@ export default function Checkout() {
         ...prev,
         name: user.name || prev.name,
         phone: user.phone || prev.phone || '',
+        email: user.email || prev.email || '',
         address: user.address || prev.address || '',
         houseRoad: user.houseRoad || user.street || prev.houseRoad || '',
         landmark: user.landmark || prev.landmark || '',
@@ -524,19 +525,42 @@ export default function Checkout() {
     // Update user profile if saveAddress is true
     if (isAuthenticated && user && formData.saveAddress) {
       updateUser({
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
         division: formData.division,
         district: formData.district,
         upazila: formData.upazila,
         area: formData.area,
         address: formData.address, // Full address/House road
         zipCode: formData.postalCode,
+        postalCode: formData.postalCode
       });
       
+      // Update in firestore
+      try {
+        updateDoc(doc(db, 'users', user.id), {
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          division: formData.division,
+          district: formData.district,
+          upazila: formData.upazila,
+          area: formData.area,
+          address: formData.address,
+          zipCode: formData.postalCode,
+          postalCode: formData.postalCode
+        });
+      } catch (e) {
+        console.error("Firestore user profile update failed:", e);
+      }
+
       // Update customer in store
       const customersStore = useCustomerStore.getState();
       const currentCustomer = customersStore.customers.find(c => c.id === user.id);
       if (currentCustomer) {
         customersStore.updateCustomer(user.id, {
+          name: formData.name,
           address: {
             country: 'Bangladesh',
             division: formData.division,
@@ -700,6 +724,32 @@ export default function Checkout() {
                   className="w-full bg-white border border-neutral-250 px-3.5 py-2 rounded-lg focus:outline-none focus:border-black text-xs font-semibold placeholder:font-normal placeholder:text-neutral-400 resize-none"
                 />
               </div>
+
+              {/* 5. Save to Profile Toggle */}
+              {isAuthenticated && (
+                <div className="flex items-center gap-3 pt-3 border-t border-neutral-100">
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('saveAddress', !formData.saveAddress)}
+                    className={cn(
+                      "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 shadow-sm",
+                      formData.saveAddress ? "bg-black" : "bg-neutral-200"
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white ring-0 transition duration-200 ease-in-out shadow-sm",
+                        formData.saveAddress ? "translate-x-4" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-black leading-none">Update My Profile</span>
+                    <span className="text-[9px] font-bold text-neutral-500 mt-0.5 uppercase tracking-wide">Save this updated address for future usage</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* STEP 3: PAYMENT MODE */}

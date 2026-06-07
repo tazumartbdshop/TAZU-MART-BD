@@ -30,8 +30,12 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  const errorMsg = JSON.stringify(errInfo);
+  if (errInfo.error.includes('Quota limit exceeded')) {
+    console.warn("Firestore Quota Exceeded.");
+  } else {
+    console.error('Firestore Error: ', errorMsg);
+  }
 }
 
 export default function BannerListing() {

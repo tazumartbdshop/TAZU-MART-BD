@@ -591,6 +591,7 @@ export default function SettingsPage() {
   // 10. Logout & Account Control Modals
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isDeactivated, setIsDeactivated] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const triggerToast = (msg: string, isError = false) => {
     if (isError) {
@@ -603,7 +604,7 @@ export default function SettingsPage() {
   };
 
   // Profile image process files
-  const handlePhotoUpload = (files: FileList | null) => {
+  const handlePhotoUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
@@ -615,25 +616,31 @@ export default function SettingsPage() {
       triggerToast("Profile Image file size exceeds 2MB limit.", true);
       return;
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64Url = reader.result as string;
-      setProfilePic(base64Url);
-      updateUser({ profileImage: base64Url });
+
+    setIsUploading(true);
+    const { uploadImage } = await import('../lib/imageUtils');
+    try {
+      const downloadUrl = await uploadImage(file, 'user-profiles', `user-${user?.id || Date.now()}`);
+      setProfilePic(downloadUrl);
+      updateUser({ profileImage: downloadUrl });
 
       // Sync with customer record in useCustomerStore
       if (user?.id) {
         const customersStore = useCustomerStore.getState();
         const currentCustomer = customersStore.customers.find(c => c.id === user?.id);
         if (currentCustomer) {
-          customersStore.updateCustomer(user.id, { profileImage: base64Url });
+          customersStore.updateCustomer(user.id, { profileImage: downloadUrl });
         }
       }
 
       triggerToast("Profile photo updated successfully!");
       setShowPhotoSource(false);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error(err);
+      triggerToast("Failed to upload profile photo", true);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // Personal info save

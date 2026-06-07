@@ -248,9 +248,12 @@ function AdminProductAdd() {
   const [isOffer, setIsOffer] = useState(false);
   const [coinAmount, setCoinAmount] = useState('250');
   const [bannerImage, setBannerImage] = useState('');
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
   const [compressing, setCompressing] = useState(false);
   
+  const bannerInputRef = React.useRef<HTMLInputElement>(null);
+
   // AI Keyword system state integration
   const [manualKeywords, setManualKeywords] = useState<string[]>([]);
   const [newKeywordInput, setNewKeywordInput] = useState('');
@@ -506,18 +509,26 @@ function AdminProductAdd() {
     }
 
     try {
-        // Upload any newly selected/modified files to Firebase Storage
+        const { uploadImage } = await import('../../lib/imageUtils');
+
+        // 1. Upload Product Banner if needed
+        let finalBannerUrl = bannerImage;
+        if (bannerFile) {
+          try {
+            finalBannerUrl = await uploadImage(bannerFile, 'products', bannerFile.name);
+          } catch (err) {
+            console.error("Banner upload error:", err);
+            throw new Error("Failed to upload product banner.");
+          }
+        }
+
+        // 2. Upload any newly selected/modified files to Firebase Storage
         const finalImageUrls: string[] = [];
         
         for (const img of uploadedImages) {
           if (img.file && (img.url.startsWith('blob:') || img.url.startsWith('data:'))) {
             try {
-              const nameToUse = img.name || 'product_image.webp';
-              const cleanName = nameToUse.replace(/[^a-zA-Z0-9.]/g, '_');
-              const storageRef = ref(storage, `products/${Date.now()}_${img.id}_${cleanName}`);
-              
-              const uploadResult = await uploadBytes(storageRef, img.file);
-              const downloadUrl = await getDownloadURL(uploadResult.ref);
+              const downloadUrl = await uploadImage(img.file, 'products', img.name);
               finalImageUrls.push(downloadUrl);
             } catch (uploadErr) {
               console.error("Firebase Storage Upload Error:", uploadErr);
@@ -544,7 +555,7 @@ function AdminProductAdd() {
           status: 'active' as const,
           image: mainImage,
           featured_image: mainImage,
-          banner_image: bannerImage,
+          banner_image: finalBannerUrl,
           videoUrl: videoUrl,
           mediaUrl: videoUrl,
           images: finalImageUrls.length > 0 ? finalImageUrls : undefined,
@@ -721,30 +732,70 @@ function AdminProductAdd() {
                     ref={cameraInputRef} 
                     onChange={handleCameraChange} 
                  />
-              </div>
+               </div>
 
-              {/* Product Banner & Media Video URL Support */}
-              <div className="space-y-6 pt-8 border-t border-zinc-200">
+               {/* Product Banner & Media Video URL Support */}
+               <div className="space-y-6 pt-8 border-t border-zinc-200">
                  <h4 className="block text-xs font-black text-black uppercase tracking-widest border-l-4 border-black pl-3">Product Banner & Media Group</h4>
                  
-                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-black uppercase tracking-widest">Product Banner Image URL</label>
-                    <input 
-                       type="text" 
-                       value={bannerImage}
-                       onChange={(e) => setBannerImage(e.target.value)}
-                       placeholder="ENTER OR PASTE BANNER IMAGE URL (optional)" 
-                       className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                    />
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">
-                       Enter a dedicated image URL that will show up as a beautiful banner on this product's details page.
-                    </p>
-                    {bannerImage && (
-                       <div className="mt-2 p-3 bg-zinc-50 border border-zinc-200 rounded-none max-w-xl">
-                          <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Banner Preview</p>
-                          <img src={bannerImage} alt="Product Banner Preview" className="h-32 w-full object-cover border border-zinc-200" referrerPolicy="no-referrer" />
-                       </div>
-                    )}
+                 <div className="space-y-3">
+                    <label className="text-[10px] font-black text-black uppercase tracking-widest">Product Banner Image</label>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex gap-2">
+                        <input 
+                           type="text" 
+                           value={bannerImage}
+                           onChange={(e) => {
+                             setBannerImage(e.target.value);
+                             setBannerFile(null);
+                           }}
+                           placeholder="ENTER OR PASTE BANNER IMAGE URL" 
+                           className="flex-1 px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => bannerInputRef.current?.click()}
+                          className="bg-black text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-800"
+                        >
+                          <Upload className="w-4 h-4" /> Upload
+                        </button>
+                      </div>
+                      
+                      <input 
+                        type="file" 
+                        ref={bannerInputRef} 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setBannerFile(file);
+                            setBannerImage(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+
+                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                         Paste an image URL or upload a dedicated banner image that will show up on this product's details page.
+                      </p>
+                      
+                      {bannerImage && (
+                         <div className="mt-2 p-3 bg-zinc-50 border border-zinc-200 rounded-none max-w-xl relative">
+                            <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Banner Preview</p>
+                            <img src={bannerImage} alt="Product Banner Preview" className="h-32 w-full object-cover border border-zinc-200" referrerPolicy="no-referrer" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBannerImage('');
+                                setBannerFile(null);
+                              }}
+                              className="absolute top-4 right-4 bg-red-600 text-white p-1 rounded-sm shadow-lg"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                         </div>
+                      )}
+                    </div>
                  </div>
 
                  {/* Product Media URL Form */}

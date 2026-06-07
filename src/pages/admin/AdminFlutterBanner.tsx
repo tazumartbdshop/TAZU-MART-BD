@@ -161,30 +161,15 @@ export default function AdminFlutterBanner() {
       setUploadProgress(simulatedProgress);
     }, 100);
 
-    // Dynamic helper to try Firebase Storage with fallback to optimized Base64
-    const uploadWithFallback = async (blob: Blob, originalName: string): Promise<string> => {
-      // Parallelize base64 generation in case storage fails/times out
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read image blob'));
-        reader.readAsDataURL(blob);
-      });
-
+    // Dynamic helper to try Firebase Storage
+    const uploadToFirebase = async (blob: Blob, originalName: string): Promise<string> => {
+      const { uploadImage } = await import('../../lib/imageUtils');
       try {
-        const fileNameClean = originalName.replace(/[^a-zA-Z0-9.]/g, '_').replace(/\.[^/.]+$/, "") + ".jpg";
-        const storageRef = ref(storage, `flutterBanners/${Date.now()}_crop_${fileNameClean}`);
-        
-        // Fast upload attempt with a 4-second timeout limit
-        console.log("Attempting Firebase Storage write...");
-        const uploadResult = await withTimeout(uploadBytes(storageRef, blob), 4000);
-        const downloadUrl = await withTimeout(getDownloadURL(uploadResult.ref), 4000);
-        console.log("Firebase Storage successfully written:", downloadUrl);
-        return downloadUrl;
+        console.log("Attempting Firebase Storage write via utility...");
+        return await uploadImage(blob, 'flutter-banners', originalName);
       } catch (storageErr) {
-        console.warn("Storage upload timed out/failed. Falling back to high-reliability inline Base64 storage.", storageErr);
-        // Fallback to compressed base64 JPEG
-        return await base64Promise;
+        console.error("Storage upload failed.", storageErr);
+        throw new Error('Failed to upload image to Firebase Storage.');
       }
     };
 
@@ -205,7 +190,7 @@ export default function AdminFlutterBanner() {
         const resizedBlob = await resizeAndCropImage(file);
         toast.dismiss('crop-loader');
 
-        const resolvedUrl = await uploadWithFallback(resizedBlob, file.name);
+        const resolvedUrl = await uploadToFirebase(resizedBlob, file.name);
 
         clearInterval(progressInterval);
         setImageUrl(resolvedUrl);
@@ -236,7 +221,7 @@ export default function AdminFlutterBanner() {
           // Pre-crop image to 2560x1440 (YouTube banner ratio)
           const resizedBlob = await resizeAndCropImage(file);
 
-          const resolvedUrl = await uploadWithFallback(resizedBlob, file.name);
+          const resolvedUrl = await uploadToFirebase(resizedBlob, file.name);
 
           const displayName = file.name.substring(0, file.name.lastIndexOf('.')) || 'New Banner';
 

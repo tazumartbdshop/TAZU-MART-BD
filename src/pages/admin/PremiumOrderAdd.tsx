@@ -519,12 +519,17 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
                     <input 
                       type="file" 
                       className="hidden" 
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => setCustomerImage(reader.result as string);
-                          reader.readAsDataURL(file);
+                          try {
+                            const { uploadImage } = await import('../../lib/imageUtils');
+                            const url = await uploadImage(file, 'customers', `premium-order-${Date.now()}`);
+                            setCustomerImage(url);
+                          } catch (err) {
+                            console.error('Failed to upload image', err);
+                            alert('Failed to upload customer image');
+                          }
                         }
                       }} 
                     />

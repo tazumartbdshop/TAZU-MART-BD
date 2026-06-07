@@ -419,7 +419,9 @@ export default function Login() {
       }
 
     } catch (err: any) {
-      console.error(err);
+      if (err.code !== 'auth/operation-not-allowed' && err.code !== 'auth/wrong-password' && err.code !== 'auth/user-not-found' && err.code !== 'auth/invalid-credential') {
+        console.error(err);
+      }
       if (err.code === 'auth/operation-not-allowed') {
         setError("Firebase 'Email/Password' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Email/Password' and enable it.");
       } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -659,9 +661,13 @@ export default function Login() {
                 pixelService.trackLogin(fbUser.uid);
                 navigate('/account/dashboard');
               } catch (err: any) {
-                console.error(err);
+                if (err.code !== 'auth/operation-not-allowed' && err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                  console.error(err);
+                }
                 if (err.code === 'auth/operation-not-allowed') {
                   setError("Firebase 'Google' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Google' and enable it.");
+                } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+                  // user closed popup, ignore
                 } else {
                   setError(err.message || 'Google Login failed.');
                 }
@@ -724,9 +730,13 @@ export default function Login() {
                 pixelService.trackLogin(fbUser.uid);
                 navigate('/account/dashboard');
               } catch (err: any) {
-                console.error(err);
+                if (err.code !== 'auth/operation-not-allowed' && err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                  console.error(err);
+                }
                 if (err.code === 'auth/operation-not-allowed') {
                   setError("Firebase 'Facebook' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Facebook' and enable it.");
+                } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+                  // user closed popup, ignore
                 } else {
                   setError(err.message || 'Facebook Login failed.');
                 }

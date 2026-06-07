@@ -119,18 +119,11 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
   const [ticketSuccess, setTicketSuccess] = useState<string | null>(null);
   
   const PROBLEM_CATEGORIES = [
-    'Payment Problem',
     'Order Problem',
-    'Delivery Problem',
+    'Payment Problem',
     'Product Problem',
-    'Refund Request',
-    'Return Request',
-    'Exchange Request',
-    'Account Problem',
-    'Login Problem',
-    'Coupon Problem',
-    'Technical Problem',
-    'Other Problem'
+    'Delivery Problem',
+    'Refund Problem'
   ];
   const [fullName, setFullName] = useState(user?.name || '');
   const [mobileNumber, setMobileNumber] = useState(user?.phone || '');
@@ -544,22 +537,56 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
     if (fileInputRef.current) fileInputRef.current.click();
   };
 
-  const handleImageFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleImageFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setAttachedImage('https://images.unsplash.com/photo-1542751371-adc38448a05e?w=800&auto=format&fit=crop&q=80');
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File is too large (max 5MB)');
+      return;
+    }
+
+    setIsUploading(true);
+    const { uploadImage } = await import('../../lib/imageUtils');
+    try {
+      const folder = chatType === 'ticket_form' ? 'support-attachments' : 'chat-images';
+      const downloadUrl = await uploadImage(file, folder, `upload-${Date.now()}`);
+      setAttachedImage(downloadUrl);
       playTone('open');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload image');
+    } finally {
+      setIsUploading(null);
     }
   };
 
-  const handleDocFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Document is too large (max 10MB)');
+      return;
+    }
+
+    setIsUploading(true);
+    const { uploadImage } = await import('../../lib/imageUtils');
+    try {
+      const folder = chatType === 'ticket_form' ? 'support-attachments' : 'chat-images';
+      const downloadUrl = await uploadImage(file, folder, `doc-${Date.now()}-${file.name}`);
       setAttachedFile({
         name: file.name,
-        url: '#dummyfile'
+        url: downloadUrl
       });
       playTone('open');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload document');
+    } finally {
+      setIsUploading(null);
     }
   };
 
@@ -1236,7 +1263,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                                          <p className="text-[11px] text-indigo-900 font-bold leading-relaxed">
                                            {ticket.status === 'Open' && "আপনার অভিযোগটি সফলভাবে জমা হয়েছে। আমাদের টিম শীঘ্রই তা যাচাই করবে।"}
                                            {ticket.status === 'Pending' && "আপনার সমস্যাটি পেন্ডিং লিস্টে আছে, অল্প সময়ের মধ্যেই কাজ শুরু হবে।"}
-                                           {ticket.status === 'In Review' && "এই সমস্যাটি বর্তমানে যাচাই ও সমাধানের প্রক্রিয়াধীন আছে।"}
+                                           {ticket.status === 'In Review' && "এই সমস্যাটি বর্তমানে যাচাই করা হচ্ছে।"}
                                            {ticket.status === 'Resolved' && "অভিনন্দন! আপনার সমস্যাটি সফলভাবে সমাধান করা হয়েছে।"}
                                            {ticket.status === 'Closed' && "এই টিকিটটি বন্ধ করা হয়েছে। কোনো প্রয়োজনে আবার যোগাযোগ করুন।"}
                                          </p>

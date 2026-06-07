@@ -279,7 +279,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         set({ trackingStatuses: defaultList });
       }
     }, (error) => {
-      console.error("Error loading tracking_statuses:", error);
+      handleFirestoreError(error, OperationType.GET, 'tracking_statuses');
     });
     return unsubscribe;
   },
