@@ -50,7 +50,7 @@ export interface Customer {
 
 interface CustomerState {
   customers: Customer[];
-  addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'isRead'>) => void;
+  addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'isRead'> & { id?: string }) => void;
   syncCustomerFromAuth: (user: any) => void;
   updateCustomer: (id: string, updates: Partial<Customer>) => void;
   deleteCustomer: (id: string) => void;
@@ -70,7 +70,7 @@ export const useCustomerStore = create<CustomerState>()(
           ...state.customers,
           {
             ...customerPayload,
-            id: Math.random().toString(36).substring(2, 9),
+            id: customerPayload.id || Math.random().toString(36).substring(2, 9),
             createdAt: Date.now(),
             isRead: false,
           }

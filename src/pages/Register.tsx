@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Mail, Lock, Smartphone, User, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Plus, Trash2, Calendar, X, Pencil, RotateCw, UploadCloud, MapPin, Building2, Home } from 'lucide-react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { cn } from '../lib/utils';
@@ -158,7 +161,7 @@ export default function Register() {
     };
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
@@ -238,12 +241,55 @@ export default function Register() {
         }).join(' | ')
       : '';
 
-    setTimeout(() => {
-      setIsLoading(false);
-      setSuccess(true);
+    try {
+      const signupEmail = formData.email ? formData.email.toLowerCase().trim() : `${formData.phone.trim()}@tazumart.com`;
       
-      // Persist the custom customer securely in customer store so they can log back in
+      let firebaseUser;
+      try {
+        const authResult = await createUserWithEmailAndPassword(auth, signupEmail, formData.password);
+        firebaseUser = authResult.user;
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/operation-not-allowed') {
+          console.warn("Firebase Auth is not enabled. Proceeding with robust local fallback customer direct Firestore write.");
+          // Generate a safe local ID
+          const fallbackUid = 'local_usr_' + Math.floor(Math.random() * 10000000).toString();
+          firebaseUser = {
+            uid: fallbackUid,
+            email: signupEmail,
+          };
+        } else {
+          throw authErr;
+        }
+      }
+
+      try {
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          uid: firebaseUser.uid,
+          name: formData.fullName,
+          email: formData.email ? formData.email.toLowerCase().trim() : '',
+          phone: formData.phone.trim(),
+          role: 'customer',
+          status: 'Active',
+          password: formData.password,
+          createdAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+          gender: formData.gender,
+          address: formData.address.trim(),
+          division: formData.division,
+          district: formData.district,
+          upazila: formData.upazila,
+          area: formData.area,
+          postalCode: formData.postalCode,
+          profileImage: formData.profileImage || '',
+          occasionName: occasionJoined,
+          specialDate: datesJoined,
+        });
+      } catch (fsErr) {
+        handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+      }
+
       const newCustomer = {
+        id: firebaseUser.uid,
         name: formData.fullName,
         phones: [formData.phone.trim()],
         emails: formData.email ? [formData.email.toLowerCase().trim()] : [],
@@ -273,13 +319,8 @@ export default function Register() {
 
       addCustomer(newCustomer);
 
-      const latestCustomers = useCustomerStore.getState().customers;
-      const createdCustomer = latestCustomers[latestCustomers.length - 1];
-      const customerId = createdCustomer ? createdCustomer.id : 'cust_reg_' + Math.floor(Math.random() * 100000);
-
-      // Login immediately into active session
       login({
-        id: customerId,
+        id: firebaseUser.uid,
         name: formData.fullName,
         email: formData.email ? formData.email.toLowerCase().trim() : '',
         phone: formData.phone.trim(),
@@ -294,12 +335,28 @@ export default function Register() {
         specialDate: datesJoined,
       });
 
-      pixelService.trackRegister(customerId);
+      pixelService.trackRegister(firebaseUser.uid);
+
+      setIsLoading(false);
+      setSuccess(true);
 
       setTimeout(() => {
         navigate(from, { replace: true });
       }, 1800);
-    }, 1400);
+
+    } catch (err: any) {
+      console.error(err);
+      setIsLoading(false);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError("Firebase 'Email/Password' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Email/Password' and enable it.");
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('This email address or phone number is already registered.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password is too weak. Please choose a stronger password.');
+      } else {
+        setError(err.message || 'Registration failed. Please try again.');
+      }
+    }
   };
 
   if (success) {

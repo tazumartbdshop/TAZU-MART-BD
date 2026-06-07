@@ -11,6 +11,7 @@ export interface Product {
   discountPrice?: number;
   stock: number;
   image: string;
+  imageUrl?: string;
   featured_image?: string;
   banner_image?: string;
   images?: string[];

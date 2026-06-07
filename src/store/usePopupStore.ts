@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 export interface PopupConfig {
   id: string;
@@ -37,6 +38,7 @@ export interface PopupConfig {
 
   // Rotation and display timings
   displayDuration: number; // Display duration in seconds per popup (default is 2)
+  displayOrder: number; // Order starting from 1
 
   // Auto Display Settings
   showOncePerUser: boolean;
@@ -79,6 +81,7 @@ const defaultCampaigns: PopupConfig[] = [
     selectedProducts: [],
     selectedCategories: ['fashion'],
     displayDuration: 2,
+    displayOrder: 1,
     showOncePerUser: false,
     showEveryVisit: true,
     showAfter3Seconds: false,
@@ -115,6 +118,7 @@ const defaultCampaigns: PopupConfig[] = [
     selectedProducts: [],
     selectedCategories: ['electronics'],
     displayDuration: 2,
+    displayOrder: 2,
     showOncePerUser: false,
     showEveryVisit: true,
     showAfter3Seconds: false,
@@ -151,6 +155,7 @@ const defaultCampaigns: PopupConfig[] = [
     selectedProducts: [],
     selectedCategories: ['home-living', 'fashion'],
     displayDuration: 3,
+    displayOrder: 3,
     showOncePerUser: false,
     showEveryVisit: true,
     showAfter3Seconds: false,
@@ -166,52 +171,138 @@ const defaultCampaigns: PopupConfig[] = [
 
 interface PopupStore {
   popupCampaigns: PopupConfig[];
-  addPopupCampaign: (popup: Omit<PopupConfig, 'id'>) => void;
-  updatePopupCampaign: (id: string, updates: Partial<PopupConfig>) => void;
-  deletePopupCampaign: (id: string) => void;
-  resetPopupCampaigns: () => void;
+  addPopupCampaign: (popup: Omit<PopupConfig, 'id'>) => Promise<void>;
+  updatePopupCampaign: (id: string, updates: Partial<PopupConfig>) => Promise<void>;
+  deletePopupCampaign: (id: string) => Promise<void>;
+  resetPopupCampaigns: () => Promise<void>;
   // Fallback config state to sustain backwards-compatibility with static files
   config: PopupConfig;
   updateConfig: (updates: Partial<PopupConfig>) => void;
 }
 
-export const usePopupStore = create<PopupStore>()(
-  persist(
-    (set) => ({
-      popupCampaigns: defaultCampaigns,
-      addPopupCampaign: (popup) => set((state) => ({
-        popupCampaigns: [
-          ...state.popupCampaigns,
-          { ...popup, id: `campaign-${Date.now()}` }
-        ]
-      })),
-      updatePopupCampaign: (id, updates) => set((state) => ({
-        popupCampaigns: state.popupCampaigns.map((item) =>
-          item.id === id ? { ...item, ...updates } : item
-        )
-      })),
-      deletePopupCampaign: (id) => set((state) => ({
-        popupCampaigns: state.popupCampaigns.filter((item) => item.id !== id)
-      })),
-      resetPopupCampaigns: () => set({ popupCampaigns: defaultCampaigns }),
-      
-      // Keep backwards compatibility for existing setup fields in case references remain standard
-      config: defaultCampaigns[0],
-      updateConfig: (updates) => set((state) => {
-        const nextConfig = { ...state.config, ...updates };
-        return {
-          config: nextConfig,
-          popupCampaigns: state.popupCampaigns.map((item, index) =>
-            index === 0 ? { ...item, ...updates } : item
-          )
-        };
-      })
-    }),
-    {
-      name: 'luxemart-popup-settings-multiv2',
+export const usePopupStore = create<PopupStore>()((set) => ({
+  popupCampaigns: [],
+  config: defaultCampaigns[0],
+
+  addPopupCampaign: async (popup) => {
+    try {
+      const docId = `campaign-${Date.now()}`;
+      const newPopup: PopupConfig = {
+        ...popup,
+        id: docId,
+      };
+      await setDoc(doc(db, 'popup_campaigns', docId), newPopup);
+    } catch (err) {
+      console.error('Error adding popup campaign to Firestore:', err);
     }
-  )
-);
+  },
+
+  updatePopupCampaign: async (id, updates) => {
+    try {
+      const docRef = doc(db, 'popup_campaigns', id);
+      await updateDoc(docRef, updates);
+    } catch (err) {
+      console.error('Error updating popup campaign in Firestore:', err);
+    }
+  },
+
+  deletePopupCampaign: async (id) => {
+    try {
+      const docRef = doc(db, 'popup_campaigns', id);
+      await deleteDoc(docRef);
+    } catch (err) {
+      console.error('Error deleting popup campaign from Firestore:', err);
+    }
+  },
+
+  resetPopupCampaigns: async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'popup_campaigns'));
+      const batch = writeBatch(db);
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      defaultCampaigns.forEach((camp) => {
+        const docRef = doc(db, 'popup_campaigns', camp.id);
+        batch.set(docRef, camp);
+      });
+      await batch.commit();
+    } catch (err) {
+      console.error('Error resetting popup campaigns in Firestore:', err);
+    }
+  },
+
+  updateConfig: (updates) => set((state) => {
+    const nextConfig = { ...state.config, ...updates };
+    return {
+      config: nextConfig,
+    };
+  })
+}));
+
+// Setup Real-time listener for popup_campaigns
+onSnapshot(collection(db, 'popup_campaigns'), (snapshot) => {
+  if (snapshot.empty) {
+    // Seed default campaigns if completely empty to give an initially populated database list
+    const batch = writeBatch(db);
+    defaultCampaigns.forEach((camp) => {
+      const docRef = doc(db, 'popup_campaigns', camp.id);
+      batch.set(docRef, camp);
+    });
+    batch.commit().catch((err) => console.error('Error seeding default popup campaigns:', err));
+    return;
+  }
+
+  const list: PopupConfig[] = [];
+  snapshot.forEach((snap) => {
+    const data = snap.data();
+    list.push({
+      id: snap.id,
+      status: data.status || 'ACTIVE',
+      startDate: data.startDate || '',
+      startTime: data.startTime || '',
+      endDate: data.endDate || '',
+      endTime: data.endTime || '',
+      campaignType: data.campaignType || 'EVENT',
+      campaignValue: data.campaignValue || '',
+      templateId: data.templateId || '1',
+      bannerUrl: data.bannerUrl || '',
+      title: data.title || '',
+      titleFontSize: Number(data.titleFontSize) || 24,
+      discountLabel: data.discountLabel || '',
+      discountPercentage: data.discountPercentage || '',
+      subtitle: data.subtitle || '',
+      subtitleFontSize: Number(data.subtitleFontSize) || 12,
+      buttonText: data.buttonText || '',
+      buttonUrl: data.buttonUrl || '',
+      buttonStyle: data.buttonStyle || 'luxury-gradient',
+      secondaryButtonText: data.secondaryButtonText || '',
+      secondaryButtonUrl: data.secondaryButtonUrl || '',
+      selectedProducts: data.selectedProducts || [],
+      selectedCategories: data.selectedCategories || [],
+      displayDuration: Number(data.displayDuration) || 2,
+      displayOrder: Number(data.displayOrder) || 1,
+      showOncePerUser: !!data.showOncePerUser,
+      showEveryVisit: !!data.showEveryVisit,
+      showAfter3Seconds: !!data.showAfter3Seconds,
+      showAfterScroll: !!data.showAfterScroll,
+      showOnlyHomepage: !!data.showOnlyHomepage,
+      closeButtonVisible: data.closeButtonVisible !== false,
+      backgroundDarkOverlay: data.backgroundDarkOverlay !== false,
+      clickOutsideToClose: data.clickOutsideToClose !== false,
+      autoCloseAfterXSeconds: !!data.autoCloseAfterXSeconds,
+      entranceAnimation: data.entranceAnimation || 'Fade In'
+    } as PopupConfig);
+  });
+
+  // Sort by displayOrder ascending
+  list.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+
+  usePopupStore.setState({ popupCampaigns: list, config: list[0] || defaultCampaigns[0] });
+}, (error) => {
+  handleFirestoreError(error, OperationType.GET, 'popup_campaigns');
+});
 
 export function getPopupStatus(config: PopupConfig): 'ACTIVE' | 'EXPIRED' | 'SCHEDULED' | 'DISABLED' {
   if (config.status === 'DISABLED') return 'DISABLED';

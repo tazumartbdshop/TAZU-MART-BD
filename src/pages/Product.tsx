@@ -53,7 +53,7 @@ export default function Product() {
     if (product.images && product.images.length > 0) {
       return product.images;
     }
-    const list = [product.image];
+    const list = [product.imageUrl || product.image];
     const category = (product.category || '').toLowerCase();
     
     // Fallback premium gallery pictures of similar accessories
@@ -257,7 +257,7 @@ export default function Product() {
       name: cartItemName,
       price: currentPrice,
       originalPrice: originalTotal,
-      image: product.image,
+      image: product.imageUrl || product.image,
       quantity: quantity,
     });
 

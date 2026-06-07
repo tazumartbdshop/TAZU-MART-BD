@@ -2,6 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Mail, Lock, Smartphone, User, Eye, EyeOff, Loader2, AlertCircle, ShieldCheck, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  FacebookAuthProvider
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useModeratorStore } from '../store/useModeratorStore';
@@ -40,7 +49,7 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, user, isLoading]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identifier.trim() || !password.trim()) {
       setError('Please enter your credentials');
@@ -50,107 +59,379 @@ export default function Login() {
     setIsLoading(true);
     setError('');
 
-    setTimeout(() => {
-      setIsLoading(false);
-      
+    try {
       const normalizedIdentifier = identifier.toLowerCase().trim();
       const isEmail = normalizedIdentifier.includes('@');
+      const loginEmail = isEmail ? normalizedIdentifier : `${identifier.trim()}@tazumart.com`;
 
-      // Check Dynamic Website Admin First
+      // 1. Check Dynamic Website Admin First
       if (isEmail) {
         const websites = useWebsitesStore.getState().websites;
         const matchedSite = websites.find(w => w.admin_email.toLowerCase().trim() === normalizedIdentifier && w.admin_password === password);
         
         if (matchedSite) {
-          useLoginHistoryStore.getState().addLoginEvent({
-            name: matchedSite.website_name + ' Admin',
-            email: matchedSite.admin_email,
-            method: 'Manual Login',
-            password: password,
-          });
-          login({
-            id: 'admin_' + matchedSite.domain,
-            name: matchedSite.website_name + ' Admin',
-            email: matchedSite.admin_email,
-            role: 'admin',
-            permissions: ['all']
-          });
-          navigate(`/site-admin/${matchedSite.domain}`);
-          return;
+          let firebaseUser;
+          try {
+            const authResult = await signInWithEmailAndPassword(auth, loginEmail, password);
+            firebaseUser = authResult.user;
+          } catch (err: any) {
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+              try {
+                const authResult = await createUserWithEmailAndPassword(auth, loginEmail, password);
+                firebaseUser = authResult.user;
+              } catch (createErr: any) {
+                if (createErr.code === 'auth/operation-not-allowed') {
+                  firebaseUser = { uid: `local_siteadmin_${matchedSite.domain}`, email: loginEmail };
+                } else {
+                  throw createErr;
+                }
+              }
+            } else if (err.code === 'auth/operation-not-allowed') {
+              firebaseUser = { uid: `local_siteadmin_${matchedSite.domain}`, email: loginEmail };
+            } else {
+              throw err;
+            }
+          }
+
+          if (firebaseUser) {
+            try {
+              await setDoc(doc(db, 'users', firebaseUser.uid), {
+                uid: firebaseUser.uid,
+                name: matchedSite.website_name + ' Admin',
+                email: matchedSite.admin_email,
+                phone: '',
+                role: 'admin',
+                status: 'Active',
+                createdAt: serverTimestamp(),
+                lastLoginAt: serverTimestamp(),
+              }, { merge: true });
+            } catch (fsErr) {
+              handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+            }
+
+            useLoginHistoryStore.getState().addLoginEvent({
+              name: matchedSite.website_name + ' Admin',
+              email: matchedSite.admin_email,
+              method: 'Manual Login',
+              password: password,
+            });
+
+            login({
+              id: firebaseUser.uid,
+              name: matchedSite.website_name + ' Admin',
+              email: matchedSite.admin_email,
+              role: 'admin',
+              permissions: ['all']
+            });
+
+            navigate(`/site-admin/${matchedSite.domain}`);
+            return;
+          }
         }
 
-        // Check Admin
+        // 2. Check Admin
         if (normalizedIdentifier === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-          useLoginHistoryStore.getState().addLoginEvent({
-            name: 'Super Admin',
-            email: ADMIN_EMAIL,
-            method: 'Manual Login',
-            password: password,
-          });
-          login({
-            id: 'admin_primary',
-            name: 'Super Admin',
-            email: ADMIN_EMAIL,
-            role: 'admin',
-            permissions: ['all'] // Admin has all permissions
-          });
-          navigate('/admin');
-          return;
+          let firebaseUser;
+          try {
+            const authResult = await signInWithEmailAndPassword(auth, loginEmail, password);
+            firebaseUser = authResult.user;
+          } catch (err: any) {
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+              try {
+                const authResult = await createUserWithEmailAndPassword(auth, loginEmail, password);
+                firebaseUser = authResult.user;
+              } catch (createErr: any) {
+                if (createErr.code === 'auth/operation-not-allowed') {
+                  firebaseUser = { uid: 'local_superadmin_uid', email: loginEmail };
+                } else {
+                  throw createErr;
+                }
+              }
+            } else if (err.code === 'auth/operation-not-allowed') {
+              firebaseUser = { uid: 'local_superadmin_uid', email: loginEmail };
+            } else {
+              throw err;
+            }
+          }
+
+          if (firebaseUser) {
+            try {
+              await setDoc(doc(db, 'users', firebaseUser.uid), {
+                uid: firebaseUser.uid,
+                name: 'Super Admin',
+                email: ADMIN_EMAIL,
+                phone: '',
+                role: 'admin',
+                status: 'Active',
+                createdAt: serverTimestamp(),
+                lastLoginAt: serverTimestamp(),
+              }, { merge: true });
+            } catch (fsErr) {
+              handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+            }
+
+            useLoginHistoryStore.getState().addLoginEvent({
+              name: 'Super Admin',
+              email: ADMIN_EMAIL,
+              method: 'Manual Login',
+              password: password,
+            });
+
+            login({
+              id: firebaseUser.uid,
+              name: 'Super Admin',
+              email: ADMIN_EMAIL,
+              role: 'admin',
+              permissions: ['all']
+            });
+
+            navigate('/admin');
+            return;
+          }
         }
 
-        // Check Real Moderators (Also treated as Admin role for access)
+        // 3. Check Moderator
         const moderator = useModeratorStore.getState().getModeratorByEmail(normalizedIdentifier);
         if (moderator && moderator.password === password && moderator.status === 'Active') {
-          useLoginHistoryStore.getState().addLoginEvent({
-            name: moderator.name,
-            email: moderator.email,
-            method: 'Manual Login',
-            password: password,
-          });
-          login({
-            id: moderator.id,
-            name: moderator.name,
-            email: moderator.email,
-            role: 'admin', // Treated as admin role for access separation
-            permissions: moderator.permissions
-          });
-          navigate('/admin');
-          return;
+          let firebaseUser;
+          try {
+            const authResult = await signInWithEmailAndPassword(auth, loginEmail, password);
+            firebaseUser = authResult.user;
+          } catch (err: any) {
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+              try {
+                const authResult = await createUserWithEmailAndPassword(auth, loginEmail, password);
+                firebaseUser = authResult.user;
+              } catch (createErr: any) {
+                if (createErr.code === 'auth/operation-not-allowed') {
+                  firebaseUser = { uid: `local_modadmin_${moderator.id}`, email: loginEmail };
+                } else {
+                  throw createErr;
+                }
+              }
+            } else if (err.code === 'auth/operation-not-allowed') {
+              firebaseUser = { uid: `local_modadmin_${moderator.id}`, email: loginEmail };
+            } else {
+              throw err;
+            }
+          }
+
+          if (firebaseUser) {
+            try {
+              await setDoc(doc(db, 'users', firebaseUser.uid), {
+                uid: firebaseUser.uid,
+                name: moderator.name,
+                email: moderator.email,
+                phone: '',
+                role: 'admin',
+                status: 'Active',
+                createdAt: serverTimestamp(),
+                lastLoginAt: serverTimestamp(),
+              }, { merge: true });
+            } catch (fsErr) {
+              handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+            }
+
+            useLoginHistoryStore.getState().addLoginEvent({
+              name: moderator.name,
+              email: moderator.email,
+              method: 'Manual Login',
+              password: password,
+            });
+
+            login({
+              id: firebaseUser.uid,
+              name: moderator.name,
+              email: moderator.email,
+              role: 'admin',
+              permissions: moderator.permissions
+            });
+
+            navigate('/admin');
+            return;
+          }
         }
       }
 
-      // Check Real Customers from store
-      const customer = customers.find(c => {
-        if (isEmail) {
-          return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier) && c.password === password;
-        } else {
-          return c.phones.some(p => p.trim() === normalizedIdentifier) && c.password === password;
+      // 4. Try regular Customer
+      let firebaseUser;
+      
+      // Let's lookup the user collection in Firestore 1st as a robust source-of-truth fallback
+      let dbUser: any = null;
+      try {
+        const usersRef = collection(db, 'users');
+        const q = isEmail 
+          ? query(usersRef, where('email', '==', normalizedIdentifier))
+          : query(usersRef, where('phone', '==', normalizedIdentifier));
+        const qSnapshot = await getDocs(q);
+        if (!qSnapshot.empty) {
+          dbUser = qSnapshot.docs[0].data();
+          dbUser.uid = qSnapshot.docs[0].id;
         }
-      });
+      } catch (dbErr) {
+        console.error("Error querying firestore users collection on login:", dbErr);
+      }
 
-      if (customer) {
+      try {
+        const authResult = await signInWithEmailAndPassword(auth, loginEmail, password);
+        firebaseUser = authResult.user;
+      } catch (err: any) {
+        const existingLocalCust = customers.find(c => {
+          if (isEmail) {
+            return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier) && c.password === password;
+          } else {
+            return c.phones.some(p => p.trim() === normalizedIdentifier) && c.password === password;
+          }
+        });
+
+        const isPasswordCorrectFallback = 
+          (existingLocalCust && existingLocalCust.password === password) || 
+          (dbUser && dbUser.password === password);
+
+        if (err.code === 'auth/operation-not-allowed') {
+          if (isPasswordCorrectFallback) {
+            const resolvedUid = dbUser?.uid || existingLocalCust?.id || 'local_fallback_usr_' + Math.floor(Math.random() * 100000);
+            firebaseUser = { uid: resolvedUid, email: loginEmail };
+          } else {
+            // Check if password has mismatched
+            const passwordMismatchedCust = customers.find(c => {
+              if (isEmail) {
+                return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier);
+              } else {
+                return c.phones.some(p => p.trim() === normalizedIdentifier);
+              }
+            }) || dbUser;
+
+            if (passwordMismatchedCust) {
+              const wrongPassError = new Error('Invalid credentials.');
+              (wrongPassError as any).code = 'auth/wrong-password';
+              throw wrongPassError;
+            } else {
+              const userNotFoundError = new Error('No account found with this email/phone.');
+              (userNotFoundError as any).code = 'auth/user-not-found';
+              throw userNotFoundError;
+            }
+          }
+        } else if (isPasswordCorrectFallback && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+          try {
+            const authResult = await createUserWithEmailAndPassword(auth, loginEmail, password);
+            firebaseUser = authResult.user;
+          } catch (createErr: any) {
+            if (createErr.code === 'auth/operation-not-allowed') {
+              const resolvedUid = dbUser?.uid || existingLocalCust?.id || 'local_fallback_usr_' + Math.floor(Math.random() * 100000);
+              firebaseUser = { uid: resolvedUid, email: loginEmail };
+            } else {
+              throw createErr;
+            }
+          }
+        } else {
+          // If fallback password checked matches but main gave another err, check if user exists at all
+          const hasAccountButWrongPass = 
+            (customers.some(c => isEmail ? c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier) : c.phones.some(p => p.trim() === normalizedIdentifier))) || 
+            (dbUser);
+          
+          if (hasAccountButWrongPass) {
+            const wrongPassErr = new Error('Invalid credentials.');
+            wrongPassErr.name = 'AuthError';
+            (wrongPassErr as any).code = 'auth/wrong-password';
+            throw wrongPassErr;
+          }
+          throw err;
+        }
+      }
+
+      if (firebaseUser) {
+        const localCust = customers.find(c => {
+          if (isEmail) {
+            return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier);
+          } else {
+            return c.phones.some(p => p.trim() === normalizedIdentifier);
+          }
+        });
+
+        const name = dbUser?.name || localCust?.name || 'Customer User';
+        const phone = dbUser?.phone || localCust?.phones?.[0] || (isEmail ? '' : identifier.trim());
+        const email = dbUser?.email || localCust?.emails?.[0] || (isEmail ? normalizedIdentifier : '');
+        const profileImage = dbUser?.profileImage || localCust?.profileImage || '';
+        const role = dbUser?.role || 'customer';
+        const status = dbUser?.status || localCust?.status || 'Active';
+        const gender = dbUser?.gender || localCust?.gender || '';
+        const address = dbUser?.address || localCust?.address?.street || '';
+        const division = dbUser?.division || localCust?.address?.division || '';
+        const district = dbUser?.district || localCust?.address?.district || '';
+        const upazila = dbUser?.upazila || localCust?.address?.upazila || '';
+        const area = dbUser?.area || localCust?.address?.area || '';
+        const postalCode = dbUser?.postalCode || localCust?.address?.zipCode || '';
+
+        try {
+          await setDoc(doc(db, 'users', firebaseUser.uid), {
+            uid: firebaseUser.uid,
+            name,
+            email,
+            phone,
+            role,
+            status,
+            createdAt: dbUser?.createdAt || serverTimestamp(),
+            lastLoginAt: serverTimestamp(),
+            gender,
+            address,
+            division,
+            district,
+            upazila,
+            area,
+            postalCode,
+            profileImage,
+          }, { merge: true });
+        } catch (fsErr) {
+          handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+        }
+
         useLoginHistoryStore.getState().addLoginEvent({
-          name: customer.name,
-          email: customer.emails[0] || '',
+          name,
+          email,
           method: isEmail ? 'Manual Login (Email)' : 'Manual Login (Mobile)',
           password: password,
-          profileImage: customer.profileImage,
+          profileImage,
         });
+
         login({
-          id: customer.id,
-          name: customer.name,
-          email: customer.emails[0] || '',
-          phone: customer.phones[0] || '',
+          id: firebaseUser.uid,
+          name,
+          email,
+          phone,
           role: 'customer',
-          profileImage: customer.profileImage,
+          profileImage,
+          gender,
+          address,
+          division,
+          district,
+          city: district,
+          upazila,
+          area,
+          postalCode,
+          occasionName: dbUser?.occasionName || localCust?.occasionName || '',
+          specialDate: dbUser?.specialDate || localCust?.specialDate || '',
         });
-        pixelService.trackLogin(customer.id);
+
+        pixelService.trackLogin(firebaseUser.uid);
         navigate('/account/dashboard');
         return;
       }
 
-      setError('Invalid credentials.');
-    }, 1200);
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError("Firebase 'Email/Password' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Email/Password' and enable it.");
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Invalid credentials.');
+      } else if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email/phone.');
+      } else {
+        setError(err.message || 'Login failed. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Determine dynamic input icon for premium experience
@@ -331,24 +612,62 @@ export default function Login() {
         <div className="grid grid-cols-2 gap-3">
           <button 
             type="button"
-            onClick={() => {
+            onClick={async () => {
               setIsLoading(true);
               setError('');
-              setTimeout(() => {
-                setIsLoading(false);
+              try {
+                const provider = new GoogleAuthProvider();
+                const result = await signInWithPopup(auth, provider);
+                const fbUser = result.user;
+                const email = fbUser.email || '';
+                const name = fbUser.displayName || 'Google User';
+                const phone = fbUser.phoneNumber || '';
+                const photoURL = fbUser.photoURL || '';
+
+                try {
+                  await setDoc(doc(db, 'users', fbUser.uid), {
+                    uid: fbUser.uid,
+                    name,
+                    email,
+                    phone,
+                    role: 'customer',
+                    status: 'Active',
+                    createdAt: serverTimestamp(),
+                    lastLoginAt: serverTimestamp(),
+                    profileImage: photoURL,
+                  }, { merge: true });
+                } catch (fsErr) {
+                  handleFirestoreError(fsErr, OperationType.WRITE, `users/${fbUser.uid}`);
+                }
+
                 useLoginHistoryStore.getState().addLoginEvent({
-                  name: 'Google User',
-                  email: 'mdimtiazkhan.devolop@gmail.com',
+                  name,
+                  email,
                   method: 'Google Login',
+                  profileImage: photoURL,
                 });
+
                 login({
-                  id: 'cust_google_demo',
-                  name: 'Google User',
-                  email: 'mdimtiazkhan.devolop@gmail.com',
-                  role: 'customer'
+                  id: fbUser.uid,
+                  name,
+                  email,
+                  phone,
+                  role: 'customer',
+                  profileImage: photoURL,
                 });
+
+                pixelService.trackLogin(fbUser.uid);
                 navigate('/account/dashboard');
-              }, 1000);
+              } catch (err: any) {
+                console.error(err);
+                if (err.code === 'auth/operation-not-allowed') {
+                  setError("Firebase 'Google' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Google' and enable it.");
+                } else {
+                  setError(err.message || 'Google Login failed.');
+                }
+              } finally {
+                setIsLoading(false);
+              }
             }}
             className="h-11 border border-neutral-200 rounded-[14px] bg-white text-xs font-bold text-neutral-700 hover:bg-neutral-50 flex items-center justify-center gap-2 transition-all cursor-pointer select-none"
           >
@@ -358,24 +677,62 @@ export default function Login() {
           
           <button 
             type="button"
-            onClick={() => {
+            onClick={async () => {
               setIsLoading(true);
               setError('');
-              setTimeout(() => {
-                setIsLoading(false);
+              try {
+                const provider = new FacebookAuthProvider();
+                const result = await signInWithPopup(auth, provider);
+                const fbUser = result.user;
+                const email = fbUser.email || '';
+                const name = fbUser.displayName || 'Facebook User';
+                const phone = fbUser.phoneNumber || '';
+                const photoURL = fbUser.photoURL || '';
+
+                try {
+                  await setDoc(doc(db, 'users', fbUser.uid), {
+                    uid: fbUser.uid,
+                    name,
+                    email,
+                    phone,
+                    role: 'customer',
+                    status: 'Active',
+                    createdAt: serverTimestamp(),
+                    lastLoginAt: serverTimestamp(),
+                    profileImage: photoURL,
+                  }, { merge: true });
+                } catch (fsErr) {
+                  handleFirestoreError(fsErr, OperationType.WRITE, `users/${fbUser.uid}`);
+                }
+
                 useLoginHistoryStore.getState().addLoginEvent({
-                  name: 'Facebook User',
-                  email: 'mdimtiazkhan.devolop@gmail.com',
+                  name,
+                  email,
                   method: 'Facebook Login',
+                  profileImage: photoURL,
                 });
+
                 login({
-                  id: 'cust_fb_demo',
-                  name: 'Facebook User',
-                  email: 'mdimtiazkhan.devolop@gmail.com',
-                  role: 'customer'
+                  id: fbUser.uid,
+                  name,
+                  email,
+                  phone,
+                  role: 'customer',
+                  profileImage: photoURL,
                 });
+
+                pixelService.trackLogin(fbUser.uid);
                 navigate('/account/dashboard');
-              }, 1000);
+              } catch (err: any) {
+                console.error(err);
+                if (err.code === 'auth/operation-not-allowed') {
+                  setError("Firebase 'Facebook' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Facebook' and enable it.");
+                } else {
+                  setError(err.message || 'Facebook Login failed.');
+                }
+              } finally {
+                setIsLoading(false);
+              }
             }}
             className="h-11 border border-neutral-200 rounded-[14px] bg-white text-xs font-bold text-neutral-700 hover:bg-neutral-50 flex items-center justify-center gap-2 transition-all cursor-pointer select-none"
           >

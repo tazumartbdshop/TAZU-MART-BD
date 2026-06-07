@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useProductStore, generateKeywords } from '../../store/useProductStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { toast } from 'react-hot-toast';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../lib/firebase';
 
 function AdminProductList() {
   const navigate = useNavigate();
@@ -123,8 +125,8 @@ function AdminProductList() {
               <div className="flex gap-4 items-start md:items-center w-full min-w-0">
                 {/* Image left side */}
                 <div className="w-20 h-20 rounded-none bg-zinc-50 border border-zinc-200 shrink-0 overflow-hidden relative flex items-center justify-center">
-                  {product.image ? (
-                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  {(product.imageUrl || product.image) ? (
+                    <img src={product.imageUrl || product.image} alt={product.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   ) : (
                     <ImageIcon className="w-6 h-6 text-zinc-300" />
                   )}
@@ -503,47 +505,72 @@ function AdminProductAdd() {
       finalPrice = regPrice;
     }
 
-    const payload = {
-      name: formData.get('name') as string,
-      sku: formData.get('product_code') as string,
-      category: formData.get('category') as string,
-      brand: formData.get('brand') as string,
-      price: finalPrice,
-      discountPrice: finalDiscountPrice,
-      stock: Number(formData.get('stock_quantity')),
-      soldCount: Number(formData.get('sold_count')),
-      description: formData.get('long_description') as string,
-      status: 'active' as const,
-      image: uploadedImages[0]?.url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
-      featured_image: uploadedImages[0]?.url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60',
-      banner_image: bannerImage,
-      videoUrl: videoUrl,
-      mediaUrl: videoUrl,
-      images: uploadedImages.length > 0 ? uploadedImages.map(i => i.url) : undefined,
-      rating: editingProduct?.rating || 4.5,
-      reviews: editingProduct?.reviews || 0,
-      isNew: editingProduct?.isNew !== undefined ? editingProduct.isNew : true,
-      buyingPrice: Number(formData.get('buying_price')),
-      warranty: formData.get('warranty') as string,
-      unitName: formData.get('unit_name') as string,
-      seoPoints,
-      variants,
-      shippingZones,
-      is_flash_sale: isFlashSale,
-      is_trending: isTrending,
-      is_best_selling: isBestSelling,
-      is_regular: isRegular,
-      is_offer: isOffer,
-      reward_coins: Number(coinAmount),
-      keywords: manualKeywords.length > 0 ? manualKeywords : generateKeywords(
-        (formData.get('name') as string) || '',
-        (formData.get('category') as string) || '',
-        (formData.get('brand') as string) || '',
-        (formData.get('long_description') as string) || ''
-      )
-    };
-
     try {
+        // Upload any newly selected/modified files to Firebase Storage
+        const finalImageUrls: string[] = [];
+        
+        for (const img of uploadedImages) {
+          if (img.file && (img.url.startsWith('blob:') || img.url.startsWith('data:'))) {
+            try {
+              const nameToUse = img.name || 'product_image.webp';
+              const cleanName = nameToUse.replace(/[^a-zA-Z0-9.]/g, '_');
+              const storageRef = ref(storage, `products/${Date.now()}_${img.id}_${cleanName}`);
+              
+              const uploadResult = await uploadBytes(storageRef, img.file);
+              const downloadUrl = await getDownloadURL(uploadResult.ref);
+              finalImageUrls.push(downloadUrl);
+            } catch (uploadErr) {
+              console.error("Firebase Storage Upload Error:", uploadErr);
+              throw new Error(`Failed to upload ${img.name}. Please try again.`);
+            }
+          } else {
+            // This is already a remote URL, keep it
+            finalImageUrls.push(img.url);
+          }
+        }
+
+        const mainImage = finalImageUrls[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60';
+
+        const payload = {
+          name: formData.get('name') as string,
+          sku: formData.get('product_code') as string,
+          category: formData.get('category') as string,
+          brand: formData.get('brand') as string,
+          price: finalPrice,
+          discountPrice: finalDiscountPrice,
+          stock: Number(formData.get('stock_quantity')),
+          soldCount: Number(formData.get('sold_count')),
+          description: formData.get('long_description') as string,
+          status: 'active' as const,
+          image: mainImage,
+          featured_image: mainImage,
+          banner_image: bannerImage,
+          videoUrl: videoUrl,
+          mediaUrl: videoUrl,
+          images: finalImageUrls.length > 0 ? finalImageUrls : undefined,
+          rating: editingProduct?.rating || 4.5,
+          reviews: editingProduct?.reviews || 0,
+          isNew: editingProduct?.isNew !== undefined ? editingProduct.isNew : true,
+          buyingPrice: Number(formData.get('buying_price')),
+          warranty: formData.get('warranty') as string,
+          unitName: formData.get('unit_name') as string,
+          seoPoints,
+          variants,
+          shippingZones,
+          is_flash_sale: isFlashSale,
+          is_trending: isTrending,
+          is_best_selling: isBestSelling,
+          is_regular: isRegular,
+          is_offer: isOffer,
+          reward_coins: Number(coinAmount),
+          keywords: manualKeywords.length > 0 ? manualKeywords : generateKeywords(
+            (formData.get('name') as string) || '',
+            (formData.get('category') as string) || '',
+            (formData.get('brand') as string) || '',
+            (formData.get('long_description') as string) || ''
+          )
+        };
+
         if (isEditing && id) {
           await updateProduct(id, payload);
         } else {
@@ -562,8 +589,9 @@ function AdminProductAdd() {
         
         setLoading(false);
         navigate('/admin/products');
-    } catch (error) {
-        toast.error("❌ Failed to save product");
+    } catch (error: any) {
+        console.error("Error saving product:", error);
+        toast.error(error?.message || "❌ Failed to save product");
         setLoading(false);
     }
   };

@@ -83,6 +83,7 @@ export default function AdminPopupManagement() {
     selectedProducts: [],
     selectedCategories: [],
     displayDuration: 2,
+    displayOrder: 1,
     showOncePerUser: false,
     showEveryVisit: true,
     showAfter3Seconds: false,
@@ -151,7 +152,7 @@ export default function AdminPopupManagement() {
     } else {
       setFormData(prev => ({ 
         ...prev, 
-        [name]: name === 'titleFontSize' || name === 'subtitleFontSize' || name === 'displayDuration' ? Number(value) : value 
+        [name]: name === 'titleFontSize' || name === 'subtitleFontSize' || name === 'displayDuration' || name === 'displayOrder' ? Number(value) : value 
       }));
     }
   };
@@ -204,6 +205,7 @@ export default function AdminPopupManagement() {
       selectedProducts: [],
       selectedCategories: [],
       displayDuration: 2,
+      displayOrder: 1,
       showOncePerUser: false,
       showEveryVisit: true,
       showAfter3Seconds: false,
@@ -238,7 +240,7 @@ export default function AdminPopupManagement() {
     setActiveTab('form');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setErrorMessage(null);
 
     // 1. Mandatory Validations
@@ -260,29 +262,42 @@ export default function AdminPopupManagement() {
       return;
     }
 
-    // 2. Commit transaction
-    if (editingId) {
-      updatePopupCampaign(editingId, { ...formData, id: editingId });
-    } else {
-      addPopupCampaign(formData);
-    }
+    try {
+      // 2. Commit transaction
+      if (editingId) {
+        await updatePopupCampaign(editingId, { ...formData, id: editingId });
+      } else {
+        await addPopupCampaign(formData);
+      }
 
-    setShowSaveAlert(true);
-    setTimeout(() => {
-      setShowSaveAlert(false);
-      setActiveTab('listings');
-    }, 1200);
+      setShowSaveAlert(true);
+      setTimeout(() => {
+        setShowSaveAlert(false);
+        setActiveTab('listings');
+      }, 1200);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(err?.message || "Failed to save popup campaign. Please verify connection and try again.");
+    }
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete the popup campaign "${name}"? This action cannot be undone.`)) {
-      deletePopupCampaign(id);
+      try {
+        await deletePopupCampaign(id);
+      } catch (err) {
+        console.error("Error deleting campaign:", err);
+      }
     }
   };
 
-  const handleResetSystem = () => {
+  const handleResetSystem = async () => {
     if (window.confirm('WARNING: Are you sure you want to reset all popup campaigns back to system presets? This will delete your custom popups.')) {
-      resetPopupCampaigns();
+      try {
+        await resetPopupCampaigns();
+      } catch (err) {
+        console.error("Error resetting campaigns:", err);
+      }
     }
   };
 
@@ -520,37 +535,42 @@ export default function AdminPopupManagement() {
                   </select>
                 </div>
 
-                <div className="bg-purple-50/30 p-3 border border-purple-100/50 rounded-sm">
-                  <label className="block text-[10px] font-black text-purple-900 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                    <RotateCcw className="w-3 h-3" /> POPUP ROTATION TIMER
+                <div className="bg-purple-50/30 p-3.5 border border-purple-100/50 rounded-sm">
+                  <label className="block text-[10px] font-black text-purple-900 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+                    <RotateCcw className="w-3 h-3" /> POPUP ROTATION (DURATION & SEQUENCE-ORDER)
                   </label>
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="relative">
-                      <input
-                        type="number"
-                        name="displayDuration"
-                        min="1"
-                        max="10"
-                        value={formData.displayDuration}
-                        onChange={handleInputChange}
-                        className="w-full border border-gray-200 text-xs font-black p-2.5 focus:border-purple-400 focus:outline-none pr-10"
-                      />
-                      <span className="absolute right-2.5 top-2.5 text-[9px] font-black text-gray-400 uppercase">SEC</span>
+                  <div className="grid grid-cols-2 gap-3.5">
+                    <div>
+                      <span className="block text-[8px] font-bold text-gray-500 uppercase tracking-wider mb-1">Display Duration</span>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          name="displayDuration"
+                          min="1"
+                          max="30"
+                          value={formData.displayDuration}
+                          onChange={handleInputChange}
+                          className="w-full border border-gray-200 text-xs font-black p-2.5 focus:border-purple-400 focus:outline-none pr-10 bg-white"
+                        />
+                        <span className="absolute right-2 top-2.5 text-[8px] font-black text-gray-400">SEC</span>
+                      </div>
                     </div>
 
-                    <select
-                      name="displayDuration"
-                      value={formData.displayDuration}
-                      onChange={handleInputChange}
-                      className="w-full border border-gray-200 text-black text-[10px] font-black uppercase p-2.5 focus:border-purple-400 focus:outline-none"
-                    >
-                      {[1,2,3,4,5,6,7,8,9,10].map(s => (
-                        <option key={s} value={s}>{s} SEC</option>
-                      ))}
-                    </select>
+                    <div>
+                      <span className="block text-[8px] font-bold text-gray-500 uppercase tracking-wider mb-1">Display Order</span>
+                      <input
+                        type="number"
+                        name="displayOrder"
+                        min="1"
+                        value={formData.displayOrder || 1}
+                        onChange={handleInputChange}
+                        className="w-full border border-gray-200 text-xs font-black p-2.5 focus:border-purple-400 focus:outline-none bg-white"
+                        placeholder="e.g. 1, 2, 3"
+                      />
+                    </div>
                   </div>
-                  <p className="text-[8px] text-purple-600/70 font-bold uppercase tracking-wider mt-2 px-1">Controls visibility length & auto-rotation speed</p>
+                  <p className="text-[8px] text-purple-600/70 font-bold uppercase tracking-wider mt-2.5 px-0.5">Controls visibility duration & sequential order of popups</p>
                 </div>
               </div>
 

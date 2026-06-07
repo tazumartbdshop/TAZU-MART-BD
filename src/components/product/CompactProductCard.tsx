@@ -62,7 +62,7 @@ export function CompactProductCard({ product, rank }: any) {
         </div>
         
         <Link to={`/product/${product.id}`} className="block relative aspect-square overflow-hidden rounded-lg bg-gray-50 mb-2">
-          <img src={product.featured_image || product.image || null} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={product.name} referrerPolicy="no-referrer" />
+          <img src={product.imageUrl || product.featured_image || product.image || null} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt={product.name} referrerPolicy="no-referrer" />
           {product.discountPrice && (
             <span className="absolute top-0 right-0 bg-red-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-bl-lg font-mono">
               -{discountPercent}%

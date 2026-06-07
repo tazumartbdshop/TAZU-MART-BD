@@ -45,7 +45,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       id: product.id,
       name: product.name,
       price: finalDiscountPrice || product.price,
-      image: product.featured_image || product.image,
+      image: product.imageUrl || product.featured_image || product.image,
       quantity: 1,
     });
   };
@@ -95,7 +95,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       {/* Image */}
       <Link to={`/product/${product.id}`} className={`block relative pt-[115%] overflow-hidden bg-zinc-50 ${isOutOfStock ? 'opacity-50' : ''}`}>
         <img 
-          src={product.featured_image || product.image || null} 
+          src={product.imageUrl || product.featured_image || product.image || null} 
           alt={product.name} 
           className="absolute inset-0 w-full h-full object-cover transform scale-100 group-hover:scale-105 transition-transform duration-700"
           referrerPolicy="no-referrer"

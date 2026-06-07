@@ -102,6 +102,7 @@ import AdminPushNotifications from './AdminPushNotifications';
 import AdminInfrastructure from './AdminInfrastructure';
 import AdminSearchListing from './AdminSearchListing';
 import AdminOffers from './AdminOffers';
+import AdminFlutterBanner from './AdminFlutterBanner';
 
 import { useProductStore } from '../../store/useProductStore';
 import { useBannerStore } from '../../store/useBannerStore';
@@ -527,6 +528,7 @@ export default function AdminDashboard() {
               <Route path="/activity-logs" element={<PermissionGate moduleId="logs"><ComingSoon title="Activity Logs" /></PermissionGate>} />
               <Route path="/banner/create" element={<PermissionGate moduleId="banners"><AdminBanners /></PermissionGate>} />
               <Route path="/banner/list" element={<PermissionGate moduleId="banners"><BannerListing /></PermissionGate>} />
+              <Route path="/flutter-banner" element={<PermissionGate moduleId="banners"><AdminFlutterBanner /></PermissionGate>} />
               <Route path="/brand-showcase" element={<PermissionGate moduleId="banners"><AdminBrandShowcase /></PermissionGate>} />
               <Route path="/management/site-management" element={<PermissionGate moduleId="dashboard"><AdminSiteManagement /></PermissionGate>} />
               <Route path="/management/store-identity" element={<PermissionGate moduleId="dashboard"><AdminStoreIdentity /></PermissionGate>} />

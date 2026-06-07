@@ -154,6 +154,12 @@ export const defaultNavItems: NavItem[] = [
       { name: 'Banner List', path: '/admin/banner/list', icon: LayoutGrid }
     ]
   },
+  {
+    name: 'Flutter Banner',
+    path: '/admin/flutter-banner',
+    icon: Smartphone,
+    moduleId: 'banners'
+  },
   { 
     name: 'Marketing & Tracking',
     icon: Megaphone,

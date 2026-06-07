@@ -2,30 +2,59 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useBrandShowcaseStore, BrandShowcaseSlide } from '../../store/useBrandShowcaseStore';
+import { useFlutterBannerStore } from '../../store/useFlutterBannerStore';
 import { useNavigate } from 'react-router-dom';
 
 export function BrandShowcase() {
   const { slides, autoScrollSpeed, companyName, companySubtext } = useBrandShowcaseStore();
+  const { flutterBanners, subscribeFlutterBanners } = useFlutterBannerStore();
   const navigate = useNavigate();
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
 
-  // Filter slides by active status and scheduling windows
-  const activeSlides = slides.filter(slide => {
-    if (!slide.isActive) return false;
-    
-    const now = new Date();
-    if (slide.scheduledStart) {
-      const start = new Date(slide.scheduledStart);
-      if (now < start) return false;
+  // Subscribe to hot real-time updates from Firebase Database
+  useEffect(() => {
+    const unsubscribe = subscribeFlutterBanners();
+    return () => unsubscribe();
+  }, [subscribeFlutterBanners]);
+
+  // Map dynamic Firebase Banners first
+  const activeDbBanners = flutterBanners
+    .filter(b => b.isActive)
+    .map(b => ({
+      id: b.id,
+      image: b.imageUrl,
+      title: b.title,
+      tagline: b.subtitle || b.description || '',
+      redirectLink: b.redirectLink,
+      isActive: b.isActive,
+    }));
+
+  // If we have active database banners, use them! Otherwise fall back to the curated design presets.
+  const activeSlides = activeDbBanners.length > 0 
+    ? activeDbBanners 
+    : slides.filter(slide => {
+        if (!slide.isActive) return false;
+        
+        const now = new Date();
+        if (slide.scheduledStart) {
+          const start = new Date(slide.scheduledStart);
+          if (now < start) return false;
+        }
+        if (slide.scheduledEnd) {
+          const end = new Date(slide.scheduledEnd);
+          if (now > end) return false;
+        }
+        return true;
+      });
+
+  // Handle bounds check when the active dynamic slides list updates
+  useEffect(() => {
+    if (currentIndex >= activeSlides.length) {
+      setCurrentIndex(0);
     }
-    if (slide.scheduledEnd) {
-      const end = new Date(slide.scheduledEnd);
-      if (now > end) return false;
-    }
-    return true;
-  });
+  }, [activeSlides.length, currentIndex]);
 
   // Handle auto-scroll
   useEffect(() => {
