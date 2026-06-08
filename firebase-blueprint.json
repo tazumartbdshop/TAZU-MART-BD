@@ -1,182 +1,144 @@
 {
   "entities": {
-    "GameSettings": {
-      "title": "Game Settings",
-      "description": "Global configuration for the Tazu Arena game",
+    "Product": {
+      "title": "Product",
+      "description": "E-commerce product",
       "type": "object",
       "properties": {
-        "gameName": { "type": "string" },
-        "tagline": { "type": "string" },
-        "turboSpeed": { "type": "number" },
-        "snakeAcceleration": { "type": "number" },
-        "spawnRate": { "type": "number" },
-        "reviveCount": { "type": "number" },
-        "soundEnabled": { "type": "boolean" },
-        "hapticEnabled": { "type": "boolean" },
-        "activeThemeIds": { "type": "array", "items": { "type": "string" } }
-      },
-      "required": ["gameName", "tagline", "turboSpeed", "snakeAcceleration", "spawnRate"]
-    },
-    "SnakePalette": {
-      "title": "Snake Palette",
-      "description": "Visual theme for a snake",
-      "type": "object",
-      "properties": {
+        "id": { "type": "string" },
         "name": { "type": "string" },
-        "primaryColor": { "type": "string" },
-        "secondaryColor": { "type": "string" },
-        "glowColor": { "type": "string" },
-        "headColor": { "type": "string" },
-        "bodyGradient": { "type": "string" },
-        "neonEffect": { "type": "boolean" },
-        "pattern": { "type": "string", "enum": ["Solid", "Stripes", "Dots", "Neon Tube", "Electric", "Pulse", "Gradient", "Metallic", "Scale Texture", "RGB Animation"] },
         "price": { "type": "number" },
-        "isFree": { "type": "boolean" }
+        "discountPrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "status": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "categoryName": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" },
+        "variants": { "type": "array" },
+        "seoData": { "type": "object" },
+        "reviews": { "type": "array" }
       },
-      "required": ["name", "primaryColor", "secondaryColor", "glowColor", "headColor"]
+      "required": ["id", "name"]
     },
-    "ReviveAd": {
-      "title": "Revive Ad",
-      "description": "Configuration for the revive video ad",
+    "Category": {
+      "title": "Category",
+      "description": "Product category",
       "type": "object",
       "properties": {
-        "videoUrl": { "type": "string" },
-        "thumbnailUrl": { "type": "string" },
-        "title": { "type": "string" },
-        "duration": { "type": "number" },
-        "skipTime": { "type": "number" }
-      },
-      "required": ["videoUrl", "title", "duration", "skipTime"]
-    },
-    "Conversation": {
-      "title": "Conversation",
-      "description": "Represents a support chat thread",
-      "type": "object",
-      "properties": {
-        "customerId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "updatedAt": { "type": "string" },
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "image": { "type": "string" },
+        "bannerImage": { "type": "string" },
         "status": { "type": "string" }
       },
-      "required": ["customerId", "customerName", "updatedAt"]
+      "required": ["id", "name"]
     },
-    "Message": {
-      "title": "Message",
-      "description": "Represents a single chat message",
-      "type": "object",
-      "properties": {
-        "senderId": { "type": "string" },
-        "senderName": { "type": "string" },
-        "text": { "type": "string" },
-        "timestamp": { "type": "string" }
-      },
-      "required": ["senderId", "text", "timestamp"]
-    },
-    "Broadcast": {
-      "title": "Broadcast",
-      "description": "Represents a promotional broadcast or notification",
+    "Banner": {
+      "title": "Banner",
+      "description": "Hero, categories, promo or popup banners",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "title": { "type": "string" },
-        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "link": { "type": "string" },
         "type": { "type": "string" },
-        "audience": { "type": "string" },
-        "pinned": { "type": "boolean" },
-        "createdAt": { "type": "string" },
-        "bannerImage": { "type": "string" }
+        "status": { "type": "string" }
       },
-      "required": ["title", "content", "createdAt"]
+      "required": ["id", "title"]
     },
-    "LinkPage": {
-      "title": "Link Page",
-      "description": "Dynamic CMS footer page",
+    "Order": {
+      "title": "Order",
+      "description": "Customer order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "total": { "type": "number" },
+        "status": { "type": "string" },
+        "items": { "type": "array" },
+        "shippingAddress": { "type": "object" },
+        "paymentMethod": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "customerId"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Store customer",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "slug": { "type": "string" },
-        "enabled": { "type": "boolean" },
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "content": { "type": "string" },
-        "image": { "type": "string" },
-        "banner": { "type": "string" },
-        "titleColor": { "type": "string" },
-        "contentColor": { "type": "string" },
-        "backgroundColor": { "type": "string" },
-        "buttonColor": { "type": "string" },
-        "fontSize": { "type": "string" },
-        "seoTitle": { "type": "string" },
-        "seoDescription": { "type": "string" },
-        "seoKeywords": { "type": "string" }
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string" }
       },
-      "required": ["name", "slug", "title", "content"]
+      "required": ["id", "name"]
     },
-    "InfrastructureSettings": {
-      "title": "Infrastructure Settings",
-      "description": "Enterprise configuration for domains, hosting, DNS, SSL, servers, CDN, and SMTP connectivity",
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Discount coupon",
       "type": "object",
       "properties": {
-        "primaryDomain": { "type": "string" },
-        "secondaryDomain": { "type": "string" },
-        "redirectDomain": { "type": "string" },
-        "wwwStatus": { "type": "string" },
-        "hostingProvider": { "type": "string" },
-        "hostingIp": { "type": "string" },
-        "hostingHostname": { "type": "string" },
-        "hostingPanelUrl": { "type": "string" },
-        "ns1": { "type": "string" },
-        "ns2": { "type": "string" },
-        "ns3": { "type": "string" },
-        "ns4": { "type": "string" },
-        "sslProvider": { "type": "string" },
-        "sslExpiry": { "type": "string" },
-        "sslStatus": { "type": "string" },
-        "serverApiEndpoint": { "type": "string" },
-        "serverPort": { "type": "string" },
-        "serverSecretKey": { "type": "string" },
-        "cdnProvider": { "type": "string" },
-        "cdnUrl": { "type": "string" },
-        "smtpHost": { "type": "string" },
-        "smtpPort": { "type": "string" },
-        "smtpSender": { "type": "string" }
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "discount": { "type": "number" },
+        "status": { "type": "string" }
       },
-      "required": ["primaryDomain", "hostingIp"]
+      "required": ["id", "code"]
+    },
+    "WebsiteSettings": {
+      "title": "Website Settings",
+      "description": "Global website settings, including logo, favicon, about us, contact",
+      "type": "object",
+      "properties": {
+        "logo": { "type": "string" },
+        "favicon": { "type": "string" },
+        "aboutUs": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "privacyPolicy": { "type": "string" },
+        "termsConditions": { "type": "string" },
+        "shippingSettings": { "type": "object" },
+        "paymentSettings": { "type": "object" },
+        "homepageSettings": { "type": "object" },
+        "footerSettings": { "type": "object" },
+        "adminSettings": { "type": "object" }
+      },
+      "required": []
     }
   },
   "firestore": {
-    "/infrastructure/config": {
-      "schema": "InfrastructureSettings",
-      "description": "Global enterprise infrastructure settings"
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Store products"
     },
-    "/game_config/settings": {
-      "schema": "GameSettings",
-      "description": "Global game configuration"
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Store categories"
     },
-    "/snake_palettes/{paletteId}": {
-      "schema": "SnakePalette",
-      "description": "Available snake themes"
+    "/banners/{bannerId}": {
+      "schema": "Banner",
+      "description": "Store banners"
     },
-    "/ad_config/revive": {
-      "schema": "ReviveAd",
-      "description": "Revive ad settings"
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Store orders"
     },
-    "/conversations/{conversationId}": {
-      "schema": "Conversation",
-      "description": "Support chat threads"
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Store customers"
     },
-    "/conversations/{conversationId}/messages/{messageId}": {
-      "schema": "Message",
-      "description": "Messages within a conversation"
+    "/coupons/{couponId}": {
+      "schema": "Coupon",
+      "description": "Store coupons"
     },
-    "/broadcasts/{broadcastId}": {
-      "schema": "Broadcast",
-      "description": "Announcements and offers broadcasts"
-    },
-    "/link_pages/{pageId}": {
-      "schema": "LinkPage",
-      "description": "CMS generated pages"
+    "/settings/global": {
+      "schema": "WebsiteSettings",
+      "description": "Global website configurations"
     }
   }
 }

@@ -1,5 +1,17 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
+
+export function cleanObjectForFirestore<T extends object>(obj: T): T {
+  const result: any = {};
+  Object.keys(obj).forEach((key) => {
+    const val = (obj as any)[key];
+    if (val !== undefined) {
+      result[key] = val;
+    }
+  });
+  return result;
+}
 
 export interface AppSettings {
   // 1. Store Identity
@@ -405,24 +417,56 @@ const defaultSettings: AppSettings = {
 interface SettingsState {
   settings: AppSettings;
   draftSettings: AppSettings;
+  isLoaded: boolean;
   updateSettings: (updates: Partial<AppSettings>) => void;
   updateDraftSettings: (updates: Partial<AppSettings>) => void;
-  publishSettings: () => void;
+  publishSettings: () => Promise<void>;
   resetDraftSettings: () => void;
+  subscribe: () => () => void;
 }
 
-export const useSettingsStore = create<SettingsState>()(
-  persist(
-    (set) => ({
-      settings: defaultSettings,
-      draftSettings: defaultSettings,
-      updateSettings: (updates) => set((state) => ({ settings: { ...state.settings, ...updates } })),
-      updateDraftSettings: (updates) => set((state) => ({ draftSettings: { ...state.draftSettings, ...updates } })),
-      publishSettings: () => set((state) => ({ settings: state.draftSettings })),
-      resetDraftSettings: () => set((state) => ({ draftSettings: state.settings })),
-    }),
-    {
-      name: 'luxemart-settings-v2',
+export const useSettingsStore = create<SettingsState>((set, get) => ({
+  settings: defaultSettings,
+  draftSettings: defaultSettings,
+  isLoaded: false,
+  updateSettings: (updates) => {
+    // We do NOT write to firestore immediately here unless it's a direct patch that should be published
+    // Actually, usually admin updates drafting -> publish. If called directly, we can sync.
+    const newSettings = { ...get().settings, ...updates };
+    set({ settings: newSettings });
+    setDoc(doc(db, 'settings', 'global'), cleanObjectForFirestore(newSettings), { merge: true })
+      .catch(err => console.error("Firestore settings update fail", err));
+  },
+  updateDraftSettings: (updates) => {
+    set((state) => ({ draftSettings: { ...state.draftSettings, ...updates } }));
+  },
+  publishSettings: async () => {
+    try {
+      const draft = get().draftSettings;
+      await setDoc(doc(db, 'settings', 'global'), cleanObjectForFirestore(draft), { merge: true });
+      set({ settings: draft });
+      console.log("Settings published to Firebase");
+    } catch (error) {
+      console.error("Firebase publishSettings error:", error);
+      throw error;
     }
-  )
-);
+  },
+  resetDraftSettings: () => set((state) => ({ draftSettings: state.settings })),
+  subscribe: () => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as Partial<AppSettings>;
+        const mergedSettings = { ...defaultSettings, ...data };
+        set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
+      } else {
+        // Fallback to default
+        setDoc(doc(db, 'settings', 'global'), cleanObjectForFirestore(defaultSettings)).then(() => {
+          set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
+        }).catch(err => console.error("Initial settings seed failed", err));
+      }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'settings/global');
+    });
+    return unsubscribe;
+  }
+}));

@@ -29,14 +29,43 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
       exit={{ opacity: 0, y: -5 }}
       className="space-y-4"
     >
-      {/* Address Hierarchy Dropdowns */}
+      {/* 3. Full Address (Moved to Top) */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block">
+            <span className="flex items-center gap-1"><Home className="w-3 h-3" /> Full Address *</span>
+          </label>
+          <button 
+            type="button"
+            onClick={handleUseLocation}
+            className="text-[9px] font-black uppercase text-[#000000] hover:text-neutral-600 transition-colors flex items-center gap-1 cursor-pointer"
+          >
+            <Navigation className="w-3 h-3 text-neutral-900" /> Auto Fill Demo
+          </button>
+        </div>
+        <textarea 
+          id="checkout-address"
+          rows={2}
+          placeholder="Enter your detailed house/road information" 
+          value={formData.address}
+          onChange={(e) => handleInputChange('address', e.target.value)}
+          className={cn(
+            "w-full bg-white border px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-black text-xs font-bold leading-relaxed placeholder:font-normal placeholder:text-neutral-400 resize-none",
+            errors.address ? "border-red-500 bg-red-50/5" : "border-neutral-250"
+          )} 
+        />
+        {errors.address && <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1 pl-1 uppercase"><AlertCircle className="w-3.5 h-3.5" /> {errors.address}</p>}
+      </div>
+
+      {/* Address Hierarchy Dropdowns (Division & District) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Division */}
+        {/* 4. Division */}
         <div>
           <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
             <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Division (Optional)</span>
           </label>
           <select 
+            id="checkout-division"
             value={formData.division}
             onChange={(e) => {
               handleInputChange('division', e.target.value);
@@ -52,12 +81,13 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
           </select>
         </div>
 
-        {/* District */}
+        {/* 5. District */}
         <div>
           <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
             <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> District (Optional)</span>
           </label>
           <select 
+            id="checkout-district"
             value={formData.district}
             onChange={(e) => {
               handleInputChange('district', e.target.value);
@@ -72,82 +102,46 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
             ))}
           </select>
         </div>
-
-        {/* Upazila */}
-        <div className="sm:col-span-2">
-          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
-            <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Thana / Upazila (Optional)</span>
-          </label>
-          <select 
-            value={formData.upazila}
-            onChange={(e) => handleInputChange('upazila', e.target.value)}
-            disabled={!formData.district}
-            className="w-full bg-white border border-neutral-250 px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-bold transition-all cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
-          >
-            <option value="">Select Upazila</option>
-            {upazilas.map(up => (
-              <option key={up} value={up}>{up}</option>
-            ))}
-          </select>
-        </div>
       </div>
 
+      {/* 6. Thana / Upazila */}
       <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block">
-            <span className="flex items-center gap-1"><Home className="w-3 h-3" /> Full Address *</span>
-          </label>
-          <button 
-            type="button"
-            onClick={handleUseLocation}
-            className="text-[9px] font-black uppercase text-[#000000] hover:text-neutral-600 transition-colors flex items-center gap-1 cursor-pointer"
-          >
-            <Navigation className="w-3 h-3 text-neutral-900" /> Auto Fill Demo
-          </button>
-        </div>
-        <textarea 
-          rows={2}
-          placeholder="Enter your detailed house/road information" 
-          value={formData.address}
-          onChange={(e) => handleInputChange('address', e.target.value)}
-          className={cn(
-            "w-full bg-white border px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-black text-xs font-bold leading-relaxed placeholder:font-normal placeholder:text-neutral-400 resize-none",
-            errors.address ? "border-red-500 bg-red-50/5" : "border-neutral-250"
-          )} 
+        <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
+          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Thana / Upazila (Optional)</span>
+        </label>
+        <select 
+          id="checkout-upazila"
+          value={formData.upazila}
+          onChange={(e) => handleInputChange('upazila', e.target.value)}
+          disabled={!formData.district}
+          className="w-full bg-white border border-neutral-250 px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-bold transition-all cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
+        >
+          <option value="">Select Upazila</option>
+          {upazilas.map(up => (
+            <option key={up} value={up}>{up}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* 7. Nearby Landmark */}
+      <div>
+        <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
+          <span className="flex items-center gap-1"><Map className="w-3 h-3" /> Nearby Landmark (Optional)</span>
+        </label>
+        <input 
+          id="checkout-landmark"
+          type="text" 
+          placeholder="E.g. Opposite Scholastica School" 
+          value={formData.landmark}
+          onChange={(e) => handleInputChange('landmark', e.target.value)}
+          className="w-full bg-white border border-neutral-250 px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-semibold placeholder:font-normal placeholder:text-neutral-400"
         />
-        {errors.address && <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1 pl-1 uppercase"><AlertCircle className="w-3.5 h-3.5" /> {errors.address}</p>}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
-            <span className="flex items-center gap-1"><Map className="w-3 h-3" /> Nearby Landmark (Optional)</span>
-          </label>
-          <input 
-            type="text" 
-            placeholder="E.g. Opposite Scholastica School" 
-            value={formData.landmark}
-            onChange={(e) => handleInputChange('landmark', e.target.value)}
-            className="w-full bg-white border border-neutral-250 px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-semibold placeholder:font-normal placeholder:text-neutral-400"
-          />
-        </div>
-
-        <div>
-          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
-            <span className="flex items-center gap-1"><Building2 className="w-3 h-3" /> Postal Code (ঐচ্ছিক)</span>
-          </label>
-          <input 
-            type="text" 
-            placeholder="Post Code" 
-            value={formData.postalCode}
-            onChange={(e) => handleInputChange('postalCode', e.target.value)}
-            className="w-full bg-white border border-neutral-250 px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-semibold placeholder:font-normal placeholder:text-neutral-400"
-          />
-        </div>
-      </div>
-
+      {/* Save Address Toggle */}
       <div className="flex items-center gap-2 mt-2 pl-1">
         <button 
+          id="checkout-save-address-check"
           type="button"
           onClick={() => handleInputChange('saveAddress', !formData.saveAddress)}
           className={cn(
@@ -157,7 +151,7 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
         >
           {formData.saveAddress && <Save className="w-2.5 h-2.5 text-white" />}
         </button>
-        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 cursor-pointer select-none" onClick={() => handleInputChange('saveAddress', !formData.saveAddress)}>
+        <span id="checkout-save-address-label" className="text-[10px] font-black uppercase tracking-wider text-neutral-500 cursor-pointer select-none" onClick={() => handleInputChange('saveAddress', !formData.saveAddress)}>
           Save address to profile
         </span>
       </div>

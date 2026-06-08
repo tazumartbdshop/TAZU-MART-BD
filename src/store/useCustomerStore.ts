@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { generateDemoCustomers } from '../utils/demoDataGenerator';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 export interface PaymentMethod {
   id: string;
@@ -57,86 +58,148 @@ interface CustomerState {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearDemoData: () => void;
+  subscribe: () => () => void;
 }
 
 export const initialDemoCustomers: Customer[] = generateDemoCustomers();
 
-export const useCustomerStore = create<CustomerState>()(
-  persist(
-    (set, get) => ({
-      customers: initialDemoCustomers,
-      addCustomer: (customerPayload) => set((state) => ({
-        customers: [
-          ...state.customers,
-          {
-            ...customerPayload,
-            id: customerPayload.id || Math.random().toString(36).substring(2, 9),
-            createdAt: Date.now(),
-            isRead: false,
-          }
-        ]
-      })),
-      syncCustomerFromAuth: (user) => {
-        if (!user || user.role !== 'customer') return;
-        const customers = get().customers;
-        const existing = customers.find(c => c.emails.includes(user.email) || (user.phone && c.phones.includes(user.phone)));
-        
-        if (existing) {
-          get().updateCustomer(existing.id, { 
-            lastLogin: Date.now(),
-            totalLogins: (existing.totalLogins || 0) + 1,
-            lastIP: '192.168.' + Math.floor(Math.random() * 255) + '.' + Math.floor(Math.random() * 255),
-            deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop'
-          });
-        } else {
-          get().addCustomer({
-            name: user.name,
-            phones: user.phone ? [user.phone] : [],
-            emails: [user.email],
-            address: {
-              country: user.country || 'Bangladesh',
-              city: user.city || user.district || '',
-              area: user.area || user.upazila || '',
-              street: user.address || user.street || '',
-              division: user.division,
-              district: user.district,
-              upazila: user.upazila,
-              zipCode: user.zipCode
-            },
-            profileImage: user.profileImage,
-            gender: user.gender,
-            occasionName: user.occasionName, // Capture special day
-            specialDate: user.specialDate,
-            socialLinks: [],
-            status: 'Active',
-            customerType: 'New',
-            totalOrders: 0,
-            totalSpend: 0,
-            lastLogin: Date.now(),
-            totalLogins: 1,
-            lastIP: 'User Sync',
-            deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop'
-          });
+function cleanUndefined(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanUndefined);
+  }
+  if (typeof obj === 'object') {
+    const clean: any = {};
+    for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        const val = obj[key];
+        if (val !== undefined) {
+          clean[key] = cleanUndefined(val);
         }
-      },
-      updateCustomer: (id, updates) => set((state) => ({
-        customers: state.customers.map(c => c.id === id ? { ...c, ...updates } : c)
-      })),
-      deleteCustomer: (id) => set((state) => ({
-        customers: state.customers.filter(c => c.id !== id)
-      })),
-      markAsRead: (id) => set((state) => ({
-        customers: state.customers.map(c => c.id === id ? { ...c, isRead: true } : c)
-      })),
-      markAllAsRead: () => set((state) => ({
-        customers: state.customers.map(c => ({ ...c, isRead: true }))
-      })),
-      clearDemoData: () => set((state) => ({
-        customers: state.customers.filter(c => !c.isDemo)
-      })),
-    }),
-    {
-      name: 'luxemart-customers',
+      }
     }
-  )
-);
+    return clean;
+  }
+  return obj;
+}
+
+export const useCustomerStore = create<CustomerState>((set, get) => ({
+  customers: initialDemoCustomers,
+  addCustomer: (customerPayload) => {
+    const id = customerPayload.id || Math.random().toString(36).substring(2, 9);
+    const newCustomer = {
+      ...customerPayload,
+      id,
+      createdAt: Date.now(),
+      isRead: false,
+    };
+    
+    setDoc(doc(db, 'customers', id), cleanUndefined(newCustomer))
+      .catch(err => handleFirestoreError(err, OperationType.WRITE, `customers/${id}`));
+      
+    set((state) => ({
+      customers: [...state.customers, newCustomer]
+    }));
+  },
+  syncCustomerFromAuth: (user) => {
+    if (!user || user.role !== 'customer') return;
+    const customers = get().customers;
+    const existing = customers.find(c => c.emails.includes(user.email) || (user.phone && c.phones.includes(user.phone)));
+    
+    if (existing) {
+      get().updateCustomer(existing.id, { 
+        lastLogin: Date.now(),
+        totalLogins: (existing.totalLogins || 0) + 1,
+        lastIP: '192.168.' + Math.floor(Math.random() * 255) + '.' + Math.floor(Math.random() * 255),
+        deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop'
+      });
+    } else {
+      get().addCustomer({
+        name: user.name,
+        phones: user.phone ? [user.phone] : [],
+        emails: [user.email],
+        address: {
+          country: user.country || 'Bangladesh',
+          city: user.city || user.district || '',
+          area: user.area || user.upazila || '',
+          street: user.address || user.street || '',
+          division: user.division,
+          district: user.district,
+          upazila: user.upazila,
+          zipCode: user.zipCode
+        },
+        profileImage: user.profileImage,
+        gender: user.gender,
+        occasionName: user.occasionName, // Capture special day
+        specialDate: user.specialDate,
+        socialLinks: [],
+        status: 'Active',
+        customerType: 'New',
+        totalOrders: 0,
+        totalSpend: 0,
+        lastLogin: Date.now(),
+        totalLogins: 1,
+        lastIP: 'User Sync',
+        deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop'
+      });
+    }
+  },
+  updateCustomer: (id, updates) => {
+    setDoc(doc(db, 'customers', id), cleanUndefined(updates), { merge: true })
+      .catch(err => handleFirestoreError(err, OperationType.WRITE, `customers/${id}`));
+      
+    set((state) => ({
+      customers: state.customers.map(c => c.id === id ? { ...c, ...updates } : c)
+    }));
+  },
+  deleteCustomer: (id) => {
+    deleteDoc(doc(db, 'customers', id))
+      .catch(err => handleFirestoreError(err, OperationType.DELETE, `customers/${id}`));
+      
+    set((state) => ({
+      customers: state.customers.filter(c => c.id !== id)
+    }));
+  },
+  markAsRead: (id) => {
+    setDoc(doc(db, 'customers', id), { isRead: true }, { merge: true })
+      .catch(err => handleFirestoreError(err, OperationType.WRITE, `customers/${id}`));
+      
+    set((state) => ({
+      customers: state.customers.map(c => c.id === id ? { ...c, isRead: true } : c)
+    }));
+  },
+  markAllAsRead: () => {
+    get().customers.forEach((c) => {
+      if (!c.isRead) {
+        setDoc(doc(db, 'customers', c.id), { isRead: true }, { merge: true })
+          .catch(err => handleFirestoreError(err, OperationType.WRITE, `customers/${c.id}`));
+      }
+    });
+    
+    set((state) => ({
+      customers: state.customers.map(c => ({ ...c, isRead: true }))
+    }));
+  },
+  clearDemoData: () => set((state) => ({
+    customers: state.customers.filter(c => !c.isDemo)
+  })),
+  subscribe: () => {
+    const unsubscribe = onSnapshot(collection(db, 'customers'), (snapshot) => {
+      const list: Customer[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ id: doc.id, ...doc.data() } as Customer);
+      });
+      // Fallback
+      if (list.length > 0) {
+        set({ customers: list });
+      } else {
+        set({ customers: initialDemoCustomers });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'customers');
+    });
+    return unsubscribe;
+  }
+}));

@@ -241,8 +241,18 @@ export default function Checkout() {
       newErrors.phone = 'Please enter a valid phone number (01XXXXXXXXX)';
     }
 
-    if (!formData.address.trim()) {
+    const address = formData.address.trim();
+    if (!address) {
       newErrors.address = 'Please Enter Full Address';
+    } else {
+      const words = address.split(/\s+/);
+      if (words.length < 2) {
+        newErrors.address = 'Please enter a complete address (minimum 2 words).';
+      }
+    }
+
+    if (!paymentMethod) {
+      newErrors.paymentMethod = 'Please select a payment method.';
     }
     
     // Conditional payment field validations
@@ -758,6 +768,8 @@ export default function Checkout() {
                 <span className="w-5 h-5 bg-black text-white rounded-md flex items-center justify-center text-[10px] font-bold">3</span>
                 <h3 className="text-xs font-bold uppercase tracking-widest text-[#000000]">Payment Mode</h3>
               </div>
+              
+              {errors.paymentMethod && <p className="text-[10px] text-red-500 font-bold mb-3 flex items-center gap-1 pl-1 uppercase"><AlertCircle className="w-3.5 h-3.5" /> {errors.paymentMethod}</p>}
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {availableMethods.map(method => (

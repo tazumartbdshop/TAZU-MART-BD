@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 export interface ThemeConfig {
   // Global Colors
@@ -94,11 +95,13 @@ interface ButtonConfig {
 interface ThemeState {
   theme: ThemeConfig;
   draftTheme: ThemeConfig;
+  isLoaded: boolean;
+  subscribe: () => () => void;
   updateTheme: (updates: Partial<ThemeConfig>) => void;
   updateDraftTheme: (updates: Partial<ThemeConfig>) => void;
   updateButton: (type: keyof ThemeConfig['buttons'], updates: Partial<ButtonConfig>) => void;
   updateDraftButton: (type: keyof ThemeConfig['buttons'], updates: Partial<ButtonConfig>) => void;
-  publishTheme: () => void;
+  publishTheme: () => Promise<void>;
   resetTheme: () => void;
   resetDraftTheme: () => void;
 }
@@ -174,41 +177,67 @@ const defaultConfig: ThemeConfig = {
   mobileNavbarHeight: 64,
 };
 
-export const useThemeStore = create<ThemeState>()(
-  persist(
-    (set) => ({
-      theme: defaultConfig,
-      draftTheme: defaultConfig,
-      updateTheme: (updates) => set((state) => ({
-        theme: { ...state.theme, ...updates }
-      })),
-      updateDraftTheme: (updates) => set((state) => ({
-        draftTheme: { ...state.draftTheme, ...updates }
-      })),
-      updateButton: (type, updates) => set((state) => ({
-        theme: {
-          ...state.theme,
-          buttons: {
-            ...state.theme.buttons,
-            [type]: { ...state.theme.buttons[type], ...updates }
-          }
-        }
-      })),
-      updateDraftButton: (type, updates) => set((state) => ({
-        draftTheme: {
-          ...state.draftTheme,
-          buttons: {
-            ...state.draftTheme.buttons,
-            [type]: { ...state.draftTheme.buttons[type], ...updates }
-          }
-        }
-      })),
-      publishTheme: () => set((state) => ({ theme: state.draftTheme })),
-      resetTheme: () => set({ theme: defaultConfig }),
-      resetDraftTheme: () => set((state) => ({ draftTheme: state.theme })),
-    }),
-    {
-      name: 'theme-storage',
+export const useThemeStore = create<ThemeState>((set, get) => ({
+  theme: defaultConfig,
+  draftTheme: defaultConfig,
+  isLoaded: false,
+  subscribe: () => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'theme'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as Partial<ThemeConfig>;
+        const mergedSettings = { ...defaultConfig, ...data };
+        set({ theme: mergedSettings, draftTheme: mergedSettings, isLoaded: true });
+      } else {
+        setDoc(doc(db, 'settings', 'theme'), defaultConfig).then(() => {
+          set({ theme: defaultConfig, draftTheme: defaultConfig, isLoaded: true });
+        }).catch(err => console.error("Initial theme seed failed", err));
+      }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'settings/theme');
+    });
+    return unsubscribe;
+  },
+  updateTheme: (updates) => {
+    const newTheme = { ...get().theme, ...updates };
+    set({ theme: newTheme });
+    setDoc(doc(db, 'settings', 'theme'), newTheme, { merge: true })
+      .catch(err => console.error("Firestore theme update fail", err));
+  },
+  updateDraftTheme: (updates) => set((state) => ({
+    draftTheme: { ...state.draftTheme, ...updates }
+  })),
+  updateButton: (type, updates) => {
+    const state = get();
+    const newTheme = {
+      ...state.theme,
+      buttons: {
+        ...state.theme.buttons,
+        [type]: { ...state.theme.buttons[type], ...updates }
+      }
+    };
+    set({ theme: newTheme });
+    setDoc(doc(db, 'settings', 'theme'), newTheme, { merge: true })
+      .catch(err => console.error("Firestore theme button update fail", err));
+  },
+  updateDraftButton: (type, updates) => set((state) => ({
+    draftTheme: {
+      ...state.draftTheme,
+      buttons: {
+        ...state.draftTheme.buttons,
+        [type]: { ...state.draftTheme.buttons[type], ...updates }
+      }
     }
-  )
-);
+  })),
+  publishTheme: async () => {
+    try {
+      const draft = get().draftTheme;
+      await setDoc(doc(db, 'settings', 'theme'), draft, { merge: true });
+      set({ theme: draft });
+    } catch (error) {
+      console.error("Firebase publishTheme error:", error);
+      throw error;
+    }
+  },
+  resetTheme: () => set({ theme: defaultConfig }),
+  resetDraftTheme: () => set((state) => ({ draftTheme: state.theme })),
+}));

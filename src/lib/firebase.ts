@@ -5,10 +5,58 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import firebaseConfig from "../../firebase-applet-config.json";
 
-const app = initializeApp(firebaseConfig);
+// Dynamically read VITE_ environment variables to enable custom production configurations on live domains
+// We use direct static references to import.meta.env so that Vite's compiler can statically replace them during build time
+// @ts-ignore
+const envApiKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_API_KEY : undefined;
+// @ts-ignore
+const envAuthDomain = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN : undefined;
+// @ts-ignore
+const envProjectId = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_PROJECT_ID : undefined;
+// @ts-ignore
+const envAppId = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_APP_ID : undefined;
+// @ts-ignore
+const envStorageBucket = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : undefined;
+// @ts-ignore
+const envMessagingSenderId = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID : undefined;
+// @ts-ignore
+const envFirestoreDatabaseId = typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || import.meta.env.VITE_FIREBASE_DB_ID) : undefined;
 
-export const db = (firebaseConfig as any).firestoreDatabaseId 
-  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
+const envConfig = {
+  apiKey: envApiKey,
+  authDomain: envAuthDomain,
+  projectId: envProjectId,
+  appId: envAppId,
+  storageBucket: envStorageBucket,
+  messagingSenderId: envMessagingSenderId,
+  firestoreDatabaseId: envFirestoreDatabaseId
+};
+
+const windowConfig = typeof window !== 'undefined' ? ((window as any).__FIREBASE_CONFIG__ || {}) : {};
+
+const isLiveDomain = typeof window !== 'undefined' && (
+  window.location.hostname === 'tazumartbd.com' || 
+  window.location.hostname === 'www.tazumartbd.com' ||
+  window.location.hostname.endsWith('.tazumartbd.com')
+);
+
+const finalProjectId = windowConfig.projectId || envConfig.projectId || (isLiveDomain ? "tazu-mart-bd-dfcda" : firebaseConfig.projectId);
+
+const finalConfig = {
+  apiKey: windowConfig.apiKey || envConfig.apiKey || firebaseConfig.apiKey,
+  // Ensure authDomain is exactly <project-id>.firebaseapp.com if using custom auth configs
+  authDomain: windowConfig.authDomain || envConfig.authDomain || (isLiveDomain ? "tazu-mart-bd-dfcda.firebaseapp.com" : (finalProjectId ? `${finalProjectId}.firebaseapp.com` : firebaseConfig.authDomain)),
+  projectId: finalProjectId,
+  appId: windowConfig.appId || envConfig.appId || firebaseConfig.appId,
+  storageBucket: windowConfig.storageBucket || envConfig.storageBucket || (isLiveDomain ? "tazu-mart-bd-dfcda.firebasestorage.app" : firebaseConfig.storageBucket),
+  messagingSenderId: windowConfig.messagingSenderId || envConfig.messagingSenderId || firebaseConfig.messagingSenderId,
+  firestoreDatabaseId: windowConfig.firestoreDatabaseId || envConfig.firestoreDatabaseId || (firebaseConfig as any).firestoreDatabaseId
+};
+
+const app = initializeApp(finalConfig);
+
+export const db = finalConfig.firestoreDatabaseId 
+  ? getFirestore(app, finalConfig.firestoreDatabaseId)
   : getFirestore(app);
 
 export const auth = getAuth(app);
@@ -68,6 +116,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     console.warn("Firestore Quota Exceeded. Some data may not load.");
   } else {
     console.error('Firestore Error: ', errorMsg);
-    // throw new Error(errorMsg);
+    throw new Error(errorMsg);
   }
 }

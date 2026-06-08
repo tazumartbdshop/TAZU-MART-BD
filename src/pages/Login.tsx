@@ -6,6 +6,8 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   FacebookAuthProvider
 } from 'firebase/auth';
@@ -48,6 +50,79 @@ export default function Login() {
       }
     }
   }, [isAuthenticated, navigate, user, isLoading]);
+
+  useEffect(() => {
+    let active = true;
+    const handleRedirectResult = async () => {
+      try {
+        const currentHost = window.location.hostname;
+        if (currentHost.includes('run.app') || currentHost.includes('web.app')) {
+          // Do not use Cloud Run preview domains for authentication redirect checks
+          return;
+        }
+        const result = await getRedirectResult(auth);
+        if (result && active) {
+          setIsLoading(true);
+          const fbUser = result.user;
+          const email = fbUser.email || '';
+          const name = fbUser.displayName || 'Google User';
+          const phone = fbUser.phoneNumber || '';
+          const photoURL = fbUser.photoURL || '';
+
+          try {
+            await setDoc(doc(db, 'users', fbUser.uid), {
+              uid: fbUser.uid,
+              name,
+              email,
+              phone,
+              role: 'customer',
+              status: 'Active',
+              createdAt: serverTimestamp(),
+              lastLoginAt: serverTimestamp(),
+              profileImage: photoURL,
+            }, { merge: true });
+          } catch (fsErr) {
+            handleFirestoreError(fsErr, OperationType.WRITE, `users/${fbUser.uid}`);
+          }
+
+          useLoginHistoryStore.getState().addLoginEvent({
+            name,
+            email,
+            method: 'Google Login',
+            profileImage: photoURL,
+          });
+
+          login({
+            id: fbUser.uid,
+            name,
+            email,
+            phone,
+            role: 'customer',
+            profileImage: photoURL,
+          });
+
+          pixelService.trackLogin(fbUser.uid);
+          navigate('/account/dashboard');
+        }
+      } catch (err: any) {
+        console.error("Redirect auth resolution failed:", err);
+        if (err.code === 'auth/unauthorized-domain' || err.code === 'auth/unauthorized-client') {
+          setError(
+            `Unauthorized Domain Error (${err.code}). Please verify your custom domain is whitelisted in both Firebase Authentication (Authorized Domains) AND Google Cloud Console APIs & Services -> Credentials -> OAuth 2.0 Web Client ID (Authorized JavaScript Origins).`
+          );
+        } else {
+          setError(err.message || 'Verification from login redirect failed.');
+        }
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    handleRedirectResult();
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -612,14 +687,44 @@ export default function Login() {
 
         {/* Social Authentication */}
         <div className="grid grid-cols-2 gap-3">
-          <button 
+           <button 
             type="button"
             onClick={async () => {
               setIsLoading(true);
               setError('');
               try {
+                const currentHost = window.location.hostname;
+                if (currentHost.includes('run.app') || currentHost.includes('web.app')) {
+                  setError(
+                    "Google Sign-In is configured to run exclusively on the live custom domain (tazumartbd.com) to maintain absolute security. Please sign in using your standard email/password credentials or mobile login here, or access the live web store at https://tazumartbd.com to sign in with Google."
+                  );
+                  setIsLoading(false);
+                  return;
+                }
+
                 const provider = new GoogleAuthProvider();
-                const result = await signInWithPopup(auth, provider);
+                provider.setCustomParameters({ prompt: 'select_account' });
+
+                let result;
+                try {
+                  result = await signInWithPopup(auth, provider);
+                } catch (popupErr: any) {
+                  // If popup is blocked, unauthorized, or storage fails (common on custom domains/restricted cookies), use redirection as a resilient fallback
+                  if (
+                    popupErr.code === 'auth/popup-blocked' || 
+                    popupErr.code === 'auth/unauthorized-domain' || 
+                    popupErr.code === 'auth/unauthorized-client' ||
+                    popupErr.code === 'auth/web-storage-unsupported' ||
+                    window.innerWidth < 768
+                  ) {
+                    console.log(`Popup failed (${popupErr.code}). Resilient direct redirect initiated...`);
+                    await signInWithRedirect(auth, provider);
+                    return; // Redirecting...
+                  } else {
+                    throw popupErr;
+                  }
+                }
+
                 const fbUser = result.user;
                 const email = fbUser.email || '';
                 const name = fbUser.displayName || 'Google User';
@@ -666,6 +771,10 @@ export default function Login() {
                 }
                 if (err.code === 'auth/operation-not-allowed') {
                   setError("Firebase 'Google' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Google' and enable it.");
+                } else if (err.code === 'auth/unauthorized-domain' || err.code === 'auth/unauthorized-client') {
+                  setError(
+                    `Unauthorized Domain: ${window.location.hostname} has not been whitelisted in this Firebase project, or the Firebase config "authDomain" is incorrect. Important Note: If you are hosting a custom domain outside of Firebase Hosting (e.g. Cloud Run/VPS), you MUST keep the Firebase "authDomain" configured to your default Firebase project domain (e.g., "${auth.app.options.authDomain || 'project-id.firebaseapp.com'}"). Do not change it to your custom domain.`
+                  );
                 } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
                   // user closed popup, ignore
                 } else {

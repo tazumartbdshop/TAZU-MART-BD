@@ -6,6 +6,12 @@ import { useCategoryStore } from './store/useCategoryStore';
 import { useProductStore } from './store/useProductStore';
 import { useSearchStore } from './store/useSearchStore';
 import { useOrderStore } from './store/useOrderStore';
+import { useSettingsStore } from './store/useSettingsStore';
+import { useThemeStore } from './store/useThemeStore';
+import { useOfferStore } from './store/useOfferStore';
+import { useCustomerStore } from './store/useCustomerStore';
+import { useBrandShowcaseStore } from './store/useBrandShowcaseStore';
+import { useModeratorStore } from './store/useModeratorStore';
 import Home from './pages/Home';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -47,12 +53,24 @@ export default function App() {
     const unsubSearches = useSearchStore.getState().subscribe();
     const unsubOrders = useOrderStore.getState().subscribeOrders();
     const unsubTrackingStatuses = useOrderStore.getState().subscribeTrackingStatuses();
+    const unsubSettings = useSettingsStore.getState().subscribe();
+    const unsubTheme = useThemeStore.getState().subscribe();
+    const unsubOffers = useOfferStore.getState().subscribe();
+    const unsubCustomers = useCustomerStore.getState().subscribe();
+    const unsubBrands = useBrandShowcaseStore.getState().subscribe();
+    const unsubModerators = useModeratorStore.getState().subscribe();
     return () => {
       unsubCategories();
       unsubProducts();
       unsubSearches();
       unsubOrders();
       unsubTrackingStatuses();
+      unsubSettings();
+      unsubTheme();
+      unsubOffers();
+      unsubCustomers();
+      unsubBrands();
+      unsubModerators();
     };
   }, []);
 

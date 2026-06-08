@@ -19,11 +19,23 @@ async function startServer() {
   try {
     const configText = await fs.readFile(CONFIG_APPLET_FILE, 'utf-8');
     const firebaseConfig = JSON.parse(configText);
-    const firebaseApp = initializeApp(firebaseConfig);
-    db = firebaseConfig.firestoreDatabaseId 
-      ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId)
+    
+    // Prioritize production environment variables in the running backend container
+    const backendConfig = {
+      apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || firebaseConfig.apiKey,
+      authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain,
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
+      appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || firebaseConfig.appId,
+      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket,
+      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || firebaseConfig.messagingSenderId,
+      firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DB_ID || process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.FIREBASE_DB_ID || firebaseConfig.firestoreDatabaseId
+    };
+
+    const firebaseApp = initializeApp(backendConfig);
+    db = backendConfig.firestoreDatabaseId 
+      ? getFirestore(firebaseApp, backendConfig.firestoreDatabaseId)
       : getFirestore(firebaseApp);
-    console.log("Firebase Backend initialized successfully with database:", firebaseConfig.firestoreDatabaseId || "default");
+    console.log("Firebase Backend initialized successfully with project:", backendConfig.projectId);
   } catch (fbError) {
     console.error("Error initializing Firebase App in server:", fbError);
   }
@@ -476,8 +488,29 @@ Please ask me your query or select a quick question template below!`;
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    app.get('*', async (req, res) => {
+      try {
+        const indexPath = path.join(distPath, 'index.html');
+        let html = await fs.readFile(indexPath, 'utf-8');
+
+        // Capture production container's real environmental variables
+        const runtimeConfig = {
+          apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || null,
+          authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || null,
+          projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || null,
+          appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || null,
+          storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || null,
+          messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || null,
+          firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DB_ID || process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.FIREBASE_DB_ID || null
+        };
+
+        const configScript = `<script>window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};</script>`;
+        // Inject runtime variables synchronously before main bundle imports run
+        html = html.replace('<head>', `<head>\n    ${configScript}`);
+        res.send(html);
+      } catch (err) {
+        res.sendFile(path.join(distPath, 'index.html'));
+      }
     });
   }
 
