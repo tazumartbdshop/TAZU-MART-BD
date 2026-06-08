@@ -5,60 +5,10 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import firebaseConfig from "../../firebase-applet-config.json";
 
-// Dynamically read VITE_ environment variables to enable custom production configurations on live domains
-// We use direct static references to import.meta.env so that Vite's compiler can statically replace them during build time
-// @ts-ignore
-const envApiKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_API_KEY : undefined;
-// @ts-ignore
-const envAuthDomain = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN : undefined;
-// @ts-ignore
-const envProjectId = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_PROJECT_ID : undefined;
-// @ts-ignore
-const envAppId = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_APP_ID : undefined;
-// @ts-ignore
-const envStorageBucket = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : undefined;
-// @ts-ignore
-const envMessagingSenderId = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID : undefined;
-// @ts-ignore
-const envFirestoreDatabaseId = typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || import.meta.env.VITE_FIREBASE_DB_ID) : undefined;
+const app = initializeApp(firebaseConfig);
 
-const envConfig = {
-  apiKey: envApiKey,
-  authDomain: envAuthDomain,
-  projectId: envProjectId,
-  appId: envAppId,
-  storageBucket: envStorageBucket,
-  messagingSenderId: envMessagingSenderId,
-  firestoreDatabaseId: envFirestoreDatabaseId
-};
-
-const isLiveDomain = typeof window !== 'undefined' && (
-  window.location.hostname === 'tazumartbd.com' || 
-  window.location.hostname === 'www.tazumartbd.com' ||
-  window.location.hostname.endsWith('.tazumartbd.com')
-);
-
-const finalProjectId = isLiveDomain 
-  ? (envConfig.projectId || "tazu-mart-bd-dfcda") 
-  : (envConfig.projectId || firebaseConfig.projectId);
-
-const finalConfig = {
-  apiKey: envConfig.apiKey || firebaseConfig.apiKey,
-  // Ensure authDomain is exactly <project-id>.firebaseapp.com if using custom auth configs
-  authDomain: isLiveDomain 
-    ? "tazu-mart-bd-dfcda.firebaseapp.com" 
-    : (envConfig.authDomain || (finalProjectId ? `${finalProjectId}.firebaseapp.com` : firebaseConfig.authDomain)),
-  projectId: finalProjectId,
-  appId: envConfig.appId || firebaseConfig.appId,
-  storageBucket: envConfig.storageBucket || (isLiveDomain ? "tazu-mart-bd-dfcda.firebasestorage.app" : firebaseConfig.storageBucket),
-  messagingSenderId: envConfig.messagingSenderId || firebaseConfig.messagingSenderId,
-  firestoreDatabaseId: envConfig.firestoreDatabaseId || (firebaseConfig as any).firestoreDatabaseId
-};
-
-const app = initializeApp(finalConfig);
-
-export const db = finalConfig.firestoreDatabaseId 
-  ? getFirestore(app, finalConfig.firestoreDatabaseId)
+export const db = (firebaseConfig as any).firestoreDatabaseId 
+  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
   : getFirestore(app);
 
 export const auth = getAuth(app);
