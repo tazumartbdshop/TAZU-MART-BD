@@ -5,10 +5,32 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import firebaseConfig from "../../firebase-applet-config.json";
 
-const app = initializeApp(firebaseConfig);
+// Dynamically read VITE_ environment variables to enable custom production configurations on live domains
+const metaEnv = (import.meta as any).env || {};
+const envConfig = {
+  apiKey: metaEnv.VITE_FIREBASE_API_KEY,
+  authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: metaEnv.VITE_FIREBASE_PROJECT_ID,
+  appId: metaEnv.VITE_FIREBASE_APP_ID,
+  storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  firestoreDatabaseId: metaEnv.VITE_FIREBASE_FIRESTORE_DATABASE_ID || metaEnv.VITE_FIREBASE_DB_ID
+};
 
-export const db = (firebaseConfig as any).firestoreDatabaseId 
-  ? getFirestore(app, (firebaseConfig as any).firestoreDatabaseId)
+const finalConfig = {
+  apiKey: envConfig.apiKey || firebaseConfig.apiKey,
+  authDomain: envConfig.authDomain || firebaseConfig.authDomain,
+  projectId: envConfig.projectId || firebaseConfig.projectId,
+  appId: envConfig.appId || firebaseConfig.appId,
+  storageBucket: envConfig.storageBucket || firebaseConfig.storageBucket,
+  messagingSenderId: envConfig.messagingSenderId || firebaseConfig.messagingSenderId,
+  firestoreDatabaseId: envConfig.firestoreDatabaseId || (firebaseConfig as any).firestoreDatabaseId
+};
+
+const app = initializeApp(finalConfig);
+
+export const db = finalConfig.firestoreDatabaseId 
+  ? getFirestore(app, finalConfig.firestoreDatabaseId)
   : getFirestore(app);
 
 export const auth = getAuth(app);
