@@ -37,13 +37,18 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   isLoaded: false,
   
   addCategory: async (payload) => {
-    const id = doc(collection(db, 'categories')).id;
-    const newCategory: Category = {
-      ...payload,
-      id,
-      createdAt: new Date().toISOString(),
-    };
-    await setDoc(doc(db, 'categories', id), newCategory);
+    try {
+      const id = doc(collection(db, 'categories')).id;
+      const newCategory: Category = {
+        ...payload,
+        id,
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, 'categories', id), newCategory);
+    } catch (error) {
+      console.error("Firebase setDoc error in addCategory:", error);
+      throw error;
+    }
   },
   
   updateCategory: async (id, payload) => {
@@ -51,6 +56,26 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   },
   
   deleteCategory: async (id) => {
+    const category = get().categories.find(c => c.id === id);
+    if (category) {
+      try {
+        const { deleteImage } = await import('../lib/imageUtils');
+        const urlsToDelete = new Set<string>();
+        if (category.iconImage) urlsToDelete.add(category.iconImage);
+        if (category.bannerImage) urlsToDelete.add(category.bannerImage);
+        if (category.bannerImages && Array.isArray(category.bannerImages)) {
+          category.bannerImages.forEach(img => {
+            if (img) urlsToDelete.add(img);
+          });
+        }
+        
+        // Execute background deletions securely
+        Promise.all(Array.from(urlsToDelete).map(url => deleteImage(url)))
+          .catch(err => console.warn("Failed to delete some category storage files:", err));
+      } catch (importErr) {
+        console.error("Failed to import imageUtils during deleteCategory:", importErr);
+      }
+    }
     await deleteDoc(doc(db, 'categories', id));
   },
   

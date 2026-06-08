@@ -163,22 +163,28 @@ export default function AddCategory() {
     if (!formData.name.trim()) return;
     
     setIsLoading(true);
-    const { uploadImage } = await import('../../lib/imageUtils');
+    console.log("handleSubmit started: Uploading images...");
 
     try {
+        const { uploadImage } = await import('../../lib/imageUtils');
+        
         // Upload thumbnail if changed
         let iconUrl = formData.iconImage;
         if (thumbnailFile) {
+          console.log("Uploading thumbnail...");
           iconUrl = await uploadImage(thumbnailFile, 'categories', `icon-${formData.slug}`);
+          console.log("Thumbnail uploaded, URL:", iconUrl);
         }
 
         // Upload all new banners
+        console.log("Uploading banners...");
         const finalBannerUrls = await Promise.all(
           bannerFiles.map(async (fileOrUrl) => {
             if (typeof fileOrUrl === 'string') return fileOrUrl;
             return await uploadImage(fileOrUrl, 'categories', `banner-${formData.slug}-${Math.random().toString(36).substring(7)}`);
           })
         );
+        console.log("Banners uploaded, URLs:", finalBannerUrls);
 
         const payload = {
           name: formData.name,
@@ -197,10 +203,13 @@ export default function AddCategory() {
           keywords: formData.keywords
         };
 
+        console.log("Uploading payload to Firestore...");
         if (isEditing && id) {
           await updateCategory(id, payload);
+          console.log("Category updated.");
         } else {
           await addCategory(payload);
+          console.log("Category added.");
         }
         
         toast.success("✅ Category Saved Successfully", {
@@ -213,11 +222,13 @@ export default function AddCategory() {
           }
         });
         
+        navigate('/admin/category-listing');
+    } catch (error: any) {
+        console.error("Save Category Error:", error);
+        toast.error(`❌ Failed to save category: ${error.message || error}`);
+    } finally {
         setIsLoading(false);
-        navigate('/admin/categories');
-    } catch (error) {
-        toast.error("❌ Failed to save category");
-        setIsLoading(false);
+        console.log("handleSubmit finished (finally block).");
     }
   };
 
@@ -227,7 +238,7 @@ export default function AddCategory() {
         <div className="flex items-center gap-3">
           <button 
             type="button" 
-            onClick={() => navigate('/admin/categories')} 
+            onClick={() => navigate('/admin/category-listing')} 
             className="p-2 border border-zinc-200 rounded-none bg-white hover:bg-gray-100 mr-1"
           >
             <ChevronLeft className="w-4 h-4 text-black" />
@@ -238,7 +249,7 @@ export default function AddCategory() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12">
+      <form onSubmit={(e) => handleSubmit(e)} className="grid grid-cols-1 lg:grid-cols-12">
         {/* Main form configuration */}
         <div className="lg:col-span-8 p-6 md:p-10 border-r border-zinc-200">
           
@@ -264,7 +275,7 @@ export default function AddCategory() {
             </button>
           </div>
 
-          <form onSubmit={(e) => handleSubmit(e)} className="space-y-8">
+          <div className="space-y-8">
             {activeTab === 'general' ? (
               <div className="space-y-8">
                 {/* 1. Category name and slug */}
@@ -488,7 +499,7 @@ export default function AddCategory() {
                 </div>
               </div>
             )}
-          </form>
+          </div>
         </div>
 
         {/* Sidebar Status / Position settings */}
@@ -585,8 +596,7 @@ export default function AddCategory() {
             {/* Save Buttons */}
             <div className="pt-8">
               <button
-                type="button"
-                onClick={(e) => handleSubmit(e)}
+                type="submit"
                 className="w-full bg-black hover:bg-zinc-900 border border-black text-white py-4 font-black uppercase text-xs tracking-widest text-center cursor-pointer transition-colors disabled:bg-zinc-700 disabled:cursor-not-allowed"
                 disabled={isLoading}
               >
@@ -595,7 +605,7 @@ export default function AddCategory() {
             </div>
           </div>
         </div>
+      </form>
       </div>
-    </div>
-  );
-}
+    );
+  }

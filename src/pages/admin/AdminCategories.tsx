@@ -16,7 +16,7 @@ export default function AdminCategories() {
       {/* Category Tabs Menu System */}
       <div className="flex border-b border-zinc-200 select-none bg-white">
         <Link 
-          to="/admin/categories" 
+          to="/admin/category-listing" 
           className={`px-8 py-4 text-xs font-black uppercase tracking-[0.2em] border-b-2 transition-all ${
             isListing 
               ? 'border-b-4 border-black text-black' 

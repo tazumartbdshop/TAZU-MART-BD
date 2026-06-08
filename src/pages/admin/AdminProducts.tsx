@@ -487,6 +487,7 @@ function AdminProductAdd() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+    console.log("handleSubmit started for Product...");
     
     const formData = new FormData(e.currentTarget);
     
@@ -510,12 +511,15 @@ function AdminProductAdd() {
 
     try {
         const { uploadImage } = await import('../../lib/imageUtils');
+        console.log("Image utils imported.");
 
         // 1. Upload Product Banner if needed
         let finalBannerUrl = bannerImage;
         if (bannerFile) {
+          console.log("Uploading product banner...");
           try {
             finalBannerUrl = await uploadImage(bannerFile, 'products', bannerFile.name);
+            console.log("Banner uploaded.");
           } catch (err) {
             console.error("Banner upload error:", err);
             throw new Error("Failed to upload product banner.");
@@ -524,6 +528,7 @@ function AdminProductAdd() {
 
         // 2. Upload any newly selected/modified files to Firebase Storage
         const finalImageUrls: string[] = [];
+        console.log("Uploading product images...");
         
         for (const img of uploadedImages) {
           if (img.file && (img.url.startsWith('blob:') || img.url.startsWith('data:'))) {
@@ -539,6 +544,7 @@ function AdminProductAdd() {
             finalImageUrls.push(img.url);
           }
         }
+        console.log("Product images uploaded.");
 
         const mainImage = finalImageUrls[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60';
 
@@ -554,6 +560,7 @@ function AdminProductAdd() {
           description: formData.get('long_description') as string,
           status: 'active' as const,
           image: mainImage,
+          imageUrl: mainImage,
           featured_image: mainImage,
           banner_image: finalBannerUrl,
           videoUrl: videoUrl,
@@ -582,10 +589,13 @@ function AdminProductAdd() {
           )
         };
 
+        console.log("Saving payload to Firestore...");
         if (isEditing && id) {
           await updateProduct(id, payload);
+          console.log("Product updated.");
         } else {
           await addProduct(payload);
+          console.log("Product added.");
         }
         
         toast.success("✅ Product Saved Successfully", {
@@ -598,12 +608,13 @@ function AdminProductAdd() {
           }
         });
         
-        setLoading(false);
-        navigate('/admin/products');
+        navigate('/admin/product-listing');
     } catch (error: any) {
         console.error("Error saving product:", error);
         toast.error(error?.message || "❌ Failed to save product");
+    } finally {
         setLoading(false);
+        console.log("handleSubmit finished (finally block).");
     }
   };
 
@@ -613,14 +624,14 @@ function AdminProductAdd() {
            <div className="flex items-center gap-3">
               <button 
                 type="button"
-                onClick={() => navigate('/admin/products')}
+                onClick={() => navigate('/admin/product-listing')}
                 className="p-2 border border-zinc-200 rounded-none bg-white hover:bg-gray-100 mr-1"
               >
                 <ChevronLeft className="w-4 h-4 text-black" />
               </button>
               <h3 className="text-sm font-black text-black uppercase tracking-widest">{isEditing ? 'EDIT PRODUCT' : 'ADD PRODUCT'}</h3>
            </div>
-           <button onClick={() => navigate('/admin/products')} className="text-gray-400 hover:text-black bg-white border border-zinc-200 p-2 rounded-none transition-colors">
+           <button onClick={() => navigate('/admin/product-listing')} className="text-gray-400 hover:text-black bg-white border border-zinc-200 p-2 rounded-none transition-colors">
              <X className="w-4 h-4" />
            </button>
         </div>

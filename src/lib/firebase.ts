@@ -14,6 +14,8 @@ export const db = (firebaseConfig as any).firestoreDatabaseId
 export const auth = getAuth(app);
 
 export const storage = getStorage(app);
+storage.maxUploadRetryTime = 4000;
+storage.maxOperationRetryTime = 4000;
 
 export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 

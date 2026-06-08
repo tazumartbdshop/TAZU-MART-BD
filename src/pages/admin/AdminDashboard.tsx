@@ -505,9 +505,12 @@ export default function AdminDashboard() {
         <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
            <Routes>
               <Route path="/" element={<PermissionGate moduleId="dashboard"><Overview /></PermissionGate>} />
+              <Route path="/categories/*" element={<PermissionGate moduleId="categories"><AdminCategories /></PermissionGate>} />
+              <Route path="/category-listing/*" element={<PermissionGate moduleId="categories"><AdminCategories /></PermissionGate>} />
+              <Route path="/category-add/*" element={<PermissionGate moduleId="categories"><AdminCategories /></PermissionGate>} />
+              <Route path="/product-listing/*" element={<PermissionGate moduleId="products"><AdminProducts /></PermissionGate>} />
               <Route path="/products/*" element={<PermissionGate moduleId="products"><AdminProducts /></PermissionGate>} />
               <Route path="/offers/*" element={<PermissionGate moduleId="products"><AdminOffers /></PermissionGate>} />
-              <Route path="/categories/*" element={<PermissionGate moduleId="categories"><AdminCategories /></PermissionGate>} />
               <Route path="/orders/*" element={<PermissionGate moduleId="orders"><AdminOrders /></PermissionGate>} />
               <Route path="/orders/incomplete" element={<PermissionGate moduleId="orders"><AdminIncompleteOrders /></PermissionGate>} />
               <Route path="/live-tracking" element={<PermissionGate moduleId="dashboard"><AdminLiveTracking /></PermissionGate>} />
