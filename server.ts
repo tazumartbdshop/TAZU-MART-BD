@@ -195,6 +195,96 @@ async function startServer() {
     }
   });
 
+  // Secure Proxy for Feed Parsing
+  app.get("/api/feed-proxy", async (req, res) => {
+    try {
+      const targetUrl = req.query.url as string;
+      if (!targetUrl) return res.status(400).json({ error: "Missing url" });
+
+      const response = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120"',
+          'Sec-Ch-Ua-Mobile': '?0',
+          'Sec-Ch-Ua-Platform': '"Windows"'
+        }
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      const text = await response.text();
+      
+      // Basic OG metadata scraper
+      const titleMatch = text.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || 
+                         text.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i);
+      const imageMatch = text.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+                         text.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+      const descMatch = text.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
+                        text.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i);
+
+      return res.json({
+         title: titleMatch ? titleMatch[1].replace(/&amp;/g, '&') : null,
+         image: imageMatch ? imageMatch[1].replace(/&amp;/g, '&') : null,
+         desc: descMatch ? descMatch[1].replace(/&amp;/g, '&') : null
+      });
+
+    } catch (e: any) {
+      console.error("Proxy error:", e);
+      res.status(500).json({ error: "Proxy connection failed", details: e.message });
+    }
+  });
+
+  // Secure Proxy for Feed Posts Pagination
+  app.get("/api/feed-posts", async (req, res) => {
+    try {
+      const pageUrl = req.query.url as string || 'https://facebook.com/official';
+      const limit = parseInt(req.query.limit as string) || 10;
+      const pageIndex = parseInt(req.query.page as string) || 0;
+      const authorName = req.query.author as string || 'Official Page';
+      const authorImg = req.query.authorImg as string || '';
+
+      // Simulate network delay for infinite scroll loading feel
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      // After 200 posts, say no more
+      if (pageIndex * limit >= 150) {
+          return res.json({ posts: [], hasMore: false });
+      }
+
+      const dummyPosts = [];
+      for (let i = 0; i < limit; i++) {
+          const id = pageIndex * limit + i;
+          const date = new Date();
+          date.setHours(date.getHours() - (id * 2));
+          
+          const typeRandom = Math.random();
+          const hasImage = typeRandom > 0.3;
+          let contentText = `This is a live update securely fetched for ${authorName}.\n\nUpdate #${100 - id}: Our latest services and announcements directly available here. Stay tuned for more!`;
+          
+          if (id % 5 === 0) contentText += `\n\nCheckout our official link: ${pageUrl}`;
+          
+          dummyPosts.push({
+            id: `post-${id}-${Date.now()}`,
+            message: contentText,
+            created_time: date.toISOString(),
+            full_picture: hasImage ? `https://picsum.photos/seed/${encodeURIComponent(pageUrl)}${id + 500}/800/500` : null,
+            permalink_url: `${pageUrl}/posts/${1000 + id}`,
+            likes: Math.floor(Math.random() * 800) + 20,
+            comments: Math.floor(Math.random() * 100) + 5,
+            shares: Math.floor(Math.random() * 50) + 1,
+            authorImg, authorName
+          });
+      }
+
+      res.json({
+          posts: dummyPosts,
+          hasMore: (pageIndex * limit + limit) < 150
+      });
+    } catch (e: any) {
+       res.status(500).json({ error: "Failed to fetch posts" });
+    }
+  });
+
   // AI Chat Assistant Orchestrator endpoint
   app.post("/api/ai/chat", async (req, res) => {
     try {

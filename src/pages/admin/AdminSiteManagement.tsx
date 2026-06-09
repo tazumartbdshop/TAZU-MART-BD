@@ -113,13 +113,18 @@ export default function AdminSiteManagement() {
                 icon={LinkIcon}
                 placeholder="https://developer-site.com"
               />
-              <div className="md:col-span-2">
-                 <ColorInput 
-                    label="Background Color / Gradient"
-                    value={localData.developer_color}
-                    onChange={(v) => handleInputChange('developer_color', v)}
-                 />
-              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-zinc-100">
+              <StatusToggle 
+                label="Open In New Tab" 
+                isEnabled={localData.developer_new_tab} 
+                onChange={(v) => handleInputChange('developer_new_tab', v)} 
+              />
+              <StatusToggle 
+                label="Internal WebView" 
+                isEnabled={localData.developer_webview} 
+                onChange={(v) => handleInputChange('developer_webview', v)} 
+              />
             </div>
           </SectionCard>
 
@@ -146,39 +151,97 @@ export default function AdminSiteManagement() {
                 icon={LinkIcon}
                 placeholder="https://fashion-site.com"
               />
-              <div className="md:col-span-2">
-                 <ColorInput 
-                    label="Background Color / Gradient"
-                    value={localData.fashion_color}
-                    onChange={(v) => handleInputChange('fashion_color', v)}
-                 />
-              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-zinc-100">
+              <StatusToggle 
+                label="Open In New Tab" 
+                isEnabled={localData.fashion_new_tab} 
+                onChange={(v) => handleInputChange('fashion_new_tab', v)} 
+              />
+              <StatusToggle 
+                label="Internal WebView" 
+                isEnabled={localData.fashion_webview} 
+                onChange={(v) => handleInputChange('fashion_webview', v)} 
+              />
             </div>
           </SectionCard>
 
           {/* Button 3: Facebook */}
-          <SectionCard title="Button 3: Facebook Updates" icon={Facebook}>
+          <SectionCard title="Facebook Updates Feed" icon={Facebook}>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <StatusToggle 
-                  label="Enable Button" 
+                  label="Enable Live Feed Page" 
                   isEnabled={localData.facebook_status} 
                   onChange={(v) => handleInputChange('facebook_status', v)} 
                 />
               </div>
-              <InputField 
-                label="Button Label" 
-                value={localData.facebook_button_name} 
-                onChange={(v) => handleInputChange('facebook_button_name', v)}
-                icon={Type}
-              />
-              <InputField 
-                label="Facebook Link" 
-                value={localData.facebook_link} 
-                onChange={(v) => handleInputChange('facebook_link', v)}
-                icon={LinkIcon}
-                placeholder="https://facebook.com/page-name"
-              />
+              
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField 
+                    label="Feed Title" 
+                    value={localData.facebook_feed_title || 'Facebook Updates'} 
+                    onChange={(v) => handleInputChange('facebook_feed_title', v)}
+                    icon={Type}
+                />
+                <InputField 
+                    label="Facebook Feed Source URL" 
+                    value={localData.facebook_link} 
+                    onChange={(v) => handleInputChange('facebook_link', v)}
+                    icon={LinkIcon}
+                    placeholder="https://facebook.com/your-page"
+                />
+              </div>
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-zinc-100 text-left">
+                <StatusToggle 
+                  label="Open In New Tab" 
+                  isEnabled={localData.facebook_new_tab} 
+                  onChange={(v) => handleInputChange('facebook_new_tab', v)} 
+                />
+                <StatusToggle 
+                  label="Internal WebView" 
+                  isEnabled={localData.facebook_webview} 
+                  onChange={(v) => handleInputChange('facebook_webview', v)} 
+                />
+              </div>
+
+              <div className="md:col-span-2 mt-4 space-y-4 border-t border-zinc-100 pt-6">
+                <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-800">Page Profile Settings</h4>
+                <p className="text-xs text-zinc-500 mb-2">Display settings for the official page viewer.</p>
+                <StatusToggle 
+                  label="Show Header Information" 
+                  isEnabled={localData.facebook_show_header ?? true} 
+                  onChange={(v) => handleInputChange('facebook_show_header', v)} 
+                />
+                <StatusToggle 
+                  label="Show Cover Banner" 
+                  isEnabled={localData.facebook_show_cover ?? true} 
+                  onChange={(v) => handleInputChange('facebook_show_cover', v)} 
+                />
+              </div>
+
+              <div className="md:col-span-2 mt-4 space-y-4 border-t border-zinc-100 pt-6">
+                <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-800">Feed Engine Settings</h4>
+                
+                <StatusToggle 
+                  label="Auto Refresh Feed" 
+                  isEnabled={localData.facebook_auto_refresh ?? true} 
+                  onChange={(v) => handleInputChange('facebook_auto_refresh', v)} 
+                />
+                
+                <div className="w-full">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-2">Posts Per Load</label>
+                  <select 
+                    value={localData.facebook_posts_per_load ?? 10} 
+                    onChange={(e) => handleInputChange('facebook_posts_per_load', Number(e.target.value))}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 text-sm focus:outline-none focus:border-black focus:bg-white transition-all rounded-none font-bold"
+                  >
+                    {[10, 20, 30].map(num => (
+                       <option key={num} value={num}>{num} / Scroll</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
           </SectionCard>
 
@@ -215,25 +278,23 @@ export default function AdminSiteManagement() {
                 
                 <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Site Links</h3>
                 
-                <div className="flex flex-col gap-[12px]">
+                <div className="flex flex-col gap-3">
                   {localData.developer_status && (
                     <PreviewButton 
                       name={localData.developer_button_name}
-                      color={localData.developer_color}
                       icon={Code}
                     />
                   )}
                   {localData.fashion_status && (
                     <PreviewButton 
                       name={localData.fashion_button_name}
-                      color={localData.fashion_color}
                       icon={Store}
                     />
                   )}
                   {localData.facebook_status && (
                     <PreviewButton 
                       name={localData.facebook_button_name}
-                      color="#1877F2"
+                      isBlue={true}
                       icon={Facebook}
                     />
                   )}
@@ -361,22 +422,18 @@ function StatusToggle({ label, isEnabled, onChange }: { label: string, isEnabled
   );
 }
 
-function PreviewButton({ name, color, icon: Icon }: { name: string, color: string, icon: any }) {
+function PreviewButton({ name, icon: Icon, isBlue }: { name: string, isBlue?: boolean, icon: any }) {
   return (
     <div 
-      className="w-full h-[52px] rounded-[10px] flex items-center justify-between px-4 text-white transition-all relative overflow-hidden"
-      style={{ 
-        background: color,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-      }}
+      className="w-full h-14 bg-white border border-gray-200 rounded-[14px] flex items-center justify-between px-4 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
     >
-      <div className="flex items-center gap-3 relative z-10">
-        <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-[8px] flex items-center justify-center shrink-0">
-           <Icon className="w-5 h-5" />
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 ${isBlue ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-600'}`}>
+           <Icon className="w-4 h-4" />
         </div>
-        <span className="font-semibold text-[15px]">{name}</span>
+        <span className="font-bold text-[13px] text-gray-800 tracking-tight">{name}</span>
       </div>
-      <ArrowRight className="w-4 h-4 text-white/60" />
+      <ArrowRight className="w-4 h-4 text-gray-300" />
     </div>
   );
 }

@@ -9,7 +9,10 @@ import {
   signInWithRedirect,
   getRedirectResult,
   GoogleAuthProvider,
-  FacebookAuthProvider
+  FacebookAuthProvider,
+  OAuthProvider,
+  GithubAuthProvider,
+  TwitterAuthProvider
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -19,10 +22,13 @@ import { useModeratorStore } from '../store/useModeratorStore';
 import { useLoginHistoryStore } from '../store/useLoginHistoryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useWebsitesStore } from '../store/useWebsitesStore';
+import { useLoginProviderStore } from '../store/useLoginProviderStore';
 import { cn } from '../lib/utils';
 import { pixelService } from '../utils/pixelService';
+import { getProviderIcon } from '../components/ProviderIcon';
 
 export default function Login() {
+  const { providers, fetchProviders } = useLoginProviderStore();
   const { settings } = useSettingsStore();
   const ADMIN_EMAIL = (settings.adminEmail && settings.adminEmail !== "admin@tazumart.com" ? settings.adminEmail : "admin.tazumartbd@gmail.com").toLowerCase().trim();
   const ADMIN_PASSWORD = settings.adminPassword && settings.adminPassword !== "12345678" ? settings.adminPassword : "8963885522";
@@ -40,6 +46,10 @@ export default function Login() {
 
   const from = location.state?.from?.pathname || '/account/dashboard';
   const adminFrom = location.state?.from?.pathname || '/admin';
+
+  useEffect(() => {
+    fetchProviders();
+  }, [fetchProviders]);
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
@@ -70,7 +80,7 @@ export default function Login() {
           const photoURL = fbUser.photoURL || '';
 
           try {
-            await setDoc(doc(db, 'users', fbUser.uid), {
+            setDoc(doc(db, 'users', fbUser.uid), {
               uid: fbUser.uid,
               name,
               email,
@@ -126,6 +136,7 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     if (!identifier.trim() || !password.trim()) {
       setError('Please enter your credentials');
       return;
@@ -170,7 +181,7 @@ export default function Login() {
 
           if (firebaseUser) {
             try {
-              await setDoc(doc(db, 'users', firebaseUser.uid), {
+              setDoc(doc(db, 'users', firebaseUser.uid), {
                 uid: firebaseUser.uid,
                 name: matchedSite.website_name + ' Admin',
                 email: matchedSite.admin_email,
@@ -231,7 +242,7 @@ export default function Login() {
 
           if (firebaseUser) {
             try {
-              await setDoc(doc(db, 'users', firebaseUser.uid), {
+              setDoc(doc(db, 'users', firebaseUser.uid), {
                 uid: firebaseUser.uid,
                 name: 'Super Admin',
                 email: ADMIN_EMAIL,
@@ -293,7 +304,7 @@ export default function Login() {
 
           if (firebaseUser) {
             try {
-              await setDoc(doc(db, 'users', firebaseUser.uid), {
+              setDoc(doc(db, 'users', firebaseUser.uid), {
                 uid: firebaseUser.uid,
                 name: moderator.name,
                 email: moderator.email,
@@ -439,7 +450,7 @@ export default function Login() {
         const postalCode = dbUser?.postalCode || localCust?.address?.zipCode || '';
 
         try {
-          await setDoc(doc(db, 'users', firebaseUser.uid), {
+          setDoc(doc(db, 'users', firebaseUser.uid), {
             uid: firebaseUser.uid,
             name,
             email,
@@ -516,56 +527,7 @@ export default function Login() {
   const isPhoneInput = /^\+?[0-9\s-]*$/.test(identifier) && identifier.length > 2;
 
   if (isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-neutral-50/50 flex flex-col items-center justify-center p-4 font-sans text-neutral-900">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98, y: 10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="w-full max-w-[440px] bg-white p-6 md:p-8 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-neutral-150 text-center"
-        >
-          <div className="flex flex-col items-center mb-6">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm select-none">
-                T
-              </div>
-              <span className="text-base font-bold tracking-tight text-neutral-950 uppercase">Tazu Mart BD</span>
-            </Link>
-            
-            <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center border border-neutral-100 mb-4 text-emerald-600">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
-            
-            <h2 className="text-lg font-bold text-neutral-900">Session Verified</h2>
-            <p className="text-xs text-neutral-500 mt-1">
-              You are signed in as a <span className="font-semibold text-neutral-800 uppercase text-[10px] bg-neutral-100 px-2 py-0.5 rounded-full">{user?.role}</span>
-            </p>
-          </div>
-
-          <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 text-left mb-6 space-y-1">
-            <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Account Active</div>
-            <div className="text-sm font-bold text-neutral-800 truncate">{user?.name}</div>
-            <div className="text-xs text-neutral-500 font-medium truncate">{user?.email || 'No email attached'}</div>
-          </div>
-
-          <div className="space-y-3">
-            <Link 
-              to={user?.role === 'admin' ? '/admin' : '/account/dashboard'}
-              className="w-full h-12 bg-neutral-950 text-white rounded-[14px] text-xs font-bold uppercase tracking-wider hover:bg-neutral-900 transition-all flex justify-center items-center gap-2 active:scale-[0.98] cursor-pointer"
-            >
-              <span>Go to Dashboard</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            
-            <button 
-              onClick={() => useAuthStore.getState().logout()}
-              className="w-full h-11 bg-white border border-neutral-200 text-neutral-600 rounded-[14px] text-xs font-semibold hover:bg-neutral-50 hover:text-neutral-800 transition-all cursor-pointer"
-            >
-              Sign Out Securely
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -669,196 +631,149 @@ export default function Login() {
 
           <button 
             type="submit"
-            disabled={isLoading}
-            className="w-full h-[54px] bg-neutral-950 text-white rounded-[14px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all duration-200 flex justify-center items-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
+            className="w-full h-[54px] bg-neutral-950 text-white rounded-[14px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all duration-200 flex justify-center items-center gap-2 cursor-pointer shadow-sm"
           >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-white" /> : (
+            {isLoading ? (
+              <span>SIGNING IN...</span>
+            ) : (
               <span>SIGN IN</span>
             )}
           </button>
         </form>
 
-        {/* Divider */}
-        <div className="my-5 flex items-center gap-3">
-          <div className="h-px bg-neutral-200 flex-1"></div>
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-300 select-none">or continue with</span>
-          <div className="h-px bg-neutral-200 flex-1"></div>
-        </div>
-
         {/* Social Authentication */}
-        <div className="grid grid-cols-2 gap-3">
-           <button 
-            type="button"
-            onClick={async () => {
-              setIsLoading(true);
-              setError('');
-              try {
-                const currentHost = window.location.hostname;
-                if (currentHost.includes('run.app') || currentHost.includes('web.app')) {
-                  setError(
-                    "Google Sign-In is configured to run exclusively on the live custom domain (tazumartbd.com) to maintain absolute security. Please sign in using your standard email/password credentials or mobile login here, or access the live web store at https://tazumartbd.com to sign in with Google."
-                  );
-                  setIsLoading(false);
-                  return;
-                }
+        {!identifier.trim() && !password.trim() && providers.filter(p => p.enabled && p.id !== 'email_password').length > 0 && (
+          <div className="mt-5">
+            <div className="my-5 flex items-center gap-3">
+              <div className="h-px bg-neutral-200 flex-1"></div>
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-300 select-none">or continue with</span>
+              <div className="h-px bg-neutral-200 flex-1"></div>
+            </div>
+            
+            <div className={cn(
+              "grid gap-3",
+              providers.filter(p => p.enabled && p.id !== 'email_password').length === 1 ? "grid-cols-1" : "grid-cols-2"
+            )}>
+              {providers.filter(p => p.enabled && p.id !== 'email_password').map(provider => (
+                <button 
+                  key={provider.id}
+                  type="button"
+                  onClick={async () => {
+                    setIsLoading(true);
+                    setError('');
+                    try {
+                      let authProvider;
+                      if (provider.id === 'google') {
+                        const currentHost = window.location.hostname;
+                        if (currentHost.includes('run.app') || currentHost.includes('web.app')) {
+                          setError("Google Sign-In is configured to run exclusively on the live custom domain to maintain absolute security.");
+                          setIsLoading(false);
+                          return;
+                        }
+                        authProvider = new GoogleAuthProvider();
+                        authProvider.setCustomParameters({ prompt: 'select_account' });
+                      } else if (provider.id === 'facebook') {
+                        authProvider = new FacebookAuthProvider();
+                      } else if (provider.id === 'apple') {
+                        authProvider = new OAuthProvider('apple.com');
+                      } else if (provider.id === 'microsoft') {
+                        authProvider = new OAuthProvider('microsoft.com');
+                      } else if (provider.id === 'github') {
+                        authProvider = new GithubAuthProvider();
+                      } else if (provider.id === 'twitter') {
+                        authProvider = new TwitterAuthProvider();
+                      } else if (provider.id === 'yahoo') {
+                        authProvider = new OAuthProvider('yahoo.com');
+                      } else {
+                        setError(`Provider ${provider.name} is currently unsupported in this demo.`);
+                        setIsLoading(false);
+                        return;
+                      }
 
-                const provider = new GoogleAuthProvider();
-                provider.setCustomParameters({ prompt: 'select_account' });
+                      let result;
+                      try {
+                        result = await signInWithPopup(auth, authProvider);
+                      } catch (popupErr: any) {
+                        if (
+                          popupErr.code === 'auth/popup-blocked' || 
+                          popupErr.code === 'auth/unauthorized-domain' || 
+                          popupErr.code === 'auth/unauthorized-client' ||
+                          popupErr.code === 'auth/web-storage-unsupported' ||
+                          window.innerWidth < 768
+                        ) {
+                          console.log(`Popup failed (${popupErr.code}). Direct redirect initiated...`);
+                          await signInWithRedirect(auth, authProvider);
+                          return;
+                        } else {
+                          throw popupErr;
+                        }
+                      }
 
-                let result;
-                try {
-                  result = await signInWithPopup(auth, provider);
-                } catch (popupErr: any) {
-                  // If popup is blocked, unauthorized, or storage fails (common on custom domains/restricted cookies), use redirection as a resilient fallback
-                  if (
-                    popupErr.code === 'auth/popup-blocked' || 
-                    popupErr.code === 'auth/unauthorized-domain' || 
-                    popupErr.code === 'auth/unauthorized-client' ||
-                    popupErr.code === 'auth/web-storage-unsupported' ||
-                    window.innerWidth < 768
-                  ) {
-                    console.log(`Popup failed (${popupErr.code}). Resilient direct redirect initiated...`);
-                    await signInWithRedirect(auth, provider);
-                    return; // Redirecting...
-                  } else {
-                    throw popupErr;
-                  }
-                }
+                      const fbUser = result.user;
+                      const email = fbUser.email || '';
+                      const name = fbUser.displayName || `${provider.name} User`;
+                      const phone = fbUser.phoneNumber || '';
+                      const photoURL = fbUser.photoURL || '';
 
-                const fbUser = result.user;
-                const email = fbUser.email || '';
-                const name = fbUser.displayName || 'Google User';
-                const phone = fbUser.phoneNumber || '';
-                const photoURL = fbUser.photoURL || '';
+                      try {
+                        setDoc(doc(db, 'users', fbUser.uid), {
+                          uid: fbUser.uid,
+                          name,
+                          email,
+                          phone,
+                          role: 'customer',
+                          status: 'Active',
+                          createdAt: serverTimestamp(),
+                          lastLoginAt: serverTimestamp(),
+                          profileImage: photoURL,
+                        }, { merge: true });
+                      } catch (fsErr) {
+                        handleFirestoreError(fsErr, OperationType.WRITE, `users/${fbUser.uid}`);
+                      }
 
-                try {
-                  await setDoc(doc(db, 'users', fbUser.uid), {
-                    uid: fbUser.uid,
-                    name,
-                    email,
-                    phone,
-                    role: 'customer',
-                    status: 'Active',
-                    createdAt: serverTimestamp(),
-                    lastLoginAt: serverTimestamp(),
-                    profileImage: photoURL,
-                  }, { merge: true });
-                } catch (fsErr) {
-                  handleFirestoreError(fsErr, OperationType.WRITE, `users/${fbUser.uid}`);
-                }
+                      useLoginHistoryStore.getState().addLoginEvent({
+                        name,
+                        email,
+                        method: `${provider.name} Login`,
+                        profileImage: photoURL,
+                      });
 
-                useLoginHistoryStore.getState().addLoginEvent({
-                  name,
-                  email,
-                  method: 'Google Login',
-                  profileImage: photoURL,
-                });
+                      login({
+                        id: fbUser.uid,
+                        name,
+                        email,
+                        phone,
+                        role: 'customer',
+                        profileImage: photoURL,
+                      });
 
-                login({
-                  id: fbUser.uid,
-                  name,
-                  email,
-                  phone,
-                  role: 'customer',
-                  profileImage: photoURL,
-                });
-
-                pixelService.trackLogin(fbUser.uid);
-                navigate('/account/dashboard');
-              } catch (err: any) {
-                if (err.code !== 'auth/operation-not-allowed' && err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-                  console.error(err);
-                }
-                if (err.code === 'auth/operation-not-allowed') {
-                  setError("Firebase 'Google' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Google' and enable it.");
-                } else if (err.code === 'auth/unauthorized-domain' || err.code === 'auth/unauthorized-client') {
-                  setError(
-                    `Unauthorized Domain: ${window.location.hostname} has not been whitelisted in this Firebase project, or the Firebase config "authDomain" is incorrect. Important Note: If you are hosting a custom domain outside of Firebase Hosting (e.g. Cloud Run/VPS), you MUST keep the Firebase "authDomain" configured to your default Firebase project domain (e.g., "${auth.app.options.authDomain || 'project-id.firebaseapp.com'}"). Do not change it to your custom domain.`
-                  );
-                } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-                  // user closed popup, ignore
-                } else {
-                  setError(err.message || 'Google Login failed.');
-                }
-              } finally {
-                setIsLoading(false);
-              }
-            }}
-            className="h-11 border border-neutral-200 rounded-[14px] bg-white text-xs font-bold text-neutral-700 hover:bg-neutral-50 flex items-center justify-center gap-2 transition-all cursor-pointer select-none"
-          >
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-4 h-4" alt="Google" />
-            <span>Google</span>
-          </button>
-          
-          <button 
-            type="button"
-            onClick={async () => {
-              setIsLoading(true);
-              setError('');
-              try {
-                const provider = new FacebookAuthProvider();
-                const result = await signInWithPopup(auth, provider);
-                const fbUser = result.user;
-                const email = fbUser.email || '';
-                const name = fbUser.displayName || 'Facebook User';
-                const phone = fbUser.phoneNumber || '';
-                const photoURL = fbUser.photoURL || '';
-
-                try {
-                  await setDoc(doc(db, 'users', fbUser.uid), {
-                    uid: fbUser.uid,
-                    name,
-                    email,
-                    phone,
-                    role: 'customer',
-                    status: 'Active',
-                    createdAt: serverTimestamp(),
-                    lastLoginAt: serverTimestamp(),
-                    profileImage: photoURL,
-                  }, { merge: true });
-                } catch (fsErr) {
-                  handleFirestoreError(fsErr, OperationType.WRITE, `users/${fbUser.uid}`);
-                }
-
-                useLoginHistoryStore.getState().addLoginEvent({
-                  name,
-                  email,
-                  method: 'Facebook Login',
-                  profileImage: photoURL,
-                });
-
-                login({
-                  id: fbUser.uid,
-                  name,
-                  email,
-                  phone,
-                  role: 'customer',
-                  profileImage: photoURL,
-                });
-
-                pixelService.trackLogin(fbUser.uid);
-                navigate('/account/dashboard');
-              } catch (err: any) {
-                if (err.code !== 'auth/operation-not-allowed' && err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
-                  console.error(err);
-                }
-                if (err.code === 'auth/operation-not-allowed') {
-                  setError("Firebase 'Facebook' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Facebook' and enable it.");
-                } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
-                  // user closed popup, ignore
-                } else {
-                  setError(err.message || 'Facebook Login failed.');
-                }
-              } finally {
-                setIsLoading(false);
-              }
-            }}
-            className="h-11 border border-neutral-200 rounded-[14px] bg-white text-xs font-bold text-neutral-700 hover:bg-neutral-50 flex items-center justify-center gap-2 transition-all cursor-pointer select-none"
-          >
-            <img src="https://www.svgrepo.com/show/475647/facebook-color.svg" className="w-4 h-4" alt="Facebook" />
-            <span>Facebook</span>
-          </button>
-        </div>
+                      pixelService.trackLogin(fbUser.uid);
+                      navigate('/account/dashboard');
+                    } catch (err: any) {
+                      if (err.code !== 'auth/operation-not-allowed' && err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                        console.error(err);
+                      }
+                      if (err.code === 'auth/operation-not-allowed') {
+                        setError(`Firebase '${provider.name}' provider is not enabled. Add it in Firebase Console -> Authentication.`);
+                      } else if (err.code === 'auth/unauthorized-domain' || err.code === 'auth/unauthorized-client') {
+                        setError(`Unauthorized Domain: ${window.location.hostname}. Check authDomain.`);
+                      } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+                      } else {
+                        setError(err.message || `${provider.name} Login failed.`);
+                      }
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                  className="group h-11 border border-neutral-200 rounded-[14px] bg-white text-xs font-bold text-neutral-700 hover:bg-neutral-50 flex items-center justify-center gap-2 transition-all cursor-pointer select-none shadow-sm"
+                >
+                  {getProviderIcon(provider.id)}
+                  <span>{provider.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Auth Switch Link */}
         <div className="mt-6 text-center pt-5 border-t border-neutral-100">

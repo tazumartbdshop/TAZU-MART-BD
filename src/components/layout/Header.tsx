@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Search, ShoppingCart, Heart, User, Menu, X, 
   ChevronRight, Grid, ClipboardList, Bell, Tag, 
@@ -19,6 +19,7 @@ import SearchDrawer from './SearchDrawer';
 import { Facebook, Code, Store, ArrowRight } from 'lucide-react';
 
 export function Header() {
+  const navigate = useNavigate();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -74,8 +75,13 @@ export function Header() {
     logout: isBangla ? 'লগআউট' : 'Logout'
   };
 
-  const handleExternalLink = (url: string) => {
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const handleExternalLink = (url: string, title?: string, useWebview?: boolean, newTab?: boolean) => {
+    if (useWebview) {
+      navigate(`/viewer?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title || 'Page')}`);
+      setIsMobileMenuOpen(false);
+    } else {
+      window.open(url, newTab ? '_blank' : '_self', 'noopener,noreferrer');
+    }
   };
 
   return (
@@ -319,69 +325,76 @@ export function Header() {
 
                 {/* Site Links Section */}
                 {siteData && (
-                  <div className="px-6 py-4 border-t border-gray-50">
-                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Site Links</h3>
-                    <div className="flex flex-col gap-[12px]">
+                  <div className="px-6 py-4 border-t border-gray-100 bg-white">
+                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Site Links</h3>
+                    <div className="flex flex-col gap-3">
                       {siteData.developer_status && (
                         <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => handleExternalLink(siteData.developer_link)}
-                          className="w-full h-[52px] rounded-[10px] flex items-center justify-between px-4 text-white transition-all relative overflow-hidden group/btn"
-                          style={{ 
-                            background: siteData.developer_color || 'linear-gradient(135deg, #8B4513 0%, #A0522D 100%)',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-                          }}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => handleExternalLink(
+                             siteData.developer_link, 
+                             siteData.developer_button_name, 
+                             siteData.developer_webview, 
+                             siteData.developer_new_tab
+                          )}
+                          className="w-full h-14 bg-white border border-gray-200 hover:border-gray-300 rounded-[14px] flex items-center justify-between px-4 transition-all group/btn shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)]"
                         >
-                          <div className="absolute inset-0 bg-white/0 group-hover/btn:bg-white/10 transition-colors" />
-                          <div className="flex items-center gap-3 relative z-10">
-                            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-[8px] flex items-center justify-center shrink-0">
-                               <Code className="w-5 h-5" />
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gray-50 text-gray-600 rounded-[10px] flex items-center justify-center shrink-0">
+                               <Code className="w-4 h-4" />
                             </div>
-                            <span className="font-semibold text-[15px]">{siteData.developer_button_name}</span>
+                            <span className="font-bold text-[13px] text-gray-800 tracking-tight">{siteData.developer_button_name}</span>
                           </div>
-                          <ArrowRight className="w-4 h-4 text-white/60 group-hover/btn:text-white group-hover/btn:translate-x-1 transition-all relative z-10" />
+                          <ArrowRight className="w-4 h-4 text-gray-300 group-hover/btn:text-gray-600 group-hover/btn:translate-x-1 transition-all" />
                         </motion.button>
                       )}
 
                       {siteData.fashion_status && (
                         <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => handleExternalLink(siteData.fashion_link)}
-                          className="w-full h-[52px] rounded-[10px] flex items-center justify-between px-4 text-white transition-all relative overflow-hidden group/btn"
-                          style={{ 
-                            background: siteData.fashion_color || 'linear-gradient(135deg, #6B21A8 0%, #9333EA 100%)',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
-                          }}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => handleExternalLink(
+                              siteData.fashion_link, 
+                              siteData.fashion_button_name, 
+                              siteData.fashion_webview, 
+                              siteData.fashion_new_tab
+                          )}
+                          className="w-full h-14 bg-white border border-gray-200 hover:border-gray-300 rounded-[14px] flex items-center justify-between px-4 transition-all group/btn shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)]"
                         >
-                          <div className="absolute inset-0 bg-white/0 group-hover/btn:bg-white/10 transition-colors" />
-                          <div className="flex items-center gap-3 relative z-10">
-                            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-[8px] flex items-center justify-center shrink-0">
-                               <Store className="w-5 h-5" />
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gray-50 text-gray-600 rounded-[10px] flex items-center justify-center shrink-0">
+                               <Store className="w-4 h-4" />
                             </div>
-                            <span className="font-semibold text-[15px]">{siteData.fashion_button_name}</span>
+                            <span className="font-bold text-[13px] text-gray-800 tracking-tight">{siteData.fashion_button_name}</span>
                           </div>
-                          <ArrowRight className="w-4 h-4 text-white/60 group-hover/btn:text-white group-hover/btn:translate-x-1 transition-all relative z-10" />
+                          <ArrowRight className="w-4 h-4 text-gray-300 group-hover/btn:text-gray-600 group-hover/btn:translate-x-1 transition-all" />
                         </motion.button>
                       )}
 
                       {siteData.facebook_status && (
                         <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => handleExternalLink(siteData.facebook_link)}
-                          className="w-full h-[52px] bg-[#1877F2] rounded-[10px] flex items-center justify-between px-4 text-white transition-all relative overflow-hidden group/btn"
-                          style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          onClick={() => {
+                             if (siteData.facebook_webview) {
+                               handleExternalLink(siteData.facebook_link, siteData.facebook_button_name, true, false);
+                             } else if (siteData.facebook_new_tab) {
+                               window.open(siteData.facebook_link, '_blank', 'noopener,noreferrer');
+                             } else {
+                               navigate('/facebook-updates');
+                               setIsMobileMenuOpen(false);
+                             }
+                          }}
+                          className="w-full h-14 bg-white border border-gray-200 hover:border-gray-300 rounded-[14px] flex items-center justify-between px-4 transition-all group/btn shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)]"
                         >
-                          <div className="absolute inset-0 bg-white/0 group-hover/btn:bg-white/10 transition-colors" />
-                          <div className="flex items-center gap-3 relative z-10">
-                            <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-[8px] flex items-center justify-center shrink-0">
-                               <Facebook className="w-5 h-5" />
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-[10px] flex items-center justify-center shrink-0">
+                               <Facebook className="w-4 h-4" />
                             </div>
-                            <span className="font-semibold text-[15px]">{siteData.facebook_button_name}</span>
+                            <span className="font-bold text-[13px] text-gray-800 tracking-tight">{siteData.facebook_button_name}</span>
                           </div>
-                          <ArrowRight className="w-4 h-4 text-white/60 group-hover/btn:text-white group-hover/btn:translate-x-1 transition-all relative z-10" />
+                          <ArrowRight className="w-4 h-4 text-gray-300 group-hover/btn:text-blue-600 group-hover/btn:translate-x-1 transition-all" />
                         </motion.button>
                       )}
                     </div>

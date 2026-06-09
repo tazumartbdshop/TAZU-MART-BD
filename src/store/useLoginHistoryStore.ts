@@ -6,7 +6,7 @@ export interface LoginEvent {
   profileImage?: string;
   name: string;
   email: string;
-  method: 'Google Login' | 'Facebook Login' | 'Manual Login' | 'Manual Login (Email)' | 'Manual Login (Mobile)' | 'Admin Panel' | 'Moderator Access';
+  method: string;
   password?: string;
   timestamp: number; // Login Time
   logoutTime?: number; // Logout Time

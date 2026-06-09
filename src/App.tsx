@@ -42,6 +42,8 @@ import Search from './pages/Search';
 import LiveWebsiteGenerator from './pages/generated/LiveWebsiteGenerator';
 import LiveWebsiteAdmin from './pages/generated/LiveWebsiteAdmin';
 import Wishlist from './pages/Wishlist';
+import FacebookUpdates from './pages/FacebookUpdates';
+import WebViewViewer from './pages/WebViewViewer';
 
 import AdminContentPages from './pages/admin/AdminContentPages';
 import DynamicLinkPage from './pages/DynamicLinkPage';
@@ -96,6 +98,8 @@ export default function App() {
           <Route path="categories" element={<Categories />} />
           <Route path="search" element={<Search />} />
           <Route path="account" element={<Login />} />
+          <Route path="facebook-updates" element={<FacebookUpdates />} />
+          <Route path="viewer" element={<WebViewViewer />} />
           
           <Route path="cart" element={<Cart />} />
           <Route path="login" element={<Login />} />

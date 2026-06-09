@@ -230,7 +230,8 @@ export const defaultNavItems: NavItem[] = [
       { name: 'Branding', path: '/admin/management/branding', icon: Palette },
       { name: 'Business Address', path: '/admin/management/business-address', icon: MapPin },
       { name: 'Site Links', path: '/admin/management/site-management', icon: Link },
-      { name: 'Social Links', path: '/admin/management/social-links', icon: Share2 }
+      { name: 'Social Links', path: '/admin/management/social-links', icon: Share2 },
+      { name: 'Login Provider', path: '/admin/management/login-provider', icon: Lock }
     ]
   },
   {

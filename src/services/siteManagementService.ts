@@ -26,15 +26,28 @@ export interface SiteManagementData {
   developer_link: string;
   developer_color: string;
   developer_status: boolean;
+  developer_new_tab: boolean;
+  developer_webview: boolean;
   
   fashion_button_name: string;
   fashion_link: string;
   fashion_color: string;
   fashion_status: boolean;
+  fashion_new_tab: boolean;
+  fashion_webview: boolean;
   
   facebook_button_name: string;
   facebook_link: string;
   facebook_status: boolean;
+  facebook_new_tab: boolean;
+  facebook_webview: boolean;
+  
+  facebook_feed_enabled?: boolean;
+  facebook_posts_per_load?: number;
+  facebook_auto_refresh?: boolean;
+  facebook_feed_title?: string;
+  facebook_show_header?: boolean;
+  facebook_show_cover?: boolean;
 
   linkPages: LinkPage[];
   
@@ -48,15 +61,29 @@ const DEFAULT_DATA: SiteManagementData = {
   developer_link: 'https://developer-site.com',
   developer_color: 'linear-gradient(135deg, #8B4513 0%, #A0522D 100%)',
   developer_status: true,
+  developer_new_tab: true,
+  developer_webview: false,
   
   fashion_button_name: 'Visit Fashion Site',
   fashion_link: 'https://fashion-site.com',
   fashion_color: 'linear-gradient(135deg, #6B21A8 0%, #9333EA 100%)',
   fashion_status: true,
+  fashion_new_tab: true,
+  fashion_webview: false,
   
   facebook_button_name: 'Facebook Updates',
-  facebook_link: 'https://facebook.com/page-name',
+  facebook_link: 'https://www.facebook.com/facebook',
   facebook_status: true,
+  facebook_new_tab: false,
+  facebook_webview: false,
+  
+  facebook_feed_enabled: true,
+  facebook_posts_per_load: 10,
+  facebook_auto_refresh: true,
+  facebook_feed_title: 'Facebook Updates',
+  facebook_show_header: true,
+  facebook_show_cover: true,
+  
   linkPages: []
 };
 
