@@ -11,6 +11,16 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Domain Redirection Middleware (www to non-www)
+  app.use((req, res, next) => {
+    const host = req.get('host');
+    if (host && host.startsWith('www.')) {
+      const newHost = host.slice(4);
+      return res.redirect(301, `${req.protocol}://${newHost}${req.originalUrl}`);
+    }
+    next();
+  });
+
   app.use(express.json());
 
   // Initialize Firebase in backend

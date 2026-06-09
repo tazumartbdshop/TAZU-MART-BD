@@ -9,16 +9,20 @@ import { useCartStore } from '../../store/useCartStore';
 
 import { useSettingsStore } from '../../store/useSettingsStore';
 
+import { ProductSkeleton } from '../common/Skeleton';
+
 interface FlashSaleSectionProps {
   products: Product[];
+  isLoading?: boolean;
 }
 
-export default function FlashSaleSection({ products }: FlashSaleSectionProps) {
+export default function FlashSaleSection({ products, isLoading }: FlashSaleSectionProps) {
   const { settings } = useSettingsStore();
   const navigate = useNavigate();
   const { addItem } = useCartStore();
   
-  if (!settings.flashSaleEnabled || products.length === 0) return null;
+  if (!settings.flashSaleEnabled) return null;
+  if (!isLoading && products.length === 0) return null;
 
   return (
     <section id="flash-sale" className="pt-0 pb-3 bg-white border-b border-neutral-100 overflow-hidden">
@@ -49,7 +53,9 @@ export default function FlashSaleSection({ products }: FlashSaleSectionProps) {
 
         {/* Horizontal Scroll */}
         <div className="flex gap-3 overflow-x-auto pb-4 hide-scrollbar snap-x snap-mandatory">
-          {products.map((product) => {
+          {isLoading && products.length === 0 ? (
+            [1, 2, 3, 4, 5, 6].map(i => <div key={i} className="w-[145px] sm:w-[170px] shrink-0"><ProductSkeleton /></div>)
+          ) : products.map((product) => {
             const hasDiscount = product.discountPrice && product.discountPrice < product.price;
             const discountPercent = hasDiscount 
               ? Math.round(((product.price - product.discountPrice!) / product.price) * 100)

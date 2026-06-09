@@ -4,12 +4,15 @@ import { TrendingUp, ArrowRight } from 'lucide-react';
 import { Product } from '../../store/useProductStore';
 import { CompactProductCard } from '../product/CompactProductCard';
 
+import { ProductSkeleton } from '../common/Skeleton';
+
 interface TrendingSectionProps {
   products: Product[];
+  isLoading?: boolean;
 }
 
-export default function TrendingSection({ products }: TrendingSectionProps) {
-  if (products.length === 0) return null;
+export default function TrendingSection({ products, isLoading }: TrendingSectionProps) {
+  if (!isLoading && products.length === 0) return null;
 
   // Limit to maximum of 6 products
   const displayProducts = products.slice(0, 6);
@@ -45,7 +48,9 @@ export default function TrendingSection({ products }: TrendingSectionProps) {
 
         {/* Grid of Compact Product Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          {displayProducts.map((product) => (
+          {isLoading && products.length === 0 ? (
+            [1, 2, 3, 4, 5, 6].map(i => <ProductSkeleton key={i} />)
+          ) : displayProducts.map((product) => (
             <CompactProductCard key={product.id} product={product} />
           ))}
         </div>

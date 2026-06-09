@@ -15,11 +15,23 @@ export const useSiteManagementStore = create<SiteManagementState>((set) => ({
   error: null,
   fetchSettings: async () => {
     set({ isLoading: true, error: null });
+    
+    // 5-second timeout for boot resilience
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Data Fetch Timeout (5s)')), 5000)
+    );
+
     try {
-      const settings = await siteManagementService.getSettings();
+      const settings = await Promise.race([
+        siteManagementService.getSettings(),
+        timeoutPromise
+      ]) as SiteManagementData;
+      
       set({ data: settings, isLoading: false });
     } catch (error: any) {
+      console.error("[Boot Error] Site config failed:", error.message);
       set({ error: error.message, isLoading: false });
+      // We don't block the app, we let it use default values if possible
     }
   },
   updateSettings: async (updates) => {

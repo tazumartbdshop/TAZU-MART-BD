@@ -5,13 +5,16 @@ import { Product } from '../../store/useProductStore';
 import { formatPrice } from '../../lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { ProductSkeleton } from '../common/Skeleton';
+
 interface BestSellingSectionProps {
   products: Product[];
+  isLoading?: boolean;
 }
 
-export default function BestSellingSection({ products }: BestSellingSectionProps) {
+export default function BestSellingSection({ products, isLoading }: BestSellingSectionProps) {
   const navigate = useNavigate();
-  if (products.length === 0) return null;
+  if (!isLoading && products.length === 0) return null;
 
   // Show only top 6 products in the grid
   const initialProducts = products.slice(0, 6);
@@ -42,7 +45,9 @@ export default function BestSellingSection({ products }: BestSellingSectionProps
 
         {/* Grid Layout - 2 columns on mobile */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
-          {initialProducts.map((product, idx) => (
+          {isLoading && products.length === 0 ? (
+            [1, 2, 3, 4, 5, 6].map(i => <ProductSkeleton key={i} />)
+          ) : initialProducts.map((product, idx) => (
             <motion.div 
               key={product.id}
               initial={{ opacity: 0, y: 10 }}

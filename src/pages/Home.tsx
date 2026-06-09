@@ -18,11 +18,15 @@ import BestSellingSection from '../components/home/BestSellingSection';
 
 import FlashSaleTimer from '../components/home/FlashSaleTimer';
 
+import { CategorySkeleton, ProductSkeleton } from '../components/common/Skeleton';
+
 export default function Home() {
-  const { categories } = useCategoryStore();
-  const { products } = useProductStore();
+  const { categories, isLoaded: categoriesLoaded } = useCategoryStore();
+  const { products, isLoading: productsLoading } = useProductStore();
   const { banners: storeBanners } = useBannerStore();
   const location = useLocation();
+
+  const allActiveBanners = storeBanners.filter(b => b && b.status === 'active' && (b.image || b.bannerType === 'designed'));
 
   // Handle hash scrolling for Homepage sections
   useEffect(() => {
@@ -42,8 +46,6 @@ export default function Home() {
     }
   }, [location.hash]);
 
-  const allActiveBanners = storeBanners.filter(b => b && b.status === 'active' && (b.image || b.bannerType === 'designed'));
-  
   const mainHeroBanners = allActiveBanners.filter(b => {
     if (!b.locations || !Array.isArray(b.locations) || b.locations.length === 0) return true;
     return b.locations.some(loc => {
@@ -128,7 +130,9 @@ export default function Home() {
               paddingBottom: '4px'
             }}
           >
-            {sortedCategories.slice(0, 6).map((cat) => {
+            {!categoriesLoaded && categories.length === 0 ? (
+              [1, 2, 3, 4, 5, 6].map(i => <CategorySkeleton key={i} />)
+            ) : sortedCategories.slice(0, 6).map((cat) => {
               const catImage = cat.iconImage || cat.bannerImage;
               return (
                 <Link
@@ -211,12 +215,12 @@ export default function Home() {
       </section>
 
       {/* 5. Modern Integrated Offer Sections */}
-      <FlashSaleSection products={flashSaleProducts} />
-      <TrendingSection products={trendingProducts} />
+      <FlashSaleSection products={flashSaleProducts} isLoading={productsLoading} />
+      <TrendingSection products={trendingProducts} isLoading={productsLoading} />
 
       {/* 12px ~ 18px Clean Spacing (mt-4 is 16px) */}
       <div className="mt-4"></div>
-      <BestSellingSection products={bestSellingProducts} />
+      <BestSellingSection products={bestSellingProducts} isLoading={productsLoading} />
 
       {/* 8. Dynamic Category Sections */}
       {sortedCategories.map(cat => {
@@ -244,7 +248,9 @@ export default function Home() {
 
               {/* THIRD ROW: Category Products */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 font-sans">
-                {catProducts.map(prod => (
+                {productsLoading && products.length === 0 ? (
+                  [1, 2, 3, 4, 5, 6].map(i => <ProductSkeleton key={i} />)
+                ) : catProducts.map(prod => (
                   <CompactProductCard key={`cat-prod-${prod.id}`} product={prod} />
                 ))}
               </div>

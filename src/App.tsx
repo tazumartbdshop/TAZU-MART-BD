@@ -47,9 +47,16 @@ import WebViewViewer from './pages/WebViewViewer';
 
 import AdminContentPages from './pages/admin/AdminContentPages';
 import DynamicLinkPage from './pages/DynamicLinkPage';
+import { useSiteManagementStore } from './store/useSiteManagementStore';
 
 export default function App() {
+  const { fetchSettings } = useSiteManagementStore();
+
   useEffect(() => {
+    // Initial fetch for site management data
+    fetchSettings();
+
+    // Subscribe to stores
     const unsubCategories = useCategoryStore.getState().subscribe();
     const unsubProducts = useProductStore.getState().subscribe();
     const unsubSearches = useSearchStore.getState().subscribe();
@@ -61,6 +68,7 @@ export default function App() {
     const unsubCustomers = useCustomerStore.getState().subscribe();
     const unsubBrands = useBrandShowcaseStore.getState().subscribe();
     const unsubModerators = useModeratorStore.getState().subscribe();
+    
     return () => {
       unsubCategories();
       unsubProducts();
@@ -74,7 +82,7 @@ export default function App() {
       unsubBrands();
       unsubModerators();
     };
-  }, []);
+  }, [fetchSettings]);
 
   return (
     <Router>
