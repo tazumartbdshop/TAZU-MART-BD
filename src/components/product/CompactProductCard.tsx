@@ -5,6 +5,7 @@ import { useCartStore } from '../../store/useCartStore';
 import { useReviewStore } from '../../store/useReviewStore';
 import { formatPrice } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'react-hot-toast';
 
 interface Product {
   id: string;
@@ -130,29 +131,18 @@ export function CompactProductCard({ product, rank }: any) {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-1 font-mono">
+            <div className="mt-1 font-mono">
               <button 
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   addItem({ ...product, image: product.featured_image || product.image, quantity: 1 } as any);
+                  toast.success("Product added to cart successfully");
                 }}
-                className="py-1 bg-white hover:bg-gray-50 text-black border border-black text-[8px] font-black uppercase tracking-wider text-center cursor-pointer transition-colors"
+                className="w-full py-1.5 bg-black hover:bg-neutral-800 text-white border border-black text-[9px] font-black uppercase tracking-wider text-center cursor-pointer transition-colors"
               >
                 Add To Cart
-              </button>
-              <button 
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  addItem({ ...product, image: product.featured_image || product.image, quantity: 1 } as any);
-                  navigate('/checkout');
-                }}
-                className="py-1 bg-black hover:bg-neutral-800 text-white border border-black text-[8px] font-black uppercase tracking-wider text-center cursor-pointer transition-all"
-              >
-                Buy Now
               </button>
             </div>
           </div>
