@@ -160,6 +160,7 @@ export interface AppSettings {
   openGraphImage?: string;
   googleAnalyticsCode: string;
   facebookPixelCode: string;
+  googleSearchConsoleCode?: string;
 
   // 12. Social Media Settings
   facebookUrl: string;
@@ -353,6 +354,7 @@ const defaultSettings: AppSettings = {
   keywords: 'ecommerce, bangladesh, shopping',
   googleAnalyticsCode: '',
   facebookPixelCode: '',
+  googleSearchConsoleCode: '',
 
   facebookUrl: 'https://facebook.com/tazumartbd',
   facebookEnabled: true,

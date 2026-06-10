@@ -120,7 +120,8 @@ export default function Games() {
         setConfig(data);
         setSoundEnabled(data.settings.soundEnabled);
         setVibrationEnabled(data.settings.hapticEnabled);
-      });
+      })
+      .catch(err => console.error("Failed to load /api/game-config:", err));
   }, []);
 
   const BASE_SPEED = 3.0;

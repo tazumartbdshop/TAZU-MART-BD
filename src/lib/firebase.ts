@@ -116,6 +116,5 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     console.warn("Firestore Quota Exceeded. Some data may not load.");
   } else {
     console.error('Firestore Error: ', errorMsg);
-    throw new Error(errorMsg);
   }
 }

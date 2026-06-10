@@ -90,6 +90,29 @@
       },
       "required": ["id", "code"]
     },
+    "Website": {
+      "title": "Website",
+      "description": "Dynamic multi-merchant brand domain configurations",
+      "type": "object",
+      "properties": {
+        "domain": { "type": "string" },
+        "website_name": { "type": "string" },
+        "business_name": { "type": "string" },
+        "logo": { "type": "string" },
+        "banner": { "type": "string" },
+        "primary_color": { "type": "string" },
+        "admin_email": { "type": "string" },
+        "admin_password": { "type": "string" },
+        "support_number": { "type": "string" },
+        "categories": { "type": "array", "items": { "type": "string" } },
+        "theme_type": { "type": "string" },
+        "currency": { "type": "string" },
+        "address": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["domain", "website_name"]
+    },
     "WebsiteSettings": {
       "title": "Website Settings",
       "description": "Global website settings, including logo, favicon, about us, contact",
@@ -135,6 +158,10 @@
     "/coupons/{couponId}": {
       "schema": "Coupon",
       "description": "Store coupons"
+    },
+    "/websites/{websiteId}": {
+      "schema": "Website",
+      "description": "Multi-merchant dynamic website branding configurations and domains"
     },
     "/settings/global": {
       "schema": "WebsiteSettings",

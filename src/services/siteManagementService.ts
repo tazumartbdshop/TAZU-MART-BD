@@ -117,11 +117,13 @@ export const siteManagementService = {
   },
 
   async saveLinkPage(page: LinkPage): Promise<void> {
-    // Implement save logic, maybe add/update doc
-    // For simplicity, using setDoc with id
-    import('firebase/firestore').then(({ doc, setDoc }) => {
-        setDoc(doc(db, 'link_pages', page.id || page.slug), page);
-    });
+    try {
+      const { doc, setDoc } = await import('firebase/firestore');
+      await setDoc(doc(db, 'link_pages', page.id || page.slug), page);
+    } catch (err) {
+      console.error("Firestore saveLinkPage failed:", err);
+      throw err;
+    }
   },
 
   async getLinkPageBySlug(slug: string): Promise<LinkPage | null> {

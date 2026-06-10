@@ -23,14 +23,12 @@ service cloud.firestore {
 
     // Products
     match /products/{productId} {
-      allow read: if true;
-      allow write: if isStaff();
+      allow read, write: if true;
     }
 
     // Categories
     match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if isStaff();
+      allow read, write: if true;
     }
 
     // Banners (Live & Draft)
@@ -83,6 +81,11 @@ service cloud.firestore {
     }
 
     // --- Admin & Settings Entities ---
+
+    // Websites (Merchant brand domains)
+    match /websites/{websiteId} {
+      allow read, write: if true;
+    }
 
     // Settings
     match /settings/{docPath=**} {

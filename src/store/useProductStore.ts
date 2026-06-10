@@ -183,8 +183,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
   },
   
   addProduct: async (payload) => {
+    const id = doc(collection(db, 'products')).id;
     try {
-      const id = doc(collection(db, 'products')).id;
       const keywords = generateKeywords(payload.name, payload.category, payload.brand, payload.description);
       const newProduct: Product = {
         ...payload,
@@ -194,55 +194,65 @@ export const useProductStore = create<ProductState>((set, get) => ({
       };
       await setDoc(doc(db, 'products', id), newProduct);
     } catch (error) {
-      console.error("Firebase setDoc error in addProduct:", error);
+      handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
       throw error;
     }
   },
   
   updateProduct: async (id, payload) => {
-    const currentProduct = get().products.find(p => p.id === id);
-    const finalPayload = { ...payload };
+    try {
+      const currentProduct = get().products.find(p => p.id === id);
+      const finalPayload = { ...payload };
 
-    if (
-      payload.name !== undefined ||
-      payload.category !== undefined ||
-      payload.brand !== undefined ||
-      payload.description !== undefined
-    ) {
-      const name = payload.name !== undefined ? payload.name : (currentProduct?.name || '');
-      const category = payload.category !== undefined ? payload.category : (currentProduct?.category || '');
-      const brand = payload.brand !== undefined ? payload.brand : (currentProduct?.brand || '');
-      const description = payload.description !== undefined ? payload.description : (currentProduct?.description || '');
-      finalPayload.keywords = generateKeywords(name, category, brand, description);
+      if (
+        payload.name !== undefined ||
+        payload.category !== undefined ||
+        payload.brand !== undefined ||
+        payload.description !== undefined
+      ) {
+        const name = payload.name !== undefined ? payload.name : (currentProduct?.name || '');
+        const category = payload.category !== undefined ? payload.category : (currentProduct?.category || '');
+        const brand = payload.brand !== undefined ? payload.brand : (currentProduct?.brand || '');
+        const description = payload.description !== undefined ? payload.description : (currentProduct?.description || '');
+        finalPayload.keywords = generateKeywords(name, category, brand, description);
+      }
+      
+      await setDoc(doc(db, 'products', id), finalPayload, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
+      throw error;
     }
-    
-    await setDoc(doc(db, 'products', id), finalPayload, { merge: true });
   },
   
   deleteProduct: async (id) => {
-    const product = get().products.find(p => p.id === id);
-    if (product) {
-      try {
-        const { deleteImage } = await import('../lib/imageUtils');
-        const urlsToDelete = new Set<string>();
-        if (product.image) urlsToDelete.add(product.image);
-        if (product.imageUrl) urlsToDelete.add(product.imageUrl);
-        if (product.featured_image) urlsToDelete.add(product.featured_image);
-        if (product.banner_image) urlsToDelete.add(product.banner_image);
-        if (product.images && Array.isArray(product.images)) {
-          product.images.forEach(img => {
-            if (img) urlsToDelete.add(img);
-          });
+    try {
+      const product = get().products.find(p => p.id === id);
+      if (product) {
+        try {
+          const { deleteImage } = await import('../lib/imageUtils');
+          const urlsToDelete = new Set<string>();
+          if (product.image) urlsToDelete.add(product.image);
+          if (product.imageUrl) urlsToDelete.add(product.imageUrl);
+          if (product.featured_image) urlsToDelete.add(product.featured_image);
+          if (product.banner_image) urlsToDelete.add(product.banner_image);
+          if (product.images && Array.isArray(product.images)) {
+            product.images.forEach(img => {
+              if (img) urlsToDelete.add(img);
+            });
+          }
+          
+          // Execute background deletions securely
+          Promise.all(Array.from(urlsToDelete).map(url => deleteImage(url)))
+            .catch(err => console.warn("Failed to delete some product storage files:", err));
+        } catch (importErr) {
+          console.error("Failed to import imageUtils during deleteProduct:", importErr);
         }
-        
-        // Execute background deletions securely
-        Promise.all(Array.from(urlsToDelete).map(url => deleteImage(url)))
-          .catch(err => console.warn("Failed to delete some product storage files:", err));
-      } catch (importErr) {
-        console.error("Failed to import imageUtils during deleteProduct:", importErr);
       }
+      await deleteDoc(doc(db, 'products', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
+      throw error;
     }
-    await deleteDoc(doc(db, 'products', id));
   },
   
   subscribe: () => {

@@ -9,7 +9,7 @@ const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): 
   ]);
 };
 
-export const resizeImage = (file: File, maxWidth: number = 800): Promise<Blob> => {
+export const resizeImage = (file: Blob | File, maxWidth: number = 800): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -61,31 +61,28 @@ export const uploadImage = async (file: File | Blob, folder: string, originalNam
   console.log(`Starting upload to: ${folder}/${fileName}`);
   
   try {
-    // Attempt upload to Firebase Storage with a strict 3.5 second timeout
+    // Attempt upload to Firebase Storage with a 30 second timeout for high reliability
     const snapshot = await withTimeout(
       uploadBytes(storageRef, file),
-      3500,
+      30000,
       "Firebase Storage upload timed out"
     );
     console.log(`Upload complete. Snapshot:`, snapshot);
     
     const downloadURL = await withTimeout(
       getDownloadURL(storageRef),
-      3500,
+      30000,
       "Firebase Storage URL retrieval timed out"
     );
     console.log(`Download URL: ${downloadURL}`);
     return downloadURL;
   } catch (err: any) {
-    console.warn(`Firebase Storage failed, falling back to local Base64 storage: ${err.message || err}`, err);
+    console.warn(`Firebase Storage failed, falling back to compressed local Base64 storage: ${err.message || err}`, err);
     
     // Fallback block: Resize and compress to a small, Firestore-safe JPEG Base64 URI
     try {
-      let bToUse = file;
-      if (file instanceof File) {
-        // Compress to a highly efficient 500px width jpeg for rapid saving
-        bToUse = await resizeImage(file, 500);
-      }
+      // Compress to a highly efficient 500px width jpeg for rapid saving
+      const bToUse = await resizeImage(file, 500);
       const b64 = await blobToBase64(bToUse);
       console.log(`Base64 fallback complete. Size: ${Math.round(b64.length / 1024)} KB.`);
       return b64;

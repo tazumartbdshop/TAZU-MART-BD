@@ -5,7 +5,9 @@ const AdminContentPages = () => {
   const [pages, setPages] = useState<LinkPage[]>([]);
 
   useEffect(() => {
-    siteManagementService.getLinkPages().then(setPages);
+    siteManagementService.getLinkPages()
+      .then(setPages)
+      .catch(err => console.error("Failed to load link pages:", err));
   }, []);
 
   return (

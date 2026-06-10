@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query } from 'firebase/firestore';
 
 export interface DynamicWebsite {
   domain: string;
@@ -20,10 +22,11 @@ export interface DynamicWebsite {
 
 interface WebsitesStore {
   websites: DynamicWebsite[];
-  addWebsite: (website: DynamicWebsite) => void;
+  addWebsite: (website: DynamicWebsite) => Promise<void>;
   getWebsiteByDomain: (domain: string) => DynamicWebsite | undefined;
-  removeWebsite: (domain: string) => void;
-  updateWebsite: (domain: string, updates: Partial<DynamicWebsite>) => void;
+  removeWebsite: (domain: string) => Promise<void>;
+  updateWebsite: (domain: string, updates: Partial<DynamicWebsite>) => Promise<void>;
+  subscribe: () => () => void;
 }
 
 const STORAGE_KEY = 'dynamic_websites_data';
@@ -105,11 +108,32 @@ const loadWebsites = (): DynamicWebsite[] => {
 export const useWebsitesStore = create<WebsitesStore>((set, get) => ({
   websites: loadWebsites(),
   
-  addWebsite: (website) => {
+  subscribe: () => {
+    const q = query(collection(db, 'websites'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const websites = snapshot.docs.map(doc => ({ ...doc.data() } as DynamicWebsite));
+      if (websites.length > 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(websites));
+        set({ websites });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, 'websites');
+    });
+    return unsubscribe;
+  },
+
+  addWebsite: async (website) => {
     const sanitizedDomain = sanitizeDomain(website.domain);
     const newWebsite = { ...website, domain: sanitizedDomain };
+    
+    try {
+      await setDoc(doc(db, 'websites', sanitizedDomain), newWebsite);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `websites/${sanitizedDomain}`);
+      throw e;
+    }
+
     const current = get().websites;
-    // Remove if duplicate domain to prevent error, overwrite
     const filtered = current.filter(w => sanitizeDomain(w.domain) !== sanitizedDomain);
     const updated = [newWebsite, ...filtered];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -142,15 +166,34 @@ export const useWebsitesStore = create<WebsitesStore>((set, get) => ({
     return found;
   },
 
-  removeWebsite: (domain) => {
+  removeWebsite: async (domain) => {
     const sanitized = sanitizeDomain(domain);
+    
+    try {
+      await deleteDoc(doc(db, 'websites', sanitized));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `websites/${sanitized}`);
+      throw e;
+    }
+
     const updated = get().websites.filter(w => sanitizeDomain(w.domain) !== sanitized);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     set({ websites: updated });
   },
 
-  updateWebsite: (domain, updates) => {
+  updateWebsite: async (domain, updates) => {
     const sanitized = sanitizeDomain(domain);
+    const target = get().websites.find(w => sanitizeDomain(w.domain) === sanitized);
+    if (target) {
+      const updatedWebsite = { ...target, ...updates };
+      try {
+        await setDoc(doc(db, 'websites', sanitized), updatedWebsite, { merge: true });
+      } catch (e) {
+        handleFirestoreError(e, OperationType.WRITE, `websites/${sanitized}`);
+        throw e;
+      }
+    }
+
     const updated = get().websites.map(w => {
       if (sanitizeDomain(w.domain) === sanitized) {
         return { ...w, ...updates };

@@ -408,6 +408,48 @@ export default function AdminSettings() {
               <input type="text" value={formState.facebookPixelCode} onChange={e => handleUpdate('facebookPixelCode', e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 border border-[#EEEEEE] rounded-[10px]" placeholder="1234567890" />
             </div>
           </div>
+
+          <div className="pt-6 border-t border-gray-100 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-[#000000] mb-2">
+                Google Search Console Verification
+              </label>
+              <textarea
+                value={formState.googleSearchConsoleCode || ''}
+                onChange={e => handleUpdate('googleSearchConsoleCode', e.target.value)}
+                className="w-full h-24 px-4 py-3 bg-gray-50 border border-[#EEEEEE] rounded-[10px] focus:outline-none focus:border-[#000000] font-mono text-xs text-gray-700 leading-normal"
+                placeholder='<meta name="google-site-verification" content="RZG35iUF5Hzynte8o1WGNJG7-OtqhsoEkE_LpHD88qc" />'
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Paste the Google Search Console HTML Meta tag or verification code here.
+              </p>
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsSaving(true);
+                  try {
+                    updateDraftSettings({ googleSearchConsoleCode: formState.googleSearchConsoleCode });
+                    await useSettingsStore.getState().publishSettings();
+                    setShowToast(true);
+                    setTimeout(() => {
+                      setShowToast(false);
+                    }, 3000);
+                  } catch (err) {
+                    console.error("Save Verification Tag failed:", err);
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }}
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 bg-[#000000] text-[#FFFFFF] px-6 py-2.5 rounded-[10px] text-sm font-bold hover:bg-neutral-800 transition-colors duration-150 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                {isSaving ? 'Saving...' : 'Save Verification Tag'}
+              </button>
+            </div>
+          </div>
         </div>
       );
       case 'security': return (

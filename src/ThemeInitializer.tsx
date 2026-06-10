@@ -4,6 +4,7 @@ import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore'
 import { db, handleFirestoreError, OperationType } from './lib/firebase';
 import { useBannerStore, Banner } from './store/useBannerStore';
 import { useCategoryStore } from './store/useCategoryStore';
+import { useSettingsStore } from './store/useSettingsStore';
 
 /**
  * ThemeInitializer injected into the App root to apply dynamic styling 
@@ -11,6 +12,35 @@ import { useCategoryStore } from './store/useCategoryStore';
  */
 export const ThemeInitializer: React.FC = () => {
   const { theme } = useThemeStore();
+  const googleSearchConsoleCode = useSettingsStore((s) => s.settings.googleSearchConsoleCode);
+
+  useEffect(() => {
+    // Remove existing verification meta tags first
+    const existing = document.querySelectorAll('meta[name="google-site-verification"]');
+    existing.forEach(el => (el as HTMLElement).remove());
+
+    if (!googleSearchConsoleCode) return;
+
+    let contentValue = '';
+    // Let's parse if it is an HTML tag
+    if (googleSearchConsoleCode.includes('<meta') || googleSearchConsoleCode.includes('google-site-verification')) {
+      // Find content="value" or content='value'
+      const match = googleSearchConsoleCode.match(/content=["']([^"']+)["']/);
+      if (match && match[1]) {
+        contentValue = match[1];
+      }
+    } else {
+      // If they just entered the raw token instead of the tag, use it directly
+      contentValue = googleSearchConsoleCode.trim();
+    }
+
+    if (contentValue) {
+      const meta = document.createElement('meta');
+      meta.name = 'google-site-verification';
+      meta.content = contentValue;
+      document.head.appendChild(meta);
+    }
+  }, [googleSearchConsoleCode]);
 
   useEffect(() => {
     const root = document.documentElement;

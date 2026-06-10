@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   LayoutDashboard, ShoppingBag, ShoppingCart, Users, LineChart, 
   Settings as SettingsIcon, Package, Bell, Search, Menu, LogOut, Activity,
-  Plus, Trash2, Check, ArrowRight, Edit3, Image as ImageIcon, Sparkles, Coins
+  Plus, Trash2, Check, ArrowRight, Edit3, Image as ImageIcon, Sparkles, Coins,
+  Database
 } from 'lucide-react';
 import { useWebsitesStore } from '../../store/useWebsitesStore';
 import { useProductStore } from '../../store/useProductStore';
+import { db } from '../../lib/firebase';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 export default function LiveWebsiteAdmin() {
   const { storeDomain } = useParams();
@@ -16,6 +19,17 @@ export default function LiveWebsiteAdmin() {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [rawProducts, setRawProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const q = query(collection(db, 'products'), orderBy('sku', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setRawProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("Firestore Error in LiveWebsiteAdmin:", error);
+    });
+    return unsubscribe;
+  }, []);
 
   // New product form state
   const [newProdName, setNewProdName] = useState('');
@@ -44,6 +58,7 @@ export default function LiveWebsiteAdmin() {
     { id: 'dashboard', label: 'Dashboard Overview', icon: LayoutDashboard },
     { id: 'products', label: 'Product Catalog', icon: Package },
     { id: 'settings', label: 'Store Settings', icon: SettingsIcon },
+    { id: 'database', label: 'Database Status', icon: Database },
   ];
 
   if (!website) {
@@ -69,25 +84,30 @@ export default function LiveWebsiteAdmin() {
   const currentProducts = getStoreProducts();
 
   // Save Settings handler
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateWebsite(website.domain, {
-      website_name: editName,
-      business_name: editBusiness,
-      support_number: editPhone,
-      admin_email: editEmail,
-      primary_color: editColor,
-      currency: editCurrency,
-      address: editAddress,
-      theme_type: editThemeType,
-      logo: editLogo,
-      banner: editBanner,
-      categories: editedCategories
-    });
-    setSaveSuccess(true);
-    setTimeout(() => {
-      setSaveSuccess(false);
-    }, 3000);
+    try {
+      await updateWebsite(website.domain, {
+        website_name: editName,
+        business_name: editBusiness,
+        support_number: editPhone,
+        admin_email: editEmail,
+        primary_color: editColor,
+        currency: editCurrency,
+        address: editAddress,
+        theme_type: editThemeType,
+        logo: editLogo,
+        banner: editBanner,
+        categories: editedCategories
+      });
+      setSaveSuccess(true);
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 3000);
+    } catch (error: any) {
+      console.error("Failed to save website configurations:", error);
+      alert("Failed to save settings: " + (error?.message || error));
+    }
   };
 
   // Add category to list helper
@@ -104,34 +124,39 @@ export default function LiveWebsiteAdmin() {
   };
 
   // Create Product handler
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProdName.trim() || !newProdPrice.trim() || !newProdCategory.trim()) return;
 
-    // Call state hook
-    addProduct({
-      name: newProdName,
-      sku: 'PROD-' + Math.floor(100 + Math.random() * 900),
-      category: newProdCategory,
-      price: parseFloat(newProdPrice),
-      discountPrice: newProdDiscount ? parseFloat(newProdDiscount) : undefined,
-      stock: 50,
-      image: newProdImg || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80',
-      rating: 4.8,
-      reviews: 1,
-      isNew: true,
-      status: 'active',
-      reward_coins: parseInt(newProdCoins) || 100,
-      coin_enabled: true
-    });
+    try {
+      // Call state hook and await the Firestore operation
+      await addProduct({
+        name: newProdName,
+        sku: 'PROD-' + Math.floor(100 + Math.random() * 900),
+        category: newProdCategory,
+        price: parseFloat(newProdPrice),
+        discountPrice: newProdDiscount ? parseFloat(newProdDiscount) : undefined,
+        stock: 50,
+        image: newProdImg || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80',
+        rating: 4.8,
+        reviews: 1,
+        isNew: true,
+        status: 'active',
+        reward_coins: parseInt(newProdCoins) || 100,
+        coin_enabled: true
+      });
 
-    // Reset fields
-    setNewProdName('');
-    setNewProdPrice('');
-    setNewProdDiscount('');
-    setNewProdImg('');
-    setShowAddForm(false);
-    alert('Product successfully cataloged and broadcasted live!');
+      // Reset fields upon success
+      setNewProdName('');
+      setNewProdPrice('');
+      setNewProdDiscount('');
+      setNewProdImg('');
+      setShowAddForm(false);
+      alert('Product successfully cataloged and broadcasted live!');
+    } catch (error: any) {
+      console.error("Failed to add product:", error);
+      alert('Failed to save product: ' + (error?.message || error));
+    }
   };
 
   const currSign = editCurrency === 'USD' ? '$' : '৳';
@@ -657,6 +682,38 @@ export default function LiveWebsiteAdmin() {
 
                 </form>
 
+              </div>
+            )}
+
+            {/* TAB 4: DATABASE STATUS VERIFICATION */}
+            {activeTab === 'database' && (
+              <div className="bg-white p-6 border border-gray-200 shadow-sm space-y-4 animate-in fade-in duration-300">
+                <h2 className="text-xl font-black uppercase tracking-tight">Real-time Firestore Verification</h2>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Raw product data pulled directly from database (independent of store state)</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-zinc-100 border-b">
+                        <th className="p-3 font-black uppercase">SKU</th>
+                        <th className="p-3 font-black uppercase">Name</th>
+                        <th className="p-3 font-black uppercase">Category</th>
+                        <th className="p-3 font-black uppercase">Price</th>
+                        <th className="p-3 font-black uppercase">Firestore ID</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {rawProducts.map(p => (
+                        <tr key={p.id} className="hover:bg-zinc-50">
+                          <td className="p-3 font-mono text-zinc-600">{p.sku}</td>
+                          <td className="p-3 font-bold">{p.name}</td>
+                          <td className="p-3">{p.category}</td>
+                          <td className="p-3">{p.price}</td>
+                          <td className="p-3 font-mono text-[9px] text-zinc-400">{p.id}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
