@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
+import { uploadImage } from '../lib/imageUtils';
 import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useCustomerStore } from '../store/useCustomerStore';
@@ -618,7 +619,6 @@ export default function SettingsPage() {
     }
 
     setIsUploading(true);
-    const { uploadImage } = await import('../lib/imageUtils');
     try {
       const downloadUrl = await uploadImage(file, 'user-profiles', `user-${user?.id || Date.now()}`);
       setProfilePic(downloadUrl);

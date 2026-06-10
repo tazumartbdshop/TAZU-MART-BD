@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { deleteImage } from '../lib/imageUtils';
 
 export interface Product {
   id: string;
@@ -229,7 +230,6 @@ export const useProductStore = create<ProductState>((set, get) => ({
       const product = get().products.find(p => p.id === id);
       if (product) {
         try {
-          const { deleteImage } = await import('../lib/imageUtils');
           const urlsToDelete = new Set<string>();
           if (product.image) urlsToDelete.add(product.image);
           if (product.imageUrl) urlsToDelete.add(product.imageUrl);

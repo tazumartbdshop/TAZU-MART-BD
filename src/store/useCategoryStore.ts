@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { deleteImage } from '../lib/imageUtils';
 
 export interface Category {
   id: string;
@@ -59,7 +60,6 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const category = get().categories.find(c => c.id === id);
     if (category) {
       try {
-        const { deleteImage } = await import('../lib/imageUtils');
         const urlsToDelete = new Set<string>();
         if (category.iconImage) urlsToDelete.add(category.iconImage);
         if (category.bannerImage) urlsToDelete.add(category.bannerImage);

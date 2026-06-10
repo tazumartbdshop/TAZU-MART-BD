@@ -8,6 +8,7 @@ import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { cn } from '../lib/utils';
+import { uploadImage } from '../lib/imageUtils';
 import { bdAddressData, divisions } from '../data/addressData';
 import { pixelService } from '../utils/pixelService';
 
@@ -245,7 +246,6 @@ export default function Register() {
       let finalProfileImage = formData.profileImage;
       if (finalProfileImage?.startsWith('data:')) {
         try {
-          const { uploadImage } = await import('../lib/imageUtils');
           const res = await fetch(finalProfileImage);
           const blob = await res.blob();
           finalProfileImage = await uploadImage(blob, 'user-profiles', `user-${Date.now()}.jpg`);
