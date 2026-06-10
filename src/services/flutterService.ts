@@ -111,13 +111,32 @@ const DEFAULT_CONFIG: FlutterConfig = {
   },
 };
 
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
 const STORAGE_KEY = 'flutter_manager_config';
 
 export const getFlutterConfig = async (): Promise<FlutterConfig> => {
+  let isOffline = false;
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'flutter_config'));
+    if (docSnap.exists()) {
+      return docSnap.data() as FlutterConfig;
+    }
+  } catch (err: any) {
+    isOffline = true;
+    console.warn("Could not read flutter config from Firestore (using local fallback):", err?.message || err);
+  }
+
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      const config = JSON.parse(stored);
+      // Automatically migrate offline storage to Firestore ONLY if we online
+      if (!isOffline && typeof navigator !== 'undefined' && navigator.onLine !== false) {
+        saveFlutterConfig(config).catch(() => {});
+      }
+      return config;
     } catch (e) {
       return DEFAULT_CONFIG;
     }
@@ -126,5 +145,12 @@ export const getFlutterConfig = async (): Promise<FlutterConfig> => {
 };
 
 export const saveFlutterConfig = async (config: FlutterConfig): Promise<void> => {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.onLine !== false) {
+      await setDoc(doc(db, 'settings', 'flutter_config'), config, { merge: true });
+    }
+  } catch (err: any) {
+    console.warn("Could not save flutter config to Firestore (saved locally):", err?.message || err);
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
 };

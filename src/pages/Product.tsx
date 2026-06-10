@@ -43,7 +43,6 @@ export default function Product() {
   const [quantity, setQuantity] = useState(1);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'shipping' | 'returns'>('description');
-  const [isOrdering, setIsOrdering] = useState(false);
   const { toggleWishlist, isInWishlist } = useWishlistStore();
   const isWishlisted = isInWishlist(product?.id || '');
   const [isShareSuccess, setIsShareSuccess] = useState(false);
@@ -262,29 +261,14 @@ export default function Product() {
       quantity: quantity,
     });
 
-    toast.success("Product added to cart successfully");
-
     pixelService.trackAddToCart({
       id: product.id,
       name: product.name,
       price: currentPrice,
       quantity: quantity
     });
-  };
 
-  const handleBuyNow = () => {
-    if (isOutOfStock) {
-        alert("This product is currently out of stock");
-        return;
-    }
-    if (isOrdering) return;
-    setIsOrdering(true);
-    
-    setTimeout(() => {
-      clearCart();
-      handleAddToCart();
-      navigate('/checkout');
-    }, 400); 
+    toast.success("Product added to cart successfully");
   };
 
   const handleShare = async () => {
@@ -688,7 +672,7 @@ export default function Product() {
                 type="button"
                 onClick={handleAddToCart}
                 disabled={isOutOfStock}
-                className={`w-full h-[52px] bg-neutral-950 text-white font-black uppercase text-[11px] tracking-widest hover:bg-neutral-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-neutral-300 hover:bg-neutral-300' : ''}`}
+                className={`w-full h-[52px] bg-neutral-950 text-white border border-neutral-950 font-black uppercase text-[11px] tracking-widest hover:bg-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-neutral-300 border-neutral-300 text-neutral-400' : ''}`}
               >
                 <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
                 <span>{isOutOfStock ? 'OUT OF STOCK' : 'Add to Cart'}</span>
@@ -851,13 +835,13 @@ export default function Product() {
             </div>
         </div>
 
-        <div className="flex flex-1 max-w-xs sm:max-w-md ml-auto">
+        <div className="flex flex-1 gap-3 max-w-xs sm:max-w-md ml-auto">
             
             <button 
               type="button"
               onClick={handleAddToCart}
               disabled={isOutOfStock}
-              className={`w-full bg-gray-950 hover:bg-neutral-800 text-white font-semibold h-11 px-6 rounded-lg text-sm transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none ${isOutOfStock ? 'opacity-50 background-neutral-300 hover:bg-neutral-300 text-gray-400 cursor-not-allowed' : ''}`}
+              className={`w-full bg-gray-950 hover:bg-gray-900 text-white font-semibold h-11 px-4 rounded-lg text-sm shadow-md shadow-gray-950/10 transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-300 hover:bg-gray-300 text-gray-400' : ''}`}
             >
                 <ShoppingBag className="w-4 h-4" />
                 <span>{isOutOfStock ? 'OUT OF STOCK' : 'Add to Cart'}</span>

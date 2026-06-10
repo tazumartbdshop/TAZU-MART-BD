@@ -569,7 +569,7 @@ export const useSupportStore = create<SupportState>()(
               const currentStatus = snapshot.data().isBlocked || false;
               updateDoc(sessRef, { isBlocked: !currentStatus }).catch(err => console.error("Toggle block Firestore failed:", err));
             }
-          });
+          }).catch(err => console.error("getDoc session toggleBlockPhone failed:", err));
         }
       },
 

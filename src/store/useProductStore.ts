@@ -162,7 +162,7 @@ export function generateKeywords(name: string, category: string, brand?: string,
 
 export const useProductStore = create<ProductState>((set, get) => ({
   products: [],
-  isLoading: true,
+  isLoading: false,
   autoRankTrending: () => {
     const products = get().products;
     const sorted = [...products].sort((a, b) => (b.reviews || 0) * (b.rating || 0) - (a.reviews || 0) * (a.rating || 0));
@@ -246,32 +246,13 @@ export const useProductStore = create<ProductState>((set, get) => ({
   },
   
   subscribe: () => {
-    set({ isLoading: true });
-    
-    // 5-second hard timeout for initial loading state
-    const timer = setTimeout(() => {
-      set({ isLoading: false });
-      console.warn("Products subscription initial fetch timed out. Proceeding with current local state.");
-    }, 5000);
-
     const q = query(collection(db, 'products'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      clearTimeout(timer);
       const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-      set({ products, isLoading: false });
+      set({ products });
     }, (error) => {
-      clearTimeout(timer);
-      set({ isLoading: false });
-      try {
-        handleFirestoreError(error, OperationType.GET, 'products');
-      } catch (err) {
-        console.error("[Gracefully Handled products Sub Error]", err);
-      }
+      handleFirestoreError(error, OperationType.GET, 'products');
     });
-
-    return () => {
-      clearTimeout(timer);
-      unsubscribe();
-    };
+    return unsubscribe;
   }
 }));

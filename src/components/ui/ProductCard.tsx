@@ -7,6 +7,7 @@ import { useProductStore, Product } from '../../store/useProductStore';
 import { formatPrice } from '../../lib/utils';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { getProductDiscountDetails } from '../../lib/offerUtils';
+import { toast } from 'react-hot-toast';
 
 interface ProductCardProps {
   product: Product;
@@ -48,6 +49,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       image: product.imageUrl || product.featured_image || product.image,
       quantity: 1,
     });
+    toast.success("Product added to cart successfully");
   };
 
   const discountPercent = finalDiscountPrice 

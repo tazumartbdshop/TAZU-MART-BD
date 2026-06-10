@@ -131,7 +131,7 @@ export function CompactProductCard({ product, rank }: any) {
               )}
             </div>
 
-            <div className="mt-1 font-mono">
+            <div className="w-full font-mono">
               <button 
                 type="button"
                 onClick={(e) => {
@@ -140,7 +140,7 @@ export function CompactProductCard({ product, rank }: any) {
                   addItem({ ...product, image: product.featured_image || product.image, quantity: 1 } as any);
                   toast.success("Product added to cart successfully");
                 }}
-                className="w-full py-1.5 bg-black hover:bg-neutral-800 text-white border border-black text-[9px] font-black uppercase tracking-wider text-center cursor-pointer transition-colors"
+                className="w-full py-2 bg-black hover:bg-neutral-800 text-white border border-black text-[10px] font-black uppercase tracking-wider text-center cursor-pointer transition-all"
               >
                 Add To Cart
               </button>

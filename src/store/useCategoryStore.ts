@@ -82,33 +82,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   clearDemoData: () => set(() => ({ categories: [] })),
   
   subscribe: () => {
-    set({ isLoaded: false });
-    
-    // 5-second hard timeout for initial loading state
-    const timer = setTimeout(() => {
-      set({ isLoaded: true });
-      console.warn("Categories subscription initial fetch timed out. Proceeding with current local state.");
-    }, 5000);
-
     const q = query(collection(db, 'categories'), orderBy('displayOrder', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      clearTimeout(timer);
       const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
       set({ categories, isLoaded: true });
     }, (error) => {
-      clearTimeout(timer);
-      set({ isLoaded: true });
-      try {
-        handleFirestoreError(error, OperationType.GET, 'categories');
-      } catch (err) {
-        console.error("[Gracefully Handled categories Sub Error]", err);
-      }
+      handleFirestoreError(error, OperationType.GET, 'categories');
     });
-
-    return () => {
-      clearTimeout(timer);
-      unsubscribe();
-    };
+    return unsubscribe;
   }
 }));
 

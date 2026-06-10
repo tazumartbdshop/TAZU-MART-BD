@@ -122,7 +122,7 @@ export const useModeratorStore = create<ModeratorStore>((set, get) => ({
       } else {
         setDoc(doc(db, 'settings', 'moderatorAuth'), { sectionPassword: 'Aistudio@2026' }).then(() => {
           set({ isLoaded: true });
-        });
+        }).catch(err => console.error("Initial moderatorAuth seed failed", err));
       }
     }, (err) => handleFirestoreError(err, OperationType.GET, 'settings/moderatorAuth'));
 

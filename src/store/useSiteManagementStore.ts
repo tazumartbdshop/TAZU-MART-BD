@@ -23,11 +23,13 @@ export const useSiteManagementStore = create<SiteManagementState>((set) => ({
 
     try {
       const settings = await Promise.race([
-        siteManagementService.getSettings(),
+        siteManagementService.getSettings().then((res) => {
+          clearTimeout(timeoutId);
+          return res;
+        }),
         timeoutPromise
       ]) as SiteManagementData;
       
-      clearTimeout(timeoutId);
       set({ data: settings, isLoading: false });
     } catch (error: any) {
       clearTimeout(timeoutId);
