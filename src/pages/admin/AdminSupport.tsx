@@ -52,6 +52,7 @@ import { useOfferStore } from '../../store/useOfferStore';
 import { useBannerStore } from '../../store/useBannerStore';
 import { useNavigate } from 'react-router-dom';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
+import { uploadImage } from '../../lib/imageUtils';
 
 // Profile images fallback logic
 const getAvatarImage = (id: string, customerProfileImage?: string) => {
@@ -966,7 +967,6 @@ export default function AdminSupport() {
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const { uploadImage } = await import('../../lib/imageUtils');
                             try {
                               const url = await uploadImage(file, 'chat-images', `admin-reply-${Date.now()}`);
                               setReplyImage(url);
@@ -984,7 +984,6 @@ export default function AdminSupport() {
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const { uploadImage } = await import('../../lib/imageUtils');
                             try {
                               const url = await uploadImage(file, 'chat-images', `admin-file-${Date.now()}`);
                               setReplyFile({ name: file.name, url });

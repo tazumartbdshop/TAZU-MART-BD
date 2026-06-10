@@ -5,6 +5,7 @@ import { useCategoryStore, Category } from '../../store/useCategoryStore';
 import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
+import { uploadImage } from '../../lib/imageUtils';
 
 export default function AddCategory() {
   const navigate = useNavigate();
@@ -166,7 +167,6 @@ export default function AddCategory() {
     console.log("handleSubmit started: Uploading images...");
 
     try {
-        const { uploadImage } = await import('../../lib/imageUtils');
         
         // Upload thumbnail if changed
         let iconUrl = formData.iconImage;

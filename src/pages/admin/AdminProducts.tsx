@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useProductStore, generateKeywords } from '../../store/useProductStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { toast } from 'react-hot-toast';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadImage } from '../../lib/imageUtils';
 import { storage } from '../../lib/firebase';
 
 function AdminProductList() {

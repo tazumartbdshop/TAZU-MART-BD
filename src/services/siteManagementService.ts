@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export interface LinkPage {
@@ -118,7 +118,6 @@ export const siteManagementService = {
 
   async saveLinkPage(page: LinkPage): Promise<void> {
     try {
-      const { doc, setDoc } = await import('firebase/firestore');
       await setDoc(doc(db, 'link_pages', page.id || page.slug), page);
     } catch (err) {
       console.error("Firestore saveLinkPage failed:", err);
