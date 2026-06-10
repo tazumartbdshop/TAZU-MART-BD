@@ -1,12 +1,19 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from './firebase';
 
-// Helper to add timeout to promise
+// Helper to add timeout to promise with proper cleanup
 const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
+  let timeoutId: any;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(errorMessage)), ms);
+  });
+
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), ms))
-  ]);
+    timeoutPromise
+  ]).finally(() => {
+    clearTimeout(timeoutId);
+  });
 };
 
 export const resizeImage = (file: File, maxWidth: number = 800): Promise<Blob> => {

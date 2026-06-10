@@ -135,14 +135,19 @@ export default function AdminFlutterBanner() {
     });
   };
 
-  // Helper to wrap promises with a timeout
+  // Helper to wrap promises with a timeout with proper cleanup
   const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number = 15000): Promise<T> => {
+    let timeoutId: any;
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs);
+    });
+
     return Promise.race([
       promise,
-      new Promise<T>((_, reject) => 
-        setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
-      )
-    ]);
+      timeoutPromise
+    ]).finally(() => {
+      clearTimeout(timeoutId);
+    });
   };
 
   // Upload file logic with canvas auto-resize & crop, and multiple upload support (with immediate base64 fallback)
