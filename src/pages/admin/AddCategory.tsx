@@ -20,6 +20,10 @@ export default function AddCategory() {
     slug: '',
     bannerImage: '',
     iconImage: '',
+    wideBannerImage: '',
+    buttonText: '',
+    buttonLink: '',
+    featuredProducts: '',
     description: '',
     displayOrder: 1,
     status: 'Active' as 'Active' | 'Inactive',
@@ -32,6 +36,7 @@ export default function AddCategory() {
   const [bannerImages, setBannerImages] = useState<string[]>([]);
   const [bannerFiles, setBannerFiles] = useState<(File | string)[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [wideBannerFile, setWideBannerFile] = useState<File | null>(null);
   const [sliderSettings, setSliderSettings] = useState({
     autoScroll: false,
     manualScroll: true,
@@ -39,12 +44,14 @@ export default function AddCategory() {
   });
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+  const [wideBannerError, setWideBannerError] = useState<string | null>(null);
   const [showSourceSheet, setShowSourceSheet] = useState(false);
   const [displayOrderError, setDisplayOrderError] = useState<string | null>(null);
 
   const bannerGalleryInputRef = useRef<HTMLInputElement>(null);
   const bannerCameraInputRef = useRef<HTMLInputElement>(null);
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const wideBannerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isEditing) {
@@ -56,6 +63,10 @@ export default function AddCategory() {
           slug: category.slug,
           bannerImage: category.bannerImage || '',
           iconImage: category.iconImage || '',
+          wideBannerImage: category.wideBannerImage || '',
+          buttonText: category.buttonText || '',
+          buttonLink: category.buttonLink || '',
+          featuredProducts: category.featuredProducts || '',
           description: category.description || '',
           displayOrder: category.displayOrder || 1,
           status: category.status,
@@ -141,6 +152,32 @@ export default function AddCategory() {
     setThumbnailFile(file);
   };
 
+  const processWideBannerFile = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setWideBannerError(null);
+    const file = files[0];
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setWideBannerError("Only JPG, PNG and WEBP formats are supported.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setWideBannerError(`Wide Banner image exceeds 5MB limit.`);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setFormData(prev => ({ ...prev, wideBannerImage: url }));
+    setWideBannerFile(file);
+  };
+
+  const removeWideBannerImage = () => {
+    if (formData.wideBannerImage && formData.wideBannerImage.startsWith('blob:')) {
+      URL.revokeObjectURL(formData.wideBannerImage);
+    }
+    setFormData(prev => ({ ...prev, wideBannerImage: '' }));
+    setWideBannerFile(null);
+  };
+
   const removeBannerImage = (index: number) => {
     const target = bannerImages[index];
     if (target && target.startsWith('blob:')) {
@@ -168,12 +205,20 @@ export default function AddCategory() {
 
     try {
         
-        // Upload thumbnail if changed
+         // Upload thumbnail if changed
         let iconUrl = formData.iconImage;
         if (thumbnailFile) {
           console.log("Uploading thumbnail...");
           iconUrl = await uploadImage(thumbnailFile, 'categories', `icon-${formData.slug}`);
           console.log("Thumbnail uploaded, URL:", iconUrl);
+        }
+
+        // Upload wide banner (16:9) if changed
+        let wideBannerUrl = formData.wideBannerImage;
+        if (wideBannerFile) {
+          console.log("Uploading wide banner...");
+          wideBannerUrl = await uploadImage(wideBannerFile, 'categories', `wide-banner-${formData.slug}`);
+          console.log("Wide banner uploaded, URL:", wideBannerUrl);
         }
 
         // Upload all new banners
@@ -194,6 +239,10 @@ export default function AddCategory() {
           bannerImages: finalBannerUrls,
           sliderSettings: sliderSettings,
           iconImage: iconUrl,
+          wideBannerImage: wideBannerUrl,
+          buttonText: formData.buttonText,
+          buttonLink: formData.buttonLink,
+          featuredProducts: formData.featuredProducts,
           description: formData.description,
           displayOrder: Number(formData.displayOrder) || 1,
           status: formData.status,
@@ -444,6 +493,87 @@ export default function AddCategory() {
                     {bannerError && (
                       <p className="text-[10px] text-red-650 text-red-650 text-red-600 font-bold mt-2">{bannerError}</p>
                     )}
+                  </div>
+                </div>
+
+                {/* Wide Banner 16:9 & Button / Product details */}
+                <span className="h-px bg-zinc-100 block" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h5 className="text-[10px] font-black text-black uppercase tracking-widest">Wide Banner (16:9)</h5>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight -mt-3">Tap to upload category specific wide landscape banner</p>
+                    
+                    {formData.wideBannerImage ? (
+                      <div className="relative w-full aspect-[16/9] max-w-[280px] bg-zinc-50 border border-zinc-200 p-2 flex items-center justify-center">
+                        <img src={formData.wideBannerImage} alt="Wide banner" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <button
+                          type="button"
+                          onClick={removeWideBannerImage}
+                          className="absolute -top-2 -right-2 bg-red-600 border border-zinc-200 text-white p-1 hover:bg-red-700 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div 
+                        onClick={() => wideBannerInputRef.current?.click()}
+                        className="w-full aspect-[16/9] max-w-[280px] border-2 border-dashed border-zinc-200 hover:border-black bg-zinc-50 hover:bg-zinc-100/50 cursor-pointer flex flex-col items-center justify-center gap-1.5 transition-all text-center animate-fade-in"
+                      >
+                        <Camera className="w-5 h-5 text-gray-400" />
+                        <span className="text-[8px] text-gray-400 font-black uppercase tracking-widest">Upload Wide Banner</span>
+                      </div>
+                    )}
+                    
+                    <input 
+                      type="file" 
+                      ref={wideBannerInputRef}
+                      className="hidden" 
+                      accept="image/*"
+                      onChange={(e) => processWideBannerFile(e.target.files)}
+                    />
+                    {wideBannerError && (
+                      <p className="text-[10px] text-red-600 font-bold">{wideBannerError}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest font-black">Featured Products (IDs / SKUs)</label>
+                      <input 
+                        type="text" 
+                        name="featuredProducts" 
+                        value={formData.featuredProducts}
+                        onChange={handleInputChange}
+                        placeholder="e.g. SKU-123, SKU-456, SKU-789" 
+                        className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-semibold text-xs text-black" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <span className="h-px bg-zinc-100 block" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-black uppercase tracking-widest font-black">Button Text</label>
+                    <input 
+                      type="text" 
+                      name="buttonText" 
+                      value={formData.buttonText}
+                      onChange={handleInputChange}
+                      placeholder="e.g. SHOP NOW, EXPLORE MORE" 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-semibold text-xs text-black" 
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-black uppercase tracking-widest font-black">Button Link</label>
+                    <input 
+                      type="text" 
+                      name="buttonLink" 
+                      value={formData.buttonLink}
+                      onChange={handleInputChange}
+                      placeholder="e.g. /category/electronics, https://..." 
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-mono font-semibold text-xs text-black" 
+                    />
                   </div>
                 </div>
               </div>

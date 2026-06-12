@@ -11,6 +11,10 @@ export interface Category {
   bannerImage: string;
   bannerImages?: string[];
   iconImage?: string;
+  wideBannerImage?: string;
+  buttonText?: string;
+  buttonLink?: string;
+  featuredProducts?: string;
   description?: string;
   displayOrder: number;
   status: 'Active' | 'Inactive';
@@ -61,10 +65,12 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   
   updateCategory: async (id, payload) => {
     try {
+      const existing = get().categories.find(c => c.id === id);
+      const mergedPayload = existing ? { ...existing, ...payload } : payload;
       const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
       await setDoc(docRef, {
         categoryList: {
-          [id]: payload
+          [id]: mergedPayload
         }
       }, { merge: true });
     } catch (error) {
@@ -81,6 +87,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         const urlsToDelete = new Set<string>();
         if (category.iconImage) urlsToDelete.add(category.iconImage);
         if (category.bannerImage) urlsToDelete.add(category.bannerImage);
+        if (category.wideBannerImage) urlsToDelete.add(category.wideBannerImage);
         if (category.bannerImages && Array.isArray(category.bannerImages)) {
           category.bannerImages.forEach(img => {
             if (img) urlsToDelete.add(img);
