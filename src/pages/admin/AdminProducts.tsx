@@ -57,12 +57,25 @@ function AdminProductList() {
           </div>
         </div>
         
-        <div className="flex flex-col gap-3 w-full md:w-auto min-w-[240px]">
-          {/* TOTAL ITEMS CARD - Top */}
-          <div className="bg-white border border-neutral-100 p-6 rounded-none shadow-[0_2px_15px_rgba(0,0,0,0.02)] flex flex-col items-center justify-center group hover:border-purple-600 transition-all relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-purple-50 rounded-full blur-3xl -mr-8 -mt-8 opacity-50"></div>
-            <span className="text-[9px] font-black text-neutral-400 uppercase tracking-[0.25em] mb-2 relative z-10">Total Active Items</span>
-            <div className="text-4xl font-black text-[#0a0a0a] tracking-tighter relative z-10">
+        <div className="flex flex-col gap-3 w-full md:w-auto min-w-[280px]">
+          {/* FIRESTORE DEBUG COUNTER CARD */}
+          <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-none flex items-center justify-between group hover:border-purple-500 transition-all">
+            <div className="flex flex-col">
+              <span className="text-[8px] font-black text-zinc-550 uppercase tracking-[0.2em] text-[#8c32ec]">Firestore Database</span>
+              <span className="text-[10px] font-black text-black uppercase tracking-tight">Total Products Found In Firestore</span>
+            </div>
+            <div className="text-2xl font-black text-purple-600 bg-white border border-zinc-200 px-3 py-1 font-mono">
+              {products.length}
+            </div>
+          </div>
+
+          {/* ACTIVE FILTERED ITEMS CARD */}
+          <div className="bg-white border border-zinc-100 p-4 rounded-none flex items-center justify-between group hover:border-purple-650 transition-all">
+            <div className="flex flex-col">
+              <span className="text-[8px] font-black text-neutral-400 uppercase tracking-[0.2em]">Filtered Results</span>
+              <span className="text-[10px] font-black text-neutral-700 uppercase tracking-tight">Match Current Search/Tab</span>
+            </div>
+            <div className="text-2xl font-black text-neutral-900 bg-neutral-50 border border-neutral-150 px-3 py-1 font-mono">
               {filteredProducts.length}
             </div>
           </div>
@@ -598,7 +611,7 @@ function AdminProductAdd() {
           console.log("Product added.");
         }
         
-        toast.success("Product saved successfully.", {
+        toast.success("✅ Product Saved Successfully", {
           position: "top-center",
           style: {
             background: "#10B981",
@@ -608,8 +621,7 @@ function AdminProductAdd() {
           }
         });
         
-        const isListingPath = window.location.pathname.includes('product-listing');
-        navigate(isListingPath ? '/admin/product-listing' : '/admin/products');
+        navigate('/admin/product-listing');
     } catch (error: any) {
         console.error("Error saving product:", error);
         toast.error(error?.message || "❌ Failed to save product");
@@ -625,14 +637,14 @@ function AdminProductAdd() {
            <div className="flex items-center gap-3">
               <button 
                 type="button"
-                onClick={() => navigate(window.location.pathname.includes('product-listing') ? '/admin/product-listing' : '/admin/products')}
+                onClick={() => navigate('/admin/product-listing')}
                 className="p-2 border border-zinc-200 rounded-none bg-white hover:bg-gray-100 mr-1"
               >
                 <ChevronLeft className="w-4 h-4 text-black" />
               </button>
               <h3 className="text-sm font-black text-black uppercase tracking-widest">{isEditing ? 'EDIT PRODUCT' : 'ADD PRODUCT'}</h3>
            </div>
-           <button onClick={() => navigate(window.location.pathname.includes('product-listing') ? '/admin/product-listing' : '/admin/products')} className="text-gray-400 hover:text-black bg-white border border-zinc-200 p-2 rounded-none transition-colors">
+           <button onClick={() => navigate('/admin/product-listing')} className="text-gray-400 hover:text-black bg-white border border-zinc-200 p-2 rounded-none transition-colors">
              <X className="w-4 h-4" />
            </button>
         </div>

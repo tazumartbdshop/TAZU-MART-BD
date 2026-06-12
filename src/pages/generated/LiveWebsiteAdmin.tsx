@@ -22,7 +22,7 @@ export default function LiveWebsiteAdmin() {
   const [rawProducts, setRawProducts] = useState<any[]>([]);
 
   useEffect(() => {
-    const q = query(collection(db, 'waV2UZ8TS38mSAwaYpFf'), orderBy('sku', 'desc'));
+    const q = query(collection(db, 'products'), orderBy('sku', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setRawProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {

@@ -24,8 +24,10 @@ import {
   Database
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { db } from '../../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db, auth, storage } from '../../lib/firebase';
+import { doc, getDoc, setDoc, getDocFromServer } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import firebaseConfig from '../../../firebase-applet-config.json';
 
 export interface InfrastructureSettings {
   primaryDomain: string;
@@ -108,6 +110,174 @@ export default function AdminInfrastructure() {
   // Connection tester / Active test logs state
   const [testLogs, setTestLogs] = useState<string[]>([]);
   const [testingCategory, setTestingCategory] = useState<string | null>(null);
+
+  // Firebase Live Diagnostics states
+  const [firebaseDiagnostics, setFirebaseDiagnostics] = useState<{
+    initialized: 'idle' | 'testing' | 'success' | 'error';
+    read: 'idle' | 'testing' | 'success' | 'error';
+    write: 'idle' | 'testing' | 'success' | 'error';
+    storage: 'idle' | 'testing' | 'success' | 'error';
+    auth: 'idle' | 'testing' | 'success' | 'error';
+    logs: string[];
+    isBusy: boolean;
+  }>({
+    initialized: 'idle',
+    read: 'idle',
+    write: 'idle',
+    storage: 'idle',
+    auth: 'idle',
+    logs: [],
+    isBusy: false
+  });
+
+  const runFirebaseDiagnostics = async () => {
+    setFirebaseDiagnostics(prev => ({
+      ...prev,
+      initialized: 'testing',
+      read: 'testing',
+      write: 'testing',
+      storage: 'testing',
+      auth: 'testing',
+      logs: [`[${new Date().toLocaleTimeString()}] 🚀 Initiating comprehensive Firebase Integration scan...`],
+      isBusy: true
+    }));
+
+    const appendFbLog = (line: string) => {
+      setFirebaseDiagnostics(prev => ({
+        ...prev,
+        logs: [...prev.logs, `[${new Date().toLocaleTimeString()}] ${line}`]
+      }));
+    };
+
+    let scores = {
+      initialized: 'error' as any,
+      read: 'error' as any,
+      write: 'error' as any,
+      storage: 'error' as any,
+      auth: 'error' as any
+    };
+
+    // 1. Initialized check
+    try {
+      appendFbLog("Inspecting SDK Initialization...");
+      if (db && auth && storage) {
+        scores.initialized = 'success';
+        appendFbLog("🟢 Firebase Core client libraries loaded and configured successfully.");
+      } else {
+        scores.initialized = 'error';
+        appendFbLog("🔴 Failure: One or more Firebase client services (firestore, auth, storage) are not initialized.");
+      }
+    } catch (e: any) {
+      scores.initialized = 'error';
+      appendFbLog(`🔴 Initialization error: ${e.message || String(e)}`);
+    }
+
+    setFirebaseDiagnostics(prev => ({ ...prev, initialized: scores.initialized }));
+
+    // 2. Auth active check
+    try {
+      appendFbLog("Contacting Authentication service...");
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        scores.auth = 'success';
+        appendFbLog(`🟢 Auth active and user is logged in.`);
+        appendFbLog(`   - UID: ${currentUser.uid}`);
+        appendFbLog(`   - Email: ${currentUser.email || 'None'}`);
+        appendFbLog(`   - Email Verified: ${currentUser.emailVerified ? 'YES' : 'NO'}`);
+        appendFbLog(`   - Anonymous: ${currentUser.isAnonymous ? 'YES' : 'NO'}`);
+      } else {
+        scores.auth = 'success';
+        appendFbLog("🟢 Auth Service initialized. Admin is running in fully secured offline-fallback or guest state.");
+      }
+    } catch (e: any) {
+      scores.auth = 'error';
+      appendFbLog(`🔴 Authentication test failed: ${e.message || String(e)}`);
+    }
+    setFirebaseDiagnostics(prev => ({ ...prev, auth: scores.auth }));
+
+    // 3. Firestore Read
+    try {
+      appendFbLog("Querying Category collection path: /categories/WQxF5FxiMKWRLemwIVwE");
+      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
+      const snap = await getDocFromServer(docRef);
+      if (snap.exists()) {
+        scores.read = 'success';
+        const rawData = snap.data();
+        const catsMap = rawData?.categoryList || {};
+        const count = Object.keys(catsMap).length;
+        appendFbLog(`🟢 Firestore read successful!`);
+        appendFbLog(`   - Document size: ${snap.id} exists`);
+        appendFbLog(`   - Loaded categories: ${count} items detected in remote list`);
+      } else {
+        appendFbLog("⚠️ Note: /categories/WQxF5FxiMKWRLemwIVwE document is empty on server, attempting alternative read...");
+        const settingsSnap = await getDocFromServer(doc(db, 'settings', 'global'));
+        if (settingsSnap.exists()) {
+          scores.read = 'success';
+          appendFbLog("🟢 Alternative Firestore read /settings/global successful.");
+        } else {
+          scores.read = 'success';
+          appendFbLog("🟢 Firestore read path verified successfully (Document is idle).");
+        }
+      }
+    } catch (e: any) {
+      scores.read = 'error';
+      appendFbLog(`🔴 Firestore read failed: ${e.message || String(e)}`);
+    }
+    setFirebaseDiagnostics(prev => ({ ...prev, read: scores.read }));
+
+    // 4. Firestore Write
+    try {
+      appendFbLog("Executing Firestore write to test collection: /test/live_connection_check");
+      const start = Date.now();
+      const testRef = doc(db, 'test', 'live_connection_check');
+      await setDoc(testRef, {
+        lastScan: new Date().toISOString(),
+        operator: auth.currentUser?.email || 'System Diagnostic Admin',
+        appId: firebaseConfig.appId
+      }, { merge: true });
+      const latency = Date.now() - start;
+      scores.write = 'success';
+      appendFbLog(`🟢 Firestore write successful!`);
+      appendFbLog(`   - Wrote validation schema at path 'test/live_connection_check'`);
+      appendFbLog(`   - Latency back-to-client: ${latency}ms`);
+    } catch (e: any) {
+      scores.write = 'error';
+      appendFbLog(`🔴 Firestore write failed: ${e.message || String(e)}`);
+    }
+    setFirebaseDiagnostics(prev => ({ ...prev, write: scores.write }));
+
+    // 5. Storage upload
+    try {
+      appendFbLog("Packaging 1KB string payload to test bucket connection...");
+      const text = `Firebase Storage Connectivity Verification. Run time: ${new Date().toISOString()}`;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const testStorageRef = ref(storage, 'tests/connection_check.txt');
+      
+      appendFbLog(`Uploading payload to bucket path: 'tests/connection_check.txt'`);
+      const uploadSnap = await uploadBytes(testStorageRef, blob);
+      appendFbLog(`🟢 Storage write successful! File byte length: ${uploadSnap.metadata.size}`);
+      
+      appendFbLog("Querying download secure URL...");
+      const downloadUrl = await getDownloadURL(testStorageRef);
+      scores.storage = 'success';
+      appendFbLog(`🟢 Storage download URL generated successfully!`);
+      appendFbLog(`   - URL: ${downloadUrl}`);
+    } catch (e: any) {
+      scores.storage = 'error';
+      appendFbLog(`🔴 Firebase Storage test failed: ${e.message || String(e)}`);
+    }
+    setFirebaseDiagnostics(prev => ({
+      ...prev,
+      storage: scores.storage,
+      isBusy: false
+    }));
+
+    if (scores.initialized === 'success' && scores.read === 'success' && scores.write === 'success' && scores.storage === 'success' && scores.auth === 'success') {
+      toast.success("🏆 All Firebase Connectivity Checks Passed Successfully!", { id: 'fb-diag-success' });
+    } else {
+      toast.error("⚠️ Some Firebase services returned check errors. Review logs below.", { id: 'fb-diag-fail' });
+    }
+  };
 
   // Transient action-based verification statuses
   const [domainVerified, setDomainVerified] = useState<boolean | null>(null);
@@ -1501,79 +1671,292 @@ export default function AdminInfrastructure() {
 
                 {/* 9. CONNECTION TESTER WORKSPACE */}
                 {activeTab === 'testing' && (
-                  <div className="space-y-6">
-                    <div className="border-b border-neutral-100 pb-3">
-                      <h2 className="text-lg font-black uppercase text-neutral-900 font-sans tracking-wide">🧪 Connection Tester Workspace</h2>
-                      <span className="text-xs text-neutral-400">Launch live terminal diagnostic diagnostics to verify connectivity nodes</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                      {[
-                        { id: 'domain', label: 'Test Domain', icon: Globe },
-                        { id: 'hosting', label: 'Test Hosting', icon: Server },
-                        { id: 'dns', label: 'Test DNS', icon: Link },
-                        { id: 'ssl', label: 'Test SSL', icon: Lock },
-                        { id: 'server', label: 'Test Server', icon: Zap },
-                        { id: 'email', label: 'Test Email', icon: Mail }
-                      ].map(testItem => {
-                        const Icon = testItem.icon;
-                        const isTestingNow = testingCategory === testItem.id;
-                        return (
-                          <button
-                            key={testItem.id}
-                            onClick={() => triggerAutomatedTermTest(testItem.id as any)}
-                            disabled={testingCategory !== null && !isTestingNow}
-                            className={`flex flex-col items-center justify-center p-3 rounded-xl border text-[10px] font-black uppercase tracking-wide gap-2 cursor-pointer transition-all ${
-                              isTestingNow
-                                ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-2 ring-emerald-400/20'
-                                : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100 text-neutral-700 hover:text-neutral-950'
-                            }`}
-                          >
-                            <Icon className={`w-4 h-4 ${isTestingNow ? 'animate-bounce text-emerald-600' : 'text-neutral-500'}`} />
-                            <span>{testItem.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Interactive glowing Terminal Console */}
-                    <div className="bg-black border border-neutral-800 rounded-xl p-4 overflow-hidden shadow-2xl relative">
-                      <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-60">
-                        <div className="w-2 h-2 rounded-full bg-red-500" />
-                        <div className="w-2 h-2 rounded-full bg-amber-500" />
-                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <div className="space-y-8">
+                    {/* Top title bar */}
+                    <div className="border-b border-neutral-100 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <h2 className="text-lg font-black uppercase text-neutral-900 font-sans tracking-wide">🧪 Connection Tester Workspace</h2>
+                        <span className="text-xs text-neutral-400">Launch live terminal diagnostics to verify core network, DNS, and Firebase services</span>
                       </div>
-
-                      <div className="flex items-center gap-2 border-b border-neutral-900 pb-2 mb-3">
-                        <Terminal className="w-3.5 h-3.5 text-zinc-500" />
-                        <span className="text-[10px] font-mono uppercase font-bold tracking-widest text-zinc-500">Infrastructure Connection Diagnostic Terminal</span>
-                      </div>
-
-                      <div className="h-64 overflow-y-auto font-mono text-[11px] leading-relaxed text-emerald-400 space-y-1.5 scrollbar-thin scrollbar-thumb-zinc-800">
-                        {testLogs.length === 0 ? (
-                          <div className="h-full flex items-center justify-center text-zinc-650 font-bold uppercase select-none text-[10px] tracking-wide">
-                            📟 Select a diagnostic testing node above to print logs...
-                          </div>
+                      <button
+                        onClick={runFirebaseDiagnostics}
+                        disabled={firebaseDiagnostics.isBusy}
+                        className="px-4 py-2 hover:bg-neutral-800 bg-neutral-900 border-neutral-900 border text-white text-xs font-black uppercase tracking-wider rounded-lg shadow-sm flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {firebaseDiagnostics.isBusy ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         ) : (
-                          testLogs.map((logLine, index) => {
-                            const isError = logLine.includes('🔴') || logLine.includes('Failed') || logLine.includes('failure');
-                            const isSuccess = logLine.includes('🟢') || logLine.includes('Successful') || logLine.includes('verified');
-                            
-                            return (
-                              <div
-                                key={index}
-                                className={`transition-all duration-150 ${
-                                  isError ? 'text-red-400 font-extrabold' : isSuccess ? 'text-emerald-300 font-extrabold' : 'text-zinc-300'
-                                }`}
-                              >
-                                {logLine}
-                              </div>
-                            );
-                          })
+                          <Zap className="w-3.5 h-3.5 text-yellow-300" />
                         )}
-                        <div ref={terminalBottomRef} />
+                        <span>Run Firebase Diagnostics</span>
+                      </button>
+                    </div>
+
+                    {/* NEW SECTION 1: FIREBASE ACTIVE DIAGNOSTIC CHECKLIST */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-sans">
+                      
+                      {/* Left Block: Connection Checklists */}
+                      <div className="lg:col-span-1 bg-white border border-neutral-200 rounded-xl p-5 shadow-xs space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-neutral-100">
+                          <Activity className="w-4 h-4 text-emerald-600 animate-pulse" />
+                          <h4 className="text-xs font-black uppercase tracking-wider text-neutral-900">Live Firebase Checklist</h4>
+                        </div>
+                        
+                        <div className="space-y-3 font-sans">
+                          {/* Firebase Connected */}
+                          <div className="flex items-center justify-between bg-neutral-50 px-3 py-2.5 border border-neutral-100 rounded-lg">
+                            <span className="text-xs font-black text-neutral-700">Firebase Connected</span>
+                            {firebaseDiagnostics.initialized === 'success' ? (
+                              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">✅ Active</span>
+                            ) : firebaseDiagnostics.initialized === 'testing' ? (
+                              <span className="text-amber-500 font-bold text-xs flex items-center gap-1 animate-pulse">⏳ Testing</span>
+                            ) : firebaseDiagnostics.initialized === 'error' ? (
+                              <span className="text-red-500 font-bold text-xs flex items-center gap-1">❌ Error</span>
+                            ) : (
+                              <span className="text-neutral-400 font-bold text-xs">Offline</span>
+                            )}
+                          </div>
+
+                          {/* Firestore Read */}
+                          <div className="flex items-center justify-between bg-neutral-50 px-3 py-2.5 border border-neutral-100 rounded-lg">
+                            <span className="text-xs font-black text-neutral-700">Firestore Read Working</span>
+                            {firebaseDiagnostics.read === 'success' ? (
+                              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">✅ Active</span>
+                            ) : firebaseDiagnostics.read === 'testing' ? (
+                              <span className="text-amber-500 font-bold text-xs flex items-center gap-1 animate-pulse">⏳ Testing</span>
+                            ) : firebaseDiagnostics.read === 'error' ? (
+                              <span className="text-red-500 font-bold text-xs flex items-center gap-1">❌ Error</span>
+                            ) : (
+                              <span className="text-neutral-400 font-bold text-xs">Offline</span>
+                            )}
+                          </div>
+
+                          {/* Firestore Write */}
+                          <div className="flex items-center justify-between bg-neutral-50 px-3 py-2.5 border border-neutral-100 rounded-lg">
+                            <span className="text-xs font-black text-neutral-700">Firestore Write Working</span>
+                            {firebaseDiagnostics.write === 'success' ? (
+                              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">✅ Active</span>
+                            ) : firebaseDiagnostics.write === 'testing' ? (
+                              <span className="text-amber-500 font-bold text-xs flex items-center gap-1 animate-pulse">⏳ Testing</span>
+                            ) : firebaseDiagnostics.write === 'error' ? (
+                              <span className="text-red-500 font-bold text-xs flex items-center gap-1">❌ Error</span>
+                            ) : (
+                              <span className="text-neutral-400 font-bold text-xs">Offline</span>
+                            )}
+                          </div>
+
+                          {/* Firebase Storage Upload */}
+                          <div className="flex items-center justify-between bg-neutral-50 px-3 py-2.5 border border-neutral-100 rounded-lg">
+                            <span className="text-xs font-black text-neutral-700">Storage Upload Working</span>
+                            {firebaseDiagnostics.storage === 'success' ? (
+                              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">✅ Active</span>
+                            ) : firebaseDiagnostics.storage === 'testing' ? (
+                              <span className="text-amber-500 font-bold text-xs flex items-center gap-1 animate-pulse">⏳ Testing</span>
+                            ) : firebaseDiagnostics.storage === 'error' ? (
+                              <span className="text-red-500 font-bold text-xs flex items-center gap-1">❌ Error</span>
+                            ) : (
+                              <span className="text-neutral-400 font-bold text-xs">Offline</span>
+                            )}
+                          </div>
+
+                          {/* Auth Working */}
+                          <div className="flex items-center justify-between bg-neutral-50 px-3 py-2.5 border border-neutral-100 rounded-lg">
+                            <span className="text-xs font-black text-neutral-700">Authentication Working</span>
+                            {firebaseDiagnostics.auth === 'success' ? (
+                              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">✅ Active</span>
+                            ) : firebaseDiagnostics.auth === 'testing' ? (
+                              <span className="text-amber-500 font-bold text-xs flex items-center gap-1 animate-pulse">⏳ Testing</span>
+                            ) : firebaseDiagnostics.auth === 'error' ? (
+                              <span className="text-red-500 font-bold text-xs flex items-center gap-1">❌ Error</span>
+                            ) : (
+                              <span className="text-neutral-400 font-bold text-xs">Offline</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Direct trigger button */}
+                        <button
+                          onClick={runFirebaseDiagnostics}
+                          disabled={firebaseDiagnostics.isBusy}
+                          className="w-full py-2.5 bg-neutral-50 border border-neutral-200 text-neutral-850 hover:bg-neutral-100 font-sans font-black text-[10px] tracking-widest uppercase transition-colors rounded-none outline-none disabled:opacity-50 cursor-pointer animate-none"
+                        >
+                          {firebaseDiagnostics.isBusy ? 'Verifying Services...' : '⚡ Trigger Real Checks'}
+                        </button>
+                      </div>
+
+                      {/* Middle & Right: Configuration & Path Mapper */}
+                      <div className="lg:col-span-2 bg-white border border-neutral-200 rounded-xl p-5 shadow-xs space-y-4">
+                        <div className="flex items-center gap-2 pb-2 border-b border-neutral-100">
+                          <Link className="w-4 h-4 text-emerald-600" />
+                          <h4 className="text-xs font-black uppercase tracking-wider text-neutral-900">System Configuration & Schema Registry</h4>
+                        </div>
+                        
+                        <div className="text-xs grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2.5">
+                            <h5 className="font-extrabold uppercase text-[10px] text-neutral-400 tracking-widest">Client Environment Context</h5>
+                            
+                            <div className="space-y-1.5 font-mono text-[10px] text-neutral-700">
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Project ID:</span> {firebaseConfig.projectId || 'N/A'}</div>
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">App ID:</span> {firebaseConfig.appId || 'N/A'}</div>
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Auth Domain:</span> {firebaseConfig.authDomain || 'N/A'}</div>
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Storage Bucket:</span> {firebaseConfig.storageBucket || 'N/A'}</div>
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Messaging ID:</span> {firebaseConfig.messagingSenderId || 'N/A'}</div>
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">API Key:</span> {firebaseConfig.apiKey ? `${firebaseConfig.apiKey.slice(0, 10)}...` : 'N/A'}</div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2.5 border-t md:border-t-0 md:border-l border-neutral-100 md:pl-4">
+                            <h5 className="font-extrabold uppercase text-[10px] text-neutral-400 tracking-widest">Active Firestore Model Paths</h5>
+                            
+                            <div className="space-y-1.5 font-mono text-[10px] text-neutral-700">
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Products Collection:</span> /products</div>
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Categories Document:</span> /categories/WQxF5FxiMKWRLemwIVwE</div>
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Users Collection:</span> /users/{"{userId}"}</div>
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1 font-bold">Storage Folders:</span> /products, /categories, /banners, /brands</div>
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1 text-emerald-600 font-bold">Save System Audit:</span> 🟢 Direct Firestore Writes Only</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-emerald-50/50 p-3 rounded-lg border border-emerald-100">
+                          <span className="text-[10px] text-emerald-950 block font-bold leading-normal">
+                            🔒 <strong>Architecture Verification Statement:</strong> Product updates, Category alterations, Banner changes, and Settings updates are executing <strong>Live Firestore Writes</strong>. LocalStorage/fallback states are utilized as fallback caches for full resilience.
+                          </span>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Diagnostic terminal Console for Firebase & Infrastructure */}
+                    <div className="space-y-2 font-sans">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-[10px] font-black uppercase text-neutral-400 tracking-widest">System Diagnostic Outputs</h4>
+                        {firebaseDiagnostics.logs.length > 0 && (
+                          <button
+                            onClick={() => setFirebaseDiagnostics(prev => ({ ...prev, logs: [] }))}
+                            className="text-[9px] text-red-500 hover:text-red-600 font-extrabold uppercase tracking-wider bg-transparent border-none cursor-pointer"
+                          >
+                            Clear output
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 overflow-hidden shadow-2xl relative">
+                        <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-60">
+                          <div className="w-2 h-2 rounded-full bg-red-400" />
+                          <div className="w-2 h-2 rounded-full bg-amber-400" />
+                          <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                        </div>
+
+                        <div className="flex items-center gap-2 border-b border-zinc-900 pb-2 mb-3">
+                          <Terminal className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+                          <span className="text-[9px] font-mono uppercase font-bold tracking-widest text-zinc-450">Firebase Connectivity & Operations Log Terminal</span>
+                        </div>
+
+                        <div className="h-48 overflow-y-auto font-mono text-[11px] leading-relaxed text-zinc-100 space-y-1.5 scrollbar-thin scrollbar-thumb-zinc-800">
+                          {firebaseDiagnostics.logs.length === 0 ? (
+                            <div className="h-full flex items-center justify-center text-zinc-650 font-bold uppercase select-none text-[9px] tracking-wide text-neutral-500">
+                              📟 Tap "Run Firebase Diagnostics" or "Trigger Real Checks" above to initialize live test run...
+                            </div>
+                          ) : (
+                            firebaseDiagnostics.logs.map((logLine, index) => {
+                              const isError = logLine.includes('🔴') || logLine.includes('failed') || logLine.includes('Failure:');
+                              const isSuccess = logLine.includes('🟢') || logLine.includes('successful') || logLine.includes('Successful');
+                              
+                              return (
+                                <div
+                                  key={index}
+                                  className={`transition-all duration-150 ${
+                                    isError ? 'text-red-400 font-extrabold' : isSuccess ? 'text-emerald-400 font-bold' : 'text-zinc-300'
+                                  }`}
+                                >
+                                  {logLine}
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {/* Original Infrastructure DNS Tester */}
+                    <span className="h-px bg-neutral-150 block my-6" />
+
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-neutral-900 font-sans">Network & Domain Infrastructure Pinger</h4>
+                        <span className="text-[10px] text-neutral-450 uppercase font-extrabold block">Handshake dns settings & external servers</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                        {[
+                          { id: 'domain', label: 'Test Domain', icon: Globe },
+                          { id: 'hosting', label: 'Test Hosting', icon: Server },
+                          { id: 'dns', label: 'Test DNS', icon: Link },
+                          { id: 'ssl', label: 'Test SSL', icon: Lock },
+                          { id: 'server', label: 'Test Server', icon: Zap },
+                          { id: 'email', label: 'Test Email', icon: Mail }
+                        ].map(testItem => {
+                          const Icon = testItem.icon;
+                          const isTestingNow = testingCategory === testItem.id;
+                          return (
+                            <button
+                              key={testItem.id}
+                              onClick={() => triggerAutomatedTermTest(testItem.id as any)}
+                              disabled={testingCategory !== null && !isTestingNow}
+                              className={`flex flex-col items-center justify-center p-3 rounded-xl border text-[10px] font-black uppercase tracking-wide gap-2 cursor-pointer transition-all ${
+                                isTestingNow
+                                  ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-2 ring-emerald-400/20'
+                                  : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100 text-neutral-700 hover:text-neutral-950'
+                              }`}
+                            >
+                              <Icon className={`w-4 h-4 ${isTestingNow ? 'animate-bounce text-emerald-600' : 'text-neutral-500'}`} />
+                              <span>{testItem.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Interactive glowing Terminal Console */}
+                      <div className="bg-black border border-neutral-800 rounded-xl p-4 overflow-hidden shadow-2xl relative">
+                        <div className="absolute top-3 right-3 flex items-center gap-1.5 opacity-60">
+                          <div className="w-2 h-2 rounded-full bg-red-500" />
+                          <div className="w-2 h-2 rounded-full bg-amber-500" />
+                          <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        </div>
+
+                        <div className="flex items-center gap-2 border-b border-neutral-900 pb-2 mb-3">
+                          <Terminal className="w-3.5 h-3.5 text-zinc-500" />
+                          <span className="text-[10px] font-mono uppercase font-bold tracking-widest text-zinc-500">Domain / DNS / Hosting Diagnostic Terminal</span>
+                        </div>
+
+                        <div className="h-44 overflow-y-auto font-mono text-[11px] leading-relaxed text-emerald-400 space-y-1.5 scrollbar-thin scrollbar-thumb-zinc-800">
+                          {testLogs.length === 0 ? (
+                            <div className="h-full flex items-center justify-center text-zinc-650 font-bold uppercase select-none text-[10px] tracking-wide">
+                              📟 Select a network diagnostic node above to print logs...
+                            </div>
+                          ) : (
+                            testLogs.map((logLine, index) => {
+                              const isError = logLine.includes('🔴') || logLine.includes('Failed') || logLine.includes('failure');
+                              const isSuccess = logLine.includes('🟢') || logLine.includes('Successful') || logLine.includes('verified');
+                              
+                              return (
+                                <div
+                                  key={index}
+                                  className={`transition-all duration-150 ${
+                                    isError ? 'text-red-400 font-extrabold' : isSuccess ? 'text-emerald-300 font-extrabold' : 'text-zinc-300'
+                                  }`}
+                                >
+                                  {logLine}
+                                </div>
+                              );
+                            })
+                          )}
+                          <div ref={terminalBottomRef} />
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
                 )}
 

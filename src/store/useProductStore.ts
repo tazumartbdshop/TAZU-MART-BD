@@ -184,7 +184,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
   },
   
   addProduct: async (payload) => {
-    const id = doc(collection(db, 'waV2UZ8TS38mSAwaYpFf')).id;
+    const id = doc(collection(db, 'products')).id;
+    console.log(`[Firestore Log] Preparing to save new product. Generated document ID: products/${id}`);
     try {
       const keywords = generateKeywords(payload.name, payload.category, payload.brand, payload.description);
       const newProduct: Product = {
@@ -193,14 +194,17 @@ export const useProductStore = create<ProductState>((set, get) => ({
         keywords,
         createdAt: Date.now(),
       };
-      await setDoc(doc(db, 'waV2UZ8TS38mSAwaYpFf', id), newProduct);
+      await setDoc(doc(db, 'products', id), newProduct);
+      console.log(`[Firestore Log] Firestore write successful for products/${id}. Details:`, newProduct);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `waV2UZ8TS38mSAwaYpFf/${id}`);
+      console.error(`[Firestore Log] Firestore write failed for products/${id}:`, error);
+      handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
       throw error;
     }
   },
   
   updateProduct: async (id, payload) => {
+    console.log(`[Firestore Log] Preparing to update product document: products/${id}`);
     try {
       const currentProduct = get().products.find(p => p.id === id);
       const finalPayload = { ...payload };
@@ -218,14 +222,17 @@ export const useProductStore = create<ProductState>((set, get) => ({
         finalPayload.keywords = generateKeywords(name, category, brand, description);
       }
       
-      await setDoc(doc(db, 'waV2UZ8TS38mSAwaYpFf', id), finalPayload, { merge: true });
+      await setDoc(doc(db, 'products', id), finalPayload, { merge: true });
+      console.log(`[Firestore Log] Firestore update successful for products/${id}. Fields:`, finalPayload);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `waV2UZ8TS38mSAwaYpFf/${id}`);
+      console.error(`[Firestore Log] Firestore update failed for products/${id}:`, error);
+      handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
       throw error;
     }
   },
   
   deleteProduct: async (id) => {
+    console.log(`[Firestore Log] Preparing to delete product document: products/${id}`);
     try {
       const product = get().products.find(p => p.id === id);
       if (product) {
@@ -248,20 +255,25 @@ export const useProductStore = create<ProductState>((set, get) => ({
           console.error("Failed to import imageUtils during deleteProduct:", importErr);
         }
       }
-      await deleteDoc(doc(db, 'waV2UZ8TS38mSAwaYpFf', id));
+      await deleteDoc(doc(db, 'products', id));
+      console.log(`[Firestore Log] Firestore delete successful for products/${id}`);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `waV2UZ8TS38mSAwaYpFf/${id}`);
+      console.error(`[Firestore Log] Firestore delete failed for products/${id}:`, error);
+      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
       throw error;
     }
   },
   
   subscribe: () => {
-    const q = query(collection(db, 'waV2UZ8TS38mSAwaYpFf'));
+    console.log("[Firestore Log] Initializing real-time subscription for collection 'products'");
+    const q = query(collection(db, 'products'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
+      console.log(`[Firestore Log] Real-time read updated. Collection count: ${products.length} products found inside 'products' on server.`);
       set({ products });
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'waV2UZ8TS38mSAwaYpFf');
+      console.error("[Firestore Log] Real-time subscription failed on collection 'products':", error);
+      handleFirestoreError(error, OperationType.GET, 'products');
     });
     return unsubscribe;
   }
