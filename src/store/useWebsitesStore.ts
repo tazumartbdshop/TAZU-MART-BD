@@ -112,10 +112,7 @@ export const useWebsitesStore = create<WebsitesStore>((set, get) => ({
     const q = query(collection(db, 'websites'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const websites = snapshot.docs.map(doc => ({ ...doc.data() } as DynamicWebsite));
-      if (websites.length > 0) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(websites));
-        set({ websites });
-      }
+      set({ websites });
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'websites');
     });

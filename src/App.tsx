@@ -12,6 +12,9 @@ import { useOfferStore } from './store/useOfferStore';
 import { useCustomerStore } from './store/useCustomerStore';
 import { useBrandShowcaseStore } from './store/useBrandShowcaseStore';
 import { useModeratorStore } from './store/useModeratorStore';
+import { useBannerStore } from './store/useBannerStore';
+import { useMenuSortStore } from './store/useMenuSortStore';
+import { useDeliveryStore } from './store/useDeliveryStore';
 import Home from './pages/Home';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -70,6 +73,9 @@ export default function App() {
     const unsubBrands = useBrandShowcaseStore.getState().subscribe();
     const unsubModerators = useModeratorStore.getState().subscribe();
     const unsubWebsites = useWebsitesStore.getState().subscribe();
+    const unsubBanners = useBannerStore.getState().subscribe();
+    const unsubMenuSort = useMenuSortStore.getState().subscribe();
+    const unsubDelivery = useDeliveryStore.getState().subscribe();
     
     return () => {
       unsubCategories();
@@ -84,6 +90,9 @@ export default function App() {
       unsubBrands();
       unsubModerators();
       unsubWebsites();
+      unsubBanners();
+      unsubMenuSort();
+      unsubDelivery();
     };
   }, [fetchSettings]);
 

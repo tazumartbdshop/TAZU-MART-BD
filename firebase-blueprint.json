@@ -135,7 +135,7 @@
     }
   },
   "firestore": {
-    "/products/{productId}": {
+    "/waV2UZ8TS38mSAwaYpFf/{productId}": {
       "schema": "Product",
       "description": "Store products"
     },

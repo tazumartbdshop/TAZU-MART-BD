@@ -25,6 +25,9 @@ service cloud.firestore {
     match /products/{productId} {
       allow read, write: if true;
     }
+    match /waV2UZ8TS38mSAwaYpFf/{productId} {
+      allow read, write: if true;
+    }
 
     // Categories
     match /categories/{categoryId} {

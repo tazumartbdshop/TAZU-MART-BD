@@ -1,3 +1,5 @@
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export interface SupportBannerData {
   id: string;
@@ -9,8 +11,6 @@ export interface SupportBannerData {
   status: boolean;
   updated_at?: number;
 }
-
-const STORAGE_KEY = 'support_banner_settings';
 
 const DEFAULT_BANNER: SupportBannerData = {
   id: 'main-banner',
@@ -24,24 +24,34 @@ const DEFAULT_BANNER: SupportBannerData = {
 
 export const supportBannerService = {
   async getBanner(): Promise<SupportBannerData> {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
+    try {
+      const docSnap = await getDoc(doc(db, 'settings', 'supportBanner'));
+      if (docSnap.exists()) {
+        const data = docSnap.data() as Partial<SupportBannerData>;
+        return { ...DEFAULT_BANNER, ...data };
+      } else {
+        // Automatically publish default support banner to Firestore if it does not exist
+        await setDoc(doc(db, 'settings', 'supportBanner'), DEFAULT_BANNER);
         return DEFAULT_BANNER;
       }
+    } catch (e) {
+      console.error("Firestore getBanner failed, using fallback:", e);
+      return DEFAULT_BANNER;
     }
-    return DEFAULT_BANNER;
   },
 
   async updateBanner(updates: Partial<SupportBannerData>): Promise<void> {
-    const current = await this.getBanner();
-    const updated = {
-      ...current,
-      ...updates,
-      updated_at: Date.now()
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    try {
+      const current = await this.getBanner();
+      const updated = {
+        ...current,
+        ...updates,
+        updated_at: Date.now()
+      };
+      await setDoc(doc(db, 'settings', 'supportBanner'), updated, { merge: true });
+    } catch (e) {
+      console.error("Firestore updateBanner failed:", e);
+      throw e;
+    }
   }
 };

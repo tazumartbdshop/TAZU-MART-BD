@@ -184,7 +184,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
   },
   
   addProduct: async (payload) => {
-    const id = doc(collection(db, 'products')).id;
+    const id = doc(collection(db, 'waV2UZ8TS38mSAwaYpFf')).id;
     try {
       const keywords = generateKeywords(payload.name, payload.category, payload.brand, payload.description);
       const newProduct: Product = {
@@ -193,9 +193,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
         keywords,
         createdAt: Date.now(),
       };
-      await setDoc(doc(db, 'products', id), newProduct);
+      await setDoc(doc(db, 'waV2UZ8TS38mSAwaYpFf', id), newProduct);
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
+      handleFirestoreError(error, OperationType.WRITE, `waV2UZ8TS38mSAwaYpFf/${id}`);
       throw error;
     }
   },
@@ -218,9 +218,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
         finalPayload.keywords = generateKeywords(name, category, brand, description);
       }
       
-      await setDoc(doc(db, 'products', id), finalPayload, { merge: true });
+      await setDoc(doc(db, 'waV2UZ8TS38mSAwaYpFf', id), finalPayload, { merge: true });
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
+      handleFirestoreError(error, OperationType.WRITE, `waV2UZ8TS38mSAwaYpFf/${id}`);
       throw error;
     }
   },
@@ -248,20 +248,20 @@ export const useProductStore = create<ProductState>((set, get) => ({
           console.error("Failed to import imageUtils during deleteProduct:", importErr);
         }
       }
-      await deleteDoc(doc(db, 'products', id));
+      await deleteDoc(doc(db, 'waV2UZ8TS38mSAwaYpFf', id));
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
+      handleFirestoreError(error, OperationType.DELETE, `waV2UZ8TS38mSAwaYpFf/${id}`);
       throw error;
     }
   },
   
   subscribe: () => {
-    const q = query(collection(db, 'products'));
+    const q = query(collection(db, 'waV2UZ8TS38mSAwaYpFf'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
       set({ products });
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'products');
+      handleFirestoreError(error, OperationType.GET, 'waV2UZ8TS38mSAwaYpFf');
     });
     return unsubscribe;
   }

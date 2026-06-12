@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, limit, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 export interface LinkPage {
@@ -54,8 +54,6 @@ export interface SiteManagementData {
   updated_at?: number;
 }
 
-const STORAGE_KEY = 'site_management_settings';
-
 const DEFAULT_DATA: SiteManagementData = {
   developer_button_name: 'Web Developer',
   developer_link: 'https://developer-site.com',
@@ -89,31 +87,46 @@ const DEFAULT_DATA: SiteManagementData = {
 
 export const siteManagementService = {
   async getSettings(): Promise<SiteManagementData> {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (e) {
+    try {
+      const docSnap = await getDoc(doc(db, 'settings', 'siteManagement'));
+      if (docSnap.exists()) {
+        const data = docSnap.data() as Partial<SiteManagementData>;
+        return { ...DEFAULT_DATA, ...data };
+      } else {
+        // Automatically publish default settings to Firestore if does not exist
+        await setDoc(doc(db, 'settings', 'siteManagement'), DEFAULT_DATA);
         return DEFAULT_DATA;
       }
+    } catch (e) {
+      console.warn("Firestore getSettings failed, using defaults:", e);
+      return DEFAULT_DATA;
     }
-    return DEFAULT_DATA;
   },
 
   async updateSettings(updates: Partial<SiteManagementData>): Promise<void> {
-    const current = await this.getSettings();
-    const updated = {
-      ...current,
-      ...updates,
-      updated_at: Date.now()
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    try {
+      const current = await this.getSettings();
+      const updated = {
+        ...current,
+        ...updates,
+        updated_at: Date.now()
+      };
+      await setDoc(doc(db, 'settings', 'siteManagement'), updated, { merge: true });
+    } catch (e) {
+      console.error("Firestore updateSettings failed:", e);
+      throw e;
+    }
   },
 
   async getLinkPages(): Promise<LinkPage[]> {
-    const q = query(collection(db, 'link_pages'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LinkPage));
+    try {
+      const q = query(collection(db, 'link_pages'));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LinkPage));
+    } catch (e) {
+      console.error("Firestore getLinkPages failed:", e);
+      return [];
+    }
   },
 
   async saveLinkPage(page: LinkPage): Promise<void> {
@@ -137,7 +150,7 @@ export const siteManagementService = {
       const doc = querySnapshot.docs[0];
       return { id: doc.id, ...doc.data() } as LinkPage;
     } catch (e) {
-      console.error('Error fetching link page:', e);
+      console.error('Error fetching link page by slug in siteManagementService:', e);
       return null;
     }
   }

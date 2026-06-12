@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, onSnapshot } from 'firebase/firestore';
 
 export function cleanObjectForFirestore<T extends object>(obj: T): T {
   const result: any = {};
@@ -85,6 +85,7 @@ interface BannerState {
   publishBanners: () => Promise<void>;
   resetDraftBanners: () => Promise<void>;
   seedDefaultBanner: () => Promise<void>;
+  subscribe: () => () => void;
 }
 
 export const useBannerStore = create<BannerState>((set, get) => ({
@@ -95,6 +96,50 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   sliderConfig: {
     autoSlide: true,
     duration: 5,
+  },
+
+  subscribe: () => {
+    const unsubLive = onSnapshot(collection(db, 'banners'), (snapshot) => {
+      const liveList: Banner[] = [];
+      snapshot.forEach((docRef) => {
+        liveList.push({ id: docRef.id, ...docRef.data() } as Banner);
+      });
+      liveList.sort((a, b) => (Number(a.order) ?? 0) - (Number(b.order) ?? 0));
+      set({ banners: liveList, isLoaded: true });
+    }, (err) => {
+      console.error("Firestore live banners listen error:", err);
+    });
+
+    const unsubDraft = onSnapshot(collection(db, 'banners_draft'), (snapshot) => {
+      const draftList: Banner[] = [];
+      snapshot.forEach((docRef) => {
+        draftList.push({ id: docRef.id, ...docRef.data() } as Banner);
+      });
+      draftList.sort((a, b) => (Number(a.order) ?? 0) - (Number(b.order) ?? 0));
+      set({ draftBanners: draftList });
+    }, (err) => {
+      console.error("Firestore draft banners listen error:", err);
+    });
+
+    const unsubSlider = onSnapshot(doc(db, 'settings', 'slider_config'), (docSnap) => {
+      if (docSnap.exists()) {
+        const config = docSnap.data();
+        set({
+          sliderConfig: {
+            autoSlide: config.autoSlide ?? true,
+            duration: config.duration ?? 5
+          }
+        });
+      }
+    }, (err) => {
+      console.error("Firestore slider config listen error:", err);
+    });
+
+    return () => {
+      unsubLive();
+      unsubDraft();
+      unsubSlider();
+    };
   },
 
   setBanners: (banners) => set({ banners, isLoaded: true }),

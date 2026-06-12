@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, deleteField } from 'firebase/firestore';
 import { deleteImage } from '../lib/imageUtils';
 
 export interface Category {
@@ -45,15 +45,33 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         id,
         createdAt: new Date().toISOString(),
       };
-      await setDoc(doc(db, 'categories', id), newCategory);
+      
+      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
+      await setDoc(docRef, {
+        categoryList: {
+          [id]: newCategory
+        }
+      }, { merge: true });
     } catch (error) {
       console.error("Firebase setDoc error in addCategory:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'categories/WQxF5FxiMKWRLemwIVwE');
       throw error;
     }
   },
   
   updateCategory: async (id, payload) => {
-    await setDoc(doc(db, 'categories', id), payload, { merge: true });
+    try {
+      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
+      await setDoc(docRef, {
+        categoryList: {
+          [id]: payload
+        }
+      }, { merge: true });
+    } catch (error) {
+      console.error("Firebase setDoc error in updateCategory:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'categories/WQxF5FxiMKWRLemwIVwE');
+      throw error;
+    }
   },
   
   deleteCategory: async (id) => {
@@ -76,18 +94,44 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         console.error("Failed to import imageUtils during deleteCategory:", importErr);
       }
     }
-    await deleteDoc(doc(db, 'categories', id));
+    try {
+      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
+      await setDoc(docRef, {
+        categoryList: {
+          [id]: deleteField()
+        }
+      }, { merge: true });
+    } catch (error) {
+      console.error("Firebase setDoc error in deleteCategory:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'categories/WQxF5FxiMKWRLemwIVwE');
+      throw error;
+    }
   },
   
   clearDemoData: () => set(() => ({ categories: [] })),
   
   subscribe: () => {
-    const q = query(collection(db, 'categories'), orderBy('displayOrder', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
-      set({ categories, isLoaded: true });
+    const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const categoryList = data.categoryList || {};
+        let categories: Category[] = [];
+        if (typeof categoryList === 'object' && !Array.isArray(categoryList)) {
+          categories = Object.entries(categoryList).map(([id, catData]: [string, any]) => ({
+            id,
+            ...catData
+          }));
+        } else if (Array.isArray(categoryList)) {
+          categories = categoryList;
+        }
+        categories.sort((a, b) => (Number(a.displayOrder) ?? 0) - (Number(b.displayOrder) ?? 0));
+        set({ categories, isLoaded: true });
+      } else {
+        set({ categories: [], isLoaded: true });
+      }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'categories');
+      handleFirestoreError(error, OperationType.GET, 'categories/WQxF5FxiMKWRLemwIVwE');
     });
     return unsubscribe;
   }

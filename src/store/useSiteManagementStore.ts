@@ -33,9 +33,10 @@ export const useSiteManagementStore = create<SiteManagementState>((set) => ({
       set({ data: settings, isLoading: false });
     } catch (error: any) {
       clearTimeout(timeoutId);
-      console.error("[Boot Error] Site config failed:", error.message);
-      set({ error: error.message, isLoading: false });
-      // We don't block the app, we let it use default values if possible
+      console.warn("[Boot Notice] Site config fetch status:", error.message);
+      // Soft-fallback to default settings to guarantee smooth load
+      const defaults = await siteManagementService.getSettings().catch(() => null);
+      set({ data: defaults, isLoading: false });
     }
   },
   updateSettings: async (updates) => {
