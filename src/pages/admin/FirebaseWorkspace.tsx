@@ -598,7 +598,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                 onClick={() => setActiveModal('file')}
                 className="bg-black hover:bg-neutral-850 transition-all text-white font-black uppercase text-[10px] py-2 px-3.5 tracking-wider flex items-center gap-1.5"
               >
-                <FilePlus className="w-3.5 h-3.5" /> INDEX FILE
+                <FilePlus className="w-3.5 h-3.5" /> Add File
               </button>
             </div>
           )}
@@ -617,7 +617,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
               onClick={() => setActiveModal('member')}
               className="bg-black hover:bg-neutral-850 transition-all text-white font-black uppercase text-[10px] py-2 px-4 tracking-wider flex items-center gap-1.5"
             >
-              <UserPlus className="w-3.5 h-3.5" /> REGISTER PERSONNEL
+              <UserPlus className="w-3.5 h-3.5" /> Add Member
             </button>
           )}
         </div>
@@ -704,17 +704,17 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
             {loadingFolders ? (
               <div className="bg-white border p-12 text-center flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 animate-spin text-[#000000]" />
-                <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Reading Workspace Records...</p>
+                <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Loading files...</p>
               </div>
             ) : filteredFiles.length === 0 ? (
               <div className="bg-white border p-12 text-center flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 bg-neutral-55 border text-neutral-400 flex items-center justify-center">
+                <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center text-neutral-300">
                   <HardDrive className="w-8 h-8" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-sm font-black uppercase tracking-wider text-neutral-800">No Metadata Exist Yet</h4>
-                  <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                    Configure catalogs and index directories to see folders and files inside your personalized secure sandbox.
+                  <h4 className="text-sm font-black uppercase tracking-wider text-neutral-800">My Files is empty</h4>
+                  <p className="text-xs text-neutral-500 max-w-sm mx-auto font-medium leading-relaxed">
+                    Start building your personal workspace by creating folders and adding indexed files.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -722,13 +722,13 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                     onClick={() => setActiveModal('folder')}
                     className="bg-neutral-100 hover:bg-neutral-200 text-black py-2.5 px-4 font-black uppercase text-[10px] tracking-wider"
                   >
-                    Create First Folder
+                    New Folder
                   </button>
                   <button
                     onClick={() => setActiveModal('file')}
                     className="bg-black hover:bg-neutral-850 text-white py-2.5 px-4 font-black uppercase text-[10px] tracking-wider"
                   >
-                    Index First File
+                    Add File
                   </button>
                 </div>
               </div>
@@ -796,24 +796,24 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
             {loadingNotes ? (
               <div className="bg-white border p-12 text-center flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 animate-spin text-[#000000]" />
-                <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Fetching personal notes...</p>
+                <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Loading notes...</p>
               </div>
             ) : filteredNotes.length === 0 ? (
               <div className="bg-white border p-12 text-center flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 bg-neutral-55 border text-neutral-400 flex items-center justify-center">
+                <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center text-neutral-300">
                   <FileText className="w-8 h-8" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-sm font-black uppercase tracking-wider text-neutral-800">No Scratchpad Notes Exist</h4>
-                  <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                    Persist your thoughts, queries, and team announcements securely inside Firebase's Cloud Firestore.
+                  <h4 className="text-sm font-black uppercase tracking-wider text-neutral-800">My Notes is empty</h4>
+                  <p className="text-xs text-neutral-500 max-w-sm mx-auto font-medium leading-relaxed">
+                    Start capturing your thoughts and project brainstorms. All notes are saved securely in Firestore.
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveModal('note')}
                   className="bg-black hover:bg-neutral-850 text-white py-2.5 px-4 font-black uppercase text-[10px] tracking-wider"
                 >
-                  Write Your First Note
+                  New Note
                 </button>
               </div>
             ) : (
@@ -863,24 +863,24 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
             {loadingMembers ? (
               <div className="bg-white border p-12 text-center flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 animate-spin text-[#000000]" />
-                <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Querying personnel registry...</p>
+                <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Loading members...</p>
               </div>
             ) : filteredMembers.length === 0 ? (
               <div className="bg-white border p-12 text-center flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 bg-neutral-55 border text-neutral-400 flex items-center justify-center">
+                <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center text-neutral-300">
                   <Users className="w-8 h-8" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="text-sm font-black uppercase tracking-wider text-neutral-800">No Team Members Registered</h4>
-                  <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                    Record authorized team members and delegate project roles inside this secure user console.
+                  <h4 className="text-sm font-black uppercase tracking-wider text-neutral-800">Team Members is empty</h4>
+                  <p className="text-xs text-neutral-500 max-w-sm mx-auto font-medium leading-relaxed">
+                    Assign roles and track project personnel. This list is synced directly with your Firestore database.
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveModal('member')}
                   className="bg-black hover:bg-neutral-850 text-white py-2.5 px-4 font-black uppercase text-[10px] tracking-wider"
                 >
-                  Register Team Personnel
+                  Add Member
                 </button>
               </div>
             ) : (
@@ -1061,7 +1061,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                   type="submit"
                   className="bg-[#000000] hover:bg-[#222222] text-white px-5 py-2 text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
                 >
-                  {editingItem ? 'Update Metadata' : 'INDEX FILE'}
+                  {editingItem ? 'Update File' : 'Add File'}
                 </button>
               </div>
             </form>
@@ -1117,7 +1117,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                   type="submit"
                   className="bg-[#000000] hover:bg-[#222222] text-white px-5 py-2 text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
                 >
-                  {editingItem ? 'Update Note' : 'SAVE NOTE'}
+                  {editingItem ? 'Update Note' : 'Save Note'}
                 </button>
               </div>
             </form>
@@ -1189,7 +1189,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                   type="submit"
                   className="bg-[#000000] hover:bg-[#222222] text-white px-5 py-2 text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
                 >
-                  {editingItem ? 'Update Personnel' : 'REGISTER PERSONNEL'}
+                  {editingItem ? 'Update Member' : 'Add Member'}
                 </button>
               </div>
             </form>
