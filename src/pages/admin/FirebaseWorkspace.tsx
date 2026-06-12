@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { useAuthStore } from '../../store/useAuthStore';
 import { 
   Folder, 
   FileText, 
@@ -65,7 +66,9 @@ interface FirebaseWorkspaceProps {
 
 export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps) {
   const navigate = useNavigate();
+  const { user: authUser, isAuthenticated } = useAuthStore();
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   
   // Real-time collections
   const [profile, setProfile] = useState<UserProfileType | null>(null);
@@ -73,6 +76,8 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
   const [notes, setNotes] = useState<NoteType[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberType[]>([]);
   
+  const activeUid = currentUser?.uid || (isAuthenticated ? authUser?.id : null);
+
   // Sagas loaders
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingFolders, setLoadingFolders] = useState(true);
@@ -103,25 +108,26 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       setCurrentUser(user);
+      setIsAuthLoading(false);
     });
     return () => unsubscribeAuth();
   }, []);
 
   // Sync / Read Data under users/{uid}
   useEffect(() => {
-    if (!currentUser) {
-      setProfile(null);
-      setLoadingProfile(false);
-      setLoadingFolders(false);
-      setLoadingNotes(false);
-      setLoadingMembers(false);
+    if (!activeUid) {
+      if (!isAuthLoading) {
+        setProfile(null);
+        setLoadingProfile(false);
+        setLoadingFolders(false);
+        setLoadingNotes(false);
+        setLoadingMembers(false);
+      }
       return;
     }
 
-    const uid = currentUser.uid;
-
     // 1. Initial Profile Setup / Sync
-    const profileRef = doc(db, 'users', uid);
+    const profileRef = doc(db, 'users', activeUid);
     const unsubscribeProfile = onSnapshot(profileRef, (snapshot) => {
       if (snapshot.exists()) {
         setProfile(snapshot.data() as UserProfileType);
@@ -129,8 +135,8 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       } else {
         // Initialize user record if absent
         const initialProfile: UserProfileType = {
-          displayName: currentUser.displayName || 'Enterprise Member',
-          email: currentUser.email || '',
+          displayName: currentUser?.displayName || authUser?.name || 'Enterprise Member',
+          email: currentUser?.email || authUser?.email || '',
           plan: 'Premium Developer Plan',
           createdAt: new Date().toISOString()
         };
@@ -140,19 +146,19 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
             setProfile(initialProfile);
           })
           .catch((error) => {
-            handleFirestoreError(error, OperationType.WRITE, `users/${uid}`);
+            handleFirestoreError(error, OperationType.WRITE, `users/${activeUid}`);
           })
           .finally(() => {
             setLoadingProfile(false);
           });
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${uid}`);
+      handleFirestoreError(error, OperationType.GET, `users/${activeUid}`);
       setLoadingProfile(false);
     });
 
     // 2. folders Sync (Unified for Folders & Files)
-    const foldersRef = collection(db, 'users', uid, 'folders');
+    const foldersRef = collection(db, 'users', activeUid, 'folders');
     const unsubscribeFolders = onSnapshot(foldersRef, (snapshot) => {
       const foldersList: FolderType[] = [];
       snapshot.forEach((d) => {
@@ -163,12 +169,12 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       setFolders(foldersList);
       setLoadingFolders(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${uid}/folders`);
+      handleFirestoreError(error, OperationType.GET, `users/${activeUid}/folders`);
       setLoadingFolders(false);
     });
 
     // 3. Notes Sync
-    const notesRef = collection(db, 'users', uid, 'notes');
+    const notesRef = collection(db, 'users', activeUid, 'notes');
     const unsubscribeNotes = onSnapshot(notesRef, (snapshot) => {
       const notesList: NoteType[] = [];
       snapshot.forEach((d) => {
@@ -179,12 +185,12 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       setNotes(notesList);
       setLoadingNotes(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${uid}/notes`);
+      handleFirestoreError(error, OperationType.GET, `users/${activeUid}/notes`);
       setLoadingNotes(false);
     });
 
     // 5. Team Members Sync
-    const membersRef = collection(db, 'users', uid, 'teamMembers');
+    const membersRef = collection(db, 'users', activeUid, 'teamMembers');
     const unsubscribeMembers = onSnapshot(membersRef, (snapshot) => {
       const membersList: TeamMemberType[] = [];
       snapshot.forEach((d) => {
@@ -194,7 +200,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       setTeamMembers(membersList);
       setLoadingMembers(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${uid}/teamMembers`);
+      handleFirestoreError(error, OperationType.GET, `users/${activeUid}/teamMembers`);
       setLoadingMembers(false);
     });
 
@@ -204,26 +210,25 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       unsubscribeNotes();
       unsubscribeMembers();
     };
-  }, [currentUser]);
+  }, [activeUid]);
 
   // Form Submission Handlers
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) return;
+    if (!activeUid) return;
     if (!folderName.trim()) {
       toast.error('Folder name cannot be blank.');
       return;
     }
 
-    const uid = currentUser.uid;
-    const path = `users/${uid}/folders`;
+    const path = `users/${activeUid}/folders`;
     try {
       // Close modal immediately for instant feedback
       setActiveModal(null);
       const name = folderName.trim();
       setFolderName('');
 
-      const docRef = await addDoc(collection(db, 'users', uid, 'folders'), {
+      const docRef = await addDoc(collection(db, 'users', activeUid, 'folders'), {
         name,
         type: 'folder',
         createdAt: new Date().toISOString()
@@ -238,14 +243,13 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
 
   const handleAddFile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) return;
+    if (!activeUid) return;
     if (!fileName.trim()) {
       toast.error('File name cannot be blank.');
       return;
     }
 
-    const uid = currentUser.uid;
-    const path = `users/${uid}/folders`; // INDEX FILE writes to folders
+    const path = `users/${activeUid}/folders`; // INDEX FILE writes to folders
     try {
       const payload = {
         name: fileName.trim(),
@@ -259,7 +263,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       setFileName('');
       setFileSize('1.2 MB');
 
-      const docRef = await addDoc(collection(db, 'users', uid, 'folders'), payload);
+      const docRef = await addDoc(collection(db, 'users', activeUid, 'folders'), payload);
       console.log(`[FIREBASE_WORKSPACE] File indexed in folders with ID: ${docRef.id}`);
       toast.success('Saved Successfully');
     } catch (err) {
@@ -271,14 +275,13 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
 
   const handleCreateNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) return;
+    if (!activeUid) return;
     if (!noteTitle.trim()) {
       toast.error('Note title cannot be blank.');
       return;
     }
 
-    const uid = currentUser.uid;
-    const path = `users/${uid}/notes`;
+    const path = `users/${activeUid}/notes`;
     try {
       // Close modal immediately for instant feedback
       setActiveModal(null);
@@ -287,7 +290,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       setNoteTitle('');
       setNoteContent('');
 
-      const docRef = await addDoc(collection(db, 'users', uid, 'notes'), {
+      const docRef = await addDoc(collection(db, 'users', activeUid, 'notes'), {
         title,
         content,
         createdAt: new Date().toISOString()
@@ -303,14 +306,13 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
 
   const handleAddTeamMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser) return;
+    if (!activeUid) return;
     if (!memberName.trim()) {
       toast.error('Team member name cannot be blank.');
       return;
     }
 
-    const uid = currentUser.uid;
-    const path = `users/${uid}/teamMembers`;
+    const path = `users/${activeUid}/teamMembers`;
     try {
       // Close modal immediately for instant feedback
       setActiveModal(null);
@@ -321,7 +323,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       setMemberEmail('');
       setMemberRole('Developer');
 
-      const docRef = await addDoc(collection(db, 'users', uid, 'teamMembers'), {
+      const docRef = await addDoc(collection(db, 'users', activeUid, 'teamMembers'), {
         name,
         email,
         role,
@@ -342,8 +344,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
   };
 
   const executeDelete = async () => {
-    if (!currentUser || !deleteTarget) return;
-    const uid = currentUser.uid;
+    if (!activeUid || !deleteTarget) return;
     const { id, type } = deleteTarget;
     
     // Map collection name
@@ -354,7 +355,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
     };
     
     const colName = colMap[type];
-    const path = `users/${uid}/${colName}/${id}`;
+    const path = `users/${activeUid}/${colName}/${id}`;
     
     try {
       // Close immediately for snappy response
@@ -362,7 +363,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       const targetName = deleteTarget.name;
       setDeleteTarget(null);
       
-      await deleteDoc(doc(db, 'users', uid, colName, id));
+      await deleteDoc(doc(db, 'users', activeUid, colName, id));
       toast.success('Deleted Successfully');
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, path);
@@ -394,26 +395,25 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
 
   const handleUpdateItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser || !editingItem) return;
-    const uid = currentUser.uid;
+    if (!activeUid || !editingItem) return;
     const { id, type } = editingItem;
 
     try {
       if (type === 'folder') {
-        await updateDoc(doc(db, 'users', uid, 'folders', id), { name: folderName.trim() });
+        await updateDoc(doc(db, 'users', activeUid, 'folders', id), { name: folderName.trim() });
       } else if (type === 'file') {
-        await updateDoc(doc(db, 'users', uid, 'folders', id), {
+        await updateDoc(doc(db, 'users', activeUid, 'folders', id), {
           name: fileName.trim(),
           size: fileSize.trim(),
           folderId: fileFolderId
         });
       } else if (type === 'note') {
-        await updateDoc(doc(db, 'users', uid, 'notes', id), {
+        await updateDoc(doc(db, 'users', activeUid, 'notes', id), {
           title: noteTitle.trim(),
           content: noteContent.trim()
         });
       } else if (type === 'member') {
-        await updateDoc(doc(db, 'users', uid, 'teamMembers', id), {
+        await updateDoc(doc(db, 'users', activeUid, 'teamMembers', id), {
           name: memberName.trim(),
           email: memberEmail.trim(),
           role: memberRole.trim()
@@ -427,7 +427,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       setFolderName(''); setFileName(''); setFileSize('1.2 MB'); setFileFolderId('');
       setNoteTitle(''); setNoteContent(''); setMemberName(''); setMemberEmail(''); setMemberRole('Developer');
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `users/${uid}/${type}/${id}`);
+      handleFirestoreError(err, OperationType.WRITE, `users/${activeUid}/${type}/${id}`);
       toast.error('Failed to update.');
     }
   };
@@ -461,7 +461,18 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
   });
 
   // Authenticated guard message
-  if (!currentUser) {
+  if (isAuthLoading) {
+    return (
+      <div className="flex-1 p-4 md:p-8 flex items-center justify-center min-h-[500px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-black" />
+          <p className="text-xs font-black uppercase tracking-widest text-neutral-400">Verifying Security Session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && !currentUser) {
     return (
       <div className="flex-1 p-4 md:p-8 flex items-center justify-center min-h-[500px]">
         <div id="auth-unauth-card" className="bg-white border p-8 max-w-md w-full text-center space-y-4 shadow-sm">
@@ -497,7 +508,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
             🔥 Firebase Workspace
           </h1>
           <p className="text-xs text-neutral-400 leading-relaxed font-medium">
-            Authorized User context: <span className="text-neutral-200 underline font-semibold">{currentUser.email}</span>. Use standard secure isolated collections synced automatically.
+            Authorized User context: <span className="text-neutral-200 underline font-semibold">{currentUser?.email || authUser?.email}</span>. Use standard secure isolated collections synced automatically.
           </p>
         </div>
 
