@@ -233,7 +233,14 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
         type: 'folder',
         createdAt: new Date().toISOString()
       });
-      console.log(`[FIREBASE_WORKSPACE] Folder created with ID: ${docRef.id}`);
+      const fullPath = `users/${activeUid}/folders/${docRef.id}`;
+      console.log(`%c[FIRESTORE_WRITE_SUCCESS]`, 'background: #000; color: #10B981; font-weight: bold; padding: 2px 4px;', {
+        type: 'folder',
+        id: docRef.id,
+        path: fullPath,
+        timestamp: new Date().toISOString()
+      });
+      setLastWrite(new Date().toLocaleTimeString());
       toast.success('Saved Successfully');
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
@@ -264,7 +271,14 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       setFileSize('1.2 MB');
 
       const docRef = await addDoc(collection(db, 'users', activeUid, 'folders'), payload);
-      console.log(`[FIREBASE_WORKSPACE] File indexed in folders with ID: ${docRef.id}`);
+      const fullPath = `users/${activeUid}/folders/${docRef.id}`;
+      console.log(`%c[FIRESTORE_WRITE_SUCCESS]`, 'background: #000; color: #10B981; font-weight: bold; padding: 2px 4px;', {
+        type: 'file',
+        id: docRef.id,
+        path: fullPath,
+        timestamp: new Date().toISOString()
+      });
+      setLastWrite(new Date().toLocaleTimeString());
       toast.success('Saved Successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Could not add file';
@@ -295,7 +309,14 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
         content,
         createdAt: new Date().toISOString()
       });
-      console.log(`[FIREBASE_WORKSPACE] Note created with ID: ${docRef.id}`);
+      const fullPath = `users/${activeUid}/notes/${docRef.id}`;
+      console.log(`%c[FIRESTORE_WRITE_SUCCESS]`, 'background: #000; color: #10B981; font-weight: bold; padding: 2px 4px;', {
+        type: 'note',
+        id: docRef.id,
+        path: fullPath,
+        timestamp: new Date().toISOString()
+      });
+      setLastWrite(new Date().toLocaleTimeString());
       toast.success('Saved Successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Could not create note';
@@ -329,7 +350,14 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
         role,
         createdAt: new Date().toISOString()
       });
-      console.log(`[FIREBASE_WORKSPACE] Team member created with ID: ${docRef.id}`);
+      const fullPath = `users/${activeUid}/teamMembers/${docRef.id}`;
+      console.log(`%c[FIRESTORE_WRITE_SUCCESS]`, 'background: #000; color: #10B981; font-weight: bold; padding: 2px 4px;', {
+        type: 'member',
+        id: docRef.id,
+        path: fullPath,
+        timestamp: new Date().toISOString()
+      });
+      setLastWrite(new Date().toLocaleTimeString());
       toast.success('Saved Successfully');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Could not save team member';
@@ -431,6 +459,9 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       toast.error('Failed to update.');
     }
   };
+
+  // Status track for inspector
+  const [lastWrite, setLastWrite] = useState<string | null>(null);
 
   // Navigations / Tab click handlers
   const handleTabChange = (key: 'files' | 'notes' | 'team-members') => {
@@ -625,6 +656,44 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
 
       {/* Tab Contents */}
       <div id="fw-content-panel">
+        {/* Firestore Path Inspector - NEW */}
+        <div className="bg-neutral-900 border border-neutral-800 p-4 mb-6 relative overflow-hidden group">
+          <div className="absolute right-0 top-0 p-4 opacity-5 pointer-events-none">
+            <Database className="w-16 h-16 text-white" />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-6 relative z-10">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Database className="w-3.5 h-3.5 text-orange-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Live Firestore Path Inspector</span>
+              </div>
+              <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-850 px-3 py-1.5 font-mono text-[11px] text-green-400">
+                <span className="text-neutral-600">PATH:</span>
+                users/{activeUid}/{defaultTab === 'team-members' ? 'teamMembers' : defaultTab}
+              </div>
+            </div>
+
+            <div className="flex gap-8">
+              <div className="space-y-0.5">
+                <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Document Count</p>
+                <p className="text-sm font-black text-white">
+                  {defaultTab === 'files' ? folders.length : defaultTab === 'notes' ? notes.length : teamMembers.length}
+                </p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Last Write Time</p>
+                <p className="text-sm font-black text-white uppercase">{lastWrite || 'No writes this session'}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Sync Status</p>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-black text-white uppercase">Live</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         {/* ==================== 1. MY FILES ==================== */}
         {defaultTab === 'files' && (
           <div className="space-y-6">

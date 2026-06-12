@@ -106,6 +106,36 @@ export default function AdminInfrastructure() {
   const [data, setData] = useState<InfrastructureSettings>(defaultData);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [fbConfig, setFbConfig] = useState(firebaseConfig);
+
+  const appendFbLog = (line: string) => {
+    const timestamp = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const formattedLine = `[${timestamp}] ${line}`;
+    setFirebaseDiagnostics(prev => ({
+      ...prev,
+      logs: [...prev.logs, formattedLine]
+    }));
+  };
+
+  const saveFirebaseConfigOverride = async () => {
+    try {
+      setSaving(true);
+      // Save to localStorage for immediate application on refresh
+      localStorage.setItem('__FIREBASE_CONFIG_OVERRIDE__', JSON.stringify(fbConfig));
+      
+      // Save to Firestore for persistence
+      await setDoc(doc(db, 'admin_settings', 'firebase_config'), fbConfig);
+      
+      appendFbLog("🟢 Configuration saved to system. Please REFRESH the page to apply initialization changes fully.");
+      toast.success("Saved Successfully");
+    } catch (e: any) {
+      console.error("Save Error:", e);
+      appendFbLog(`🔴 Save Failure: ${e.message}`);
+      toast.error("Failed to save configuration");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Connection tester / Active test logs state
   const [testLogs, setTestLogs] = useState<string[]>([]);
@@ -142,13 +172,6 @@ export default function AdminInfrastructure() {
       isBusy: true
     }));
 
-    const appendFbLog = (line: string) => {
-      setFirebaseDiagnostics(prev => ({
-        ...prev,
-        logs: [...prev.logs, `[${new Date().toLocaleTimeString()}] ${line}`]
-      }));
-    };
-
     let scores = {
       initialized: 'error' as any,
       read: 'error' as any,
@@ -160,12 +183,24 @@ export default function AdminInfrastructure() {
     // 1. Initialized check
     try {
       appendFbLog("Inspecting SDK Initialization...");
-      if (db && auth && storage) {
+      const configToAudit = fbConfig;
+      const missing = [];
+      if (!configToAudit.projectId) missing.push("Project ID");
+      if (!configToAudit.appId) missing.push("App ID");
+      if (!configToAudit.apiKey) missing.push("API Key");
+      if (!configToAudit.authDomain) missing.push("Auth Domain");
+      if (!configToAudit.storageBucket) missing.push("Storage Bucket");
+      if (!configToAudit.messagingSenderId) missing.push("Messaging Sender ID");
+
+      if (missing.length > 0) {
+        appendFbLog(`🔴 Configuration Audit Failed: Missing ${missing.join(', ')}`);
+        scores.initialized = 'error';
+      } else if (db && auth && storage) {
         scores.initialized = 'success';
         appendFbLog("🟢 Firebase Core client libraries loaded and configured successfully.");
       } else {
         scores.initialized = 'error';
-        appendFbLog("🔴 Failure: One or more Firebase client services (firestore, auth, storage) are not initialized.");
+        appendFbLog("🔴 Failure: One or more Firebase client services are not initialized.");
       }
     } catch (e: any) {
       scores.initialized = 'error';
@@ -316,6 +351,7 @@ export default function AdminInfrastructure() {
     'cdn',
     'email',
     'security-monitor',
+    'firebase-config',
     'testing'
   ].includes(activeTabFromUrl)
     ? activeTabFromUrl
@@ -825,6 +861,7 @@ export default function AdminInfrastructure() {
                 { id: 'cdn', label: 'CDN & Performance', icon: Radio },
                 { id: 'email', label: 'Email Infrastructure', icon: Mail },
                 { id: 'security-monitor', label: 'Security Monitor', icon: Shield },
+                { id: 'firebase-config', label: 'Firebase Configuration', icon: Database },
                 { id: 'testing', label: 'Connection Tester', icon: Terminal }
               ].map(tabItem => {
                 const Icon = tabItem.icon;
@@ -1666,6 +1703,314 @@ export default function AdminInfrastructure() {
                       </div>
 
                     </div>
+                  </div>
+                )}
+
+                {/* 10. FIREBASE CONFIGURATION AUDIT PANEL */}
+                {activeTab === 'firebase-config' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
+                      <div>
+                        <h2 className="text-lg font-black uppercase text-neutral-900 font-sans tracking-wide">🔥 Firebase Configuration Audit</h2>
+                        <span className="text-xs text-neutral-400 font-medium">Audit service connectivity and update missing cloud credentials</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {firebaseDiagnostics.initialized === 'success' ? (
+                          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase px-2.5 py-1 rounded-full border border-emerald-200">✅ Firebase Connected</span>
+                        ) : (
+                          <span className="bg-neutral-50 text-neutral-500 text-[10px] font-black uppercase px-2.5 py-1 rounded-full border border-neutral-200">Checking...</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* LIVE CONNECTION STATUS CARDS */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className={`p-4 rounded-xl border flex items-center gap-3 font-sans ${firebaseDiagnostics.auth === 'success' ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200'}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${firebaseDiagnostics.auth === 'success' ? 'bg-emerald-500 text-white' : 'bg-neutral-200 text-neutral-400'}`}>
+                          <Lock className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-neutral-500 block leading-none mb-1">Authentication</span>
+                          <span className={`text-xs font-black uppercase ${firebaseDiagnostics.auth === 'success' ? 'text-emerald-700' : 'text-neutral-400'}`}>
+                            {firebaseDiagnostics.auth === 'success' ? '✅ Working' : 'Disconnected'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className={`p-4 rounded-xl border flex items-center gap-3 font-sans ${firebaseDiagnostics.read === 'success' ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200'}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${firebaseDiagnostics.read === 'success' ? 'bg-emerald-500 text-white' : 'bg-neutral-200 text-neutral-400'}`}>
+                          <Database className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-neutral-500 block leading-none mb-1">Firestore Service</span>
+                          <span className={`text-xs font-black uppercase ${firebaseDiagnostics.read === 'success' ? 'text-emerald-700' : 'text-neutral-400'}`}>
+                            {firebaseDiagnostics.read === 'success' ? '✅ Working' : 'Disconnected'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className={`p-4 rounded-xl border flex items-center gap-3 font-sans ${firebaseDiagnostics.storage === 'success' ? 'bg-emerald-50 border-emerald-200' : 'bg-neutral-50 border-neutral-200'}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${firebaseDiagnostics.storage === 'success' ? 'bg-emerald-500 text-white' : 'bg-neutral-200 text-neutral-400'}`}>
+                          <Globe className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-neutral-500 block leading-none mb-1">Cloud Storage</span>
+                          <span className={`text-xs font-black uppercase ${firebaseDiagnostics.storage === 'success' ? 'text-emerald-700' : 'text-neutral-400'}`}>
+                            {firebaseDiagnostics.storage === 'success' ? '✅ Working' : 'Disconnected'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-neutral-50 border border-neutral-200 rounded-2xl p-6 space-y-6">
+                      <div className="space-y-4">
+                        <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400 border-b border-neutral-200 pb-2 flex items-center gap-2">
+                          <Terminal className="w-3.5 h-3.5" /> Environmental Audit & Input
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Firebase Project ID */}
+                          <div className="space-y-2">
+                            <label className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">Firebase Project ID</span>
+                              {fbConfig.projectId ? (
+                                <span className="text-emerald-600 text-[9px] font-bold uppercase">🟢 Connected</span>
+                              ) : (
+                                <span className="text-red-500 text-[9px] font-bold uppercase animate-pulse">🔴 Missing</span>
+                              )}
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={fbConfig.projectId}
+                                onChange={(e) => setFbConfig(prev => ({ ...prev, projectId: e.target.value }))}
+                                placeholder="Enter Project ID"
+                                className="flex-1 bg-white border border-neutral-200 h-10 px-3.5 text-xs font-semibold rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                              {(fbConfig.projectId !== firebaseConfig.projectId) && (
+                                <button 
+                                  onClick={saveFirebaseConfigOverride}
+                                  disabled={saving}
+                                  className="bg-black text-white px-3 text-[10px] font-black uppercase tracking-wider rounded-lg disabled:opacity-50"
+                                >
+                                  {saving ? '...' : 'Save'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Firebase App ID */}
+                          <div className="space-y-2">
+                            <label className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">Firebase App ID</span>
+                              {fbConfig.appId ? (
+                                <span className="text-emerald-600 text-[9px] font-bold uppercase">🟢 Connected</span>
+                              ) : (
+                                <span className="text-red-500 text-[9px] font-bold uppercase animate-pulse">🔴 Missing</span>
+                              )}
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={fbConfig.appId}
+                                onChange={(e) => setFbConfig(prev => ({ ...prev, appId: e.target.value }))}
+                                placeholder="Enter App ID"
+                                className="flex-1 bg-white border border-neutral-200 h-10 px-3.5 text-xs font-semibold rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                              {(fbConfig.appId !== firebaseConfig.appId) && (
+                                <button 
+                                  onClick={saveFirebaseConfigOverride}
+                                  disabled={saving}
+                                  className="bg-black text-white px-3 text-[10px] font-black uppercase tracking-wider rounded-lg disabled:opacity-50"
+                                >
+                                  {saving ? '...' : 'Save'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Firebase API Key */}
+                          <div className="space-y-2">
+                            <label className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">Firebase API Key</span>
+                              {fbConfig.apiKey ? (
+                                <span className="text-emerald-600 text-[9px] font-bold uppercase">🟢 Connected</span>
+                              ) : (
+                                <span className="text-red-500 text-[9px] font-bold uppercase animate-pulse">🔴 Missing</span>
+                              )}
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="password"
+                                value={fbConfig.apiKey}
+                                onChange={(e) => setFbConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                                placeholder="Enter API Key"
+                                className="flex-1 bg-white border border-neutral-200 h-10 px-3.5 text-xs font-semibold rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                              {(fbConfig.apiKey !== firebaseConfig.apiKey) && (
+                                <button 
+                                  onClick={saveFirebaseConfigOverride}
+                                  disabled={saving}
+                                  className="bg-black text-white px-3 text-[10px] font-black uppercase tracking-wider rounded-lg disabled:opacity-50"
+                                >
+                                  {saving ? '...' : 'Save'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Auth Domain */}
+                          <div className="space-y-2">
+                            <label className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">Auth Domain</span>
+                              {fbConfig.authDomain ? (
+                                <span className="text-emerald-600 text-[9px] font-bold uppercase">🟢 Connected</span>
+                              ) : (
+                                <span className="text-red-500 text-[9px] font-bold uppercase animate-pulse">🔴 Missing</span>
+                              )}
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={fbConfig.authDomain}
+                                onChange={(e) => setFbConfig(prev => ({ ...prev, authDomain: e.target.value }))}
+                                placeholder="Enter Auth Domain"
+                                className="flex-1 bg-white border border-neutral-200 h-10 px-3.5 text-xs font-semibold rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                              {(fbConfig.authDomain !== firebaseConfig.authDomain) && (
+                                <button 
+                                  onClick={saveFirebaseConfigOverride}
+                                  disabled={saving}
+                                  className="bg-black text-white px-3 text-[10px] font-black uppercase tracking-wider rounded-lg disabled:opacity-50"
+                                >
+                                  {saving ? '...' : 'Save'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Storage Bucket */}
+                          <div className="space-y-2">
+                            <label className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">Storage Bucket</span>
+                              {fbConfig.storageBucket ? (
+                                <span className="text-emerald-600 text-[9px] font-bold uppercase">🟢 Connected</span>
+                              ) : (
+                                <span className="text-red-500 text-[9px] font-bold uppercase animate-pulse">🔴 Missing</span>
+                              )}
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={fbConfig.storageBucket}
+                                onChange={(e) => setFbConfig(prev => ({ ...prev, storageBucket: e.target.value }))}
+                                placeholder="Enter Storage Bucket"
+                                className="flex-1 bg-white border border-neutral-200 h-10 px-3.5 text-xs font-semibold rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                              {(fbConfig.storageBucket !== firebaseConfig.storageBucket) && (
+                                <button 
+                                  onClick={saveFirebaseConfigOverride}
+                                  disabled={saving}
+                                  className="bg-black text-white px-3 text-[10px] font-black uppercase tracking-wider rounded-lg disabled:opacity-50"
+                                >
+                                  {saving ? '...' : 'Save'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Messaging Sender ID */}
+                          <div className="space-y-2">
+                            <label className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">Messaging Sender ID</span>
+                              {fbConfig.messagingSenderId ? (
+                                <span className="text-emerald-600 text-[9px] font-bold uppercase">🟢 Connected</span>
+                              ) : (
+                                <span className="text-red-500 text-[9px] font-bold uppercase animate-pulse">🔴 Missing</span>
+                              )}
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={fbConfig.messagingSenderId}
+                                onChange={(e) => setFbConfig(prev => ({ ...prev, messagingSenderId: e.target.value }))}
+                                placeholder="Enter Messaging ID"
+                                className="flex-1 bg-white border border-neutral-200 h-10 px-3.5 text-xs font-semibold rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                              {(fbConfig.messagingSenderId !== firebaseConfig.messagingSenderId) && (
+                                <button 
+                                  onClick={saveFirebaseConfigOverride}
+                                  disabled={saving}
+                                  className="bg-black text-white px-3 text-[10px] font-black uppercase tracking-wider rounded-lg disabled:opacity-50"
+                                >
+                                  {saving ? '...' : 'Save'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Firestore Database ID */}
+                          <div className="space-y-2">
+                            <label className="flex items-center justify-between">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600">Firestore Database ID</span>
+                              {(fbConfig as any).firestoreDatabaseId ? (
+                                <span className="text-emerald-600 text-[9px] font-bold uppercase">🟢 Connected</span>
+                              ) : (
+                                <span className="text-red-500 text-[9px] font-bold uppercase animate-pulse">🔴 Missing</span>
+                              )}
+                            </label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={(fbConfig as any).firestoreDatabaseId}
+                                onChange={(e) => setFbConfig(prev => ({ ...prev, firestoreDatabaseId: e.target.value }))}
+                                placeholder="Enter Database ID"
+                                className="flex-1 bg-white border border-neutral-200 h-10 px-3.5 text-xs font-semibold rounded-lg focus:outline-none focus:ring-1 focus:ring-black"
+                              />
+                              {(fbConfig as any).firestoreDatabaseId !== (firebaseConfig as any).firestoreDatabaseId && (
+                                <button 
+                                  onClick={saveFirebaseConfigOverride}
+                                  disabled={saving}
+                                  className="bg-black text-white px-3 text-[10px] font-black uppercase tracking-wider rounded-lg disabled:opacity-50"
+                                >
+                                  {saving ? '...' : 'Save'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+
+                      <div className="border-t border-neutral-200 pt-6 flex justify-center">
+                        <button
+                          onClick={runFirebaseDiagnostics}
+                          disabled={firebaseDiagnostics.isBusy}
+                          className="px-8 h-12 bg-neutral-900 hover:bg-neutral-950 text-white text-sm font-black uppercase tracking-widest rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-neutral-900/10 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {firebaseDiagnostics.isBusy ? <RotateCw className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5 text-yellow-400" />}
+                          Run Live Connection Audit
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* DIAGNOSTIC RESULTS LOGS */}
+                    {firebaseDiagnostics.logs.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-[10px] font-black uppercase text-neutral-400 tracking-widest">Audit Output Terminal</h3>
+                        <div className="bg-black rounded-xl p-4 font-mono text-[11px] h-48 overflow-y-auto space-y-1.5 border border-neutral-800">
+                          {firebaseDiagnostics.logs.map((log, i) => {
+                            const isFail = log.includes('🔴') || log.includes('Failed');
+                            const isOk = log.includes('🟢') || log.includes('successful');
+                            return (
+                              <div key={i} className={isFail ? 'text-red-400' : isOk ? 'text-emerald-400' : 'text-neutral-400'}>
+                                {log}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

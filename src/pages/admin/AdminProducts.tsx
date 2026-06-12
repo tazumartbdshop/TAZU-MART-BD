@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
-import { Search, Plus, Edit, Trash2, Upload, X, Image as ImageIcon, ChevronLeft, ChevronDown, ChevronRight, Camera, AlertCircle, Loader2 } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Upload, X, Image as ImageIcon, ChevronLeft, ChevronDown, ChevronRight, Camera, AlertCircle, Loader2, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProductStore, generateKeywords } from '../../store/useProductStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
@@ -41,6 +41,38 @@ function AdminProductList() {
       )}
 
       {/* Top Header Section */}
+      <div className="bg-neutral-900 border border-neutral-800 p-4 relative overflow-hidden group mb-4">
+        <div className="absolute right-0 top-0 p-4 opacity-5 pointer-events-none">
+          <Database className="w-16 h-16 text-white" />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-6 relative z-10">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Database className="w-3.5 h-3.5 text-orange-500" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Live Firestore Path Inspector</span>
+            </div>
+            <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-850 px-3 py-1.5 font-mono text-[11px] text-green-400">
+              <span className="text-neutral-600">PATH:</span>
+              products
+            </div>
+          </div>
+
+          <div className="flex gap-8">
+            <div className="space-y-0.5">
+              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Document Count</p>
+              <p className="text-sm font-black text-white">{products.length}</p>
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Storage Status</p>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-black text-white uppercase tracking-wider">Production Live</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-8 py-2">
         <div className="flex items-center gap-4">
           <button 

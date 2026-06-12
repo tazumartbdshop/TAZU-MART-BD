@@ -34,23 +34,27 @@ const envConfig = {
 
 const windowConfig = typeof window !== 'undefined' ? ((window as any).__FIREBASE_CONFIG__ || {}) : {};
 
+// Support local storage overrides for the Firebase Configuration Audit feature
+const storageConfigStr = typeof window !== 'undefined' ? localStorage.getItem('__FIREBASE_CONFIG_OVERRIDE__') : null;
+const storageConfig = storageConfigStr ? JSON.parse(storageConfigStr) : {};
+
 const isLiveDomain = typeof window !== 'undefined' && (
   window.location.hostname === 'tazumartbd.com' || 
   window.location.hostname === 'www.tazumartbd.com' ||
   window.location.hostname.endsWith('.tazumartbd.com')
 );
 
-const finalProjectId = windowConfig.projectId || envConfig.projectId || (isLiveDomain ? "tazu-mart-bd-dfcda" : firebaseConfig.projectId);
+const finalProjectId = storageConfig.projectId || windowConfig.projectId || envConfig.projectId || (isLiveDomain ? "tazu-mart-bd-dfcda" : firebaseConfig.projectId);
 
 const finalConfig = {
-  apiKey: windowConfig.apiKey || envConfig.apiKey || firebaseConfig.apiKey,
+  apiKey: storageConfig.apiKey || windowConfig.apiKey || envConfig.apiKey || firebaseConfig.apiKey,
   // Ensure authDomain is exactly <project-id>.firebaseapp.com if using custom auth configs
-  authDomain: windowConfig.authDomain || envConfig.authDomain || (isLiveDomain ? "tazu-mart-bd-dfcda.firebaseapp.com" : (finalProjectId ? `${finalProjectId}.firebaseapp.com` : firebaseConfig.authDomain)),
+  authDomain: storageConfig.authDomain || windowConfig.authDomain || envConfig.authDomain || (isLiveDomain ? "tazu-mart-bd-dfcda.firebaseapp.com" : (finalProjectId ? `${finalProjectId}.firebaseapp.com` : firebaseConfig.authDomain)),
   projectId: finalProjectId,
-  appId: windowConfig.appId || envConfig.appId || firebaseConfig.appId,
-  storageBucket: windowConfig.storageBucket || envConfig.storageBucket || (isLiveDomain ? "tazu-mart-bd-dfcda.firebasestorage.app" : firebaseConfig.storageBucket),
-  messagingSenderId: windowConfig.messagingSenderId || envConfig.messagingSenderId || firebaseConfig.messagingSenderId,
-  firestoreDatabaseId: windowConfig.firestoreDatabaseId || envConfig.firestoreDatabaseId || (firebaseConfig as any).firestoreDatabaseId
+  appId: storageConfig.appId || windowConfig.appId || envConfig.appId || firebaseConfig.appId,
+  storageBucket: storageConfig.storageBucket || windowConfig.storageBucket || envConfig.storageBucket || (isLiveDomain ? "tazu-mart-bd-dfcda.firebasestorage.app" : firebaseConfig.storageBucket),
+  messagingSenderId: storageConfig.messagingSenderId || windowConfig.messagingSenderId || envConfig.messagingSenderId || firebaseConfig.messagingSenderId,
+  firestoreDatabaseId: storageConfig.firestoreDatabaseId || windowConfig.firestoreDatabaseId || envConfig.firestoreDatabaseId || (firebaseConfig as any).firestoreDatabaseId
 };
 
 const app = initializeApp(finalConfig);
