@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 import { useCustomerStore } from './useCustomerStore';
 
@@ -55,7 +57,10 @@ export const useAuthStore = create<AuthState>()(
           useCustomerStore.getState().syncCustomerFromAuth(user);
         }, 500);
       },
-      logout: () => set({ user: null, isAuthenticated: false }),
+      logout: () => {
+        signOut(auth).catch((err) => console.error("Firebase signOut failed:", err));
+        set({ user: null, isAuthenticated: false });
+      },
       updateUser: (updatedUser) => set((state) => ({
         user: state.user ? { ...state.user, ...updatedUser } : null
       })),

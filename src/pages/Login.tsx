@@ -389,11 +389,11 @@ export default function Login() {
             }) || dbUser;
 
             if (passwordMismatchedCust) {
-              const wrongPassError = new Error('Invalid credentials.');
+              const wrongPassError = new Error('Email or password is incorrect');
               (wrongPassError as any).code = 'auth/wrong-password';
               throw wrongPassError;
             } else {
-              const userNotFoundError = new Error('No account found with this email/phone.');
+              const userNotFoundError = new Error('Email or password is incorrect');
               (userNotFoundError as any).code = 'auth/user-not-found';
               throw userNotFoundError;
             }
@@ -417,7 +417,7 @@ export default function Login() {
             (dbUser);
           
           if (hasAccountButWrongPass) {
-            const wrongPassErr = new Error('Invalid credentials.');
+            const wrongPassErr = new Error('Email or password is incorrect');
             wrongPassErr.name = 'AuthError';
             (wrongPassErr as any).code = 'auth/wrong-password';
             throw wrongPassErr;
@@ -449,6 +449,8 @@ export default function Login() {
         const area = dbUser?.area || localCust?.address?.area || '';
         const postalCode = dbUser?.postalCode || localCust?.address?.zipCode || '';
 
+        // Commented out to satisfy 'Do NOT save user profile data' / 'Do NOT use Firestore yet'
+        /*
         try {
           setDoc(doc(db, 'users', firebaseUser.uid), {
             uid: firebaseUser.uid,
@@ -471,6 +473,7 @@ export default function Login() {
         } catch (fsErr) {
           handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
         }
+        */
 
         useLoginHistoryStore.getState().addLoginEvent({
           name,
@@ -510,10 +513,8 @@ export default function Login() {
       }
       if (err.code === 'auth/operation-not-allowed') {
         setError("Firebase 'Email/Password' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Email/Password' and enable it.");
-      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('Invalid credentials.');
-      } else if (err.code === 'auth/user-not-found') {
-        setError('No account found with this email/phone.');
+      } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
+        setError('Email or password is incorrect');
       } else {
         setError(err.message || 'Login failed. Please try again.');
       }

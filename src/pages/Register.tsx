@@ -183,7 +183,7 @@ export default function Register() {
       } else {
         const emailInUse = customers.some(c => c.emails.some(e => e.toLowerCase().trim() === formData.email.toLowerCase().trim()));
         if (emailInUse) {
-          newErrors.email = 'This email address is already registered';
+          newErrors.email = 'User already exists. Please sign in';
         }
       }
     }
@@ -246,9 +246,10 @@ export default function Register() {
       let finalProfileImage = formData.profileImage;
       if (finalProfileImage?.startsWith('data:')) {
         try {
-          const res = await fetch(finalProfileImage);
-          const blob = await res.blob();
-          finalProfileImage = await uploadImage(blob, 'user-profiles', `user-${Date.now()}.jpg`);
+          // Bypassed Storage file uploads to satisfy "Do NOT use Storage yet"
+          // const res = await fetch(finalProfileImage);
+          // const blob = await res.blob();
+          // finalProfileImage = await uploadImage(blob, 'user-profiles', `user-${Date.now()}.jpg`);
         } catch (err) {
           console.error('Failed to upload image:', err);
         }
@@ -274,6 +275,8 @@ export default function Register() {
         }
       }
 
+      // Bypassed Firestore user profile record creation to satisfy "Do NOT save user profile data" and "Do NOT use Firestore yet"
+      /*
       try {
         await setDoc(doc(db, 'users', firebaseUser.uid), {
           uid: firebaseUser.uid,
@@ -299,6 +302,7 @@ export default function Register() {
       } catch (fsErr) {
         handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
       }
+      */
 
       const newCustomer = {
         id: firebaseUser.uid,
@@ -364,7 +368,7 @@ export default function Register() {
       if (err.code === 'auth/operation-not-allowed') {
         setError("Firebase 'Email/Password' authentication provider is not enabled. Please go to your Firebase Console -> Authentication -> Sign-in method, click 'Add new provider', select 'Email/Password' and enable it.");
       } else if (err.code === 'auth/email-already-in-use') {
-        setError('This email address or phone number is already registered.');
+        setError('User already exists. Please sign in');
       } else if (err.code === 'auth/weak-password') {
         setError('Password is too weak. Please choose a stronger password.');
       } else {
