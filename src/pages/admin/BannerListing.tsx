@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Edit, Trash2, Image as ImageIcon, Layers, Plus, Crop, Upload } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
-import { db } from '../../lib/firebase';
+import { db } from '../../lib/db';
 import { doc, deleteDoc } from 'firebase/firestore';
 
 enum OperationType {

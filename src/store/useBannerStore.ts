@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { db } from '../lib/firebase';
+import { db } from '../lib/db';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, onSnapshot } from 'firebase/firestore';
 
 export function cleanObjectForFirestore<T extends object>(obj: T): T {

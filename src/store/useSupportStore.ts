@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { db } from '../lib/firebase';
+import { db } from '../lib/db';
 import { collection, addDoc, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, updateDoc, getDoc } from 'firebase/firestore';
 
 export interface SupportTicket {

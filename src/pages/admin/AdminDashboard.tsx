@@ -15,8 +15,8 @@ import {
   Plus, 
   Search, 
   Filter, 
-  Edit, 
   Trash2, 
+  HardDrive,
   Eye, 
   Bell, 
   ChevronDown, 
@@ -41,11 +41,15 @@ import {
   Palette,
   Star,
   Puzzle,
-  Coins
+  Coins,
+  FileText,
+  Folder
 } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
+import { db, auth } from '../../lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
 import AdminSettings from './AdminSettings';
@@ -83,8 +87,11 @@ import { useOrderStore } from '../../store/useOrderStore';
 import { useCustomerStore } from '../../store/useCustomerStore';
 import { useSearchStore } from '../../store/useSearchStore';
 import { useLeadStore } from '../../store/useLeadStore';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
 import { defaultNavItems } from '../../lib/adminMenus';
 import { useMenuSortStore } from '../../store/useMenuSortStore';
+import { Database, PlusCircle, FolderPlus, FilePlus, UserPlus, FileCode, Edit, Loader2 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import AdminMenuManagement from './AdminMenuManagement';
 import AdminPopupManagement from './AdminPopupManagement';
 import AdminCourierAPI from './AdminCourierAPI';
@@ -628,6 +635,43 @@ function Overview() {
   const { autoRankTrending, autoRankBestSellers } = useProductStore();
   const [rankingStatus, setRankingStatus] = useState<string | null>(null);
   const { banners: storeBanners } = useBannerStore();
+  const { user: authUser } = useAuthStore();
+  const { 
+    folders, 
+    notes, 
+    teamMembers, 
+    isLoading, 
+    subscribe,
+    addFolder,
+    addFile,
+    addNote,
+    addTeamMember,
+    updateFolder,
+    updateFile,
+    updateNote,
+    updateTeamMember,
+    deleteItem
+  } = useWorkspaceStore();
+  
+  const [activeModal, setActiveModal] = useState<'folder' | 'file' | 'note' | 'member' | 'delete' | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'folders' | 'notes' | 'teamMembers'; name: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: string; type: 'folder' | 'file' | 'note' | 'member' } | null>(null);
+
+  // Form states
+  const [folderName, setFolderName] = useState('');
+  const [fileName, setFileName] = useState('');
+  const [noteContent, setNoteContent] = useState('');
+  const [memberName, setMemberName] = useState('');
+  const [memberEmail, setMemberEmail] = useState('');
+  const [memberRole, setMemberRole] = useState('Developer');
+
+  const activeUid = auth.currentUser?.uid || authUser?.id;
+
+  useEffect(() => {
+    if (!activeUid) return;
+    const unsub = subscribe(activeUid);
+    return () => unsub();
+  }, [activeUid]);
 
   const handleAutoRank = async (type: 'trending' | 'best') => {
     setRankingStatus(type === 'trending' ? 'Ranking Trending...' : 'Ranking Best Sellers...');
@@ -807,13 +851,313 @@ function Overview() {
 
       {/* KPI Cards Grid */}
       <h3 className="text-lg font-sans font-black text-[#000000] mb-4 uppercase tracking-tighter">Enterprise Insights</h3>
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-10">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-8">
          <KPICard label="Total Sales" value="BDT 854,200" trend="+18.2%" icon={DollarSign} borderClass="border-l-purple-600" themeColor="#9333ea" />
          <KPICard label="Total Orders" value="1,254" trend="+12.4%" icon={ShoppingBag} borderClass="border-l-blue-600" themeColor="#2563eb" />
          <KPICard label="Total Customers" value="842" trend="+8.5%" icon={Users} borderClass="border-l-cyan-600" themeColor="#0891b2" />
          <KPICard label="Total Revenue" value="BDT 1,240K" trend="+15.3%" icon={Activity} borderClass="border-l-emerald-600" themeColor="#10b981" />
          <KPICard label="Total Reviews" value="3,842" trend="+9.8%" icon={Star} borderClass="border-l-rose-600" themeColor="#e11d48" />
       </div>
+
+      {/* Cloud Workspace Real-time Sections */}
+      <h3 className="text-lg font-sans font-black text-[#000000] mb-4 uppercase tracking-tighter flex items-center gap-2">
+        <Database className="w-5 h-5 text-orange-500" /> Fully Synchronized Cloud Workspace
+      </h3>
+      
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-10">
+        {/* My Files Section */}
+        <div className="bg-white border border-neutral-200 rounded-none overflow-hidden flex flex-col shadow-sm">
+          <div className="p-4 bg-neutral-950 text-white flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Folder className="w-4 h-4 text-orange-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest">My Files</span>
+              <span className="bg-orange-500 text-[9px] px-1.5 py-0.5 rounded-full text-white font-bold">{folders.filter(f => f.type === 'file').length}</span>
+            </div>
+            <div className="flex gap-2">
+               <button onClick={() => setActiveModal('folder')} className="text-[8px] bg-white/10 hover:bg-white/20 px-2 py-1 uppercase font-black tracking-widest border border-white/10">New Folder</button>
+               <button onClick={() => setActiveModal('file')} className="text-[8px] bg-orange-500 hover:bg-orange-600 px-2 py-1 uppercase font-black tracking-widest text-white transition-colors">Add File</button>
+            </div>
+          </div>
+          <div className="flex-1 p-4 bg-neutral-50/30 overflow-y-auto max-h-[400px]">
+             {isLoading.folders ? (
+               <div className="flex flex-col items-center justify-center py-20 gap-3">
+                 <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                 <span className="text-[9px] font-black uppercase text-neutral-400">Syncing...</span>
+               </div>
+             ) : folders.length === 0 ? (
+               <div className="text-center py-20 opacity-40">
+                 <HardDrive className="w-10 h-10 mx-auto mb-2 text-neutral-300" />
+                 <p className="text-[10px] font-black uppercase tracking-widest">No Storage Found</p>
+               </div>
+             ) : (
+               <div className="space-y-3">
+                 {folders.map(item => (
+                   <div key={item.id} className="bg-white border border-neutral-100 p-3 flex items-center justify-between hover:border-orange-200 transition-all group">
+                     <div className="flex items-center gap-3">
+                       {item.type === 'folder' ? (
+                         <div className="w-8 h-8 bg-orange-50 text-orange-500 flex items-center justify-center border border-orange-100"><Folder className="w-4 h-4 fill-current" /></div>
+                       ) : (
+                         <div className="w-8 h-8 bg-neutral-100 text-neutral-500 flex items-center justify-center border border-neutral-200"><FileCode className="w-4 h-4" /></div>
+                       )}
+                       <div>
+                         <p className="text-[11px] font-black text-neutral-900 uppercase truncate max-w-[120px]">{item.name}</p>
+                         <p className="text-[8px] font-bold text-neutral-400 uppercase tracking-tighter">{item.type} {item.size ? `• ${item.size}` : ''}</p>
+                       </div>
+                     </div>
+                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                       <button onClick={() => { setEditingItem({ id: item.id, type: item.type }); setFolderName(item.name); setFileName(item.name); setActiveModal(item.type); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-black transition-all"><Edit className="w-3 h-3" /></button>
+                       <button onClick={() => { setDeleteTarget({ id: item.id, type: 'folders', name: item.name }); setActiveModal('delete'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-red-500 transition-all"><Trash2 className="w-3 h-3" /></button>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+          </div>
+        </div>
+
+        {/* My Notes Section */}
+        <div className="bg-white border border-neutral-200 rounded-none overflow-hidden flex flex-col shadow-sm">
+          <div className="p-4 bg-neutral-950 text-white flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-purple-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest">My Notes</span>
+              <span className="bg-purple-500 text-[9px] px-1.5 py-0.5 rounded-full text-white font-bold">{notes.length}</span>
+            </div>
+            <button onClick={() => setActiveModal('note')} className="text-[8px] bg-purple-500 hover:bg-purple-600 px-2 py-1 uppercase font-black tracking-widest text-white transition-colors">New Note</button>
+          </div>
+          <div className="flex-1 p-4 bg-neutral-50/30 overflow-y-auto max-h-[400px]">
+             {isLoading.notes ? (
+               <div className="flex flex-col items-center justify-center py-20 gap-3">
+                 <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                 <span className="text-[9px] font-black uppercase text-neutral-400">Syncing...</span>
+               </div>
+             ) : notes.length === 0 ? (
+               <div className="text-center py-20 opacity-40">
+                 <FileText className="w-10 h-10 mx-auto mb-2 text-neutral-300" />
+                 <p className="text-[10px] font-black uppercase tracking-widest">No Intelligence Logged</p>
+               </div>
+             ) : (
+               <div className="space-y-3">
+                 {notes.map(note => (
+                   <div key={note.id} className="bg-white border border-neutral-100 p-4 hover:border-purple-200 transition-all group relative">
+                     <h4 className="text-[12px] font-black text-neutral-900 border-b border-neutral-100 pb-2 mb-2 uppercase italic tracking-tight">{note.title}</h4>
+                     <p className="text-[10px] text-neutral-500 line-clamp-2 leading-relaxed">{note.content}</p>
+                     <div className="mt-3 flex justify-between items-center">
+                        <span className="text-[8px] font-bold text-neutral-400 uppercase">{new Date(note.createdAt).toLocaleDateString()}</span>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <button onClick={() => { setEditingItem({ id: note.id, type: 'note' }); setNoteContent(note.content || ''); setActiveModal('note'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-black transition-all"><Edit className="w-3 h-3" /></button>
+                          <button onClick={() => { setDeleteTarget({ id: note.id, type: 'notes', name: 'Note' }); setActiveModal('delete'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-red-500 transition-all"><Trash2 className="w-3 h-3" /></button>
+                        </div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+          </div>
+        </div>
+
+        {/* Team Members Section */}
+        <div className="bg-white border border-neutral-200 rounded-none overflow-hidden flex flex-col shadow-sm">
+          <div className="p-4 bg-neutral-950 text-white flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-emerald-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Team Personnel</span>
+              <span className="bg-emerald-500 text-[9px] px-1.5 py-0.5 rounded-full text-white font-bold">{teamMembers.length}</span>
+            </div>
+            <button onClick={() => setActiveModal('member')} className="text-[8px] bg-emerald-500 hover:bg-emerald-600 px-2 py-1 uppercase font-black tracking-widest text-white transition-colors">Add Member</button>
+          </div>
+          <div className="flex-1 p-4 bg-neutral-50/30 overflow-y-auto max-h-[400px]">
+             {isLoading.teamMembers ? (
+               <div className="flex flex-col items-center justify-center py-20 gap-3">
+                 <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                 <span className="text-[9px] font-black uppercase text-neutral-400">Syncing...</span>
+               </div>
+             ) : teamMembers.length === 0 ? (
+               <div className="text-center py-20 opacity-40">
+                 <Users className="w-10 h-10 mx-auto mb-2 text-neutral-300" />
+                 <p className="text-[10px] font-black uppercase tracking-widest">No Personnel Indexed</p>
+               </div>
+             ) : (
+               <div className="space-y-2">
+                 {teamMembers.map(member => (
+                   <div key={member.id} className="bg-white border border-neutral-100 p-3 flex items-center justify-between hover:border-emerald-200 transition-all group">
+                     <div className="flex items-center gap-3">
+                       <div className="w-9 h-9 bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 font-black text-xs">
+                          {member.name.charAt(0).toUpperCase()}
+                       </div>
+                       <div>
+                         <p className="text-[11px] font-black text-neutral-900 uppercase truncate max-w-[120px]">{member.name}</p>
+                         <p className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{member.role}</p>
+                       </div>
+                     </div>
+                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                       <button onClick={() => { setEditingItem({ id: member.id, type: 'member' }); setMemberName(member.name); setMemberEmail(member.email); setMemberRole(member.role || 'Developer'); setActiveModal('member'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-black transition-all"><Edit className="w-3 h-3" /></button>
+                       <button onClick={() => { setDeleteTarget({ id: member.id, type: 'teamMembers', name: member.name }); setActiveModal('delete'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-red-500 transition-all"><Trash2 className="w-3 h-3" /></button>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modals for Workspace */}
+      {activeModal === 'folder' && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white border w-full max-w-sm rounded-none p-6 shadow-2xl">
+            <h3 className="text-sm font-black uppercase tracking-widest border-b pb-4 mb-6">{editingItem ? 'Edit Folder' : 'New Folder'}</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!folderName.trim()) return toast.error('Name required');
+              if (!activeUid) return toast.error('Auth required');
+              try {
+                if (editingItem) await updateFolder(activeUid, editingItem.id, folderName.trim());
+                else await addFolder(activeUid, folderName.trim());
+                toast.success('Saved'); setFolderName(''); setEditingItem(null); setActiveModal(null);
+              } catch (err) { toast.error('Error saving'); }
+            }} className="space-y-6">
+              <div>
+                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Folder Identity</label>
+                <input type="text" value={folderName} onChange={e => setFolderName(e.target.value)} placeholder="e.g. Finance Reports" className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none" autoFocus />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => { setActiveModal(null); setEditingItem(null); setFolderName(''); }} className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 bg-black text-white font-black uppercase text-[10px] tracking-widest">Save Folder</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {activeModal === 'file' && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white border w-full max-w-sm rounded-none p-6 shadow-2xl">
+            <h3 className="text-sm font-black uppercase tracking-widest border-b pb-4 mb-6">{editingItem ? 'Edit File' : 'Add New File'}</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!fileName.trim()) return toast.error('Name required');
+              if (!activeUid) return toast.error('Auth required');
+              try {
+                if (editingItem) await updateFile(activeUid, editingItem.id, fileName.trim());
+                else await addFile(activeUid, fileName.trim());
+                toast.success('Saved'); setFileName(''); setEditingItem(null); setActiveModal(null);
+              } catch (err) { toast.error('Error saving'); }
+            }} className="space-y-5">
+              <div>
+                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">File Attachment Name</label>
+                <input type="text" value={fileName} onChange={e => setFileName(e.target.value)} placeholder="image_01.jpg" className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none" autoFocus />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => { setActiveModal(null); setEditingItem(null); setFileName(''); }} className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 bg-orange-500 text-white font-black uppercase text-[10px] tracking-widest">Commit File</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {activeModal === 'note' && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white border w-full max-w-md rounded-none p-6 shadow-2xl">
+            <h3 className="text-sm font-black uppercase tracking-widest border-b pb-4 mb-6">{editingItem ? 'Edit Protocol' : 'New Intelligence Note'}</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!noteContent.trim()) return toast.error('Content required');
+              if (!activeUid) return toast.error('Auth required');
+              try {
+                if (editingItem) await updateNote(activeUid, editingItem.id, noteContent.trim());
+                else await addNote(activeUid, noteContent.trim());
+                toast.success('Saved'); setNoteContent(''); setEditingItem(null); setActiveModal(null);
+              } catch (err) { toast.error('Error saving'); }
+            }} className="space-y-5">
+              <div>
+                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Internal Body</label>
+                <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} placeholder="Start logging data..." rows={6} className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none resize-none" />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => { setActiveModal(null); setEditingItem(null); setNoteContent(''); }} className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 bg-purple-600 text-white font-black uppercase text-[10px] tracking-widest">Sync Note</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {activeModal === 'member' && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white border w-full max-w-sm rounded-none p-6 shadow-2xl">
+            <h3 className="text-sm font-black uppercase tracking-widest border-b pb-4 mb-6">{editingItem ? 'Modify Member' : 'Provision Personnel'}</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!memberName.trim()) return toast.error('Name required');
+              if (!activeUid) return toast.error('Auth required');
+              try {
+                if (editingItem) await updateTeamMember(activeUid, editingItem.id, memberName.trim(), memberEmail.trim(), memberRole.trim());
+                else await addTeamMember(activeUid, memberName.trim(), memberEmail.trim(), memberRole.trim());
+                toast.success('Member Saved'); setMemberName(''); setMemberEmail(''); setEditingItem(null); setActiveModal(null);
+              } catch (err) { toast.error('Error saving'); }
+            }} className="space-y-4">
+              <div>
+                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Full Legal Name</label>
+                <input type="text" value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="Jane Doe" className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none" autoFocus />
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Corporate Email</label>
+                <input type="email" value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="jane@enterprise.com" className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none" />
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Personnel Role</label>
+                <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className="w-full bg-neutral-50 border p-3 text-xs font-black focus:ring-1 focus:ring-black outline-none appearance-none">
+                  {['Developer', 'Manager', 'Product Lead', 'Designer', 'QA Engineer', 'Security Audit'].map(r => (
+                    <option key={r} value={r}>{r.toUpperCase()}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 pt-6">
+                <button type="button" onClick={() => { setActiveModal(null); setEditingItem(null); setMemberName(''); setMemberEmail(''); }} className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest">Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3 bg-emerald-600 text-white font-black uppercase text-[10px] tracking-widest">Register Team</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {activeModal === 'delete' && deleteTarget && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-white border w-full max-w-sm rounded-none p-8 text-center shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-red-600" />
+            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-none flex items-center justify-center mx-auto mb-6">
+              <Shield className="w-8 h-8" />
+            </div>
+            <h3 className="text-lg font-black uppercase tracking-tighter text-neutral-900 mb-2">Security Override</h3>
+            <p className="text-xs text-neutral-500 mb-8 font-medium leading-relaxed">
+              Confirm deletion of <span className="font-black text-red-600">"{deleteTarget.name}"</span>.<br />
+              This document will be wiped from the encrypted Firestore node permanently.
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => { setActiveModal(null); setDeleteTarget(null); }}
+                className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest hover:bg-neutral-200 transition-all"
+              >
+                Abort
+              </button>
+              <button 
+                onClick={async () => {
+                  if (!activeUid) return toast.error('Auth required');
+                  try {
+                    await deleteItem(activeUid, deleteTarget.id, deleteTarget.type);
+                    toast.success('Deleted Successfully'); setActiveModal(null); setDeleteTarget(null);
+                  } catch (err) { toast.error('Error deleting'); }
+                }}
+                className="flex-1 px-4 py-3 bg-red-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-all"
+              >
+                Wipe Doc
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tables Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 mb-6">

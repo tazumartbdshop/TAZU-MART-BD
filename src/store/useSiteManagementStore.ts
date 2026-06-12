@@ -17,13 +17,17 @@ export const useSiteManagementStore = create<SiteManagementState>((set) => ({
     set({ isLoading: true, error: null });
     
     let timeoutId: any;
+    let isFinished = false;
     const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error('Data Fetch Timeout (5s)')), 5000);
+      timeoutId = setTimeout(() => {
+        if (!isFinished) reject(new Error('Data Fetch Timeout (5s)'));
+      }, 5000);
     });
 
     try {
       const settings = await Promise.race([
         siteManagementService.getSettings().then((res) => {
+          isFinished = true;
           clearTimeout(timeoutId);
           return res;
         }),
@@ -32,6 +36,7 @@ export const useSiteManagementStore = create<SiteManagementState>((set) => ({
       
       set({ data: settings, isLoading: false });
     } catch (error: any) {
+      isFinished = true;
       clearTimeout(timeoutId);
       console.warn("[Boot Notice] Site config fetch status:", error.message);
       // Soft-fallback to default settings to guarantee smooth load

@@ -38,11 +38,11 @@ async function startServer() {
       appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || firebaseConfig.appId,
       storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket,
       messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || firebaseConfig.messagingSenderId,
-      firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DB_ID || process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.FIREBASE_DB_ID || firebaseConfig.firestoreDatabaseId
+      firestoreDatabaseId: (process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID && process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID !== "default") ? process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID : firebaseConfig.firestoreDatabaseId
     };
 
     const firebaseApp = initializeApp(backendConfig);
-    db = backendConfig.firestoreDatabaseId 
+    db = (backendConfig.firestoreDatabaseId && backendConfig.firestoreDatabaseId !== "default" && backendConfig.firestoreDatabaseId !== "(default)")
       ? getFirestore(firebaseApp, backendConfig.firestoreDatabaseId)
       : getFirestore(firebaseApp);
     console.log("Firebase Backend initialized successfully with project:", backendConfig.projectId);
@@ -601,7 +601,7 @@ Please ask me your query or select a quick question template below!`;
           appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || null,
           storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || null,
           messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || null,
-          firestoreDatabaseId: process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.VITE_FIREBASE_DB_ID || process.env.FIREBASE_FIRESTORE_DATABASE_ID || process.env.FIREBASE_DB_ID || null
+          firestoreDatabaseId: (process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID && process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID !== "default") ? process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID : null
         };
 
         const configScript = `<script>window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};</script>`;

@@ -54,12 +54,29 @@ const finalConfig = {
   appId: storageConfig.appId || windowConfig.appId || envConfig.appId || firebaseConfig.appId,
   storageBucket: storageConfig.storageBucket || windowConfig.storageBucket || envConfig.storageBucket || (isLiveDomain ? "tazu-mart-bd-dfcda.firebasestorage.app" : firebaseConfig.storageBucket),
   messagingSenderId: storageConfig.messagingSenderId || windowConfig.messagingSenderId || envConfig.messagingSenderId || firebaseConfig.messagingSenderId,
-  firestoreDatabaseId: storageConfig.firestoreDatabaseId || windowConfig.firestoreDatabaseId || envConfig.firestoreDatabaseId || (firebaseConfig as any).firestoreDatabaseId
+  firestoreDatabaseId: (storageConfig.firestoreDatabaseId && storageConfig.firestoreDatabaseId !== "default") || 
+                       (windowConfig.firestoreDatabaseId && windowConfig.firestoreDatabaseId !== "default") || 
+                       (envConfig.firestoreDatabaseId && envConfig.firestoreDatabaseId !== "default") || 
+                       (firebaseConfig as any).firestoreDatabaseId
 };
+
+// Log Firebase configuration for debugging "Database not found" issues
+if (typeof window !== 'undefined') {
+  console.log("%c[FIREBASE_CONFIG]", "background: #4F46E5; color: white; padding: 2px 4px; border-radius: 2px;", {
+    projectId: finalConfig.projectId,
+    databaseId: finalConfig.firestoreDatabaseId || "(default)",
+    hasApiKey: !!finalConfig.apiKey
+  });
+}
 
 const app = initializeApp(finalConfig);
 
-export const db = finalConfig.firestoreDatabaseId 
+// Initialize Firestore with the explicit database ID if provided, 
+// otherwise default to (default). Handle edge cases where "default" 
+// might be passed as a string.
+export const db = finalConfig.firestoreDatabaseId && 
+                 finalConfig.firestoreDatabaseId !== "default" && 
+                 finalConfig.firestoreDatabaseId !== "(default)"
   ? getFirestore(app, finalConfig.firestoreDatabaseId)
   : getFirestore(app);
 

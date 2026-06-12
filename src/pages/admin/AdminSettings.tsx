@@ -28,6 +28,7 @@ const SETTING_MODULES = [
   { id: 'support', name: 'Customer Support', icon: HeadphonesIcon, desc: 'Hotline, Chat, Email' },
   { id: 'media', name: 'File & Media', icon: ImageIcon, desc: 'Upload Limits & Types' },
   { id: 'promotion', name: 'Promotion & Offers', icon: Zap, desc: 'Flash Sale, Discounts' },
+  { id: 'supabase', name: 'Supabase Config', icon: Database, desc: 'Supabase Database Connection' },
   { id: 'system', name: 'Backup & System', icon: Database, desc: 'Backups & Cache' },
 ];
 
@@ -533,6 +534,12 @@ export default function AdminSettings() {
                 * When DISABLED / BLOCKED (Recommended), coupon discounts will not be applicable on lists that contain promo items.
               </p>
            </div>
+        </div>
+      );
+      case 'supabase': return (
+        <div className="space-y-6 max-w-3xl animate-in fade-in">
+           <Input label="Supabase URL" field="supabaseUrl" placeholder="https://xyz.supabase.co" />
+           <Input label="Supabase Key" field="supabaseKey" placeholder="Your Supabase ANON Key" />
         </div>
       );
       case 'system': return (

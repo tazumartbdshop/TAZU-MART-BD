@@ -3,9 +3,16 @@ import { storage } from './firebase';
 
 // Helper to add timeout to promise
 const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
+  let finished = false;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    setTimeout(() => {
+      if (!finished) reject(new Error(errorMessage));
+    }, ms);
+  });
+
   return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), ms))
+    promise.then(res => { finished = true; return res; }).catch(err => { finished = true; throw err; }),
+    timeoutPromise
   ]);
 };
 

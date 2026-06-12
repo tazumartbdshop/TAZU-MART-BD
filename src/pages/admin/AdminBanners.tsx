@@ -4,7 +4,7 @@ import { Upload, Layers, ArrowLeft, Search, X, Database } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
 import { useProductStore } from '../../store/useProductStore';
-import { db } from '../../lib/firebase';
+import { db } from '../../lib/db';
 import { doc, setDoc, deleteDoc, collection } from 'firebase/firestore';
 
 enum OperationType {

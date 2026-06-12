@@ -137,11 +137,16 @@ export default function AdminFlutterBanner() {
 
   // Helper to wrap promises with a timeout
   const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number = 15000): Promise<T> => {
+    let finished = false;
+    const timeoutPromise = new Promise<T>((_, reject) => 
+      setTimeout(() => {
+        if (!finished) reject(new Error('TIMEOUT'));
+      }, timeoutMs)
+    );
+
     return Promise.race([
-      promise,
-      new Promise<T>((_, reject) => 
-        setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
-      )
+      promise.then(res => { finished = true; return res; }).catch(err => { finished = true; throw err; }),
+      timeoutPromise
     ]);
   };
 

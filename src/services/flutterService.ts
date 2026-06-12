@@ -112,7 +112,7 @@ const DEFAULT_CONFIG: FlutterConfig = {
 };
 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db } from '../lib/db';
 
 export const getFlutterConfig = async (): Promise<FlutterConfig> => {
   try {

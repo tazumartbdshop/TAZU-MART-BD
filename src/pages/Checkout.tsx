@@ -13,7 +13,7 @@ import { useFakeOrderStore } from '../store/useFakeOrderStore';
 import { bdAddressData, divisions } from '../data/addressData';
 import { HomeDeliverySection } from '../components/checkout/HomeDeliverySection';
 import { formatPrice, cn } from '../lib/utils';
-import { db } from '../lib/firebase';
+import { db } from '../lib/db';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { pixelService } from '../utils/pixelService';
 import { 

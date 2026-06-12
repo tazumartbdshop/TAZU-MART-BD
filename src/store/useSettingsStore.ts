@@ -228,6 +228,10 @@ export interface AppSettings {
   flashSaleEnabled: boolean;
   flashSaleEndTime: string;
   allowStackDiscount: boolean;
+
+  // 20. Supabase Settings
+  supabaseUrl: string;
+  supabaseKey: string;
 }
 
 const defaultSettings: AppSettings = {
@@ -414,6 +418,9 @@ const defaultSettings: AppSettings = {
   flashSaleEnabled: true,
   flashSaleEndTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   allowStackDiscount: false,
+  
+  supabaseUrl: '',
+  supabaseKey: '',
 };
 
 interface SettingsState {

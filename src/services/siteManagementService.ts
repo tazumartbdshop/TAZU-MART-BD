@@ -1,5 +1,5 @@
 import { collection, query, where, getDocs, limit, doc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db } from '../lib/db';
 
 export interface LinkPage {
   id: string;

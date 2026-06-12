@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useWorkspaceStore, FolderType, NoteType, TeamMemberType } from '../../store/useWorkspaceStore';
 import { 
   Folder, 
   FileText, 
@@ -24,34 +25,11 @@ import {
   Sparkles,
   ChevronRight,
   Database,
-  Briefcase
+  Briefcase,
+  Edit
 } from 'lucide-react';
-import { auth, db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { collection, onSnapshot, doc, setDoc, addDoc, deleteDoc, getDoc, updateDoc } from 'firebase/firestore';
-
-export interface FolderType {
-  id: string;
-  name: string;
-  type: 'folder' | 'file';
-  size?: string;
-  folderId?: string;
-  createdAt: string;
-}
-
-export interface NoteType {
-  id: string;
-  title: string;
-  content?: string;
-  createdAt: string;
-}
-
-export interface TeamMemberType {
-  id: string;
-  name: string;
-  email: string;
-  role?: string;
-  createdAt: string;
-}
+import { auth, db } from '../../lib/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 export interface UserProfileType {
   displayName: string;
@@ -67,22 +45,31 @@ interface FirebaseWorkspaceProps {
 export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps) {
   const navigate = useNavigate();
   const { user: authUser, isAuthenticated } = useAuthStore();
+  const { 
+    folders, 
+    notes, 
+    teamMembers, 
+    isLoading, 
+    subscribe,
+    addFolder,
+    addFile,
+    addNote,
+    addTeamMember,
+    updateFolder,
+    updateFile,
+    updateNote,
+    updateTeamMember,
+    deleteItem
+  } = useWorkspaceStore();
+  
   const [currentUser, setCurrentUser] = useState(auth.currentUser);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   
-  // Real-time collections
+  // Local profile state
   const [profile, setProfile] = useState<UserProfileType | null>(null);
-  const [folders, setFolders] = useState<FolderType[]>([]);
-  const [notes, setNotes] = useState<NoteType[]>([]);
-  const [teamMembers, setTeamMembers] = useState<TeamMemberType[]>([]);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   
   const activeUid = currentUser?.uid || (isAuthenticated ? authUser?.id : null);
-
-  // Sagas loaders
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [loadingFolders, setLoadingFolders] = useState(true);
-  const [loadingNotes, setLoadingNotes] = useState(true);
-  const [loadingMembers, setLoadingMembers] = useState(true);
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,9 +83,6 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
   // Modal Form Inputs
   const [folderName, setFolderName] = useState('');
   const [fileName, setFileName] = useState('');
-  const [fileFolderId, setFileFolderId] = useState('');
-  const [fileSize, setFileSize] = useState('1.2 MB');
-  const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const [memberName, setMemberName] = useState('');
   const [memberEmail, setMemberEmail] = useState('');
@@ -113,27 +97,29 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
     return () => unsubscribeAuth();
   }, []);
 
-  // Sync / Read Data under users/{uid}
+  // Workspace Sync Listener
+  useEffect(() => {
+    if (!activeUid) return;
+    const unsub = subscribe(activeUid);
+    return () => unsub();
+  }, [activeUid]);
+
+  // Profile Sync Listener
   useEffect(() => {
     if (!activeUid) {
       if (!isAuthLoading) {
         setProfile(null);
         setLoadingProfile(false);
-        setLoadingFolders(false);
-        setLoadingNotes(false);
-        setLoadingMembers(false);
       }
       return;
     }
 
-    // 1. Initial Profile Setup / Sync
     const profileRef = doc(db, 'users', activeUid);
     const unsubscribeProfile = onSnapshot(profileRef, (snapshot) => {
       if (snapshot.exists()) {
         setProfile(snapshot.data() as UserProfileType);
         setLoadingProfile(false);
       } else {
-        // Initialize user record if absent
         const initialProfile: UserProfileType = {
           displayName: currentUser?.displayName || authUser?.name || 'Enterprise Member',
           email: currentUser?.email || authUser?.email || '',
@@ -142,75 +128,17 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
         };
         
         setDoc(profileRef, initialProfile)
-          .then(() => {
-            setProfile(initialProfile);
-          })
-          .catch((error) => {
-            handleFirestoreError(error, OperationType.WRITE, `users/${activeUid}`);
-          })
-          .finally(() => {
-            setLoadingProfile(false);
-          });
+          .then(() => setProfile(initialProfile))
+          .catch(err => console.error("Profile initialization error:", err))
+          .finally(() => setLoadingProfile(false));
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${activeUid}`);
+      console.error("Profile listener error:", error);
       setLoadingProfile(false);
     });
 
-    // 2. folders Sync (Unified for Folders & Files)
-    const foldersRef = collection(db, 'users', activeUid, 'folders');
-    const unsubscribeFolders = onSnapshot(foldersRef, (snapshot) => {
-      const foldersList: FolderType[] = [];
-      snapshot.forEach((d) => {
-        foldersList.push({ id: d.id, ...d.data() } as FolderType);
-      });
-      // Sort by newest
-      foldersList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setFolders(foldersList);
-      setLoadingFolders(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${activeUid}/folders`);
-      setLoadingFolders(false);
-    });
-
-    // 3. Notes Sync
-    const notesRef = collection(db, 'users', activeUid, 'notes');
-    const unsubscribeNotes = onSnapshot(notesRef, (snapshot) => {
-      const notesList: NoteType[] = [];
-      snapshot.forEach((d) => {
-        notesList.push({ id: d.id, ...d.data() } as NoteType);
-      });
-      // Sort by newest
-      notesList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setNotes(notesList);
-      setLoadingNotes(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${activeUid}/notes`);
-      setLoadingNotes(false);
-    });
-
-    // 5. Team Members Sync
-    const membersRef = collection(db, 'users', activeUid, 'teamMembers');
-    const unsubscribeMembers = onSnapshot(membersRef, (snapshot) => {
-      const membersList: TeamMemberType[] = [];
-      snapshot.forEach((d) => {
-        membersList.push({ id: d.id, ...d.data() } as TeamMemberType);
-      });
-      membersList.sort((a, b) => a.name.localeCompare(b.name));
-      setTeamMembers(membersList);
-      setLoadingMembers(false);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${activeUid}/teamMembers`);
-      setLoadingMembers(false);
-    });
-
-    return () => {
-      unsubscribeProfile();
-      unsubscribeFolders();
-      unsubscribeNotes();
-      unsubscribeMembers();
-    };
-  }, [activeUid]);
+    return () => unsubscribeProfile();
+  }, [activeUid, isAuthLoading]);
 
   // Form Submission Handlers
   const handleCreateFolder = async (e: React.FormEvent) => {
@@ -221,29 +149,12 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       return;
     }
 
-    const path = `users/${activeUid}/folders`;
     try {
-      // Close modal immediately for instant feedback
       setActiveModal(null);
-      const name = folderName.trim();
+      await addFolder(activeUid, folderName.trim());
       setFolderName('');
-
-      const docRef = await addDoc(collection(db, 'users', activeUid, 'folders'), {
-        name,
-        type: 'folder',
-        createdAt: new Date().toISOString()
-      });
-      const fullPath = `users/${activeUid}/folders/${docRef.id}`;
-      console.log(`%c[FIRESTORE_WRITE_SUCCESS]`, 'background: #000; color: #10B981; font-weight: bold; padding: 2px 4px;', {
-        type: 'folder',
-        id: docRef.id,
-        path: fullPath,
-        timestamp: new Date().toISOString()
-      });
-      setLastWrite(new Date().toLocaleTimeString());
       toast.success('Saved Successfully');
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, path);
       toast.error('Could not create folder.');
     }
   };
@@ -256,72 +167,31 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       return;
     }
 
-    const path = `users/${activeUid}/folders`; // INDEX FILE writes to folders
     try {
-      const payload = {
-        name: fileName.trim(),
-        size: fileSize.trim() || '1.0 MB',
-        createdAt: new Date().toISOString(),
-        type: 'file'
-      };
-
-      // Close modal immediately for instant feedback
       setActiveModal(null);
+      await addFile(activeUid, fileName.trim());
       setFileName('');
-      setFileSize('1.2 MB');
-
-      const docRef = await addDoc(collection(db, 'users', activeUid, 'folders'), payload);
-      const fullPath = `users/${activeUid}/folders/${docRef.id}`;
-      console.log(`%c[FIRESTORE_WRITE_SUCCESS]`, 'background: #000; color: #10B981; font-weight: bold; padding: 2px 4px;', {
-        type: 'file',
-        id: docRef.id,
-        path: fullPath,
-        timestamp: new Date().toISOString()
-      });
-      setLastWrite(new Date().toLocaleTimeString());
       toast.success('Saved Successfully');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Could not add file';
-      handleFirestoreError(err, OperationType.WRITE, path);
-      toast.error(`Error: ${errorMessage}`);
+      toast.error('Could not add file.');
     }
   };
 
   const handleCreateNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeUid) return;
-    if (!noteTitle.trim()) {
-      toast.error('Note title cannot be blank.');
+    if (!noteContent.trim()) {
+      toast.error('Note content cannot be blank.');
       return;
     }
 
-    const path = `users/${activeUid}/notes`;
     try {
-      // Close modal immediately for instant feedback
       setActiveModal(null);
-      const title = noteTitle.trim();
-      const content = noteContent.trim();
-      setNoteTitle('');
+      await addNote(activeUid, noteContent.trim());
       setNoteContent('');
-
-      const docRef = await addDoc(collection(db, 'users', activeUid, 'notes'), {
-        title,
-        content,
-        createdAt: new Date().toISOString()
-      });
-      const fullPath = `users/${activeUid}/notes/${docRef.id}`;
-      console.log(`%c[FIRESTORE_WRITE_SUCCESS]`, 'background: #000; color: #10B981; font-weight: bold; padding: 2px 4px;', {
-        type: 'note',
-        id: docRef.id,
-        path: fullPath,
-        timestamp: new Date().toISOString()
-      });
-      setLastWrite(new Date().toLocaleTimeString());
       toast.success('Saved Successfully');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Could not create note';
-      handleFirestoreError(err, OperationType.WRITE, path);
-      toast.error(`Error: ${errorMessage}`);
+      toast.error('Could not create note.');
     }
   };
 
@@ -333,36 +203,15 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       return;
     }
 
-    const path = `users/${activeUid}/teamMembers`;
     try {
-      // Close modal immediately for instant feedback
       setActiveModal(null);
-      const name = memberName.trim();
-      const email = memberEmail.trim();
-      const role = memberRole.trim() || 'Contributor';
+      await addTeamMember(activeUid, memberName.trim(), memberEmail.trim(), memberRole.trim() || 'Contributor');
       setMemberName('');
       setMemberEmail('');
       setMemberRole('Developer');
-
-      const docRef = await addDoc(collection(db, 'users', activeUid, 'teamMembers'), {
-        name,
-        email,
-        role,
-        createdAt: new Date().toISOString()
-      });
-      const fullPath = `users/${activeUid}/teamMembers/${docRef.id}`;
-      console.log(`%c[FIRESTORE_WRITE_SUCCESS]`, 'background: #000; color: #10B981; font-weight: bold; padding: 2px 4px;', {
-        type: 'member',
-        id: docRef.id,
-        path: fullPath,
-        timestamp: new Date().toISOString()
-      });
-      setLastWrite(new Date().toLocaleTimeString());
       toast.success('Saved Successfully');
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Could not save team member';
-      handleFirestoreError(err, OperationType.WRITE, path);
-      toast.error(`Error: ${errorMessage}`);
+      toast.error('Could not save team member.');
     }
   };
 
@@ -376,25 +225,20 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
     const { id, type } = deleteTarget;
     
     // Map collection name
-    const colMap: Record<string, string> = {
+    const colMap: Record<string, 'folders' | 'notes' | 'teamMembers'> = {
       folders: 'folders',
       note: 'notes',
       member: 'teamMembers'
     };
     
     const colName = colMap[type];
-    const path = `users/${activeUid}/${colName}/${id}`;
     
     try {
-      // Close immediately for snappy response
       setActiveModal(null);
-      const targetName = deleteTarget.name;
       setDeleteTarget(null);
-      
-      await deleteDoc(doc(db, 'users', activeUid, colName, id));
+      await deleteItem(activeUid, id, colName);
       toast.success('Deleted Successfully');
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, path);
       toast.error(`Failed to remove ${type}.`);
     }
   };
@@ -406,11 +250,8 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
       setActiveModal('folder');
     } else if (type === 'file') {
       setFileName(item.name);
-      setFileSize(item.size || '1.0 MB');
-      setFileFolderId(item.folderId || '');
       setActiveModal('file');
     } else if (type === 'note') {
-      setNoteTitle(item.title);
       setNoteContent(item.content || '');
       setActiveModal('note');
     } else if (type === 'member') {
@@ -428,34 +269,20 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
 
     try {
       if (type === 'folder') {
-        await updateDoc(doc(db, 'users', activeUid, 'folders', id), { name: folderName.trim() });
+        await updateFolder(activeUid, id, folderName.trim());
       } else if (type === 'file') {
-        await updateDoc(doc(db, 'users', activeUid, 'folders', id), {
-          name: fileName.trim(),
-          size: fileSize.trim(),
-          folderId: fileFolderId
-        });
+        await updateFile(activeUid, id, fileName.trim());
       } else if (type === 'note') {
-        await updateDoc(doc(db, 'users', activeUid, 'notes', id), {
-          title: noteTitle.trim(),
-          content: noteContent.trim()
-        });
+        await updateNote(activeUid, id, noteContent.trim());
       } else if (type === 'member') {
-        await updateDoc(doc(db, 'users', activeUid, 'teamMembers', id), {
-          name: memberName.trim(),
-          email: memberEmail.trim(),
-          role: memberRole.trim()
-        });
+        await updateTeamMember(activeUid, id, memberName.trim(), memberEmail.trim(), memberRole.trim());
       }
 
       toast.success('Updated Successfully');
       setActiveModal(null);
       setEditingItem(null);
-      // Reset inputs
-      setFolderName(''); setFileName(''); setFileSize('1.2 MB'); setFileFolderId('');
-      setNoteTitle(''); setNoteContent(''); setMemberName(''); setMemberEmail(''); setMemberRole('Developer');
+      setFolderName(''); setFileName(''); setNoteContent(''); setMemberName(''); setMemberEmail(''); setMemberRole('Developer');
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `users/${activeUid}/${type}/${id}`);
       toast.error('Failed to update.');
     }
   };
@@ -547,15 +374,15 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
         <div className="grid grid-cols-3 gap-3 relative z-10 shrink-0">
           <div className="bg-neutral-900 p-3 text-center border border-neutral-800 rounded-none min-w-[90px]">
             <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Files</p>
-            <p className="text-xl font-black text-orange-400">{loadingFolders ? '...' : folders.filter(f => f.type === 'file').length}</p>
+            <p className="text-xl font-black text-orange-400">{isLoading.folders ? '...' : folders.filter(f => f.type === 'file').length}</p>
           </div>
           <div className="bg-neutral-900 p-3 text-center border border-neutral-800 rounded-none min-w-[90px]">
             <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Notes</p>
-            <p className="text-xl font-black text-purple-400">{loadingNotes ? '...' : notes.length}</p>
+            <p className="text-xl font-black text-purple-400">{isLoading.notes ? '...' : notes.length}</p>
           </div>
           <div className="bg-neutral-900 p-3 text-center border border-neutral-800 rounded-none min-w-[90px]">
             <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Team</p>
-            <p className="text-xl font-black text-green-400">{loadingMembers ? '...' : teamMembers.length}</p>
+            <p className="text-xl font-black text-green-400">{isLoading.teamMembers ? '...' : teamMembers.length}</p>
           </div>
         </div>
       </div>
@@ -751,15 +578,17 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
                           <button
                             onClick={() => handleEditItem(folder, 'folder')}
-                            className="bg-neutral-50 hover:bg-neutral-100 text-neutral-400 hover:text-black p-1.5 transition-colors border border-transparent hover:border-neutral-200"
+                            className="bg-neutral-50 hover:bg-black hover:text-white text-neutral-600 px-2 py-1 transition-all flex items-center gap-1 border border-neutral-200"
                           >
-                            <PlusCircle className="w-3.5 h-3.5" />
+                            <Edit className="w-2.5 h-2.5" />
+                            <span className="text-[8px] font-black uppercase">Edit</span>
                           </button>
                           <button
                             onClick={() => triggerDeleteConfirm(folder.id, 'folders', folder.name)}
-                            className="bg-neutral-50 hover:bg-red-50 text-neutral-400 hover:text-red-500 transition-colors p-1.5 border border-transparent hover:border-red-100"
+                            className="bg-neutral-50 hover:bg-red-600 hover:text-white text-neutral-600 px-2 py-1 transition-all flex items-center gap-1 border border-neutral-200"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-2.5 h-2.5" />
+                            <span className="text-[8px] font-black uppercase">Del</span>
                           </button>
                         </div>
                       </div>
@@ -770,7 +599,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
             )}
 
             {/* Loading/Empty State Files */}
-            {loadingFolders ? (
+            {isLoading.folders ? (
               <div className="bg-white border p-12 text-center flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 animate-spin text-[#000000]" />
                 <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Loading files...</p>
@@ -809,9 +638,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                   <span className="text-[9px] font-mono text-[#888888] font-bold uppercase">{filteredFiles.length} item(s) found</span>
                 </div>
                 <div className="divide-y divide-neutral-100">
-                  {filteredFiles.map(file => {
-                    const parentFolder = folders.find(f => f.type !== 'file' && f.id === file.folderId);
-                    return (
+                      {filteredFiles.map(file => (
                       <div key={file.id} className="p-3.5 flex items-center justify-between hover:bg-neutral-50/65 transition-all">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-neutral-100 text-neutral-700 border flex items-center justify-center">
@@ -819,40 +646,27 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                           </div>
                           <div>
                             <span className="text-xs font-bold text-neutral-850 block">{file.name}</span>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              {parentFolder && (
-                                <span className="inline-flex items-center gap-0.5 text-[8.5px] uppercase font-bold text-orange-600 border border-orange-100 bg-orange-50/50 px-1.5 rounded">
-                                  <Folder className="w-2.5 h-2.5" /> {parentFolder.name}
-                                </span>
-                              )}
-                              <span className="text-[9px] text-[#888888] flex items-center gap-1 font-semibold">
-                                <Clock className="w-3 h-3" /> Indexed {new Date(file.createdAt || '').toLocaleDateString()}
-                              </span>
-                            </div>
                           </div>
                         </div>
 
                         <div className="flex items-center gap-2 text-right">
-                          <div className="mr-2">
-                            <span className="text-xs font-mono font-black text-[#000000]">{file.size}</span>
-                            <p className="text-[8px] uppercase tracking-widest text-neutral-400 font-bold text-right">Metadata Size</p>
-                          </div>
                           <button
                             onClick={() => handleEditItem(file, 'file')}
-                            className="text-neutral-400 hover:text-black p-1.5 transition-colors hover:bg-neutral-100"
+                            className="bg-neutral-50 hover:bg-black hover:text-white text-neutral-600 px-3 py-1.5 transition-all flex items-center gap-1.5 border border-neutral-200"
                           >
-                            <PlusCircle className="w-4 h-4" />
+                            <Edit className="w-3 h-3" />
+                            <span className="text-[9px] font-black uppercase tracking-wider">Edit</span>
                           </button>
                           <button
                             onClick={() => triggerDeleteConfirm(file.id, 'folders', file.name)}
-                            className="text-neutral-400 hover:text-red-500 p-1.5 transition-colors hover:bg-red-50"
+                            className="bg-neutral-50 hover:bg-red-600 hover:text-white text-neutral-600 px-3 py-1.5 transition-all flex items-center gap-1.5 border border-neutral-200"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3 h-3" />
+                            <span className="text-[9px] font-black uppercase tracking-wider">Delete</span>
                           </button>
                         </div>
                       </div>
-                    );
-                  })}
+                    ))}
                 </div>
               </div>
             )}
@@ -862,7 +676,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
         {/* ==================== 2. MY NOTES ==================== */}
         {defaultTab === 'notes' && (
           <div>
-            {loadingNotes ? (
+            {isLoading.notes ? (
               <div className="bg-white border p-12 text-center flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 animate-spin text-[#000000]" />
                 <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Loading notes...</p>
@@ -891,33 +705,33 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                 {filteredNotes.map(note => (
                   <div key={note.id} className="bg-white border p-5 flex flex-col justify-between hover:shadow-md transition-all gap-4 relative group">
                     <div className="space-y-2">
-                      <div className="flex justify-between items-start gap-2">
-                        <h4 className="text-sm font-sans font-black uppercase tracking-wide text-neutral-900 border-b pb-1 flex-1 leading-tight">{note.title}</h4>
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                          <button
-                            onClick={() => handleEditItem(note, 'note')}
-                            className="text-neutral-400 hover:text-black transition-all p-1.5 shrink-0 hover:bg-neutral-50"
-                          >
-                            <PlusCircle className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => triggerDeleteConfirm(note.id, 'note', note.title)}
-                            className="text-neutral-400 hover:text-red-500 transition-all p-1.5 shrink-0 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                      <p className="text-xs text-neutral-600 leading-relaxed whitespace-pre-wrap min-h-[60px] font-medium">
-                        {note.content || <span className="text-[#BBBBBB] italic">No description provided</span>}
+                      <p className="text-xs text-neutral-900 leading-relaxed whitespace-pre-wrap min-h-[60px] font-medium">
+                        {note.content || <span className="text-[#BBBBBB] italic">No content</span>}
                       </p>
                     </div>
 
-                    <div className="pt-3 border-t border-neutral-100 flex items-center justify-between text-[10px]">
-                      <span className="text-neutral-400 flex items-center gap-1 font-semibold">
-                        <Clock className="w-3.5 h-3.5" /> {new Date(note.createdAt).toLocaleDateString()}
-                      </span>
-                      <span className="text-[#888888] font-mono uppercase font-black tracking-wide text-[8.5px]">Firestore doc</span>
+                    <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] text-neutral-400 flex items-center gap-1 font-semibold uppercase tracking-wider">
+                          <Clock className="w-3 h-3" /> {new Date(note.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditItem(note, 'note')}
+                          className="bg-neutral-50 hover:bg-black hover:text-white text-neutral-600 px-3 py-1.5 transition-all flex items-center gap-1.5 border border-neutral-200"
+                        >
+                          <Edit className="w-3 h-3" />
+                          <span className="text-[9px] font-black uppercase tracking-wider">Edit</span>
+                        </button>
+                        <button
+                          onClick={() => triggerDeleteConfirm(note.id, 'note', 'Note')}
+                          className="bg-neutral-50 hover:bg-red-600 hover:text-white text-neutral-600 px-3 py-1.5 transition-all flex items-center gap-1.5 border border-neutral-200"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span className="text-[9px] font-black uppercase tracking-wider">Delete</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -929,7 +743,7 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
         {/* ==================== 3. TEAM MEMBERS ==================== */}
         {defaultTab === 'team-members' && (
           <div>
-            {loadingMembers ? (
+            {isLoading.teamMembers ? (
               <div className="bg-white border p-12 text-center flex flex-col items-center justify-center gap-2">
                 <Loader2 className="w-8 h-8 animate-spin text-[#000000]" />
                 <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Loading members...</p>
@@ -993,15 +807,17 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                             <div className="flex items-center justify-end gap-2">
                               <button
                                 onClick={() => handleEditItem(member, 'member')}
-                                className="text-neutral-400 hover:text-black transition-colors p-2 hover:bg-neutral-50"
+                                className="bg-neutral-50 hover:bg-black hover:text-white text-neutral-600 px-3 py-1.5 transition-all flex items-center gap-1.5 border border-neutral-200"
                               >
-                                <PlusCircle className="w-4 h-4" />
+                                <Edit className="w-3 h-3" />
+                                <span className="text-[9px] font-black uppercase tracking-wider">Edit</span>
                               </button>
                               <button
                                 onClick={() => triggerDeleteConfirm(member.id, 'member', member.name)}
-                                className="text-neutral-400 hover:text-red-500 transition-colors p-2 hover:bg-red-50"
+                                className="bg-neutral-50 hover:bg-red-600 hover:text-white text-neutral-600 px-3 py-1.5 transition-all flex items-center gap-1.5 border border-neutral-200"
                               >
-                                <Trash2 className="w-4 text-right h-4" />
+                                <Trash2 className="w-3 h-3" />
+                                <span className="text-[9px] font-black uppercase tracking-wider">Delete</span>
                               </button>
                             </div>
                           </td>
@@ -1085,41 +901,11 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-neutral-500 block">Virtual Size</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 1.2 MB"
-                    required
-                    value={fileSize}
-                    onChange={(e) => setFileSize(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-neutral-300 text-xs text-black focus:ring-1 focus:ring-black focus:outline-none bg-neutral-50 rounded-none font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-neutral-500 block">Folder Destination</label>
-                  <select
-                    value={fileFolderId}
-                    onChange={(e) => setFileFolderId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-neutral-300 text-xs text-black focus:ring-1 focus:ring-black focus:outline-none bg-neutral-50 rounded-none font-bold"
-                  >
-                    <option value="">Root Directory</option>
-                    {folders.filter(f => f.type !== 'file').map(f => (
-                      <option key={f.id} value={f.id}>{f.name.toUpperCase()}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setFileName('');
-                    setFileSize('1.2 MB');
-                    setFileFolderId('');
                     setActiveModal(null);
                   }}
                   className="px-4 py-2 text-xs font-bold text-neutral-500 hover:text-neutral-800 uppercase tracking-wider"
@@ -1147,23 +933,12 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
             </h3>
             
             <form onSubmit={editingItem ? handleUpdateItem : handleCreateNote} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-neutral-500 block">Note Title</label>
-                <input
-                  type="text"
-                  placeholder="e.g. PIXEL AD BACKUP KEY"
-                  required
-                  value={noteTitle}
-                  onChange={(e) => setNoteTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-neutral-300 text-xs text-black focus:ring-1 focus:ring-black focus:outline-none bg-neutral-50 rounded-none uppercase font-bold"
-                />
-              </div>
-
               <div className="space-y-1) ml-0.5">
                 <label className="text-[10px] font-black uppercase tracking-widest text-neutral-500 block">Detailed Content</label>
                 <textarea
                   rows={4}
-                  placeholder="Paste details, logs, credentials, or instructions..."
+                  placeholder="Paste your note content here..."
+                  required
                   value={noteContent}
                   onChange={(e) => setNoteContent(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-neutral-300 text-xs text-black focus:ring-1 focus:ring-black focus:outline-none bg-neutral-50 rounded-none font-medium h-[110px]"
@@ -1174,7 +949,6 @@ export default function FirebaseWorkspace({ defaultTab }: FirebaseWorkspaceProps
                 <button
                   type="button"
                   onClick={() => {
-                    setNoteTitle('');
                     setNoteContent('');
                     setActiveModal(null);
                   }}

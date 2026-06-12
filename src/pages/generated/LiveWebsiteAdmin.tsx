@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useWebsitesStore } from '../../store/useWebsitesStore';
 import { useProductStore } from '../../store/useProductStore';
-import { db } from '../../lib/firebase';
+import { db } from '../../lib/db';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
 export default function LiveWebsiteAdmin() {

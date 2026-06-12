@@ -1,5 +1,5 @@
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db } from '../lib/db';
 
 export interface LoginProvider {
   id: string; // e.g. 'google', 'facebook', 'email_password'
