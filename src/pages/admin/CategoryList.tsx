@@ -290,8 +290,10 @@ export default function CategoryList() {
                 <button 
                   onClick={() => {
                     if (showConfirmDelete) {
-                      deleteCategory(showConfirmDelete);
-                      setShowConfirmDelete(null);
+                      if (confirm('Are you sure you want to delete this category?')) {
+                        deleteCategory(showConfirmDelete);
+                        setShowConfirmDelete(null);
+                      }
                     }
                   }}
                   className="w-full bg-red-650 bg-red-650 bg-red-600 text-white py-3 font-black uppercase text-xs tracking-widest hover:bg-red-700 transition-colors rounded-none"

@@ -274,7 +274,7 @@ function AllOffersView() {
 
                       <button 
                         onClick={() => {
-                          if (confirm(`Are you sure you want to delete the offer "${offer.name}"?`)) {
+                          if (confirm('Are you sure you want to delete this homepage section?')) {
                             deleteOffer(offer.id);
                           }
                         }}

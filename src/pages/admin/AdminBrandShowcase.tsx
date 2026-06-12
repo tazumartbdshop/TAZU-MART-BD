@@ -227,7 +227,7 @@ export default function AdminBrandShowcase() {
                         <button
                           type="button"
                           onClick={() => {
-                            if (confirm('Permanently delete this brand showcase banner?')) {
+                            if (confirm('Are you sure you want to delete this brand?')) {
                               removeSlide(slide.id);
                               triggerToast('Showcase slide deleted.');
                             }

@@ -201,7 +201,7 @@ function AdminProductList() {
                 <button
                   type="button"
                   onClick={() => {
-                     if (confirm('Are you sure you want to permanently delete this product?')) {
+                     if (confirm('Are you sure you want to delete this product?')) {
                        deleteProduct(product.id);
                        showToast("Product deleted successfully");
                      }

@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, deleteField } from 'firebase/firestore';
 import { deleteImage } from '../lib/imageUtils';
-import { useDebugStore } from './useDebugStore';
 
 export interface Category {
   id: string;
@@ -43,37 +42,40 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   isLoaded: false,
   
   addCategory: async (payload) => {
-    const id = doc(collection(db, 'categories')).id;
-    console.log(`[Firestore Log] Preparing to save new category. Generated document ID: categories/${id}`);
-    useDebugStore.getState().setLastWrite(`categories/${id}`, 'Pending');
     try {
+      const id = doc(collection(db, 'categories')).id;
       const newCategory: Category = {
         ...payload,
         id,
         createdAt: new Date().toISOString(),
       };
-      await setDoc(doc(db, 'categories', id), newCategory);
-      console.log(`[Firestore Log] Firestore write successful for categories/${id}. Details:`, newCategory);
-      useDebugStore.getState().setLastWrite(`categories/${id}`, 'Success');
-    } catch (error: any) {
-      console.error(`[Firestore Log] Firestore write failed for categories/${id}:`, error);
-      useDebugStore.getState().setLastWrite(`categories/${id}`, 'Failed');
-      handleFirestoreError(error, OperationType.WRITE, `categories/${id}`);
+      
+      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
+      await setDoc(docRef, {
+        categoryList: {
+          [id]: newCategory
+        }
+      }, { merge: true });
+    } catch (error) {
+      console.error("Firebase setDoc error in addCategory:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'categories/WQxF5FxiMKWRLemwIVwE');
       throw error;
     }
   },
   
   updateCategory: async (id, payload) => {
-    console.log(`[Firestore Log] Preparing to update category document: categories/${id}`);
-    useDebugStore.getState().setLastWrite(`categories/${id}`, 'Pending');
     try {
-      await setDoc(doc(db, 'categories', id), payload, { merge: true });
-      console.log(`[Firestore Log] Firestore update successful for categories/${id}. Fields:`, payload);
-      useDebugStore.getState().setLastWrite(`categories/${id}`, 'Success');
-    } catch (error: any) {
-      console.error(`[Firestore Log] Firestore update failed for categories/${id}:`, error);
-      useDebugStore.getState().setLastWrite(`categories/${id}`, 'Failed');
-      handleFirestoreError(error, OperationType.WRITE, `categories/${id}`);
+      const existing = get().categories.find(c => c.id === id);
+      const mergedPayload = existing ? { ...existing, ...payload } : payload;
+      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
+      await setDoc(docRef, {
+        categoryList: {
+          [id]: mergedPayload
+        }
+      }, { merge: true });
+    } catch (error) {
+      console.error("Firebase setDoc error in updateCategory:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'categories/WQxF5FxiMKWRLemwIVwE');
       throw error;
     }
   },
@@ -99,16 +101,16 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         console.error("Failed to import imageUtils during deleteCategory:", importErr);
       }
     }
-    console.log(`[Firestore Log] Preparing to delete category document: categories/${id}`);
-    useDebugStore.getState().setLastWrite(`categories/${id}`, 'Pending');
     try {
-      await deleteDoc(doc(db, 'categories', id));
-      console.log(`[Firestore Log] Firestore delete successful for categories/${id}`);
-      useDebugStore.getState().setLastWrite(`categories/${id} (deleted)`, 'Success');
-    } catch (error: any) {
-      console.error(`[Firestore Log] Firestore delete failed for categories/${id}:`, error);
-      useDebugStore.getState().setLastWrite(`categories/${id} (delete-failed)`, 'Failed');
-      handleFirestoreError(error, OperationType.DELETE, `categories/${id}`);
+      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
+      await setDoc(docRef, {
+        categoryList: {
+          [id]: deleteField()
+        }
+      }, { merge: true });
+    } catch (error) {
+      console.error("Firebase setDoc error in deleteCategory:", error);
+      handleFirestoreError(error, OperationType.WRITE, 'categories/WQxF5FxiMKWRLemwIVwE');
       throw error;
     }
   },
@@ -116,18 +118,27 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   clearDemoData: () => set(() => ({ categories: [] })),
   
   subscribe: () => {
-    console.log("[Firestore Log] Initializing real-time subscription for collection 'categories'");
-    const unsubscribe = onSnapshot(collection(db, 'categories'), (snapshot) => {
-      const categories: Category[] = [];
-      snapshot.forEach(docSnap => {
-        categories.push({ id: docSnap.id, ...docSnap.data() } as Category);
-      });
-      categories.sort((a, b) => (Number(a.displayOrder) ?? 0) - (Number(b.displayOrder) ?? 0));
-      console.log(`[Firestore Log] Real-time read updated. Collection count: ${categories.length} categories found inside 'categories' on server.`);
-      set({ categories, isLoaded: true });
+    const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const categoryList = data.categoryList || {};
+        let categories: Category[] = [];
+        if (typeof categoryList === 'object' && !Array.isArray(categoryList)) {
+          categories = Object.entries(categoryList).map(([id, catData]: [string, any]) => ({
+            id,
+            ...catData
+          }));
+        } else if (Array.isArray(categoryList)) {
+          categories = categoryList;
+        }
+        categories.sort((a, b) => (Number(a.displayOrder) ?? 0) - (Number(b.displayOrder) ?? 0));
+        set({ categories, isLoaded: true });
+      } else {
+        set({ categories: [], isLoaded: true });
+      }
     }, (error) => {
-      console.error("[Firestore Log] Real-time subscription failed on collection 'categories':", error);
-      handleFirestoreError(error, OperationType.GET, 'categories');
+      handleFirestoreError(error, OperationType.GET, 'categories/WQxF5FxiMKWRLemwIVwE');
     });
     return unsubscribe;
   }
