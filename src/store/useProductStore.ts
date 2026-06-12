@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { deleteImage } from '../lib/imageUtils';
+import { useDebugStore } from './useDebugStore';
 
 export interface Product {
   id: string;
@@ -186,6 +187,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
   addProduct: async (payload) => {
     const id = doc(collection(db, 'products')).id;
     console.log(`[Firestore Log] Preparing to save new product. Generated document ID: products/${id}`);
+    useDebugStore.getState().setLastWrite(`products/${id}`, 'Pending');
     try {
       const keywords = generateKeywords(payload.name, payload.category, payload.brand, payload.description);
       const newProduct: Product = {
@@ -196,8 +198,10 @@ export const useProductStore = create<ProductState>((set, get) => ({
       };
       await setDoc(doc(db, 'products', id), newProduct);
       console.log(`[Firestore Log] Firestore write successful for products/${id}. Details:`, newProduct);
+      useDebugStore.getState().setLastWrite(`products/${id}`, 'Success');
     } catch (error) {
       console.error(`[Firestore Log] Firestore write failed for products/${id}:`, error);
+      useDebugStore.getState().setLastWrite(`products/${id}`, 'Failed');
       handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
       throw error;
     }
@@ -205,6 +209,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
   
   updateProduct: async (id, payload) => {
     console.log(`[Firestore Log] Preparing to update product document: products/${id}`);
+    useDebugStore.getState().setLastWrite(`products/${id}`, 'Pending');
     try {
       const currentProduct = get().products.find(p => p.id === id);
       const finalPayload = { ...payload };
@@ -224,8 +229,10 @@ export const useProductStore = create<ProductState>((set, get) => ({
       
       await setDoc(doc(db, 'products', id), finalPayload, { merge: true });
       console.log(`[Firestore Log] Firestore update successful for products/${id}. Fields:`, finalPayload);
+      useDebugStore.getState().setLastWrite(`products/${id}`, 'Success');
     } catch (error) {
       console.error(`[Firestore Log] Firestore update failed for products/${id}:`, error);
+      useDebugStore.getState().setLastWrite(`products/${id}`, 'Failed');
       handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
       throw error;
     }
@@ -233,6 +240,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
   
   deleteProduct: async (id) => {
     console.log(`[Firestore Log] Preparing to delete product document: products/${id}`);
+    useDebugStore.getState().setLastWrite(`products/${id}`, 'Pending');
     try {
       const product = get().products.find(p => p.id === id);
       if (product) {
@@ -257,8 +265,10 @@ export const useProductStore = create<ProductState>((set, get) => ({
       }
       await deleteDoc(doc(db, 'products', id));
       console.log(`[Firestore Log] Firestore delete successful for products/${id}`);
+      useDebugStore.getState().setLastWrite(`products/${id} (deleted)`, 'Success');
     } catch (error) {
       console.error(`[Firestore Log] Firestore delete failed for products/${id}:`, error);
+      useDebugStore.getState().setLastWrite(`products/${id} (delete-failed)`, 'Failed');
       handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
       throw error;
     }

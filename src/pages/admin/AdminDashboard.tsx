@@ -107,6 +107,8 @@ import AdminFlutterBanner from './AdminFlutterBanner';
 
 import { useProductStore } from '../../store/useProductStore';
 import { useBannerStore } from '../../store/useBannerStore';
+import { useCategoryStore } from '../../store/useCategoryStore';
+import { useDebugStore } from '../../store/useDebugStore';
 import MainHeroCarousel from '../../components/home/MainHeroCarousel';
 
 const salesData = [
@@ -141,6 +143,13 @@ export default function AdminDashboard() {
   const { logout, user } = useAuthStore();
   const { setUnlocked } = useModeratorStore();
   const { settings } = useSettingsStore();
+
+  const productsCount = useProductStore((state) => state.products.length);
+  const categoriesCount = useCategoryStore((state) => state.categories.length);
+  const bannersCount = useBannerStore((state) => state.banners.length);
+  const lastCreatedDocId = useDebugStore((state) => state.lastCreatedDocId);
+  const lastWriteStatus = useDebugStore((state) => state.lastWriteStatus);
+  const [isDebugExpanded, setIsDebugExpanded] = useState(true);
 
   const handleLogout = () => {
     setUnlocked(false);
@@ -451,6 +460,72 @@ export default function AdminDashboard() {
           </div>
         </div>
       </aside>
+
+      {/* PERSISTENT FLOATING ADMIN FIRESTORE DEBUGGER PANEL */}
+      <div id="admin-debug-firestore-panel" className="fixed bottom-4 right-4 z-50 font-mono text-[11px] shadow-2xl transition-all duration-300">
+        {isDebugExpanded ? (
+          <div className="bg-zinc-950 text-neutral-200 border border-zinc-800 w-80 overflow-hidden relative shadow-2xl rounded-lg text-left">
+            <div className="bg-zinc-900 px-4 py-2.5 flex items-center justify-between border-b border-zinc-800">
+              <span className="font-extrabold uppercase tracking-widest text-[#a855f7] flex items-center gap-1.5 text-[10px]">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Firestore DB Monitor
+              </span>
+              <button 
+                onClick={() => setIsDebugExpanded(false)} 
+                className="text-zinc-500 hover:text-white transition-colors text-xs p-1 cursor-pointer select-none"
+                title="Minimize Panel"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center bg-zinc-900/60 p-2 border border-zinc-800/40 rounded">
+                  <span className="text-zinc-400">Total Products:</span>
+                  <span className="text-emerald-400 font-bold font-mono">{productsCount} doc(s)</span>
+                </div>
+                <div className="flex justify-between items-center bg-zinc-900/60 p-2 border border-zinc-800/40 rounded">
+                  <span className="text-zinc-400">Total Categories:</span>
+                  <span className="text-emerald-400 font-bold font-mono">{categoriesCount} doc(s)</span>
+                </div>
+                <div className="flex justify-between items-center bg-zinc-900/60 p-2 border border-zinc-800/40 rounded">
+                  <span className="text-zinc-400">Total Banners:</span>
+                  <span className="text-emerald-400 font-bold font-mono">{bannersCount} doc(s)</span>
+                </div>
+              </div>
+
+              <div className="border-t border-zinc-800/60 pt-3.5 space-y-2">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Last Created Document ID</span>
+                  <div className="bg-zinc-900 w-full p-2 rounded border border-zinc-800 text-zinc-300 break-all select-all font-mono text-[9px] min-h-7 leading-normal">
+                    {lastCreatedDocId}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Write Result Status</span>
+                  <span className={`px-2 py-0.5 font-bold uppercase text-[9px] rounded ${
+                    lastWriteStatus === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                    lastWriteStatus === 'Pending' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 animate-pulse' :
+                    lastWriteStatus === 'Failed' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                    'bg-neutral-800 text-neutral-400 border border-neutral-700'
+                  }`}>
+                    {lastWriteStatus}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button 
+            onClick={() => setIsDebugExpanded(true)}
+            className="bg-zinc-950 text-white border border-zinc-800 hover:border-purple-400 transition-all font-mono text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 flex items-center gap-2 shadow-2xl rounded-lg cursor-pointer select-none"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+            Show DB Monitor ({productsCount + categoriesCount + bannersCount})
+          </button>
+        )}
+      </div>
 
       {/* Main Content */}
       <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden bg-[#f8f8f8]">

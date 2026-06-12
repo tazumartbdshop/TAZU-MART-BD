@@ -4,6 +4,7 @@ import { Upload, Layers, ArrowLeft, Search, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
 import { useProductStore } from '../../store/useProductStore';
+import { useDebugStore } from '../../store/useDebugStore';
 import { db } from '../../lib/firebase';
 import { doc, setDoc, deleteDoc, collection } from 'firebase/firestore';
 
@@ -111,6 +112,7 @@ export default function AdminBanners() {
     try {
       const currentBannersLength = useBannerStore.getState().banners.length;
 
+      let lastSavedId = '';
       for (const file of files) {
         if (!file.type.startsWith('image/')) {
           toast.error(`❌ ${file.name} is not an image!`);
@@ -180,6 +182,7 @@ export default function AdminBanners() {
           const downloadUrl = await uploadImage(bannerBlob, 'banners', file.name);
 
           const targetId = doc(collection(db, 'banners')).id;
+          lastSavedId = targetId;
           const currentOrder = currentBannersLength + successCount;
 
           const bannerData = {
@@ -199,6 +202,7 @@ export default function AdminBanners() {
             createdDate: new Date().toISOString()
           };
 
+          useDebugStore.getState().setLastWrite(`banners/${targetId}`, 'Pending');
           batch.set(doc(db, 'banners', targetId), bannerData);
           batch.set(doc(db, 'banners_draft', targetId), bannerData);
           successCount++;
@@ -210,7 +214,11 @@ export default function AdminBanners() {
 
       if (successCount > 0) {
         await batch.commit();
+        if (lastSavedId) {
+          useDebugStore.getState().setLastWrite(`banners/${lastSavedId}`, 'Success');
+        }
         toast.success(`🎉 ${successCount} banners published successfully!`);
+        navigate('/admin/banner/list');
       }
     } catch (err) {
       console.error(err);
