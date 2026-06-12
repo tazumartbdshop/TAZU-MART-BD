@@ -56,7 +56,10 @@ import {
   SlidersHorizontal,
   BarChart3,
   Terminal,
-  Mail
+  Mail,
+  Flame,
+  Folder,
+  FileText
 } from 'lucide-react';
 
 export interface NavSubItem {
@@ -284,6 +287,16 @@ export const defaultNavItems: NavItem[] = [
       { name: 'Theme Settings', path: '/admin/theme-settings', icon: Palette },
       { name: 'Flutter Manager', path: '/admin/flutter-manager', icon: Smartphone },
       { name: 'Automation', path: '/admin/automation', icon: Zap }
+    ]
+  },
+  {
+    name: '🔥 Firebase Workspace',
+    icon: Flame,
+    moduleId: 'settings',
+    subItems: [
+      { name: 'My Files', path: '/admin/firebase-workspace/files', icon: Folder },
+      { name: 'My Notes', path: '/admin/firebase-workspace/notes', icon: FileText },
+      { name: 'Team Members', path: '/admin/firebase-workspace/team-members', icon: Users }
     ]
   },
   {

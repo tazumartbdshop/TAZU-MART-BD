@@ -76,6 +76,7 @@ import AdminAIControlCenter from './AdminAIControlCenter';
 import AdminReviews from './AdminReviews';
 import { AdminCoinControl } from './AdminCoinControl';
 import AdminBarControl from './AdminBarControl';
+import FirebaseWorkspace from './FirebaseWorkspace';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useModeratorStore } from '../../store/useModeratorStore';
 import { useOrderStore } from '../../store/useOrderStore';
@@ -573,6 +574,13 @@ export default function AdminDashboard() {
                <Route path="/marketing/attribution" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
                <Route path="/marketing/testing" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
               <Route path="/marketing-tracking" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+              
+              {/* 🔥 Firebase Workspace Routes */}
+              <Route path="/firebase-workspace/files" element={<PermissionGate moduleId="settings"><FirebaseWorkspace defaultTab="files" /></PermissionGate>} />
+              <Route path="/firebase-workspace/notes" element={<PermissionGate moduleId="settings"><FirebaseWorkspace defaultTab="notes" /></PermissionGate>} />
+              <Route path="/firebase-workspace/team-members" element={<PermissionGate moduleId="settings"><FirebaseWorkspace defaultTab="team-members" /></PermissionGate>} />
+              <Route path="/firebase-workspace" element={<PermissionGate moduleId="settings"><FirebaseWorkspace defaultTab="files" /></PermissionGate>} />
+              
               <Route path="/infrastructure" element={<PermissionGate moduleId="settings"><AdminInfrastructure /></PermissionGate>} />
               <Route path="/infrastructure/*" element={<PermissionGate moduleId="settings"><AdminInfrastructure /></PermissionGate>} />
            </Routes>

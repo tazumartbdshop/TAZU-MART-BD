@@ -275,8 +275,6 @@ export default function Register() {
         }
       }
 
-      // Bypassed Firestore user profile record creation to satisfy "Do NOT save user profile data" and "Do NOT use Firestore yet"
-      /*
       try {
         await setDoc(doc(db, 'users', firebaseUser.uid), {
           uid: firebaseUser.uid,
@@ -298,11 +296,13 @@ export default function Register() {
           profileImage: finalProfileImage || '',
           occasionName: occasionJoined,
           specialDate: datesJoined,
-        });
+        }, { merge: true });
+        
+        // Note: Subcollections (folders, notes, teamMembers) are implicitly 
+        // ready and will start existing as soon as the user adds their first record.
       } catch (fsErr) {
         handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
       }
-      */
 
       const newCustomer = {
         id: firebaseUser.uid,

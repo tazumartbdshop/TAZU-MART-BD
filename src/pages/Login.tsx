@@ -449,10 +449,8 @@ export default function Login() {
         const area = dbUser?.area || localCust?.address?.area || '';
         const postalCode = dbUser?.postalCode || localCust?.address?.zipCode || '';
 
-        // Commented out to satisfy 'Do NOT save user profile data' / 'Do NOT use Firestore yet'
-        /*
         try {
-          setDoc(doc(db, 'users', firebaseUser.uid), {
+          await setDoc(doc(db, 'users', firebaseUser.uid), {
             uid: firebaseUser.uid,
             name,
             email,
@@ -473,7 +471,6 @@ export default function Login() {
         } catch (fsErr) {
           handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
         }
-        */
 
         useLoginHistoryStore.getState().addLoginEvent({
           name,

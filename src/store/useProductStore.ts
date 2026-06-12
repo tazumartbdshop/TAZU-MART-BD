@@ -168,14 +168,18 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const products = get().products;
     const sorted = [...products].sort((a, b) => (b.reviews || 0) * (b.rating || 0) - (a.reviews || 0) * (a.rating || 0));
     sorted.slice(0, 5).forEach(p => {
-      get().updateProduct(p.id, { is_trending: true });
+      get().updateProduct(p.id, { is_trending: true }).catch(err => {
+        console.warn(`Auto-rank trending failed for ${p.id}`, err);
+      });
     });
   },
   autoRankBestSellers: () => {
     const products = get().products;
     const sorted = [...products].sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
     sorted.slice(0, 5).forEach(p => {
-      get().updateProduct(p.id, { is_best_selling: true });
+      get().updateProduct(p.id, { is_best_selling: true }).catch(err => {
+        console.warn(`Auto-rank best sellers failed for ${p.id}`, err);
+      });
     });
   },
   clearDemoData: () => {

@@ -1,171 +1,81 @@
 {
   "entities": {
-    "Product": {
-      "title": "Product",
-      "description": "E-commerce product",
+    "User": {
+      "title": "User Profile",
+      "description": "User profile metadata",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "price": { "type": "number" },
-        "discountPrice": { "type": "number" },
-        "stock": { "type": "number" },
-        "status": { "type": "string" },
-        "categoryId": { "type": "string" },
-        "categoryName": { "type": "string" },
-        "images": { "type": "array", "items": { "type": "string" } },
-        "description": { "type": "string" },
-        "variants": { "type": "array" },
-        "seoData": { "type": "object" },
-        "reviews": { "type": "array" }
-      },
-      "required": ["id", "name"]
-    },
-    "Category": {
-      "title": "Category",
-      "description": "Product category",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "image": { "type": "string" },
-        "bannerImage": { "type": "string" },
-        "status": { "type": "string" }
-      },
-      "required": ["id", "name"]
-    },
-    "Banner": {
-      "title": "Banner",
-      "description": "Hero, categories, promo or popup banners",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "imageUrl": { "type": "string" },
-        "link": { "type": "string" },
-        "type": { "type": "string" },
-        "status": { "type": "string" }
-      },
-      "required": ["id", "title"]
-    },
-    "Order": {
-      "title": "Order",
-      "description": "Customer order",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "customerId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "total": { "type": "number" },
-        "status": { "type": "string" },
-        "items": { "type": "array" },
-        "shippingAddress": { "type": "object" },
-        "paymentMethod": { "type": "string" },
-        "createdAt": { "type": "string" }
-      },
-      "required": ["id", "customerId"]
-    },
-    "Customer": {
-      "title": "Customer",
-      "description": "Store customer",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
+        "displayName": { "type": "string" },
         "email": { "type": "string" },
-        "phone": { "type": "string" },
-        "createdAt": { "type": "string" }
+        "plan": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "name"]
+      "required": ["email", "createdAt"]
     },
-    "Coupon": {
-      "title": "Coupon",
-      "description": "Discount coupon",
+    "Folder": {
+      "title": "Indexed Item",
+      "description": "User's file folder or indexed file metadata",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "code": { "type": "string" },
-        "discount": { "type": "number" },
-        "status": { "type": "string" }
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["folder", "file"] },
+        "size": { "type": "string" },
+        "folderId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "code"]
+      "required": ["name", "createdAt"]
     },
-    "Website": {
-      "title": "Website",
-      "description": "Dynamic multi-merchant brand domain configurations",
+    "File": {
+      "title": "File",
+      "description": "User's file metadata",
       "type": "object",
       "properties": {
-        "domain": { "type": "string" },
-        "website_name": { "type": "string" },
-        "business_name": { "type": "string" },
-        "logo": { "type": "string" },
-        "banner": { "type": "string" },
-        "primary_color": { "type": "string" },
-        "admin_email": { "type": "string" },
-        "admin_password": { "type": "string" },
-        "support_number": { "type": "string" },
-        "categories": { "type": "array", "items": { "type": "string" } },
-        "theme_type": { "type": "string" },
-        "currency": { "type": "string" },
-        "address": { "type": "string" },
-        "status": { "type": "string" },
-        "createdAt": { "type": "string" }
+        "name": { "type": "string" },
+        "folderId": { "type": "string" },
+        "size": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["domain", "website_name"]
+      "required": ["name", "createdAt"]
     },
-    "WebsiteSettings": {
-      "title": "Website Settings",
-      "description": "Global website settings, including logo, favicon, about us, contact",
+    "Note": {
+      "title": "Note",
+      "description": "User's personal note",
       "type": "object",
       "properties": {
-        "logo": { "type": "string" },
-        "favicon": { "type": "string" },
-        "aboutUs": { "type": "string" },
-        "contactEmail": { "type": "string" },
-        "contactPhone": { "type": "string" },
-        "privacyPolicy": { "type": "string" },
-        "termsConditions": { "type": "string" },
-        "shippingSettings": { "type": "object" },
-        "paymentSettings": { "type": "object" },
-        "homepageSettings": { "type": "object" },
-        "footerSettings": { "type": "object" },
-        "adminSettings": { "type": "object" }
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": []
+      "required": ["title", "createdAt"]
+    },
+    "TeamMember": {
+      "title": "Team Member",
+      "description": "User's team member information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "createdAt"]
     }
   },
   "firestore": {
-    "/products/{productId}": {
-      "schema": "Product",
-      "description": "Store products"
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document"
     },
-    "/categories/{categoryId}": {
-      "schema": "Category",
-      "description": "Store categories"
+    "/users/{userId}/folders/{folderId}": {
+      "schema": "Folder",
+      "description": "Folder and File metadata collection"
     },
-    "/banners/{bannerId}": {
-      "schema": "Banner",
-      "description": "Store banners"
+    "/users/{userId}/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Notes content collection"
     },
-    "/orders/{orderId}": {
-      "schema": "Order",
-      "description": "Store orders"
-    },
-    "/customers/{customerId}": {
-      "schema": "Customer",
-      "description": "Store customers"
-    },
-    "/coupons/{couponId}": {
-      "schema": "Coupon",
-      "description": "Store coupons"
-    },
-    "/websites/{websiteId}": {
-      "schema": "Website",
-      "description": "Multi-merchant dynamic website branding configurations and domains"
-    },
-    "/settings/global": {
-      "schema": "WebsiteSettings",
-      "description": "Global website configurations"
+    "/users/{userId}/teamMembers/{memberId}": {
+      "schema": "TeamMember",
+      "description": "Team members collection"
     }
   }
 }

@@ -93,10 +93,19 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
-    // Users (Auth tracking)
+    // Users (Auth tracking & Firebase Workspace)
     match /users/{userId} {
-      allow read: if isStaff() || (isAuthenticated() && request.auth.uid == userId);
-      allow write: if isStaff() || (isAuthenticated() && request.auth.uid == userId);
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+
+      match /folders/{folderId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+      match /notes/{noteId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+      match /teamMembers/{memberId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
     }
 
     // Moderators
