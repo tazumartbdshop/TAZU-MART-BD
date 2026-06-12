@@ -261,7 +261,7 @@ export default function AddCategory() {
           console.log("Category added.");
         }
         
-        toast.success("✅ Category Saved Successfully", {
+        toast.success("Category saved successfully.", {
           position: "top-center",
           style: {
             background: "#10B981",
@@ -271,7 +271,8 @@ export default function AddCategory() {
           }
         });
         
-        navigate('/admin/category-listing');
+        const isListingPath = window.location.pathname.includes('category-listing');
+        navigate(isListingPath ? '/admin/category-listing' : '/admin/categories');
     } catch (error: any) {
         console.error("Save Category Error:", error);
         toast.error(`❌ Failed to save category: ${error.message || error}`);
@@ -287,7 +288,7 @@ export default function AddCategory() {
         <div className="flex items-center gap-3">
           <button 
             type="button" 
-            onClick={() => navigate('/admin/category-listing')} 
+            onClick={() => navigate(window.location.pathname.includes('category-listing') ? '/admin/category-listing' : '/admin/categories')} 
             className="p-2 border border-zinc-200 rounded-none bg-white hover:bg-gray-100 mr-1"
           >
             <ChevronLeft className="w-4 h-4 text-black" />

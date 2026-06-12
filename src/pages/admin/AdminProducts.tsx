@@ -598,7 +598,7 @@ function AdminProductAdd() {
           console.log("Product added.");
         }
         
-        toast.success("✅ Product Saved Successfully", {
+        toast.success("Product saved successfully.", {
           position: "top-center",
           style: {
             background: "#10B981",
@@ -608,7 +608,8 @@ function AdminProductAdd() {
           }
         });
         
-        navigate('/admin/product-listing');
+        const isListingPath = window.location.pathname.includes('product-listing');
+        navigate(isListingPath ? '/admin/product-listing' : '/admin/products');
     } catch (error: any) {
         console.error("Error saving product:", error);
         toast.error(error?.message || "❌ Failed to save product");
@@ -624,14 +625,14 @@ function AdminProductAdd() {
            <div className="flex items-center gap-3">
               <button 
                 type="button"
-                onClick={() => navigate('/admin/product-listing')}
+                onClick={() => navigate(window.location.pathname.includes('product-listing') ? '/admin/product-listing' : '/admin/products')}
                 className="p-2 border border-zinc-200 rounded-none bg-white hover:bg-gray-100 mr-1"
               >
                 <ChevronLeft className="w-4 h-4 text-black" />
               </button>
               <h3 className="text-sm font-black text-black uppercase tracking-widest">{isEditing ? 'EDIT PRODUCT' : 'ADD PRODUCT'}</h3>
            </div>
-           <button onClick={() => navigate('/admin/product-listing')} className="text-gray-400 hover:text-black bg-white border border-zinc-200 p-2 rounded-none transition-colors">
+           <button onClick={() => navigate(window.location.pathname.includes('product-listing') ? '/admin/product-listing' : '/admin/products')} className="text-gray-400 hover:text-black bg-white border border-zinc-200 p-2 rounded-none transition-colors">
              <X className="w-4 h-4" />
            </button>
         </div>
