@@ -1,4 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { getDoc, setDoc, doc } from 'firebase/firestore';
+import { db } from './firebase';
 
 // Get fallback from env if available
 const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -67,10 +69,42 @@ const supabaseProxy = new Proxy({} as SupabaseClient, {
 
 export const supabase = supabaseProxy;
 
-// Secure helper to load configuration from backend
+// Secure helper to load configuration from background cloud resources
 export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
+  // Level 1: Check if Firestore can give us the credentials directly
   try {
-    console.log("[Supabase Config] Fetching credentials from backend /api/supabase-config...");
+    console.log("[Supabase Config] Fetching credentials from persistent Firestore database (configs/supabase)...");
+    const docRef = doc(db, 'configs', 'supabase');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data.supabaseUrl && data.supabaseKey) {
+        (window as any).__supabase_url = data.supabaseUrl;
+        (window as any).__supabase_key = data.supabaseKey;
+        
+        // Update localStorage as fallback
+        const stored = localStorage.getItem('supabase_config');
+        let parsed = {};
+        if (stored) {
+          try { parsed = JSON.parse(stored); } catch(e) {}
+        }
+        localStorage.setItem('supabase_config', JSON.stringify({
+          ...parsed,
+          supabaseUrl: data.supabaseUrl,
+          supabaseKey: data.supabaseKey
+        }));
+        
+        console.log("[Supabase Config] Successfully obtained credentials from Cloud Firestore. URL:", data.supabaseUrl);
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn("[Supabase Config] Cloud Firestore lookup bypassed or empty:", err);
+  }
+
+  // Level 2: Try falling back to backend environment variables via Express server-side
+  try {
+    console.log("[Supabase Config] Fetching credentials from backend /api/supabase-config... as fallback");
     const res = await fetch('/api/supabase-config');
     if (res.ok) {
       const data = await res.json();
@@ -100,5 +134,20 @@ export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
     console.error("[Supabase Config] Error fetching credentials from server:", err);
   }
   return false;
+};
+
+// Help sync newly entered credentials directly to Firestore for future direct visitor page loads
+export const syncSupabaseConfigToFirestore = async (url: string, key: string): Promise<boolean> => {
+  try {
+    if (!url || !key) return false;
+    console.log("[Supabase Config] Syncing primary credentials to persistent Firestore...");
+    const docRef = doc(db, 'configs', 'supabase');
+    await setDoc(docRef, { supabaseUrl: url, supabaseKey: key });
+    console.log("[Supabase Config] Credentials successfully synchronized on Firebase Cloud Storage!");
+    return true;
+  } catch (err) {
+    console.error("[Supabase Config] Failed to sync credentials to Firestore:", err);
+    return false;
+  }
 };
 

@@ -39,10 +39,42 @@ async function startServer() {
   }
 
   // API Routes
-  app.get("/api/supabase-config", (req, res) => {
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+  app.get("/api/supabase-config", async (req, res) => {
+    let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    
+    // Fallback: load from local server-side JSON file if exists
+    if (!supabaseUrl || !supabaseKey) {
+      try {
+        const localPath = path.join(process.cwd(), 'supabase_config_cache.json');
+        const content = await fs.readFile(localPath, 'utf-8');
+        const parsed = JSON.parse(content);
+        if (parsed.supabaseUrl && parsed.supabaseKey) {
+          supabaseUrl = parsed.supabaseUrl;
+          supabaseKey = parsed.supabaseKey;
+          console.log("[Supabase Config Server] Loaded credentials from local JSON file.");
+        }
+      } catch (err) {
+        // file not found or corrupted, ignore
+      }
+    }
+    
     res.json({ supabaseUrl, supabaseKey });
+  });
+
+  app.post("/api/save-supabase-config", async (req, res) => {
+    try {
+      const { supabaseUrl, supabaseKey } = req.body;
+      if (supabaseUrl && supabaseKey) {
+        const localPath = path.join(process.cwd(), 'supabase_config_cache.json');
+        await fs.writeFile(localPath, JSON.stringify({ supabaseUrl, supabaseKey }, null, 2), 'utf-8');
+        console.log("[Supabase Config Server] Successfully saved credentials to server-side cache!");
+        return res.json({ status: "success" });
+      }
+    } catch (err) {
+      console.error("[Supabase Config Server] Failed to save credentials to disk:", err);
+    }
+    res.status(500).json({ status: "error", error: "Failed to persist credentials" });
   });
 
   app.get("/api/game-config", async (req, res) => {
