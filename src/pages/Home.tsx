@@ -20,6 +20,7 @@ import FlashSaleTimer from '../components/home/FlashSaleTimer';
 
 
 export default function Home() {
+  // Deployment Hash: 1718284042 (Fresh Deploy)
   const { categories, isLoaded: categoriesLoaded } = useCategoryStore();
   const { products, isLoading: productsLoading } = useProductStore();
   const { banners: storeBanners } = useBannerStore();

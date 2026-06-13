@@ -14,7 +14,7 @@ interface BestSellingSectionProps {
 
 export default function BestSellingSection({ products, isLoading }: BestSellingSectionProps) {
   const navigate = useNavigate();
-  if (!isLoading && products.length === 0) return null;
+  if (products.length === 0) return null;
 
   // Show only top 6 products in the grid
   const initialProducts = products.slice(0, 6);

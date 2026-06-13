@@ -22,7 +22,7 @@ export default function FlashSaleSection({ products, isLoading }: FlashSaleSecti
   const { addItem } = useCartStore();
   
   if (!settings.flashSaleEnabled) return null;
-  if (!isLoading && products.length === 0) return null;
+  if (products.length === 0) return null;
 
   return (
     <section id="flash-sale" className="pt-0 pb-3 bg-white border-b border-neutral-100 overflow-hidden">

@@ -12,7 +12,7 @@ interface TrendingSectionProps {
 }
 
 export default function TrendingSection({ products, isLoading }: TrendingSectionProps) {
-  if (!isLoading && products.length === 0) return null;
+  if (products.length === 0) return null;
 
   // Limit to maximum of 6 products
   const displayProducts = products.slice(0, 6);
