@@ -7,13 +7,31 @@ import { Image as ImageIcon } from 'lucide-react';
 export default function Categories() {
   const { categories } = useCategoryStore();
 
+  console.log("[Categories Page Debug] Total categories in store:", categories.length, "Items:", categories);
   const activeCategories = [...categories]
-    .filter(c => c.status === 'Active')
+    .filter(c => {
+      const statusStr = String(c.status || 'Active').toLowerCase();
+      const isActive = statusStr === 'active';
+      
+      const isVisible = (c as any).is_visible !== false && (c as any).isVisible !== false;
+      const isPublished = (c as any).published !== false;
+      
+      const keep = isActive && isVisible && isPublished;
+      if (!keep) {
+        console.log(`[Categories Page Debug] Filtering out category: "${c.name}" (ID: ${c.id}) because:`, {
+          isActive,
+          isVisible,
+          isPublished
+        });
+      }
+      return keep;
+    })
     .sort((a, b) => {
       const orderA = a.displayOrder !== undefined && a.displayOrder !== null && a.displayOrder !== 0 ? Number(a.displayOrder) : Infinity;
       const orderB = b.displayOrder !== undefined && b.displayOrder !== null && b.displayOrder !== 0 ? Number(b.displayOrder) : Infinity;
       return orderA - orderB;
     });
+  console.log("[Categories Page Debug] Rendered on categories page after filters:", activeCategories.length, "Items:", activeCategories);
 
   return (
     <div className="bg-white min-h-screen pb-32">

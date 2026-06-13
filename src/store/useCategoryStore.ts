@@ -130,17 +130,65 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   subscribe: () => {
     const supabase = getSupabase();
     if (!supabase) {
+        console.warn("[Supabase Categories Sync] Supabase client is not available or configured. Defaulting to empty array.");
         set({ isLoaded: true });
         return () => {}; // fallback
     }
 
+    const mapDbToCategory = (row: any): Category => {
+      if (!row) return row;
+      const getVal = (exactKey: string, snakeKey: string) => {
+        if (row[exactKey] !== undefined) return row[exactKey];
+        if (row[snakeKey] !== undefined) return row[snakeKey];
+        const lowerExact = exactKey.toLowerCase();
+        const lowerSnake = snakeKey.toLowerCase();
+        for (const k of Object.keys(row)) {
+          const lk = k.toLowerCase();
+          if (lk === lowerExact || lk === lowerSnake) {
+            return row[k];
+          }
+        }
+        return undefined;
+      };
+
+      return {
+        id: row.id || '',
+        name: row.name || '',
+        slug: row.slug || '',
+        bannerName: getVal('bannerName', 'banner_name') || '',
+        bannerImage: getVal('bannerImage', 'banner_image') || '',
+        bannerImages: getVal('bannerImages', 'banner_images') || (getVal('bannerImage', 'banner_image') ? [getVal('bannerImage', 'banner_image')] : []),
+        iconImage: getVal('iconImage', 'icon_image') || '',
+        wideBannerImage: getVal('wideBannerImage', 'wide_banner_image') || '',
+        buttonText: getVal('buttonText', 'button_text') || '',
+        buttonLink: getVal('buttonLink', 'button_link') || '',
+        featuredProducts: getVal('featuredProducts', 'featured_products') || '',
+        description: row.description || '',
+        displayOrder: Number(getVal('displayOrder', 'display_order') ?? 1),
+        status: getVal('status', 'status') || 'Active',
+        showOnHomepage: getVal('showOnHomepage', 'show_on_homepage') !== false,
+        createdAt: getVal('createdAt', 'created_at') || '',
+        metaTitle: getVal('metaTitle', 'meta_title') || '',
+        metaDescription: getVal('metaDescription', 'meta_description') || '',
+        keywords: getVal('keywords', 'keywords') || '',
+        isDemo: getVal('isDemo', 'is_demo') || false,
+        sliderSettings: getVal('sliderSettings', 'slider_settings') || null
+      };
+    };
+
+    console.log("[Supabase Categories Fetch] Querying from 'categories' table...");
     supabase.from('categories').select('*')
-      .order('displayOrder', { ascending: true })
       .then(({ data, error }) => {
-        if (!error && data) {
-            set({ categories: data as Category[], isLoaded: true });
+        if (error) {
+            console.error("[Supabase Categories Fetch ERROR]:", error);
+            set({ isLoaded: true });
+        } else if (data) {
+            console.log("[Supabase Categories Fetch SUCCESS] Count:", data.length, "Raw Data:", data);
+            const mappedData = data.map(mapDbToCategory).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
+            console.log("[Supabase Categories Fetch SUCCESS] Mapped & Sorted Data:", mappedData);
+            set({ categories: mappedData, isLoaded: true });
         } else {
-            if (error && error.code !== '42P01') console.error("Fetch categories error:", error);
+            console.log("[Supabase Categories Fetch] Empty table / no data returned from Supabase.");
             set({ isLoaded: true });
         }
     });
@@ -148,16 +196,20 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const channel = supabase
       .channel('public:categories:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, (payload) => {
-        supabase.from('categories').select('*').order('displayOrder', { ascending: true })
+        console.log("[Supabase Categories Sync] postgres_changes change detected:", payload);
+        supabase.from('categories').select('*')
             .then(({ data, error }) => {
                 if (!error && data) {
-                    set({ categories: data as Category[], isLoaded: true });
+                    const mappedData = data.map(mapDbToCategory).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
+                    console.log("[Supabase Categories Sync] Reloaded items count:", mappedData.length, "Loaded:", mappedData);
+                    set({ categories: mappedData, isLoaded: true });
                 }
             });
       })
       .subscribe();
       
     return () => {
+      console.log("[Supabase Categories Sync] Unsubscribing real-time channel");
       supabase.removeChannel(channel);
     };
   }

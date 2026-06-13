@@ -60,13 +60,33 @@ export default function Home() {
     b.locations && Array.isArray(b.locations) && b.locations.some(loc => typeof loc === 'string' && loc.toLowerCase() === 'under hero cta')
   );
 
+  console.log("[Home Page Categories Debug] Total categories in store:", categories.length, "Items:", categories);
   const sortedCategories = [...categories]
-    .filter(c => c.status === 'Active' && c.showOnHomepage)
+    .filter(c => {
+      const statusStr = String(c.status || 'Active').toLowerCase();
+      const isActive = statusStr === 'active';
+      
+      const showOnHome = c.showOnHomepage !== false && (c as any).show_on_homepage !== false;
+      const isVisible = (c as any).is_visible !== false && (c as any).isVisible !== false;
+      const isPublished = (c as any).published !== false;
+      
+      const keep = isActive && showOnHome && isVisible && isPublished;
+      if (!keep) {
+        console.log(`[Home Page Categories Debug] Filtering out category: "${c.name}" (ID: ${c.id}) because:`, {
+          isActive,
+          showOnHome,
+          isVisible,
+          isPublished
+        });
+      }
+      return keep;
+    })
     .sort((a, b) => {
       const orderA = a.displayOrder !== undefined && a.displayOrder !== null && a.displayOrder !== 0 ? Number(a.displayOrder) : Infinity;
       const orderB = b.displayOrder !== undefined && b.displayOrder !== null && b.displayOrder !== 0 ? Number(b.displayOrder) : Infinity;
       return orderA - orderB;
     });
+  console.log("[Home Page Categories Debug] Rendered on homepage after filters:", sortedCategories.length, "Items:", sortedCategories);
 
   const { offers } = useOfferStore();
   const activeOffers = offers.filter(o => o.status === 'Active');

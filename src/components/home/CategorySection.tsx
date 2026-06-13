@@ -15,9 +15,27 @@ const iconMap: Record<string, any> = {
 export function CategorySection() {
   const { categories } = useCategoryStore();
   
+  console.log("[CategorySection Debug] Total categories in store:", categories.length, "Items:", categories);
   const activeCategories = [...categories]
-    .filter(c => c.status === 'Active')
-    .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    .filter(c => {
+      const statusStr = String(c.status || 'Active').toLowerCase();
+      const isActive = statusStr === 'active';
+      
+      const isVisible = (c as any).is_visible !== false && (c as any).isVisible !== false;
+      const isPublished = (c as any).published !== false;
+      
+      const keep = isActive && isVisible && isPublished;
+      if (!keep) {
+        console.log(`[CategorySection Debug] Filtering out category: "${c.name}" (ID: ${c.id}) because:`, {
+          isActive,
+          isVisible,
+          isPublished
+        });
+      }
+      return keep;
+    })
+    .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
+  console.log("[CategorySection Debug] Rendered on homepage section after filters:", activeCategories.length, "Items:", activeCategories);
 
   return (
     <section className="py-20 bg-white border-b border-gray-100">
