@@ -140,27 +140,80 @@ export default function Home() {
       )}
 
       {/* 4. Redesigned Premium Category Slider */}
-      <section className="bg-white border-b border-gray-100 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative mb-3">
-        <div className="container mx-auto px-4">
-          <div 
-            className="flex scrollbar-hide scroll-smooth"
-            style={{
-              display: 'flex',
-              gap: '16px',
-              overflowX: 'auto',
-              WebkitOverflowScrolling: 'touch',
-              paddingBottom: '4px'
-            }}
-          >
-            {!categoriesLoaded && categories.length === 0 ? (
-              [1, 2, 3, 4, 5, 6].map(i => <CategorySkeleton key={i} />)
-            ) : sortedCategories.slice(0, 6).map((cat) => {
-              const catImage = cat.iconImage || cat.bannerImage;
-              return (
+      {sortedCategories.length > 0 && (
+        <section className="bg-white border-b border-gray-100 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative mb-3">
+          <div className="container mx-auto px-4">
+            <div 
+              className="flex scrollbar-hide scroll-smooth"
+              style={{
+                display: 'flex',
+                gap: '16px',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                paddingBottom: '4px'
+              }}
+            >
+              {sortedCategories.slice(0, 6).map((cat) => {
+                const catImage = cat.iconImage || cat.bannerImage;
+                return (
+                  <Link
+                    key={cat.id}
+                    to={`/category/${cat.id}`}
+                    className="relative shrink-0 group transition-all duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer block select-none"
+                    style={{
+                      width: '110px',
+                      height: '150px',
+                      borderRadius: '18px',
+                      overflow: 'hidden'
+                    }}
+                    draggable={false}
+                  >
+                    <div className="w-full h-full relative bg-gray-100">
+                      {catImage ? (
+                        <img
+                          src={catImage}
+                          alt={cat.name}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                          draggable={false}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
+                          <ImageIcon className="w-6 h-6 mb-1" />
+                          <span className="text-[8px] font-bold">NO IMAGE</span>
+                        </div>
+                      )}
+                      
+                      {/* Bottom Black Transparent Overlay */}
+                      <div 
+                        className="absolute inset-x-0 bottom-0 py-2 cursor-pointer flex items-center justify-center text-center"
+                        style={{
+                          background: 'rgba(0,0,0,0.55)',
+                          height: '42px'
+                        }}
+                      >
+                        {/* Bold Uppercase Category Name in white */}
+                        <span 
+                          className="text-[10px] tracking-wider text-center line-clamp-2 px-1"
+                          style={{
+                            color: '#ffffff',
+                            fontWeight: 700,
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          {cat.name}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+
+              {sortedCategories.length > 6 && (
                 <Link
-                  key={cat.id}
-                  to={`/category/${cat.id}`}
-                  className="relative shrink-0 group transition-all duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer block select-none"
+                  key="view-all-cats"
+                  to="/categories"
+                  className="relative shrink-0 group transition-all duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-neutral-300 hover:border-black bg-neutral-50"
                   style={{
                     width: '110px',
                     height: '150px',
@@ -169,72 +222,19 @@ export default function Home() {
                   }}
                   draggable={false}
                 >
-                  <div className="w-full h-full relative bg-gray-100">
-                    {catImage ? (
-                      <img
-                        src={catImage}
-                        alt={cat.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        referrerPolicy="no-referrer"
-                        draggable={false}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                        <ImageIcon className="w-6 h-6 mb-1" />
-                        <span className="text-[8px] font-bold">NO IMAGE</span>
-                      </div>
-                    )}
-                    
-                    {/* Bottom Black Transparent Overlay */}
-                    <div 
-                      className="absolute inset-x-0 bottom-0 py-2 cursor-pointer flex items-center justify-center text-center"
-                      style={{
-                        background: 'rgba(0,0,0,0.55)',
-                        height: '42px'
-                      }}
-                    >
-                      {/* Bold Uppercase Category Name in white */}
-                      <span 
-                        className="text-[10px] tracking-wider text-center line-clamp-2 px-1"
-                        style={{
-                          color: '#ffffff',
-                          fontWeight: 700,
-                          textTransform: 'uppercase'
-                        }}
-                      >
-                        {cat.name}
-                      </span>
+                  <div className="flex flex-col items-center justify-center p-3 text-center">
+                    <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center mb-1.5 shadow-md">
+                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-900 leading-tight">View All</span>
+                    <span className="text-[7.5px] text-neutral-400 font-bold mt-1 uppercase tracking-wider">{sortedCategories.length} Categories</span>
                   </div>
                 </Link>
-              );
-            })}
-
-            {sortedCategories.length > 6 && (
-              <Link
-                key="view-all-cats"
-                to="/categories"
-                className="relative shrink-0 group transition-all duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-neutral-300 hover:border-black bg-neutral-50"
-                style={{
-                  width: '110px',
-                  height: '150px',
-                  borderRadius: '18px',
-                  overflow: 'hidden'
-                }}
-                draggable={false}
-              >
-                <div className="flex flex-col items-center justify-center p-3 text-center">
-                  <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center mb-1.5 shadow-md">
-                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-neutral-900 leading-tight">View All</span>
-                  <span className="text-[7.5px] text-neutral-400 font-bold mt-1 uppercase tracking-wider">{sortedCategories.length} Categories</span>
-                </div>
-              </Link>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 5. Modern Integrated Offer Sections */}
       <FlashSaleSection products={flashSaleProducts} isLoading={productsLoading} />
