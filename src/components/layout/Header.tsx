@@ -27,6 +27,7 @@ export function Header() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isBangla, setIsBangla] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const cartCount = useCartStore((state) => state.getCartCount());
   const wishlistCount = useWishlistStore((state) => state.wishlistIds.length);
   const { categories } = useCategoryStore();
@@ -34,6 +35,13 @@ export function Header() {
   const { settings } = useSettingsStore();
 
   const { data: siteData, fetchSettings } = useSiteManagementStore();
+
+  useEffect(() => {
+    // Fetch latest logo URL directly from Supabase Database sites_settings
+    useSettingsStore.getState().fetchLatestLogo().catch(err => {
+      console.warn("Header mount logo fetch error:", err);
+    });
+  }, []);
 
   useEffect(() => {
     setIsSearchDrawerOpen(false);
@@ -110,8 +118,8 @@ export function Header() {
 
             <Link to="/" className="flex items-center gap-1.5 shrink-0">
               <div className="w-7.5 h-7.5 md:w-8.5 md:h-8.5 bg-theme-secondary rounded flex items-center justify-center text-theme-bg font-sans font-black text-base md:text-lg overflow-hidden shrink-0">
-                 {settings.storeLogo ? (
-                   <img src={settings.storeLogo || null} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                 {settings.storeLogo && !logoError ? (
+                   <img src={settings.storeLogo || undefined} onError={() => setLogoError(true)} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                  ) : (
                    'T'
                  )}
@@ -189,8 +197,14 @@ export function Header() {
               <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
                 <Link to="/" className="flex items-center gap-1.5" onClick={() => setIsMobileMenuOpen(false)}>
                   <div className="w-9 h-9 bg-neutral-950 rounded flex items-center justify-center text-white font-black text-xl overflow-hidden">
-                    {settings.storeLogo ? (
-                      <img src={settings.storeLogo || null} alt="Logo" className="w-full h-full object-contain transition-all duration-300" referrerPolicy="no-referrer" />
+                    {settings.storeLogo && !logoError ? (
+                      <img 
+                        src={settings.storeLogo} 
+                        alt="Logo" 
+                        className="w-full h-full object-contain transition-all duration-300" 
+                        referrerPolicy="no-referrer" 
+                        onError={() => setLogoError(true)}
+                      />
                     ) : (
                       'T'
                     )}

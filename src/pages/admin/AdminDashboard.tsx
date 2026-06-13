@@ -142,6 +142,7 @@ interface NavItem {
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [logoError, setLogoError] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { logout, user } = useAuthStore();
@@ -483,8 +484,8 @@ export default function AdminDashboard() {
                <p className="text-xs text-[#666666]">Main Administrator</p>
             </div>
             <div className="w-10 h-10 rounded-none bg-[#000000] border-2 border-white shadow-md flex items-center justify-center text-white font-bold overflow-hidden">
-               {settings.storeLogo ? (
-                 <img src={settings.storeLogo} alt="Logo" className="w-full h-full object-contain transition-all duration-300" referrerPolicy="no-referrer" />
+               {settings.storeLogo && !logoError ? (
+                 <img src={settings.storeLogo} onError={() => setLogoError(true)} alt="Logo" className="w-full h-full object-contain transition-all duration-300" referrerPolicy="no-referrer" />
                ) : (
                  "A"
                )}

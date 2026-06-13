@@ -420,12 +420,97 @@ interface SettingsState {
   publishSettings: () => Promise<void>;
   resetDraftSettings: () => void;
   subscribe: () => () => void;
+  fetchLatestLogo: () => Promise<string | null>;
 }
+
+// Robust helper to write logo to site_settings with fallback schemas
+const saveLogoToSiteSettings = async (logoUrl: string) => {
+  const supabase = getSupabase();
+  if (!supabase || !logoUrl) return;
+
+  console.log("Upserting logo to site_settings table:", logoUrl);
+  const cleanUrl = logoUrl.split('?')[0];
+
+  try {
+    // Attempt 1: ID-column oriented row
+    const { error: err1 } = await supabase.from('site_settings').upsert([{ 
+      id: 'logo', 
+      logo_url: cleanUrl, 
+      logo: cleanUrl,
+      url: cleanUrl,
+      value: cleanUrl,
+      updated_at: new Date().toISOString()
+    }]);
+    
+    if (err1) {
+      console.warn("site_settings upsert format 1 failed, trying format 2...", err1.message);
+      // Attempt 2: Key-value oriented row
+      const { error: err2 } = await supabase.from('site_settings').upsert([{ 
+        key: 'logo_url', 
+        value: cleanUrl,
+        logo_url: cleanUrl,
+        updated_at: new Date().toISOString()
+      }]);
+      
+      if (err2) {
+        console.warn("site_settings upsert format 2 failed, trying format 3...", err2.message);
+        // Attempt 3: Key-value alternative row
+        await supabase.from('site_settings').upsert([{ 
+          key: 'logo', 
+          value: cleanUrl, 
+          updated_at: new Date().toISOString() 
+        }]);
+      }
+    }
+  } catch (e) {
+    console.warn("site_settings upsert caught error:", e);
+  }
+};
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: defaultSettings,
   draftSettings: defaultSettings,
   isLoaded: false,
+  fetchLatestLogo: async () => {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.from('site_settings').select('*');
+      if (error) {
+        console.warn("Could not query 'site_settings' table (may not exist or is loading):", error.message);
+        return null;
+      }
+      
+      if (data && data.length > 0) {
+        let foundUrl = '';
+        const keysToSearch = ['logo_url', 'value', 'url', 'storeLogo', 'logo'];
+        for (const row of data) {
+          for (const k of keysToSearch) {
+            if (row[k] && typeof row[k] === 'string' && row[k].startsWith('http')) {
+              foundUrl = row[k];
+              break;
+            }
+          }
+          if (foundUrl) break;
+        }
+
+        if (foundUrl) {
+          const cleanUrl = foundUrl.split('?')[0];
+          // Cache bust URL by appending current timestamp
+          const bustedUrl = `${cleanUrl}?t=${Date.now()}`;
+          
+          set((state) => ({
+            settings: { ...state.settings, storeLogo: bustedUrl },
+            draftSettings: { ...state.draftSettings, storeLogo: bustedUrl }
+          }));
+          return bustedUrl;
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching logo from site_settings:", err);
+    }
+    return null;
+  },
   updateSettings: async (updates) => {
     const newSettings = { ...get().settings, ...updates };
     set({ settings: newSettings });
@@ -443,6 +528,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Assume document structure with id 'global'
         const { error } = await supabase.from('settings').upsert([{ id: 'global', ...newSettings }]);
         if (error && error.code !== '42P01') console.error("Supabase settings update fail", error);
+        
+        // Also save to specialized site_settings table if storeLogo is updated
+        if (updates.storeLogo) {
+          await saveLogoToSiteSettings(updates.storeLogo);
+        }
     }
   },
   updateDraftSettings: (updates) => {
@@ -455,6 +545,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (supabase) {
           const { error } = await supabase.from('settings').upsert([{ id: 'global', ...draft }]);
           if (error && error.code !== '42P01') throw error;
+          
+          // Also save to specialized site_settings table if storeLogo exists in draft
+          if (draft.storeLogo) {
+            await saveLogoToSiteSettings(draft.storeLogo);
+          }
       }
       set({ settings: draft });
       console.log("Settings published to Supabase");
@@ -473,6 +568,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         return () => {};
     }
     
+    // Load setting collections
     supabase.from('settings').select('*').eq('id', 'global').limit(1).then(({ data, error }) => {
         if (!error && data && data.length > 0) {
             const mergedSettings = { ...defaultSettings, ...data[0] };
@@ -482,6 +578,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             supabase.from('settings').upsert([{ id: 'global', ...defaultSettings }]).then(({error}) => error && console.warn(error));
             set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
         }
+        
+        // Always load latest logo from site_settings immediately on page initialization
+        get().fetchLatestLogo();
     });
 
     const channel = supabase
@@ -495,9 +594,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         });
       })
       .subscribe();
+
+    // Setup listener on specialized site_settings table as well
+    const channelLogo = supabase
+      .channel('public:site_settings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, (payload) => {
+        console.log("Real-time site_settings update received!");
+        get().fetchLatestLogo();
+      })
+      .subscribe();
       
     return () => {
         supabase.removeChannel(channel);
+        supabase.removeChannel(channelLogo);
     }
   }
 }));
