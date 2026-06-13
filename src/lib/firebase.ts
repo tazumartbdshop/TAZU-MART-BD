@@ -38,21 +38,15 @@ const windowConfig = typeof window !== 'undefined' ? ((window as any).__FIREBASE
 const storageConfigStr = typeof window !== 'undefined' ? localStorage.getItem('__FIREBASE_CONFIG_OVERRIDE__') : null;
 const storageConfig = storageConfigStr ? JSON.parse(storageConfigStr) : {};
 
-const isLiveDomain = typeof window !== 'undefined' && (
-  window.location.hostname === 'tazumartbd.com' || 
-  window.location.hostname === 'www.tazumartbd.com' ||
-  window.location.hostname.endsWith('.tazumartbd.com')
-);
-
-const finalProjectId = storageConfig.projectId || windowConfig.projectId || envConfig.projectId || (isLiveDomain ? "tazu-mart-bd-dfcda" : firebaseConfig.projectId);
+const finalProjectId = storageConfig.projectId || windowConfig.projectId || envConfig.projectId || firebaseConfig.projectId;
 
 const finalConfig = {
   apiKey: storageConfig.apiKey || windowConfig.apiKey || envConfig.apiKey || firebaseConfig.apiKey,
   // Ensure authDomain is exactly <project-id>.firebaseapp.com if using custom auth configs
-  authDomain: storageConfig.authDomain || windowConfig.authDomain || envConfig.authDomain || (isLiveDomain ? "tazu-mart-bd-dfcda.firebaseapp.com" : (finalProjectId ? `${finalProjectId}.firebaseapp.com` : firebaseConfig.authDomain)),
+  authDomain: storageConfig.authDomain || windowConfig.authDomain || envConfig.authDomain || (finalProjectId ? `${finalProjectId}.firebaseapp.com` : firebaseConfig.authDomain),
   projectId: finalProjectId,
   appId: storageConfig.appId || windowConfig.appId || envConfig.appId || firebaseConfig.appId,
-  storageBucket: storageConfig.storageBucket || windowConfig.storageBucket || envConfig.storageBucket || (isLiveDomain ? "tazu-mart-bd-dfcda.firebasestorage.app" : firebaseConfig.storageBucket),
+  storageBucket: storageConfig.storageBucket || windowConfig.storageBucket || envConfig.storageBucket || (finalProjectId ? `${finalProjectId}.firebasestorage.app` : firebaseConfig.storageBucket),
   messagingSenderId: storageConfig.messagingSenderId || windowConfig.messagingSenderId || envConfig.messagingSenderId || firebaseConfig.messagingSenderId,
   firestoreDatabaseId: (storageConfig.firestoreDatabaseId && storageConfig.firestoreDatabaseId !== "default") || 
                        (windowConfig.firestoreDatabaseId && windowConfig.firestoreDatabaseId !== "default") || 

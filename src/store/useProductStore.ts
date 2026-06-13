@@ -162,7 +162,7 @@ export function generateKeywords(name: string, category: string, brand?: string,
 
 export const useProductStore = create<ProductState>((set, get) => ({
   products: [],
-  isLoading: false,
+  isLoading: true,
   autoRankTrending: () => {
     const products = get().products;
     const sorted = [...products].sort((a, b) => (b.reviews || 0) * (b.rating || 0) - (a.reviews || 0) * (a.rating || 0));
@@ -302,9 +302,12 @@ export const useProductStore = create<ProductState>((set, get) => ({
     // Initial fetch
     supabase.from('products').select('*').then(({ data, error }) => {
         if (!error && data) {
-            set({ products: data as Product[] });
+            set({ products: data as Product[], isLoading: false });
         } else if (error && error.code !== '42P01') {
             console.error("Failed to fetch products:", error);
+            set({ isLoading: false });
+        } else {
+            set({ isLoading: false });
         }
     });
 
@@ -314,7 +317,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
         // Simple reload strategy on any change
         supabase.from('products').select('*').then(({ data, error }) => {
             if (!error && data) {
-                set({ products: data as Product[] });
+                set({ products: data as Product[], isLoading: false });
             }
         });
       })

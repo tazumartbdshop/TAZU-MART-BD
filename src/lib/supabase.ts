@@ -13,10 +13,25 @@ let cachedKey = '';
 // Always create a dynamic getter so we can use the latest creds
 export const getSupabase = (): SupabaseClient | null => {
   const localSettings = localStorage.getItem('supabase_config');
-  let url = (window as any).__supabase_url || envUrl;
-  let key = (window as any).__supabase_key || envKey;
+  const windowConfig = (window as any).__SUPABASE_CONFIG__ || {};
   
-  if (localSettings) {
+  let url = (window as any).__supabase_url || windowConfig.supabaseUrl || envUrl;
+  let key = (window as any).__supabase_key || windowConfig.supabaseKey || envKey;
+  
+  if (typeof window !== 'undefined') {
+    // Only log once or twice to avoid console spam
+    if (!(window as any).__sb_logged) {
+        console.log("[Supabase DEBUG] Configuration state:", {
+            hasUrl: !!url,
+            hasKey: !!key,
+            sourceUrl: (window as any).__supabase_url ? 'global' : (windowConfig.supabaseUrl ? 'injected' : (envUrl ? 'env' : 'none')),
+            hostname: window.location.hostname
+        });
+        (window as any).__sb_logged = true;
+    }
+  }
+
+  if (localSettings && (!url || !key)) {
     try {
       const parsed = JSON.parse(localSettings);
       if (parsed.supabaseUrl && parsed.supabaseKey) {

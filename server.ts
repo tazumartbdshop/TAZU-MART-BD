@@ -615,7 +615,7 @@ Please ask me your query or select a quick question template below!`;
         const indexPath = path.join(distPath, 'index.html');
         let html = await fs.readFile(indexPath, 'utf-8');
 
-        // Capture production container's real environmental variables
+        // Capture production container's real environmental variables for Firebase
         const runtimeConfig = {
           apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || null,
           authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || null,
@@ -626,7 +626,31 @@ Please ask me your query or select a quick question template below!`;
           firestoreDatabaseId: (process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID && process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID !== "default") ? process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID : null
         };
 
-        const configScript = `<script>window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};</script>`;
+        // Also capture Supabase credentials for production synchronization
+        let supUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || null;
+        let supKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || null;
+
+        // Fallback to local server cache for Supabase if ENVs are missing
+        if (!supUrl || !supKey) {
+            try {
+                const localPath = path.join(process.cwd(), 'supabase_config_cache.json');
+                const content = await fs.readFile(localPath, 'utf-8');
+                const parsed = JSON.parse(content);
+                if (parsed.supabaseUrl && parsed.supabaseKey) {
+                    supUrl = parsed.supabaseUrl;
+                    supKey = parsed.supabaseKey;
+                }
+            } catch (e) {}
+        }
+
+        const supabaseConfig = { supabaseUrl: supUrl, supabaseKey: supKey };
+
+        const configScript = `
+    <script>
+      window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};
+      window.__SUPABASE_CONFIG__ = ${JSON.stringify(supabaseConfig)};
+    </script>`;
+
         // Inject runtime variables synchronously before main bundle imports run
         html = html.replace('<head>', `<head>\n    ${configScript}`);
         res.send(html);
