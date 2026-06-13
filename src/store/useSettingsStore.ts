@@ -517,9 +517,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     
     // Save supabase creds to localStorage immediately just in case
     if (updates.supabaseUrl !== undefined || updates.supabaseKey !== undefined) {
-      const localStore = JSON.parse(localStorage.getItem('supabase_config') || '{}');
-      if (updates.supabaseUrl) localStore.supabaseUrl = updates.supabaseUrl;
-      if (updates.supabaseKey) localStore.supabaseKey = updates.supabaseKey;
+      const localStore = {
+        supabaseUrl: updates.supabaseUrl || get().settings.supabaseUrl,
+        supabaseKey: updates.supabaseKey || get().settings.supabaseKey
+      };
       localStorage.setItem('supabase_config', JSON.stringify(localStore));
     }
     
@@ -541,6 +542,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   publishSettings: async () => {
     try {
       const draft = get().draftSettings;
+      
+      // Also ensure Supabase config in draft is persisted to localStorage for client fallback
+      if (draft.supabaseUrl || draft.supabaseKey) {
+        localStorage.setItem('supabase_config', JSON.stringify({
+          supabaseUrl: draft.supabaseUrl,
+          supabaseKey: draft.supabaseKey
+        }));
+      }
+
       const supabase = getSupabase();
       if (supabase) {
           const { error } = await supabase.from('settings').upsert([{ id: 'global', ...draft }]);

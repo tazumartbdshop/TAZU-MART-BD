@@ -594,7 +594,27 @@ Please ask me your query or select a quick question template below!`;
           firestoreDatabaseId: (process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID && process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID !== "default") ? process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID : null
         };
 
-        const configScript = `<script>window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};</script>`;
+  // Also capture Supabase credentials for production synchronization
+        const sbConfig = {
+          supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || null,
+          supabaseKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || null,
+        };
+
+        if (!sbConfig.supabaseUrl || !sbConfig.supabaseKey) {
+          console.warn("[PRODUCTION] WARNING: Supabase credentials (VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY) are missing in environment variables. Falling back to build-time values.");
+        } else {
+          console.log(`[PRODUCTION] Injecting Supabase credentials targeting: ${sbConfig.supabaseUrl}`);
+        }
+
+        const configScript = `
+          <script>
+            window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};
+            window.__SUPABASE_URL = ${JSON.stringify(sbConfig.supabaseUrl)};
+            window.__SUPABASE_KEY = ${JSON.stringify(sbConfig.supabaseKey)};
+            // Legacy/Fallback aliases
+            window.__supabase_url = window.__SUPABASE_URL;
+            window.__supabase_key = window.__SUPABASE_KEY;
+          </script>`;
         // Inject runtime variables synchronously before main bundle imports run
         html = html.replace('<head>', `<head>\n    ${configScript}`);
         res.send(html);

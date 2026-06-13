@@ -10,21 +10,43 @@ let cachedKey = '';
 
 // Always create a dynamic getter so we can use the latest creds
 export const getSupabase = (): SupabaseClient | null => {
-  const localSettings = localStorage.getItem('supabase_config');
-  let url = (window as any).__supabase_url || envUrl;
-  let key = (window as any).__supabase_key || envKey;
+  // Priority order for credentials:
+  // 1. Primary window variables (Injected via server.ts synchronously into <head>)
+  // 2. Legacy window variables (Lower-case aliases)
+  // 3. LocalStorage persistence (User-set via Admin UI)
+  // 4. Build-time environment variables (VITE_SUPABASE_URL)
   
-  if (localSettings) {
+  let url = (window as any).__SUPABASE_URL || (window as any).__supabase_url;
+  let key = (window as any).__SUPABASE_KEY || (window as any).__supabase_key;
+  
+  // Try localStorage if window vars are missing (persisted from Admin UI)
+  if (!url || !key) {
     try {
-      const parsed = JSON.parse(localSettings);
-      if (parsed.supabaseUrl && parsed.supabaseKey) {
-        if (!(window as any).__supabase_url) url = parsed.supabaseUrl;
-        if (!(window as any).__supabase_key) key = parsed.supabaseKey;
+      const persisted = localStorage.getItem('supabase_config');
+      if (persisted) {
+        const parsed = JSON.parse(persisted);
+        if (parsed.supabaseUrl && parsed.supabaseKey) {
+          url = parsed.supabaseUrl;
+          key = parsed.supabaseKey;
+          console.debug("[Supabase Lib] Using credentials from localStorage fallback.");
+        }
       }
-    } catch(e) {}
+    } catch (e) {
+      // Ignored
+    }
+  }
+
+  // Final fallback to build-time env vars
+  if (!url || !key) {
+    url = envUrl;
+    key = envKey;
+    if (url && key) {
+      console.debug("[Supabase Lib] Using build-time environment variables (envUrl).");
+    }
   }
   
   if (!url || !key) {
+    console.warn("[Supabase Lib] No credentials found. Supabase services will be disabled.");
     return null; // Not configured
   }
   
@@ -33,6 +55,7 @@ export const getSupabase = (): SupabaseClient | null => {
   }
   
   try {
+    console.log(`[Supabase Lib] Initializing new client with URL: ${url}`);
     cachedClient = createClient(url, key, {
       auth: {
         persistSession: true,
@@ -42,7 +65,7 @@ export const getSupabase = (): SupabaseClient | null => {
     cachedUrl = url;
     cachedKey = key;
   } catch (err) {
-    console.error("Failed to create Supabase client:", err);
+    console.error("[Supabase Lib] Failed to create Supabase client:", err);
     return null;
   }
   
@@ -70,36 +93,35 @@ export const supabase = supabaseProxy;
 // Secure helper to load configuration from backend
 export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
   try {
-    console.log("[Supabase Config] Fetching credentials from backend /api/supabase-config...");
-    const res = await fetch('/api/supabase-config');
+    // If already have window vars from HTML injection, no need to fetch again
+    if (((window as any).__SUPABASE_URL && (window as any).__SUPABASE_KEY) || 
+        ((window as any).__supabase_url && (window as any).__supabase_key)) {
+      console.log("[Supabase Config] Using credentials already present in window/head.");
+      return true;
+    }
+
+    console.log("[Supabase Config] No pre-injected variables found. Fetching from /api/supabase-config (cache: no-store)...");
+    const res = await fetch('/api/supabase-config', { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (data.supabaseUrl && data.supabaseKey) {
         (window as any).__supabase_url = data.supabaseUrl;
         (window as any).__supabase_key = data.supabaseKey;
         
-        // Update localStorage as fallback
-        const stored = localStorage.getItem('supabase_config');
-        let parsed = {};
-        if (stored) {
-          try { parsed = JSON.parse(stored); } catch(e) {}
-        }
-        localStorage.setItem('supabase_config', JSON.stringify({
-          ...parsed,
-          supabaseUrl: data.supabaseUrl,
-          supabaseKey: data.supabaseKey
-        }));
+        // Also update the __SUPABASE_URL/KEY aliases just in case
+        (window as any).__SUPABASE_URL = data.supabaseUrl;
+        (window as any).__SUPABASE_KEY = data.supabaseKey;
         
-        console.log("[Supabase Config] Successfully obtained credentials from server.");
+        console.log("[Supabase Config] Successfully obtained credentials from server API.");
         return true;
       } else {
-        console.warn("[Supabase Config] Server returned empty credentials. Keeping existing settings.");
+        console.warn("[Supabase Config] Server API returned empty credentials. Falling back to build defaults.");
       }
     } else {
-      console.warn("[Supabase Config] /api/supabase-config endpoint returned status:", res.status);
+      console.warn("[Supabase Config] Server API fetch failed with status:", res.status);
     }
   } catch (err) {
-    console.error("[Supabase Config] Error fetching credentials from server:", err);
+    console.error("[Supabase Config] Network error while fetching config:", err);
   }
   return false;
 };
