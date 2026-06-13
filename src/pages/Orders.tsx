@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Search, Package, MapPin, Truck, Phone, User, Calendar, CreditCard, CheckCircle2, Clock, AlertCircle, FileText, ChevronRight, Hash, Eye, ArrowLeft } from 'lucide-react';
-import { orders as mockOrders } from '../data/mockData';
 import { formatPrice, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useOrderStore } from '../store/useOrderStore';
@@ -70,8 +69,7 @@ export default function Orders() {
 
   // Merge dynamic state order and our initial mock orders
   const getMergedOrders = () => {
-    const dynamicMapped = storeOrders.map(mapDynamicOrder);
-    return [...dynamicMapped, ...mockOrders];
+    return storeOrders.map(mapDynamicOrder);
   };
 
   const handleTrack = (e: React.FormEvent) => {

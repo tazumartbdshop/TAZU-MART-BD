@@ -383,7 +383,15 @@ export default function AdminThemeSettings() {
 // --- Custom Preview Panels (Keep only needed ones) ---
 
 function ButtonPanelPreview({ theme }: { theme: ThemeConfig }) {
-  const sampleProduct = mockProducts[0];
+  const sampleProduct = mockProducts[0] || {
+    id: 'placeholder',
+    name: 'Theme Preview Product',
+    price: 1000,
+    discountPrice: 800,
+    image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&q=80&w=200',
+    rating: 4.5,
+    category: 'Perfume'
+  };
   
   return (
     <div className="p-12 space-y-12 min-h-full bg-theme-bg">
