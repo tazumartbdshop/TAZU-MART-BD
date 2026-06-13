@@ -3,6 +3,24 @@ import path from "path";
 import fs from "fs/promises";
 import { createServer as createViteServer } from "vite";
 import { createClient } from '@supabase/supabase-js';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+
+// Initialize Firebase Admin for persistent config retrieval
+// Use a more resilient check for app initialization
+let firestore: any;
+try {
+  const apps = getApps();
+  if (apps.length === 0) {
+    initializeApp();
+    console.log("Firebase Admin initialized on server side");
+  } else {
+    console.log(`Firebase Admin already initialized with ${apps.length} apps`);
+  }
+  firestore = getFirestore();
+} catch (e) {
+  console.warn("Firebase Admin failed init or was already initialized:", e);
+}
 
 const CONFIG_FILE = path.join(process.cwd(), 'game_config.json');
 
@@ -43,6 +61,23 @@ async function startServer() {
     let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
     let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
     
+    // Check Firestore (Universal Cloud Cache)
+    if ((!supabaseUrl || !supabaseKey) && firestore) {
+        try {
+            const docSnap = await firestore.collection('configs').doc('supabase').get();
+            if (docSnap.exists) {
+                const data = docSnap.data();
+                if (data?.supabaseUrl && data?.supabaseKey) {
+                    supabaseUrl = data.supabaseUrl;
+                    supabaseKey = data.supabaseKey;
+                    console.log("[Supabase API Proxy] Provided credentials from persistent Cloud Firestore.");
+                }
+            }
+        } catch (e) {
+            console.warn("[Supabase API Proxy] Firestore fetch failed during API request:", e);
+        }
+    }
+
     // Fallback: load from local server-side JSON file if exists
     if (!supabaseUrl || !supabaseKey) {
       try {
@@ -629,8 +664,26 @@ Please ask me your query or select a quick question template below!`;
         // Also capture Supabase credentials for production synchronization
         let supUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || null;
         let supKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || null;
+        
+        // CRITICAL: Fetch from Cloud Firestore (Source of Truth) if environment is missing
+        if ((!supUrl || !supKey) && firestore) {
+            try {
+                console.log("[Supabase Server Proxy] Fetching credentials from persistent Cloud Firestore...");
+                const docSnap = await firestore.collection('configs').doc('supabase').get();
+                if (docSnap.exists) {
+                    const data = docSnap.data();
+                    if (data?.supabaseUrl && data?.supabaseKey) {
+                        supUrl = data.supabaseUrl;
+                        supKey = data.supabaseKey;
+                        console.log("[Supabase Server Proxy] Successfully synchronized live connection from Cloud Firestore!");
+                    }
+                }
+            } catch (e) {
+                console.warn("[Supabase Server Proxy] Cloud Firestore lookup failed:", e);
+            }
+        }
 
-        // Fallback to local server cache for Supabase if ENVs are missing
+        // Final fallback to local server cache for Supabase if Firestore failed
         if (!supUrl || !supKey) {
             try {
                 const localPath = path.join(process.cwd(), 'supabase_config_cache.json');
@@ -665,4 +718,14 @@ Please ask me your query or select a quick question template below!`;
   });
 }
 
-startServer();
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+startServer().catch(err => {
+  console.error("Critical server startup failure:", err);
+});
