@@ -18,7 +18,6 @@ import BestSellingSection from '../components/home/BestSellingSection';
 
 import FlashSaleTimer from '../components/home/FlashSaleTimer';
 
-import { CategorySkeleton, ProductSkeleton } from '../components/common/Skeleton';
 
 export default function Home() {
   const { categories, isLoaded: categoriesLoaded } = useCategoryStore();
@@ -168,7 +167,7 @@ export default function Home() {
                     }}
                     draggable={false}
                   >
-                    <div className="w-full h-full relative bg-gray-100">
+                    <div className="w-full h-full relative">
                       {catImage ? (
                         <img
                           src={catImage}
@@ -270,9 +269,7 @@ export default function Home() {
 
               {/* THIRD ROW: Category Products */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 font-sans">
-                {productsLoading && products.length === 0 ? (
-                  [1, 2, 3, 4, 5, 6].map(i => <ProductSkeleton key={i} />)
-                ) : catProducts.map(prod => (
+                {catProducts.map(prod => (
                   <CompactProductCard key={`cat-prod-${prod.id}`} product={prod} />
                 ))}
               </div>

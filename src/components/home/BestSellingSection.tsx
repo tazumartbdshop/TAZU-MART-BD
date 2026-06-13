@@ -45,9 +45,7 @@ export default function BestSellingSection({ products, isLoading }: BestSellingS
 
         {/* Grid Layout - 2 columns on mobile */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
-          {isLoading && products.length === 0 ? (
-            [1, 2, 3, 4, 5, 6].map(i => <ProductSkeleton key={i} />)
-          ) : initialProducts.map((product, idx) => (
+          {initialProducts.map((product, idx) => (
             <motion.div 
               key={product.id}
               initial={{ opacity: 0, y: 10 }}

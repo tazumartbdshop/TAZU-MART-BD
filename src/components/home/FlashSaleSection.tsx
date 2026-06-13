@@ -53,9 +53,7 @@ export default function FlashSaleSection({ products, isLoading }: FlashSaleSecti
 
         {/* Horizontal Scroll */}
         <div className="flex gap-3 overflow-x-auto pb-4 hide-scrollbar snap-x snap-mandatory">
-          {isLoading && products.length === 0 ? (
-            [1, 2, 3, 4, 5, 6].map(i => <div key={i} className="w-[145px] sm:w-[170px] shrink-0"><ProductSkeleton /></div>)
-          ) : products.map((product) => {
+          {products.map((product) => {
             const hasDiscount = product.discountPrice && product.discountPrice < product.price;
             const discountPercent = hasDiscount 
               ? Math.round(((product.price - product.discountPrice!) / product.price) * 100)

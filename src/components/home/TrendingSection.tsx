@@ -48,9 +48,7 @@ export default function TrendingSection({ products, isLoading }: TrendingSection
 
         {/* Grid of Compact Product Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          {isLoading && products.length === 0 ? (
-            [1, 2, 3, 4, 5, 6].map(i => <ProductSkeleton key={i} />)
-          ) : displayProducts.map((product) => (
+          {displayProducts.map((product) => (
             <CompactProductCard key={product.id} product={product} />
           ))}
         </div>
