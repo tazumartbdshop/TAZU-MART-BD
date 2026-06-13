@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface ThemeConfig {
   // Global Colors
@@ -182,26 +181,41 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   draftTheme: defaultConfig,
   isLoaded: false,
   subscribe: () => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'theme'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as Partial<ThemeConfig>;
-        const mergedSettings = { ...defaultConfig, ...data };
-        set({ theme: mergedSettings, draftTheme: mergedSettings, isLoaded: true });
-      } else {
-        setDoc(doc(db, 'settings', 'theme'), defaultConfig).then(() => {
-          set({ theme: defaultConfig, draftTheme: defaultConfig, isLoaded: true });
-        }).catch(err => console.error("Initial theme seed failed", err));
-      }
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'settings/theme');
-    });
-    return unsubscribe;
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadTheme = async () => {
+        const { data, error } = await supabase.from('settings').select('*').eq('id', 'theme').limit(1);
+        if (!error && data && data.length > 0) {
+            const dataObj = data[0];
+            const mergedSettings = { ...defaultConfig, ...dataObj };
+            set({ theme: mergedSettings, draftTheme: mergedSettings, isLoaded: true });
+        } else if (!error && data && data.length === 0) {
+            supabase.from('settings').upsert([{ id: 'theme', ...defaultConfig }]).then(({error}) => error && console.warn(error));
+            set({ theme: defaultConfig, draftTheme: defaultConfig, isLoaded: true });
+        }
+    };
+    
+    loadTheme();
+    
+    const channel = supabase
+      .channel('public:settings:theme')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.theme' }, () => {
+         loadTheme();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   },
   updateTheme: (updates) => {
     const newTheme = { ...get().theme, ...updates };
     set({ theme: newTheme });
-    setDoc(doc(db, 'settings', 'theme'), newTheme, { merge: true })
-      .catch(err => console.error("Firestore theme update fail", err));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update(newTheme).eq('id', 'theme').then(({error}) => error && console.warn(error));
+    }
   },
   updateDraftTheme: (updates) => set((state) => ({
     draftTheme: { ...state.draftTheme, ...updates }
@@ -216,8 +230,10 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       }
     };
     set({ theme: newTheme });
-    setDoc(doc(db, 'settings', 'theme'), newTheme, { merge: true })
-      .catch(err => console.error("Firestore theme button update fail", err));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update(newTheme).eq('id', 'theme').then(({error}) => error && console.warn(error));
+    }
   },
   updateDraftButton: (type, updates) => set((state) => ({
     draftTheme: {
@@ -231,10 +247,13 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   publishTheme: async () => {
     try {
       const draft = get().draftTheme;
-      await setDoc(doc(db, 'settings', 'theme'), draft, { merge: true });
+      const supabase = getSupabase();
+      if (supabase) {
+          await supabase.from('settings').upsert([{ id: 'theme', ...draft }]);
+      }
       set({ theme: draft });
     } catch (error) {
-      console.error("Firebase publishTheme error:", error);
+      console.error("Supabase publishTheme error:", error);
       throw error;
     }
   },

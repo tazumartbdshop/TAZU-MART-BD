@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface Offer {
   id: string;
@@ -129,21 +128,31 @@ export const useOfferStore = create<OfferState>((set, get) => ({
   getBannerStyleByType,
   
   subscribe: () => {
-    const unsubscribe = onSnapshot(collection(db, 'offers'), (snapshot) => {
-      const list: Offer[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as Offer);
-      });
-      list.sort((a, b) => (a.priority || 0) - (b.priority || 0));
-      if (list.length > 0) {
-        set({ offers: list, isLoaded: true });
-      } else {
-        set({ offers: initialOffers, isLoaded: true });
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'offers');
-    });
-    return unsubscribe;
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadOffers = async () => {
+        const { data, error } = await supabase.from('offers').select('*').order('priority', { ascending: true });
+        if (!error && data && data.length > 0) {
+            set({ offers: data as Offer[], isLoaded: true });
+        } else if (!error && data && data.length === 0) {
+            supabase.from('offers').upsert(initialOffers).then(({error}) => error && console.warn(error));
+            set({ offers: initialOffers, isLoaded: true });
+        }
+    };
+    
+    loadOffers();
+    
+    const channel = supabase
+      .channel('public:offers')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'offers' }, () => {
+         loadOffers();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   },
 
   addOffer: (offerPayload) => {
@@ -156,8 +165,8 @@ export const useOfferStore = create<OfferState>((set, get) => ({
       bannerStyle,
     };
     
-    setDoc(doc(db, 'offers', id), newOffer)
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, `offers/${id}`));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('offers').insert([newOffer]).then(({error}) => error && console.warn(error));
       
     set((state) => ({ offers: [newOffer, ...state.offers] }));
   },
@@ -177,16 +186,16 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     
     const offerToUpdate = updatedOffers.find(o => o.id === id);
     if (offerToUpdate) {
-      setDoc(doc(db, 'offers', id), offerToUpdate, { merge: true })
-        .catch(err => handleFirestoreError(err, OperationType.WRITE, `offers/${id}`));
+      const supabase = getSupabase();
+      if (supabase) supabase.from('offers').update(offerToUpdate).eq('id', id).then(({error}) => error && console.warn(error));
     }
     
     set({ offers: updatedOffers });
   },
 
   deleteOffer: (id) => {
-    deleteDoc(doc(db, 'offers', id))
-      .catch(err => handleFirestoreError(err, OperationType.DELETE, `offers/${id}`));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('offers').delete().eq('id', id).then(({error}) => error && console.warn(error));
       
     set((state) => ({
       offers: state.offers.filter((o) => o.id !== id),

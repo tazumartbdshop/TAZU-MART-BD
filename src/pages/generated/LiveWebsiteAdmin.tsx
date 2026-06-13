@@ -8,8 +8,7 @@ import {
 } from 'lucide-react';
 import { useWebsitesStore } from '../../store/useWebsitesStore';
 import { useProductStore } from '../../store/useProductStore';
-import { db } from '../../lib/db';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { getSupabase } from '../../lib/supabase';
 
 export default function LiveWebsiteAdmin() {
   const { storeDomain } = useParams();
@@ -22,13 +21,25 @@ export default function LiveWebsiteAdmin() {
   const [rawProducts, setRawProducts] = useState<any[]>([]);
 
   useEffect(() => {
-    const q = query(collection(db, 'products'), orderBy('sku', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setRawProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      console.error("Firestore Error in LiveWebsiteAdmin:", error);
-    });
-    return unsubscribe;
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const loadProducts = async () => {
+      const { data, error } = await supabase.from('products').select('*').order('sku', { ascending: false });
+      if (!error && data) {
+         setRawProducts(data);
+      }
+    };
+
+    loadProducts();
+
+    const channel = supabase.channel('public:products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, loadProducts)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // New product form state

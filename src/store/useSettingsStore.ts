@@ -1,17 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, setDoc, onSnapshot, getDoc } from 'firebase/firestore';
-
-export function cleanObjectForFirestore<T extends object>(obj: T): T {
-  const result: any = {};
-  Object.keys(obj).forEach((key) => {
-    const val = (obj as any)[key];
-    if (val !== undefined) {
-      result[key] = val;
-    }
-  });
-  return result;
-}
+import { getSupabase } from '../lib/supabase';
 
 export interface AppSettings {
   // 1. Store Identity
@@ -228,7 +216,7 @@ export interface AppSettings {
   flashSaleEnabled: boolean;
   flashSaleEndTime: string;
   allowStackDiscount: boolean;
-
+  
   // 20. Supabase Settings
   supabaseUrl: string;
   supabaseKey: string;
@@ -438,13 +426,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: defaultSettings,
   draftSettings: defaultSettings,
   isLoaded: false,
-  updateSettings: (updates) => {
-    // We do NOT write to firestore immediately here unless it's a direct patch that should be published
-    // Actually, usually admin updates drafting -> publish. If called directly, we can sync.
+  updateSettings: async (updates) => {
     const newSettings = { ...get().settings, ...updates };
     set({ settings: newSettings });
-    setDoc(doc(db, 'settings', 'global'), cleanObjectForFirestore(newSettings), { merge: true })
-      .catch(err => console.error("Firestore settings update fail", err));
+    
+    // Save supabase creds to localStorage immediately just in case
+    if (updates.supabaseUrl !== undefined || updates.supabaseKey !== undefined) {
+      const localStore = JSON.parse(localStorage.getItem('supabase_config') || '{}');
+      if (updates.supabaseUrl) localStore.supabaseUrl = updates.supabaseUrl;
+      if (updates.supabaseKey) localStore.supabaseKey = updates.supabaseKey;
+      localStorage.setItem('supabase_config', JSON.stringify(localStore));
+    }
+    
+    const supabase = getSupabase();
+    if (supabase) {
+        // Assume document structure with id 'global'
+        const { error } = await supabase.from('settings').upsert([{ id: 'global', ...newSettings }]);
+        if (error && error.code !== '42P01') console.error("Supabase settings update fail", error);
+    }
   },
   updateDraftSettings: (updates) => {
     set((state) => ({ draftSettings: { ...state.draftSettings, ...updates } }));
@@ -452,30 +451,53 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   publishSettings: async () => {
     try {
       const draft = get().draftSettings;
-      await setDoc(doc(db, 'settings', 'global'), cleanObjectForFirestore(draft), { merge: true });
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('settings').upsert([{ id: 'global', ...draft }]);
+          if (error && error.code !== '42P01') throw error;
+      }
       set({ settings: draft });
-      console.log("Settings published to Firebase");
+      console.log("Settings published to Supabase");
     } catch (error) {
-      console.error("Firebase publishSettings error:", error);
+      console.error("Supabase publishSettings error:", error);
       throw error;
     }
   },
   resetDraftSettings: () => set((state) => ({ draftSettings: state.settings })),
   subscribe: () => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as Partial<AppSettings>;
-        const mergedSettings = { ...defaultSettings, ...data };
-        set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
-      } else {
-        // Fallback to default
-        setDoc(doc(db, 'settings', 'global'), cleanObjectForFirestore(defaultSettings)).then(() => {
-          set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
-        }).catch(err => console.error("Initial settings seed failed", err));
-      }
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'settings/global');
+    const supabase = getSupabase();
+    
+    // Always fall back to local if no supabase
+    if (!supabase) {
+        set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
+        return () => {};
+    }
+    
+    supabase.from('settings').select('*').eq('id', 'global').limit(1).then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+            const mergedSettings = { ...defaultSettings, ...data[0] };
+            set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
+        } else {
+            // Initial seed if not exist
+            supabase.from('settings').upsert([{ id: 'global', ...defaultSettings }]).then(({error}) => error && console.warn(error));
+            set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
+        }
     });
-    return unsubscribe;
+
+    const channel = supabase
+      .channel('public:settings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
+        supabase.from('settings').select('*').eq('id', 'global').limit(1).then(({ data, error }) => {
+            if (!error && data && data.length > 0) {
+                const mergedSettings = { ...defaultSettings, ...data[0] };
+                set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
+            }
+        });
+      })
+      .subscribe();
+      
+    return () => {
+        supabase.removeChannel(channel);
+    }
   }
 }));

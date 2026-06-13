@@ -1,5 +1,4 @@
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { storage } from './firebase';
+import { getSupabase } from './supabase';
 
 // Helper to add timeout to promise
 const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
@@ -63,30 +62,55 @@ export const uploadImage = async (file: File | Blob, folder: string, originalNam
   const extension = originalName?.split('.').pop() || 'jpg';
   const cleanName = originalName ? originalName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50) : `img-${Date.now()}`;
   const fileName = `${Date.now()}-${cleanName}.${extension}`;
-  const storageRef = ref(storage, `${folder}/${fileName}`);
+  const path = `${folder}/${fileName}`;
   
-  console.log(`Starting upload to: ${folder}/${fileName}`);
+  console.log(`Starting upload to Supabase: ${path}`);
+  const supabase = getSupabase();
+  
+  if (!supabase) {
+    console.warn("Supabase not configured, falling back to local base64");
+    return fallbackToBase64(file);
+  }
   
   try {
-    // Attempt upload to Firebase Storage with a 30 second timeout for high reliability
-    const snapshot = await withTimeout(
-      uploadBytes(storageRef, file),
+    const uploadPromise = supabase.storage
+      .from('media')
+      .upload(path, file, { cacheControl: '3600', upsert: true });
+
+    const { data, error } = await withTimeout(
+      uploadPromise,
       30000,
-      "Firebase Storage upload timed out"
+      "Supabase Storage upload timed out"
     );
-    console.log(`Upload complete. Snapshot:`, snapshot);
+
+    if (error) {
+       // Attempt to create bucket if it doesn't exist, though usually you create this via dashboard
+       if (error.message.includes('bucket not found')) {
+           console.warn("Bucket 'media' not found. Attempting to fall back as we cannot auto-create buckets reliably from client");
+           throw error;
+       }
+       throw error;
+    }
     
-    const downloadURL = await withTimeout(
-      getDownloadURL(storageRef),
-      30000,
-      "Firebase Storage URL retrieval timed out"
-    );
-    console.log(`Download URL: ${downloadURL}`);
-    return downloadURL;
+    console.log(`Upload complete:`, data);
+    
+    const { data: publicData } = supabase.storage
+      .from('media')
+      .getPublicUrl(path);
+      
+    if (!publicData || !publicData.publicUrl) {
+        throw new Error("Could not retrieve public URL");
+    }
+    
+    console.log(`Download URL: ${publicData.publicUrl}`);
+    return publicData.publicUrl;
   } catch (err: any) {
-    console.warn(`Firebase Storage failed, falling back to compressed local Base64 storage: ${err.message || err}`, err);
-    
-    // Fallback block: Resize and compress to a small, Firestore-safe JPEG Base64 URI
+    console.warn(`Supabase Storage failed, falling back to compressed local Base64 storage: ${err.message || err}`, err);
+    return fallbackToBase64(file);
+  }
+};
+
+async function fallbackToBase64(file: File | Blob): Promise<string> {
     try {
       // Compress to a highly efficient 500px width jpeg for rapid saving
       const bToUse = await resizeImage(file, 500);
@@ -95,19 +119,24 @@ export const uploadImage = async (file: File | Blob, folder: string, originalNam
       return b64;
     } catch (fallbackErr: any) {
       console.error("Base64 fallback failed inside uploadImage:", fallbackErr);
-      throw new Error(`Failed to process image: ${err.message || err}`);
+      throw new Error(`Failed to process image`);
     }
-  }
-};
+}
 
 export const deleteImage = async (url: string): Promise<void> => {
-  if (!url || !url.startsWith('https://firebasestorage.googleapis.com')) {
+  if (!url || !url.includes('supabase.co/storage/v1/object/public/media/')) {
     return;
   }
   try {
-    const storageRef = ref(storage, url);
-    await deleteObject(storageRef);
-    console.log(`Successfully deleted storage image: ${url}`);
+    const supabase = getSupabase();
+    if (!supabase) return;
+    
+    const urlParts = url.split('supabase.co/storage/v1/object/public/media/');
+    if (urlParts.length > 1) {
+       const path = urlParts[1];
+       await supabase.storage.from('media').remove([path]);
+       console.log(`Successfully deleted storage image: ${path}`);
+    }
   } catch (err) {
     console.warn(`Failed to delete image from storage (non-blocking):`, err);
   }

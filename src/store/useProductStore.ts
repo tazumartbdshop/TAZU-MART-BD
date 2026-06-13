@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 import { deleteImage } from '../lib/imageUtils';
 
 export interface Product {
@@ -188,97 +187,125 @@ export const useProductStore = create<ProductState>((set, get) => ({
   },
   
   addProduct: async (payload) => {
-    const id = doc(collection(db, 'products')).id;
-    console.log(`[Firestore Log] Preparing to save new product. Generated document ID: products/${id}`);
-    try {
-      const keywords = generateKeywords(payload.name, payload.category, payload.brand, payload.description);
-      const newProduct: Product = {
-        ...payload,
-        id,
-        keywords,
-        createdAt: Date.now(),
-      };
-      await setDoc(doc(db, 'products', id), newProduct);
-      console.log(`[Firestore Log] Firestore write successful for products/${id}. Details:`, newProduct);
-    } catch (error) {
-      console.error(`[Firestore Log] Firestore write failed for products/${id}:`, error);
-      handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
-      throw error;
+    const supabase = getSupabase();
+    const id = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const keywords = generateKeywords(payload.name, payload.category, payload.brand, payload.description);
+    const newProduct: Product = {
+      ...payload,
+      id,
+      keywords,
+      createdAt: Date.now(),
+    };
+    
+    if (supabase) {
+      const { error } = await supabase.from('products').insert([newProduct]);
+      if (error) {
+        if (error.code !== '42P01') console.error("Supabase insert error", error);
+      }
+    } else {
+        // Fallback for development if no supabase config
+        const currentProducts = get().products;
+        set({ products: [...currentProducts, newProduct] });
     }
   },
   
   updateProduct: async (id, payload) => {
-    console.log(`[Firestore Log] Preparing to update product document: products/${id}`);
-    try {
-      const currentProduct = get().products.find(p => p.id === id);
-      const finalPayload = { ...payload };
+    const supabase = getSupabase();
+    console.log(`[Supabase Log] Preparing to update product document: products/${id}`);
+    
+    const currentProduct = get().products.find(p => p.id === id);
+    const finalPayload = { ...payload };
 
-      if (
-        payload.name !== undefined ||
-        payload.category !== undefined ||
-        payload.brand !== undefined ||
-        payload.description !== undefined
-      ) {
-        const name = payload.name !== undefined ? payload.name : (currentProduct?.name || '');
-        const category = payload.category !== undefined ? payload.category : (currentProduct?.category || '');
-        const brand = payload.brand !== undefined ? payload.brand : (currentProduct?.brand || '');
-        const description = payload.description !== undefined ? payload.description : (currentProduct?.description || '');
-        finalPayload.keywords = generateKeywords(name, category, brand, description);
-      }
-      
-      await setDoc(doc(db, 'products', id), finalPayload, { merge: true });
-      console.log(`[Firestore Log] Firestore update successful for products/${id}. Fields:`, finalPayload);
-    } catch (error) {
-      console.error(`[Firestore Log] Firestore update failed for products/${id}:`, error);
-      handleFirestoreError(error, OperationType.WRITE, `products/${id}`);
-      throw error;
+    if (
+      payload.name !== undefined ||
+      payload.category !== undefined ||
+      payload.brand !== undefined ||
+      payload.description !== undefined
+    ) {
+      const name = payload.name !== undefined ? payload.name : (currentProduct?.name || '');
+      const category = payload.category !== undefined ? payload.category : (currentProduct?.category || '');
+      const brand = payload.brand !== undefined ? payload.brand : (currentProduct?.brand || '');
+      const description = payload.description !== undefined ? payload.description : (currentProduct?.description || '');
+      finalPayload.keywords = generateKeywords(name, category, brand, description);
+    }
+    
+    if (supabase) {
+      const { error } = await supabase.from('products').update(finalPayload).eq('id', id);
+      if (error && error.code !== '42P01') console.error("Supabase update error", error);
+    } else {
+        // Fallback
+        const newProducts = get().products.map(p => p.id === id ? { ...p, ...finalPayload } : p);
+        set({ products: newProducts });
     }
   },
   
   deleteProduct: async (id) => {
-    console.log(`[Firestore Log] Preparing to delete product document: products/${id}`);
-    try {
-      const product = get().products.find(p => p.id === id);
-      if (product) {
-        try {
-          const urlsToDelete = new Set<string>();
-          if (product.image) urlsToDelete.add(product.image);
-          if (product.imageUrl) urlsToDelete.add(product.imageUrl);
-          if (product.featured_image) urlsToDelete.add(product.featured_image);
-          if (product.banner_image) urlsToDelete.add(product.banner_image);
-          if (product.images && Array.isArray(product.images)) {
-            product.images.forEach(img => {
-              if (img) urlsToDelete.add(img);
-            });
-          }
-          
-          // Execute background deletions securely
-          Promise.all(Array.from(urlsToDelete).map(url => deleteImage(url)))
-            .catch(err => console.warn("Failed to delete some product storage files:", err));
-        } catch (importErr) {
-          console.error("Failed to import imageUtils during deleteProduct:", importErr);
+    const supabase = getSupabase();
+    console.log(`[Supabase Log] Preparing to delete product document: products/${id}`);
+    
+    const product = get().products.find(p => p.id === id);
+    if (product) {
+      try {
+        const urlsToDelete = new Set<string>();
+        if (product.image) urlsToDelete.add(product.image);
+        if (product.imageUrl) urlsToDelete.add(product.imageUrl);
+        if (product.featured_image) urlsToDelete.add(product.featured_image);
+        if (product.banner_image) urlsToDelete.add(product.banner_image);
+        if (product.images && Array.isArray(product.images)) {
+          product.images.forEach(img => {
+            if (img) urlsToDelete.add(img);
+          });
         }
+        
+        // Execute background deletions securely
+        Promise.all(Array.from(urlsToDelete).map(url => deleteImage(url)))
+          .catch(err => console.warn("Failed to delete some product storage files:", err));
+      } catch (importErr) {
+        console.error("Failed to import imageUtils during deleteProduct:", importErr);
       }
-      await deleteDoc(doc(db, 'products', id));
-      console.log(`[Firestore Log] Firestore delete successful for products/${id}`);
-    } catch (error) {
-      console.error(`[Firestore Log] Firestore delete failed for products/${id}:`, error);
-      handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
-      throw error;
+    }
+    
+    if (supabase) {
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error && error.code !== '42P01') console.error("Supabase delete error", error);
+    } else {
+        const newProducts = get().products.filter(p => p.id !== id);
+        set({ products: newProducts });
     }
   },
   
   subscribe: () => {
-    console.log("[Firestore Log] Initializing real-time subscription for collection 'products'");
-    const q = query(collection(db, 'products'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-      console.log(`[Firestore Log] Real-time read updated. Collection count: ${products.length} products found inside 'products' on server.`);
-      set({ products });
-    }, (error) => {
-      console.error("[Firestore Log] Real-time subscription failed on collection 'products':", error);
-      handleFirestoreError(error, OperationType.GET, 'products');
+    const supabase = getSupabase();
+    
+    if (!supabase) {
+        return () => {}; // No-op if not configured
+    }
+    
+    console.log("[Supabase Log] Initializing real-time subscription for collection 'products'");
+    
+    // Initial fetch
+    supabase.from('products').select('*').then(({ data, error }) => {
+        if (!error && data) {
+            set({ products: data as Product[] });
+        } else if (error && error.code !== '42P01') {
+            console.error("Failed to fetch products:", error);
+        }
     });
-    return unsubscribe;
+
+    const channel = supabase
+      .channel('public:products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+        // Simple reload strategy on any change
+        supabase.from('products').select('*').then(({ data, error }) => {
+            if (!error && data) {
+                set({ products: data as Product[] });
+            }
+        });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 }));

@@ -3,40 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Edit, Trash2, Image as ImageIcon, Layers, Plus, Crop, Upload } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
-import { db } from '../../lib/db';
-import { doc, deleteDoc } from 'firebase/firestore';
-
-enum OperationType {
-  DELETE = 'delete',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: null,
-      email: null,
-    },
-    operationType,
-    path
-  };
-  const errorMsg = JSON.stringify(errInfo);
-  if (errInfo.error.includes('Quota limit exceeded')) {
-    console.warn("Firestore Quota Exceeded.");
-  } else {
-    console.error('Firestore Error: ', errorMsg);
-  }
-}
 
 export default function BannerListing() {
   const { banners, sliderConfig } = useBannerStore();

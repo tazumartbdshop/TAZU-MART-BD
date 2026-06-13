@@ -13,8 +13,7 @@ import { useFakeOrderStore } from '../store/useFakeOrderStore';
 import { bdAddressData, divisions } from '../data/addressData';
 import { HomeDeliverySection } from '../components/checkout/HomeDeliverySection';
 import { formatPrice, cn } from '../lib/utils';
-import { db } from '../lib/db';
-import { doc, updateDoc, increment } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 import { pixelService } from '../utils/pixelService';
 import { 
   ShieldCheck, CheckCircle2, ArrowLeft, Lock, MapPin, Edit2, Plus, 
@@ -520,10 +519,10 @@ export default function Checkout() {
     try {
       const activeCampaignId = localStorage.getItem('activeCampaignAttribution');
       if (activeCampaignId) {
-        const bRef = doc(db, 'broadcasts', activeCampaignId);
-        updateDoc(bRef, {
-          purchasesCount: increment(1)
-        }).catch(err => console.error("Error updating purchasesCount in checkout:", err));
+        const supabase = getSupabase();
+        if (supabase) {
+           supabase.rpc('increment_broadcast_purchases', { broadcast_id: activeCampaignId }).then(({error}: any) => { if (error) console.error("RPC fail", error); });
+        }
         
         // Remove tracking to prevent multiple attribution counts for one click
         localStorage.removeItem('activeCampaignAttribution');
@@ -547,22 +546,25 @@ export default function Checkout() {
         postalCode: formData.postalCode
       });
       
-      // Update in firestore
+      // Update in database
       try {
-        updateDoc(doc(db, 'users', user.id), {
-          name: formData.name,
-          phone: formData.phone,
-          email: formData.email,
-          division: formData.division,
-          district: formData.district,
-          upazila: formData.upazila,
-          area: formData.area,
-          address: formData.address,
-          zipCode: formData.postalCode,
-          postalCode: formData.postalCode
-        });
+        const supabase = getSupabase();
+        if (supabase) {
+          supabase.from('users').update({
+            name: formData.name,
+            phone: formData.phone,
+            email: formData.email,
+            division: formData.division,
+            district: formData.district,
+            upazila: formData.upazila,
+            area: formData.area,
+            address: formData.address,
+            zipCode: formData.postalCode,
+            postalCode: formData.postalCode
+          }).eq('id', user.id).then(({error})=> error && console.warn(error));
+        }
       } catch (e) {
-        console.error("Firestore user profile update failed:", e);
+        console.error("User profile update failed:", e);
       }
 
       // Update customer in store

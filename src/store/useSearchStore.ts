@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface SearchRecord {
   id: string; // lowerecased keyword
@@ -36,30 +35,37 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     const existing = get().searches.find(s => s.id === id);
     const count = existing ? (existing.count + 1) : 1;
 
-    const docRef = doc(db, 'searches', id);
     try {
-      await setDoc(docRef, {
-        id,
-        keyword: cleanKeyword,
-        category: category || existing?.category || '',
-        relatedProduct: relatedProduct || existing?.relatedProduct || '',
-        timestamp: Date.now(),
-        count,
-        isRead: false,
-        hasResults,
-        resultCount
-      }, { merge: true });
+      const supabase = getSupabase();
+      if (supabase) {
+          const payload = {
+            id,
+            keyword: cleanKeyword,
+            category: category || existing?.category || '',
+            relatedProduct: relatedProduct || existing?.relatedProduct || '',
+            timestamp: Date.now(),
+            count,
+            isRead: false,
+            hasResults,
+            resultCount
+          };
+          const { error } = await supabase.from('searches').upsert([payload]);
+          if (error) throw error;
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `searches/${id}`);
+       console.error('Error in addSearch Supabase:', error);
     }
   },
 
   markAsRead: async (id) => {
-    const docRef = doc(db, 'searches', id);
     try {
-      await setDoc(docRef, { isRead: true }, { merge: true });
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('searches').update({ isRead: true }).eq('id', id);
+          if (error) throw error;
+      }
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `searches/${id}`);
+       console.error('Error in markAsRead Supabase:', error);
     }
   },
 
@@ -67,11 +73,14 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     const { searches } = get();
     for (const search of searches) {
       if (!search.isRead) {
-        const docRef = doc(db, 'searches', search.id);
         try {
-          await setDoc(docRef, { isRead: true }, { merge: true });
+          const supabase = getSupabase();
+          if (supabase) {
+             const { error } = await supabase.from('searches').update({ isRead: true }).eq('id', search.id);
+             if (error) throw error;
+          }
         } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, `searches/${search.id}`);
+           console.error('Error in markAllAsRead Supabase:', error);
         }
       }
     }
@@ -81,35 +90,46 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     const { searches } = get();
     for (const s of searches) {
       try {
-        await deleteDoc(doc(db, 'searches', s.id));
+          const supabase = getSupabase();
+          if (supabase) {
+             const { error } = await supabase.from('searches').delete().eq('id', s.id);
+             if (error) throw error;
+          }
       } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, `searches/${s.id}`);
+         console.error('Error in clearSearches Supabase:', error);
       }
     }
   },
 
   subscribe: () => {
     set({ isLoading: true });
-    const q = query(collection(db, 'searches'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const searches = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          keyword: data.keyword || doc.id,
-          category: data.category || '',
-          relatedProduct: data.relatedProduct || '',
-          timestamp: data.timestamp || Date.now(),
-          count: data.count || 1,
-          isRead: data.isRead !== undefined ? data.isRead : false,
-          hasResults: data.hasResults !== undefined ? data.hasResults : true,
-          resultCount: data.resultCount !== undefined ? data.resultCount : 1,
-        } as SearchRecord;
-      });
-      set({ searches, isLoading: false });
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'searches');
-    });
-    return unsubscribe;
+    
+    const supabase = getSupabase();
+    if (!supabase) {
+        set({ isLoading: false });
+        return () => {};
+    }
+
+    const loadSearches = async () => {
+        const { data, error } = await supabase.from('searches').select('*');
+        if (!error && data) {
+            set({ searches: data as SearchRecord[], isLoading: false });
+        } else {
+             set({ isLoading: false });
+        }
+    };
+    
+    loadSearches();
+    
+    const channel = supabase
+      .channel('public:searches')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'searches' }, () => {
+         loadSearches();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   }
 }));

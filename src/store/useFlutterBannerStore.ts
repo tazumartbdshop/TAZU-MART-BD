@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface FlutterBanner {
   id: string;
@@ -34,13 +33,11 @@ export const useFlutterBannerStore = create<FlutterBannerStore>((set, get) => ({
   fetchFlutterBanners: async () => {
     set({ loading: true });
     try {
-      const q = query(collection(db, 'flutterBanners'), orderBy('displayOrder', 'asc'));
-      const querySnapshot = await getDocs(q);
-      const list: FlutterBanner[] = [];
-      querySnapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as FlutterBanner);
-      });
-      set({ flutterBanners: list, isLoaded: true, loading: false });
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Supabase internal error");
+      const { data, error } = await supabase.from('flutterBanners').select('*').order('displayOrder', { ascending: true });
+      if (error) throw error;
+      set({ flutterBanners: data as FlutterBanner[], isLoaded: true, loading: false });
     } catch (error) {
       console.error("Error fetching flutter banners:", error);
       set({ loading: false });
@@ -48,29 +45,43 @@ export const useFlutterBannerStore = create<FlutterBannerStore>((set, get) => ({
   },
 
   subscribeFlutterBanners: () => {
-    const q = query(collection(db, 'flutterBanners'), orderBy('displayOrder', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: FlutterBanner[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as FlutterBanner);
-      });
-      set({ flutterBanners: list, isLoaded: true });
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'flutterBanners');
-    });
-    return unsubscribe;
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadBanners = async () => {
+        const { data, error } = await supabase.from('flutterBanners').select('*').order('displayOrder', { ascending: true });
+        if (!error && data) {
+            set({ flutterBanners: data as FlutterBanner[], isLoaded: true });
+        }
+    };
+    
+    loadBanners();
+    
+    const channel = supabase
+      .channel('public:flutterBanners')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'flutterBanners' }, () => {
+         loadBanners();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   },
 
   addFlutterBanner: async (banner) => {
     try {
-      const newId = doc(collection(db, 'flutterBanners')).id;
-      const docRef = doc(db, 'flutterBanners', newId);
+      const newId = 'fb-' + Math.random().toString(36).substring(2, 9);
       const payload: FlutterBanner = {
         ...banner,
         id: newId,
         createdAt: new Date().toISOString(),
       };
-      await setDoc(docRef, payload);
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('flutterBanners').insert([payload]);
+          if(error) throw error;
+      }
     } catch (error) {
       console.error("Error adding flutter banner:", error);
       throw error;
@@ -79,8 +90,11 @@ export const useFlutterBannerStore = create<FlutterBannerStore>((set, get) => ({
 
   updateFlutterBanner: async (id, updates) => {
     try {
-      const docRef = doc(db, 'flutterBanners', id);
-      await setDoc(docRef, updates, { merge: true });
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('flutterBanners').update(updates).eq('id', id);
+          if(error) throw error;
+      }
     } catch (error) {
       console.error("Error updating flutter banner:", error);
       throw error;
@@ -89,8 +103,11 @@ export const useFlutterBannerStore = create<FlutterBannerStore>((set, get) => ({
 
   deleteFlutterBanner: async (id) => {
     try {
-      const docRef = doc(db, 'flutterBanners', id);
-      await deleteDoc(docRef);
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('flutterBanners').delete().eq('id', id);
+          if (error) throw error;
+      }
     } catch (error) {
       console.error("Error deleting flutter banner:", error);
       throw error;

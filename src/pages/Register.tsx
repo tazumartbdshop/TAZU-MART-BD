@@ -3,8 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Mail, Lock, Smartphone, User, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, Plus, Trash2, Calendar, X, Pencil, RotateCw, UploadCloud, MapPin, Building2, Home } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { getSupabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { cn } from '../lib/utils';
@@ -276,32 +276,36 @@ export default function Register() {
       }
 
       try {
-        await setDoc(doc(db, 'users', firebaseUser.uid), {
-          uid: firebaseUser.uid,
-          name: formData.fullName,
-          email: formData.email ? formData.email.toLowerCase().trim() : '',
-          phone: formData.phone.trim(),
-          role: 'customer',
-          status: 'Active',
-          password: formData.password,
-          createdAt: serverTimestamp(),
-          lastLoginAt: serverTimestamp(),
-          gender: formData.gender,
-          address: formData.address.trim(),
-          division: formData.division,
-          district: formData.district,
-          upazila: formData.upazila,
-          area: formData.area,
-          postalCode: formData.postalCode,
-          profileImage: finalProfileImage || '',
-          occasionName: occasionJoined,
-          specialDate: datesJoined,
-        }, { merge: true });
+        const supabase = getSupabase();
+        if (supabase) {
+          await supabase.from('users').upsert([{
+            id: firebaseUser.uid,
+            uid: firebaseUser.uid,
+            name: formData.fullName,
+            email: formData.email ? formData.email.toLowerCase().trim() : '',
+            phone: formData.phone.trim(),
+            role: 'customer',
+            status: 'Active',
+            password: formData.password,
+            createdAt: new Date().toISOString(),
+            lastLoginAt: new Date().toISOString(),
+            gender: formData.gender,
+            address: formData.address.trim(),
+            division: formData.division,
+            district: formData.district,
+            upazila: formData.upazila,
+            area: formData.area,
+            postalCode: formData.postalCode,
+            profileImage: finalProfileImage || '',
+            occasionName: occasionJoined,
+            specialDate: datesJoined,
+          }]);
+        }
         
         // Note: Subcollections (folders, notes, teamMembers) are implicitly 
         // ready and will start existing as soon as the user adds their first record.
       } catch (fsErr) {
-        handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+        console.error("Supabase sign up store err", fsErr);
       }
 
       const newCustomer = {

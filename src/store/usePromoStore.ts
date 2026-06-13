@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { getSupabase } from '../lib/supabase';
 
 export type DiscountType = 'Percentage' | 'Fixed Amount';
 
@@ -20,14 +19,88 @@ export interface PromoCode {
 
 interface PromoStore {
   promoCodes: PromoCode[];
+  isLoaded: boolean;
+  subscribe: () => () => void;
   addPromoCode: (promo: Omit<PromoCode, 'id' | 'usedCount' | 'createdAt'>) => Promise<void>;
   updatePromoCode: (id: string, updates: Partial<PromoCode>) => Promise<void>;
   deletePromoCode: (id: string) => Promise<void>;
   incrementPromoUsedCount: (id: string) => Promise<void>;
 }
 
+const initialPromos: PromoCode[] = [
+  {
+    id: 'SAVE100',
+    name: 'Save 100 Taka Promo',
+    code: 'SAVE100',
+    type: 'Fixed Amount',
+    value: 100,
+    minOrder: 1000,
+    expiryDate: '2026-12-31',
+    usageLimit: 200,
+    usedCount: 0,
+    status: 'Active',
+    createdAt: Date.now(),
+  },
+  {
+    id: 'WELCOME50',
+    name: 'New Customer Welcome',
+    code: 'WELCOME50',
+    type: 'Fixed Amount',
+    value: 50,
+    minOrder: 500,
+    expiryDate: '2026-12-31',
+    usageLimit: 500,
+    usedCount: 0,
+    status: 'Active',
+    createdAt: Date.now(),
+  },
+  {
+    id: 'SAVE10',
+    name: 'Mega 10 Percent Save',
+    code: 'SAVE10',
+    type: 'Percentage',
+    value: 10,
+    minOrder: 1000,
+    expiryDate: '2026-12-31',
+    usageLimit: 100,
+    usedCount: 0,
+    status: 'Active',
+    createdAt: Date.now(),
+  }
+];
+
 export const usePromoStore = create<PromoStore>()((set, get) => ({
   promoCodes: [],
+  isLoaded: false,
+
+  subscribe: () => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadPromos = async () => {
+        const { data, error } = await supabase.from('promo_codes').select('*');
+        if (!error && data && data.length > 0) {
+            set({ promoCodes: data as PromoCode[], isLoaded: true });
+        } else if (!error && data && data.length === 0) {
+            supabase.from('promo_codes').upsert(initialPromos).then(({error}) => error && console.warn(error));
+             set({ promoCodes: initialPromos, isLoaded: true });
+        }
+    };
+    
+    loadPromos();
+    
+    const channel = supabase
+      .channel('public:promo_codes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'promo_codes' }, () => {
+         loadPromos();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  },
+
   addPromoCode: async (promo) => {
     try {
       const docId = promo.code.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -37,25 +110,36 @@ export const usePromoStore = create<PromoStore>()((set, get) => ({
         usedCount: 0,
         createdAt: Date.now(),
       };
-      await setDoc(doc(db, 'promo_codes', newPromo.id), newPromo);
+      
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('promo_codes').insert([newPromo]);
+          if(error) throw error;
+      }
     } catch (err) {
-      console.error('Error adding promo code to Firestore:', err);
+      console.error('Error adding promo code to Supabase:', err);
     }
   },
   updatePromoCode: async (id, updates) => {
     try {
-      const promoRef = doc(db, 'promo_codes', id);
-      await updateDoc(promoRef, updates);
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('promo_codes').update(updates).eq('id', id);
+          if(error) throw error;
+      }
     } catch (err) {
-      console.error('Error updating promo code in Firestore:', err);
+      console.error('Error updating promo code in Supabase:', err);
     }
   },
   deletePromoCode: async (id) => {
     try {
-      const promoRef = doc(db, 'promo_codes', id);
-      await deleteDoc(promoRef);
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('promo_codes').delete().eq('id', id);
+          if (error) throw error;
+      }
     } catch (err) {
-      console.error('Error deleting promo code from Firestore:', err);
+      console.error('Error deleting promo code from Supabase:', err);
     }
   },
   incrementPromoUsedCount: async (id) => {
@@ -63,92 +147,14 @@ export const usePromoStore = create<PromoStore>()((set, get) => ({
       const codes = get().promoCodes;
       const found = codes.find(c => c.id === id);
       if (found) {
-        const promoRef = doc(db, 'promo_codes', id);
-        await updateDoc(promoRef, {
-          usedCount: (found.usedCount || 0) + 1
-        });
+        const supabase = getSupabase();
+        if (supabase) {
+             const { error } = await supabase.from('promo_codes').update({ usedCount: (found.usedCount || 0) + 1 }).eq('id', id);
+             if (error) throw error;
+        }
       }
     } catch (err) {
-      console.error('Error incrementing promo used count in Firestore:', err);
+      console.error('Error incrementing promo used count in Supabase:', err);
     }
   }
 }));
-
-// Setup Real-Time Sync Listener for Promo Codes
-onSnapshot(collection(db, 'promo_codes'), (snapshot) => {
-  if (snapshot.empty) {
-    // Seed default codes to Firestore if the collection doesn't exist or is empty
-    const initialPromos: PromoCode[] = [
-      {
-        id: 'SAVE100',
-        name: 'Save 100 Taka Promo',
-        code: 'SAVE100',
-        type: 'Fixed Amount',
-        value: 100,
-        minOrder: 1000,
-        expiryDate: '2026-12-31',
-        usageLimit: 200,
-        usedCount: 0,
-        status: 'Active',
-        createdAt: Date.now(),
-      },
-      {
-        id: 'WELCOME50',
-        name: 'New Customer Welcome',
-        code: 'WELCOME50',
-        type: 'Fixed Amount',
-        value: 50,
-        minOrder: 500,
-        expiryDate: '2026-12-31',
-        usageLimit: 500,
-        usedCount: 0,
-        status: 'Active',
-        createdAt: Date.now(),
-      },
-      {
-        id: 'SAVE10',
-        name: 'Mega 10 Percent Save',
-        code: 'SAVE10',
-        type: 'Percentage',
-        value: 10,
-        minOrder: 1000,
-        expiryDate: '2026-12-31',
-        usageLimit: 100,
-        usedCount: 0,
-        status: 'Active',
-        createdAt: Date.now(),
-      }
-    ];
-    initialPromos.forEach(async (p) => {
-      try {
-        await setDoc(doc(db, 'promo_codes', p.id), p);
-      } catch (err) {
-        console.error('Seed promo code error:', err);
-      }
-    });
-    return;
-  }
-
-  const list: PromoCode[] = [];
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-    list.push({
-      id: docSnap.id,
-      name: data.name || data.code,
-      code: data.code || docSnap.id,
-      type: data.type || 'Fixed Amount',
-      value: Number(data.value) || 0,
-      minOrder: Number(data.minOrder) || 0,
-      expiryDate: data.expiryDate || '',
-      usageLimit: Number(data.usageLimit) || 0,
-      usedCount: Number(data.usedCount) || 0,
-      status: data.status || 'Active',
-      createdAt: data.createdAt || Date.now(),
-    } as PromoCode);
-  });
-  
-  // Update the Zustand store instance with the Firestore synchronized documents list
-  usePromoStore.setState({ promoCodes: list });
-}, (error) => {
-  handleFirestoreError(error, OperationType.GET, 'promo_codes');
-});

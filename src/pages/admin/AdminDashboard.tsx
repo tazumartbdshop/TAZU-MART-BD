@@ -48,8 +48,6 @@ import {
 import { formatPrice } from '../../lib/utils';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
-import { db, auth } from '../../lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 
 import AdminSettings from './AdminSettings';
@@ -665,7 +663,7 @@ function Overview() {
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState('Developer');
 
-  const activeUid = auth.currentUser?.uid || authUser?.id;
+  const activeUid = authUser?.id;
 
   useEffect(() => {
     if (!activeUid) return;

@@ -1,7 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { db } from '../lib/db';
-import { collection, addDoc, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, updateDoc, getDoc } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface SupportTicket {
   id: string;
@@ -103,6 +101,7 @@ interface SupportState {
   activeSessionId: string | null;
   currentCustomerSessionId: string; // The session ID representing the current browser customer
   blockedPhones: string[]; // Track globally blocked phone numbers
+  isLoaded: boolean;
 
   // Actions
   addTicket: (ticket: Omit<SupportTicket, 'id' | 'ticketNumber' | 'status' | 'createdAt'>) => Promise<string>;
@@ -134,6 +133,7 @@ interface SupportState {
   // Real-time Listeners
   subscribeLiveSupport: () => () => void;
   subscribeMessages: (sessionId: string) => () => void;
+  subscribeSettingsAndBroadcasts: () => () => void;
 
   // Settings Action
   updateSettings: (settings: Partial<SupportSettings>) => void;
@@ -163,215 +163,241 @@ const SEED_BROADCASTS: Broadcast[] = [
   }
 ];
 
-const SEED_TICKETS: SupportTicket[] = [];
+export const useSupportStore = create<SupportState>((set, get) => ({
+  tickets: [],
+  sessions: SEED_SESSIONS,
+  broadcasts: SEED_BROADCASTS,
+  settings: DEFAULT_SETTINGS,
+  activeSessionId: null,
+  currentCustomerSessionId: '',
+  blockedPhones: [],
+  isLoaded: false,
 
-export const useSupportStore = create<SupportState>()(
-  persist(
-    (set, get) => ({
-      tickets: [],
-      sessions: SEED_SESSIONS,
-      broadcasts: SEED_BROADCASTS,
-      settings: DEFAULT_SETTINGS,
-      activeSessionId: null,
-      currentCustomerSessionId: '',
-      blockedPhones: [],
+  subscribeSettingsAndBroadcasts: () => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
 
-      addTicket: async (ticketInput) => {
-        const ticketCounter = get().tickets.length + 1001;
-        const ticketNumber = `TKT-${ticketCounter}`;
-        const ticketId = `ticket-${Date.now()}`;
-              const newTicket: SupportTicket = {
-          ...ticketInput,
-          id: ticketId,
-          ticketNumber,
-          status: 'Open',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
+    const loadSettings = async () => {
+      const { data, error } = await supabase.from('settings').select('*').eq('id', 'support_settings').limit(1);
+      if (!error && data && data.length > 0) {
+        set({ settings: { ...DEFAULT_SETTINGS, ...data[0].data } });
+      } else if (!error && data && data.length === 0) {
+        supabase.from('settings').upsert([{ id: 'support_settings', data: DEFAULT_SETTINGS }]).then(({error})=> error && console.warn(error));
+      }
+    };
+    
+    const loadBroadcasts = async () => {
+       const { data, error } = await supabase.from('broadcasts').select('*').order('createdAt', { ascending: false });
+       if (!error && data) {
+           if (data.length === 0) {
+              set({ broadcasts: SEED_BROADCASTS });
+              supabase.from('broadcasts').upsert(SEED_BROADCASTS).then(({error})=> error && console.warn(error));
+           } else {
+              set({ broadcasts: data as Broadcast[] });
+           }
+       }
+    };
 
-        try {
-          const docRef = doc(db, 'support_tickets', ticketId);
-          // Remove undefined fields for Firestore compatibility
-          const cleanTicket = Object.fromEntries(
-            Object.entries(newTicket).filter(([_, v]) => v !== undefined)
-          );
-          await setDoc(docRef, cleanTicket);
-          
-          set((state) => ({
-            tickets: [newTicket, ...state.tickets]
-          }));
-          return ticketNumber;
-        } catch (error) {
-          console.error("Error adding ticket to Firestore:", error);
-          throw error;
+    const loadBlockedPhones = async () => {
+        const { data, error } = await supabase.from('settings').select('*').eq('id', 'blocked_phones').limit(1);
+        if (!error && data && data.length > 0) {
+            set({ blockedPhones: data[0].phones || [] });
         }
-      },
+    };
 
-      updateTicketStatus: (ticketId, status) => {
-        const now = new Date().toISOString();
-        set((state) => ({
-          tickets: state.tickets.map((t) => 
-            t.id === ticketId ? { ...t, status, updatedAt: now } : t
-          )
-        }));
-        const docRef = doc(db, 'support_tickets', ticketId);
-        updateDoc(docRef, { status, updatedAt: now }).catch(err => console.error("Update ticket status failed:", err));
-      },
+    loadSettings();
+    loadBroadcasts();
+    loadBlockedPhones();
 
-      deleteTicket: (ticketId) => {
-        set((state) => ({
-          tickets: state.tickets.filter((t) => t.id !== ticketId)
-        }));
-        const docRef = doc(db, 'support_tickets', ticketId);
-        deleteDoc(docRef).catch(err => console.error("Delete ticket failed:", err));
-      },
-
-      subscribeTickets: () => {
-        const ticketsCol = collection(db, 'support_tickets');
-        const q = query(ticketsCol, orderBy('createdAt', 'desc'));
+    const channel1 = supabase.channel('public:settings:support')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.support_settings' }, loadSettings)
+        .subscribe();
         
-        const unsub = onSnapshot(q, (snapshot) => {
-          const fetchedTickets: SupportTicket[] = [];
-          snapshot.forEach((doc) => {
-            fetchedTickets.push(doc.data() as SupportTicket);
-          });
-          set({ tickets: fetchedTickets });
-        }, (error) => {
-          console.error("Error listening to support tickets:", error);
-        });
-        return unsub;
-      },
-
-      addBroadcast: (broadcastInput) => {
-        const id = `BC-${Math.floor(1000 + Math.random() * 9000)}`;
-        const docRef = doc(db, 'broadcasts', id);
-        const newBC = { ...broadcastInput, id, createdAt: new Date().toISOString() };
+    const channel2 = supabase.channel('public:broadcasts')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'broadcasts' }, loadBroadcasts)
+        .subscribe();
         
-        // Remove undefined fields for Firestore
-        const cleanBC = Object.fromEntries(
-          Object.entries(newBC).filter(([_, v]) => v !== undefined)
-        );
+    const channel3 = supabase.channel('public:settings:blocked_phones')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.blocked_phones' }, loadBlockedPhones)
+        .subscribe();
 
-        set((state) => ({
-          broadcasts: [newBC, ...state.broadcasts]
-        }));
-        setDoc(docRef, cleanBC).catch(err => console.error("Firestore addBroadcast failed:", err));
-      },
+    set({ isLoaded: true });
 
-      deleteBroadcast: (broadcastId) => {
-        set((state) => ({
-          broadcasts: state.broadcasts.filter((b) => b.id !== broadcastId)
-        }));
-        const docRef = doc(db, 'broadcasts', broadcastId);
-        deleteDoc(docRef).catch(err => console.error("Firestore deleteDoc failed:", err));
-      },
+    return () => {
+       supabase.removeChannel(channel1);
+       supabase.removeChannel(channel2);
+       supabase.removeChannel(channel3);
+    };
+  },
 
-      pinBroadcast: (broadcastId) => {
-        const broadcasts = get().broadcasts;
-        const found = broadcasts.find(b => b.id === broadcastId);
-        if (found) {
-          const newPinned = !found.pinned;
-          set((state) => ({
-            broadcasts: state.broadcasts.map((b) =>
-              b.id === broadcastId ? { ...b, pinned: newPinned } : b
-            )
-          }));
-          const docRef = doc(db, 'broadcasts', broadcastId);
-          
-          const updatedBC = { ...found, pinned: newPinned };
-          const cleanUpdatedBC = Object.fromEntries(
-            Object.entries(updatedBC).filter(([_, v]) => v !== undefined)
-          );
+  addTicket: async (ticketInput) => {
+    const supabase = getSupabase();
+    const ticketCounter = get().tickets.length + 1001;
+    const ticketNumber = `TKT-${ticketCounter}`;
+    const ticketId = `ticket-${Date.now()}`;
+    const newTicket: SupportTicket = {
+      ...ticketInput,
+      id: ticketId,
+      ticketNumber,
+      status: 'Open',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
 
-          setDoc(docRef, cleanUpdatedBC, { merge: true })
-            .catch(err => console.error("Firestore pinBroadcast failed:", err));
+    try {
+      if (supabase) {
+        const { error } = await supabase.from('support_tickets').insert([newTicket]);
+        if (error) throw error;
+      }
+      return ticketNumber;
+    } catch (error) {
+      console.error("Error adding ticket to Supabase:", error);
+      throw error;
+    }
+  },
+
+  updateTicketStatus: async (ticketId, status) => {
+    const now = new Date().toISOString();
+    const supabase = getSupabase();
+    if (supabase) {
+      await supabase.from('support_tickets').update({ status, updatedAt: now }).eq('id', ticketId);
+    }
+  },
+
+  deleteTicket: async (ticketId) => {
+    const supabase = getSupabase();
+    if (supabase) {
+      await supabase.from('support_tickets').delete().eq('id', ticketId);
+    }
+  },
+
+  subscribeTickets: () => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+    
+    const loadTickets = async () => {
+      const { data, error } = await supabase.from('support_tickets').select('*').order('createdAt', { ascending: false });
+      if (!error && data) {
+         set({ tickets: data as SupportTicket[] });
+      }
+    };
+    
+    loadTickets();
+    const channel = supabase.channel('public:support_tickets')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, loadTickets)
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  },
+
+  addBroadcast: (broadcastInput) => {
+    const supabase = getSupabase();
+    const id = `BC-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newBC = { ...broadcastInput, id, createdAt: new Date().toISOString() };
+    if (supabase) {
+        supabase.from('broadcasts').insert([newBC]).then(({error}) => { if (error) console.error("Supabase addBroadcast failed:", error); });
+    }
+  },
+
+  deleteBroadcast: (broadcastId) => {
+    const supabase = getSupabase();
+    if (supabase) {
+       supabase.from('broadcasts').delete().eq('id', broadcastId).then(({error}) => { if (error) console.error(error); });
+    }
+  },
+
+  pinBroadcast: (broadcastId) => {
+    const broadcasts = get().broadcasts;
+    const found = broadcasts.find(b => b.id === broadcastId);
+    if (found) {
+      const newPinned = !found.pinned;
+      const supabase = getSupabase();
+      if (supabase) supabase.from('broadcasts').update({ pinned: newPinned }).eq('id', broadcastId);
+    }
+  },
+
+  setActiveSession: (sessionId) => {
+    set({ activeSessionId: sessionId });
+    if (sessionId) {
+      get().setSeenStatus(sessionId, 'admin');
+    }
+  },
+
+  sendMessageToSession: async (sessionId, sender, text, imageUrl, fileUrl, fileName) => {
+    const supabase = getSupabase();
+    const messageId = `msg-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newMessage: ChatMessage = {
+      id: messageId,
+      sender,
+      text,
+      imageUrl,
+      fileUrl,
+      fileName,
+      timestamp: new Date().toISOString(),
+      seen: sender === 'admin' && get().activeSessionId === sessionId,
+      deliveryStatus: 'sending'
+    };
+
+    set((state) => {
+      const updatedSessions = state.sessions.map((sess) => {
+        if (sess.id === sessionId) {
+          const updatedMessages = [...sess.messages, newMessage];
+          return {
+            ...sess,
+            messages: updatedMessages,
+            lastMessageAt: newMessage.timestamp,
+            customerOnline: sender === 'customer' ? true : sess.customerOnline
+          };
         }
-      },
+        return sess;
+      });
 
-      setActiveSession: (sessionId) => {
-        set({ activeSessionId: sessionId });
-        if (sessionId) {
-          get().setSeenStatus(sessionId, 'admin');
-        }
-      },
-
-      sendMessageToSession: async (sessionId, sender, text, imageUrl, fileUrl, fileName) => {
-        console.log("!!! SENDING TO SESSION:", sessionId, "SENDER:", sender, "TEXT:", text);                
-        const messageId = `msg-${Math.floor(100000 + Math.random() * 900000)}`;
-        const newMessage: ChatMessage = {
-          id: messageId,
-          sender,
-          text,
-          imageUrl,
-          fileUrl,
-          fileName,
-          timestamp: new Date().toISOString(),
-          seen: sender === 'admin' && get().activeSessionId === sessionId,
-          deliveryStatus: 'sending'
+      const sessionExists = updatedSessions.some(s => s.id === sessionId);
+      
+      if (!sessionExists && sessionId === state.currentCustomerSessionId) {
+        const newSess: ChatSession = {
+          id: sessionId,
+          customerName: 'Anonymous Customer',
+          customerPhone: 'N/A',
+          customerOnline: true,
+          lastMessageAt: newMessage.timestamp,
+          messages: [newMessage],
+          status: 'open'
         };
+        return { sessions: [...updatedSessions, newSess] };
+      }
+      return { sessions: updatedSessions };
+    });
 
-        set((state) => {
-          console.log("!!! CURRENT SESSIONS:", state.sessions.map(s => s.id));
-          const updatedSessions = state.sessions.map((sess) => {
-            if (sess.id === sessionId) {
-              console.log("!!! SESSION MATCH", sess.id);
-              const updatedMessages = [...sess.messages, newMessage];
-              return {
-                ...sess,
-                messages: updatedMessages,
-                lastMessageAt: newMessage.timestamp,
-                customerOnline: sender === 'customer' ? true : sess.customerOnline
-              };
-            }
-            return sess;
-          });
-
-          const sessionExists = updatedSessions.some(s => s.id === sessionId);
-          console.log("!!! SESSION EXISTS", sessionExists, "SESSION ID", sessionId, "CURRENT", state.currentCustomerSessionId);
-          
-          if (!sessionExists && sessionId === state.currentCustomerSessionId) {
-            console.log("!!! CREATING NEW SESSION");
-            const newSess: ChatSession = {
-              id: sessionId,
-              customerName: 'Anonymous Customer',
-              customerPhone: 'N/A',
-              customerOnline: true,
-              lastMessageAt: newMessage.timestamp,
-              messages: [newMessage],
-              status: 'open'
-            };
-            return { sessions: [...updatedSessions, newSess] };
-          }
-          return { sessions: updatedSessions };
-        });
-
-        try {
-          const conversationRef = doc(db, 'conversations', sessionId);
+    try {
+      if (supabase) {
+          // store message in conversation_messages
           const msgData: Record<string, any> = {
             id: newMessage.id,
+            conversation_id: sessionId,
             sender: newMessage.sender,
             timestamp: newMessage.timestamp,
             seen: newMessage.seen,
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
           };
           if (newMessage.text) msgData.text = newMessage.text;
           if (newMessage.imageUrl) msgData.imageUrl = newMessage.imageUrl;
           if (newMessage.fileUrl) msgData.fileUrl = newMessage.fileUrl;
           if (newMessage.fileName) msgData.fileName = newMessage.fileName;
-
-          await addDoc(collection(conversationRef, 'messages'), msgData);
-
-          // Update main session details in Firestore as well for Admin sidebar real-time sync
+          
+          await supabase.from('conversation_messages').insert([msgData]);
+          
+          // store conversation updates
           const sessionUpdate: any = {
-            id: sessionId,
-            lastMessageAt: newMessage.timestamp,
-            lastMessageText: newMessage.text || '📄 Attachment File',
+             id: sessionId,
+             lastMessageAt: newMessage.timestamp,
+             lastMessageText: newMessage.text || '📄 Attachment File',
           };
+          
           if (sender === 'customer') {
             sessionUpdate.customerOnline = true;
-            // Use increment if needed, but since we are merging, we'll try to increment on server side properly
-            // Here we just increment in firestore by reading first or assuming we have it.
-            // Simplified: Increment in store if it's there
             const currentSess = get().sessions.find(s => s.id === sessionId);
             if (currentSess && currentSess.id !== 'TAZU-MART-BD-OFFICIAL') {
               const currentUnread = currentSess.unreadCount || 0;
@@ -380,286 +406,279 @@ export const useSupportStore = create<SupportState>()(
               sessionUpdate.unreadCount = 1;
             }
           }
-
-          await setDoc(conversationRef, sessionUpdate, { merge: true });
-        } catch (error) {
-          console.error("FAILED TO SAVE TO FIRESTORE", error);
-        }
-        
-        setTimeout(() => {
-          set((state) => ({
-            sessions: state.sessions.map((sess) => {
-              if (sess.id === sessionId) {
-                return {
-                  ...sess,
-                  messages: sess.messages.map((m) =>
-                    m.id === messageId ? { ...m, deliveryStatus: 'sent' } : m
-                  )
-                };
-              }
-              return sess;
-            })
-          }));
-        }, 600);
-      },
-
-      setTypingIndicator: (sessionId, isTyping) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === sessionId ? { ...s, isTyping } : s
-          )
-        }));
-      },
-
-      setSeenStatus: (sessionId, sender) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) => {
-            if (s.id === sessionId) {
-              return {
-                ...s,
-                unreadCount: 0,
-                messages: s.messages.map((m) =>
-                  m.sender !== sender ? { ...m, seen: true } : m
-                )
-              };
-            }
-            return s;
-          })
-        }));
-
-        // Reset unreadCount in Firestore
-        const sessionRef = doc(db, 'conversations', sessionId);
-        updateDoc(sessionRef, { unreadCount: 0 }).catch(err => console.error("Update unreadCount failed:", err));
-        
-        // Mark all messages as seen in Firestore for this session and sender
-        // Note: For simplicity we are just updating the session level unreadCount which controls the badge.
-      },
-
-      closeSession: (sessionId) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === sessionId ? { ...s, status: 'closed' } : s
-          )
-        }));
-      },
-
-      solveSession: (sessionId) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === sessionId ? { ...s, status: 'solved' } : s
-          )
-        }));
-      },
-
-      createNewSession: (name, phone, email, avatar, uid) => {
-        const cleanPhoneInput = phone.replace(/[+\s-]+/g, '').replace(/^880/, '0');
-        const currentEmail = email?.toLowerCase().trim();
-        
-        // Use User UID as the ultimate deterministic ID for persistence (like Messenger/WhatsApp)
-        // If not logged in, fallback to email-based or phone-based deterministic ID
-        const stableId = uid 
-          ? `SESS-CHAT-${uid}`
-          : (currentEmail 
-              ? `SESS-CHAT-${currentEmail.replace(/[^a-zA-Z0-9]/g, '_')}` 
-              : `SESS-CHAT-${cleanPhoneInput || 'GUEST'}`);
-
-        const sessions = get().sessions;
-        const foundSession = sessions.find(s => s.id === stableId || s.customerUid === uid);
-        const ticketNumber = foundSession?.ticketNumber || `SUP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-
-        const sessionData: any = {
-          id: stableId,
-          customerName: name,
-          customerPhone: phone,
-          customerOnline: true,
-          lastMessageAt: new Date().toISOString(),
-          status: 'open',
-          ticketNumber: ticketNumber
-        };
-        if (email) sessionData.customerEmail = email;
-        if (avatar) sessionData.customerAvatar = avatar;
-        if (uid) sessionData.customerUid = uid;
-
-        set({ currentCustomerSessionId: stableId });
-        
-        // Persistent sync to Firestore - One Customer, One Document
-        const sessRef = doc(db, 'conversations', stableId);
-        setDoc(sessRef, sessionData, { merge: true }).catch(err => console.error("Firestore sync error:", err));
-
-        if (foundSession) {
-          // Update local state for existing session
-          set((state) => ({
-            sessions: state.sessions.map(s => 
-              s.id === stableId ? { ...s, ...sessionData, customerOnline: true } : s
-            )
-          }));
-          return stableId;
-        }
-
-        // Add as new session in local state if it didn't exist
-        const newSess: ChatSession = {
-          ...sessionData,
-          customerEmail: email || '',
-          customerAvatar: avatar || '',
-          customerOnline: true,
-          messages: [],
-          internalNotes: '',
-          assignedModerator: ''
-        };
-
-        set((state) => ({
-          sessions: [...state.sessions, newSess]
-        }));
-
-        return stableId;
-      },
-
-      updateSettings: (newSettings) => {
-        set((state) => ({
-          settings: { ...state.settings, ...newSettings }
-        }));
-      },
-
-      updateSessionNotes: (sessionId, notes) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === sessionId ? { ...s, internalNotes: notes } : s
-          )
-        }));
-        const sessRef = doc(db, 'conversations', sessionId);
-        updateDoc(sessRef, { internalNotes: notes }).catch(err => console.error("Update notes failed:", err));
-      },
-
-      assignSessionModerator: (sessionId, moderator) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === sessionId ? { ...s, assignedModerator: moderator } : s
-          )
-        }));
-        const sessRef = doc(db, 'conversations', sessionId);
-        updateDoc(sessRef, { assignedModerator: moderator }).catch(err => console.error("Assign moderator failed:", err));
-      },
-
-      updateSessionStatus: (sessionId, status) => {
-        set((state) => ({
-          sessions: state.sessions.map((s) =>
-            s.id === sessionId ? { ...s, status } : s
-          )
-        }));
-        const sessRef = doc(db, 'conversations', sessionId);
-        updateDoc(sessRef, { status }).catch(err => console.error("Update status failed:", err));
-      },
-
-      toggleBlockPhone: (phone, sessionId) => {
-        const cleanPhone = phone.replace(/[+\s-]+/g, '');
-        set((state) => {
-          const isBlocked = state.blockedPhones.includes(cleanPhone);
-          const nextBlocked = isBlocked 
-            ? state.blockedPhones.filter(p => p !== cleanPhone)
-            : [...state.blockedPhones, cleanPhone];
-          
-          return { blockedPhones: nextBlocked };
-        });
-
-        // Persist to the specific session if provided
-        if (sessionId) {
-          const sessRef = doc(db, 'conversations', sessionId);
-          getDoc(sessRef).then(snapshot => {
-            if (snapshot.exists()) {
-              const currentStatus = snapshot.data().isBlocked || false;
-              updateDoc(sessRef, { isBlocked: !currentStatus }).catch(err => console.error("Toggle block Firestore failed:", err));
-            }
-          }).catch(err => console.error("getDoc session toggleBlockPhone failed:", err));
-        }
-      },
-
-      subscribeLiveSupport: () => {
-        const conversationsCol = collection(db, 'conversations');
-        const unsub = onSnapshot(conversationsCol, (snapshot) => {
-          set((state) => {
-            const updatedSessions = [...state.sessions];
-            snapshot.docChanges().forEach((change) => {
-              const docData = change.doc.data();
-              const sessId = change.doc.id;
-              
-              const existingSessIdx = updatedSessions.findIndex(s => s.id === sessId);
-              const customSess: ChatSession = {
-                id: sessId,
-                customerName: docData.customerName || 'Anonymous Customer',
-                customerPhone: docData.customerPhone || 'N/A',
-                customerEmail: docData.customerEmail || '',
-                customerAvatar: docData.customerAvatar || '',
-                customerOnline: docData.customerOnline !== false,
-                lastMessageAt: docData.lastMessageAt || new Date().toISOString(),
-                lastMessageText: docData.lastMessageText || '',
-                unreadCount: docData.unreadCount || 0,
-                status: docData.status || 'open',
-                ticketNumber: docData.ticketNumber || '',
-                assignedModerator: docData.assignedModerator || '',
-                internalNotes: docData.internalNotes || '',
-                isBlocked: docData.isBlocked || false,
-                messages: existingSessIdx > -1 ? updatedSessions[existingSessIdx].messages : []
-              };
-
-              if (change.type === 'added' || change.type === 'modified') {
-                if (existingSessIdx > -1) {
-                  updatedSessions[existingSessIdx] = {
-                    ...updatedSessions[existingSessIdx],
-                    ...customSess,
-                    messages: updatedSessions[existingSessIdx].messages
-                  };
-                } else {
-                  updatedSessions.push(customSess);
-                }
-              } else if (change.type === 'removed') {
-                if (existingSessIdx > -1) {
-                  updatedSessions.splice(existingSessIdx, 1);
-                }
-              }
-            });
-
-            return { sessions: updatedSessions };
-          });
-        }, (error) => {
-          console.error("error listening to live support sessions:", error);
-        });
-        return unsub;
-      },
-
-      subscribeMessages: (sessionId) => {
-        const messagesCol = collection(db, 'conversations', sessionId, 'messages');
-        const q = query(messagesCol, orderBy('timestamp', 'asc'));
-        
-        const unsub = onSnapshot(q, (snapshot) => {
-          const msgs: ChatMessage[] = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            msgs.push({
-              id: doc.id,
-              sender: data.sender || 'customer',
-              text: data.text,
-              imageUrl: data.imageUrl,
-              fileUrl: data.fileUrl,
-              fileName: data.fileName,
-              timestamp: data.timestamp || new Date().toISOString(),
-              seen: data.seen || false,
-              deliveryStatus: data.deliveryStatus || 'sent'
-            });
-          });
-
-          set((state) => ({
-            sessions: state.sessions.map((s) =>
-              s.id === sessionId ? { ...s, messages: msgs } : s
-            )
-          }));
-        }, (error) => {
-          console.error("error listening to messages for session:", sessionId, error);
-        });
-        return unsub;
+          await supabase.from('conversations').upsert([sessionUpdate]);
       }
-    }),
-    {
-      name: 'tazumart-support-storage-v2'
+    } catch (error) {
+      console.error("FAILED TO SAVE TO SUPABASE", error);
     }
-  )
-);
+    
+    setTimeout(() => {
+      set((state) => ({
+        sessions: state.sessions.map((sess) => {
+          if (sess.id === sessionId) {
+            return {
+              ...sess,
+              messages: sess.messages.map((m) =>
+                m.id === messageId ? { ...m, deliveryStatus: 'sent' } : m
+              )
+            };
+          }
+          return sess;
+        })
+      }));
+    }, 600);
+  },
+
+  setTypingIndicator: (sessionId, isTyping) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId ? { ...s, isTyping } : s
+      )
+    }));
+  },
+
+  setSeenStatus: async (sessionId, sender) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) => {
+        if (s.id === sessionId) {
+          return {
+            ...s,
+            unreadCount: 0,
+            messages: s.messages.map((m) =>
+              m.sender !== sender ? { ...m, seen: true } : m
+            )
+          };
+        }
+        return s;
+      })
+    }));
+
+    const supabase = getSupabase();
+    if (supabase) {
+        await supabase.from('conversations').update({ unreadCount: 0 }).eq('id', sessionId);
+        // also set messages as seen
+        await supabase.from('conversation_messages').update({ seen: true }).eq('conversation_id', sessionId).neq('sender', sender);
+    }
+  },
+
+  closeSession: async (sessionId) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId ? { ...s, status: 'closed' } : s
+      )
+    }));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('conversations').update({ status: 'closed' }).eq('id', sessionId);
+  },
+
+  solveSession: async (sessionId) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId ? { ...s, status: 'solved' } : s
+      )
+    }));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('conversations').update({ status: 'solved' }).eq('id', sessionId);
+  },
+
+  createNewSession: (name, phone, email, avatar, uid) => {
+    const cleanPhoneInput = phone.replace(/[+\s-]+/g, '').replace(/^880/, '0');
+    const currentEmail = email?.toLowerCase().trim();
+    
+    const stableId = uid 
+      ? `SESS-CHAT-${uid}`
+      : (currentEmail 
+          ? `SESS-CHAT-${currentEmail.replace(/[^a-zA-Z0-9]/g, '_')}` 
+          : `SESS-CHAT-${cleanPhoneInput || 'GUEST'}`);
+
+    const sessions = get().sessions;
+    const foundSession = sessions.find(s => s.id === stableId || s.customerUid === uid);
+    const ticketNumber = foundSession?.ticketNumber || `SUP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const sessionData: any = {
+      id: stableId,
+      customerName: name,
+      customerPhone: phone,
+      customerOnline: true,
+      lastMessageAt: new Date().toISOString(),
+      status: 'open',
+      ticketNumber: ticketNumber
+    };
+    if (email) sessionData.customerEmail = email;
+    if (avatar) sessionData.customerAvatar = avatar;
+    if (uid) sessionData.customerUid = uid;
+
+    set({ currentCustomerSessionId: stableId });
+    
+    const supabase = getSupabase();
+    if (supabase) {
+       supabase.from('conversations').upsert([sessionData]).then(({error}) => { if (error) console.error("Supabase sync error:", error); });
+    }
+
+    if (foundSession) {
+      set((state) => ({
+        sessions: state.sessions.map(s => 
+          s.id === stableId ? { ...s, ...sessionData, customerOnline: true } : s
+        )
+      }));
+      return stableId;
+    }
+
+    const newSess: ChatSession = {
+      ...sessionData,
+      customerEmail: email || '',
+      customerAvatar: avatar || '',
+      customerOnline: true,
+      messages: [],
+      internalNotes: '',
+      assignedModerator: ''
+    };
+
+    set((state) => ({
+      sessions: [...state.sessions, newSess]
+    }));
+
+    return stableId;
+  },
+
+  updateSettings: async (newSettings) => {
+    const nextSettings = { ...get().settings, ...newSettings };
+    set({ settings: nextSettings });
+    const supabase = getSupabase();
+    if (supabase) supabase.from('settings').upsert([{ id: 'support_settings', data: nextSettings }]);
+  },
+
+  updateSessionNotes: async (sessionId, notes) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId ? { ...s, internalNotes: notes } : s
+      )
+    }));
+    const supabase = getSupabase();
+    if (supabase) await supabase.from('conversations').update({ internalNotes: notes }).eq('id', sessionId);
+  },
+
+  assignSessionModerator: async (sessionId, moderator) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId ? { ...s, assignedModerator: moderator } : s
+      )
+    }));
+    const supabase = getSupabase();
+    if (supabase) await supabase.from('conversations').update({ assignedModerator: moderator }).eq('id', sessionId);
+  },
+
+  updateSessionStatus: async (sessionId, status) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === sessionId ? { ...s, status } : s
+      )
+    }));
+    const supabase = getSupabase();
+    if(supabase) await supabase.from('conversations').update({ status }).eq('id', sessionId);
+  },
+
+  toggleBlockPhone: async (phone, sessionId) => {
+    const cleanPhone = phone.replace(/[+\s-]+/g, '');
+    let newBlocked: string[] = [];
+    set((state) => {
+      const isBlocked = state.blockedPhones.includes(cleanPhone);
+      const nextBlocked = isBlocked 
+        ? state.blockedPhones.filter(p => p !== cleanPhone)
+        : [...state.blockedPhones, cleanPhone];
+      newBlocked = nextBlocked;
+      return { blockedPhones: nextBlocked };
+    });
+
+    const supabase = getSupabase();
+    if (supabase) {
+       await supabase.from('settings').upsert([{ id: 'blocked_phones', phones: newBlocked }]);
+       if (sessionId) {
+           const { data } = await supabase.from('conversations').select('isBlocked').eq('id', sessionId).single();
+           if (data) {
+              await supabase.from('conversations').update({ isBlocked: !data.isBlocked }).eq('id', sessionId);
+           }
+       }
+    }
+  },
+
+  subscribeLiveSupport: () => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+    
+    // Subscribe to all conversations for live support
+    const loadConversations = async () => {
+        const { data, error } = await supabase.from('conversations').select('*');
+        if (!error && data) {
+           set(state => {
+              const currentSessions = [...state.sessions];
+              const fetchedSessions = data.map((docData: any) => {
+                 const existingSessIdx = currentSessions.findIndex(s => s.id === docData.id);
+                 return {
+                    id: docData.id,
+                    customerName: docData.customerName || 'Anonymous Customer',
+                    customerPhone: docData.customerPhone || 'N/A',
+                    customerEmail: docData.customerEmail || '',
+                    customerAvatar: docData.customerAvatar || '',
+                    customerOnline: docData.customerOnline !== false,
+                    lastMessageAt: docData.lastMessageAt || new Date().toISOString(),
+                    lastMessageText: docData.lastMessageText || '',
+                    unreadCount: docData.unreadCount || 0,
+                    status: docData.status || 'open',
+                    ticketNumber: docData.ticketNumber || '',
+                    assignedModerator: docData.assignedModerator || '',
+                    internalNotes: docData.internalNotes || '',
+                    isBlocked: docData.isBlocked || false,
+                    messages: existingSessIdx > -1 ? currentSessions[existingSessIdx].messages : []
+                 };
+              });
+              return { sessions: fetchedSessions };
+           });
+        }
+    };
+    
+    loadConversations();
+    const channel = supabase.channel('public:conversations')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, loadConversations)
+        .subscribe();
+        
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  },
+
+  subscribeMessages: (sessionId) => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+    
+    const loadMessages = async () => {
+        const { data, error } = await supabase.from('conversation_messages').select('*').eq('conversation_id', sessionId).order('timestamp', { ascending: true });
+        if (!error && data) {
+           const msgs: ChatMessage[] = data.map((d: any) => ({
+              id: d.id,
+              sender: d.sender || 'customer',
+              text: d.text,
+              imageUrl: d.imageUrl,
+              fileUrl: d.fileUrl,
+              fileName: d.fileName,
+              timestamp: d.timestamp || new Date().toISOString(),
+              seen: d.seen || false,
+              deliveryStatus: d.deliveryStatus || 'sent'
+           }));
+           
+           set(state => ({
+              sessions: state.sessions.map((s) => s.id === sessionId ? { ...s, messages: msgs } : s)
+           }));
+        }
+    };
+    
+    loadMessages();
+    const channel = supabase.channel(`public:conversation_messages:${sessionId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'conversation_messages', filter: `conversation_id=eq.${sessionId}` }, loadMessages)
+        .subscribe();
+        
+    return () => {
+       supabase.removeChannel(channel);
+    };
+  }
+}));

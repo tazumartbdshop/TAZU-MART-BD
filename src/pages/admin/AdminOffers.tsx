@@ -15,8 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Routes, Route, useNavigate, useParams } from 'react-router-dom';
 import { BroadcastManager } from './components/BroadcastManager';
 import AdminPopupOfferManager from './AdminPopupOfferManager';
-import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
+import { getSupabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 
 export default function AdminOffers() {
@@ -44,15 +43,29 @@ function AllOffersView() {
   const [isUpdatingBanner, setIsUpdatingBanner] = useState<boolean>(false);
 
   useEffect(() => {
-    const docRef = doc(db, 'settings', 'offers_page_banner');
-    const unsub = onSnapshot(docRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setOfferBannerUrl(snapshot.data().imageUrl || '');
+    const supabase = getSupabase();
+    if (!supabase) return;
+    
+    supabase.from('settings').select('*').eq('id', 'offers_page_banner').limit(1).then(({ data, error }) => {
+      if (data && data.length > 0) {
+        setOfferBannerUrl(data[0].imageUrl || '');
       }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'settings/offers_page_banner');
     });
-    return () => unsub();
+
+    const channel = supabase
+      .channel('public:settings:offers_banner')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.offers_page_banner' }, (payload) => {
+        if (payload.new) {
+           setOfferBannerUrl((payload.new as any).imageUrl || '');
+        } else {
+           setOfferBannerUrl('');
+        }
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,7 +75,10 @@ function AllOffersView() {
     try {
       const { uploadImage } = await import('../../lib/imageUtils');
       const downloadUrl = await uploadImage(file, 'banners', `offers-banner-${Date.now()}`);
-      await setDoc(doc(db, 'settings', 'offers_page_banner'), { imageUrl: downloadUrl });
+      const supabase = getSupabase();
+      if (supabase) {
+         await supabase.from('settings').upsert([{ id: 'offers_page_banner', imageUrl: downloadUrl }]);
+      }
       toast.success("✅ Offers page banner uploaded!");
     } catch (err) {
       console.error(err);
@@ -76,7 +92,10 @@ function AllOffersView() {
     if (confirm("Remove this custom offer banner? The fallback banner will be shown instead.")) {
       setIsUpdatingBanner(true);
       try {
-        await deleteDoc(doc(db, 'settings', 'offers_page_banner'));
+        const supabase = getSupabase();
+        if (supabase) {
+            await supabase.from('settings').delete().eq('id', 'offers_page_banner');
+        }
         setOfferBannerUrl('');
         toast.success("✅ Offers banner removed!");
       } catch (err) {

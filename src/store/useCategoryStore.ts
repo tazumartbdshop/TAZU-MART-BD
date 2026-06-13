@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, onSnapshot, deleteField } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 import { deleteImage } from '../lib/imageUtils';
 
 export interface Category {
@@ -42,46 +41,41 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   isLoaded: false,
   
   addCategory: async (payload) => {
-    try {
-      const id = doc(collection(db, 'categories')).id;
-      const newCategory: Category = {
-        ...payload,
-        id,
-        createdAt: new Date().toISOString(),
-      };
-      
-      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
-      await setDoc(docRef, {
-        categoryList: {
-          [id]: newCategory
-        }
-      }, { merge: true });
-    } catch (error) {
-      console.error("Firebase setDoc error in addCategory:", error);
-      handleFirestoreError(error, OperationType.WRITE, 'categories/WQxF5FxiMKWRLemwIVwE');
-      throw error;
+    const supabase = getSupabase();
+    const id = `cat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const newCategory: Category = {
+      ...payload,
+      id,
+      createdAt: new Date().toISOString(),
+    };
+    
+    if (supabase) {
+      const { error } = await supabase.from('categories').insert([newCategory]);
+      if (error && error.code !== '42P01') console.error("Supabase insert error", error);
+    } else {
+        const currentCats = get().categories;
+        set({ categories: [...currentCats, newCategory] });
     }
   },
   
   updateCategory: async (id, payload) => {
-    try {
-      const existing = get().categories.find(c => c.id === id);
-      const mergedPayload = existing ? { ...existing, ...payload } : payload;
-      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
-      await setDoc(docRef, {
-        categoryList: {
-          [id]: mergedPayload
-        }
-      }, { merge: true });
-    } catch (error) {
-      console.error("Firebase setDoc error in updateCategory:", error);
-      handleFirestoreError(error, OperationType.WRITE, 'categories/WQxF5FxiMKWRLemwIVwE');
-      throw error;
+    const supabase = getSupabase();
+    const existing = get().categories.find(c => c.id === id);
+    const mergedPayload = existing ? { ...existing, ...payload } : payload;
+    
+    if (supabase) {
+      const { error } = await supabase.from('categories').update(mergedPayload).eq('id', id);
+      if (error && error.code !== '42P01') console.error("Supabase update error", error);
+    } else {
+        const newCats = get().categories.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
+        set({ categories: newCats as Category[] });
     }
   },
   
   deleteCategory: async (id) => {
     const category = get().categories.find(c => c.id === id);
+    const supabase = getSupabase();
+    
     if (category) {
       try {
         const urlsToDelete = new Set<string>();
@@ -101,46 +95,51 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         console.error("Failed to import imageUtils during deleteCategory:", importErr);
       }
     }
-    try {
-      const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
-      await setDoc(docRef, {
-        categoryList: {
-          [id]: deleteField()
-        }
-      }, { merge: true });
-    } catch (error) {
-      console.error("Firebase setDoc error in deleteCategory:", error);
-      handleFirestoreError(error, OperationType.WRITE, 'categories/WQxF5FxiMKWRLemwIVwE');
-      throw error;
+    
+    if (supabase) {
+      const { error } = await supabase.from('categories').delete().eq('id', id);
+      if (error && error.code !== '42P01') console.error("Supabase delete error", error);
+    } else {
+        const newCats = get().categories.filter(c => c.id !== id);
+        set({ categories: newCats });
     }
   },
   
   clearDemoData: () => set(() => ({ categories: [] })),
   
   subscribe: () => {
-    const docRef = doc(db, 'categories', 'WQxF5FxiMKWRLemwIVwE');
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const categoryList = data.categoryList || {};
-        let categories: Category[] = [];
-        if (typeof categoryList === 'object' && !Array.isArray(categoryList)) {
-          categories = Object.entries(categoryList).map(([id, catData]: [string, any]) => ({
-            id,
-            ...catData
-          }));
-        } else if (Array.isArray(categoryList)) {
-          categories = categoryList;
+    const supabase = getSupabase();
+    if (!supabase) {
+        set({ isLoaded: true });
+        return () => {}; // fallback
+    }
+
+    supabase.from('categories').select('*')
+      .order('displayOrder', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) {
+            set({ categories: data as Category[], isLoaded: true });
+        } else {
+            if (error && error.code !== '42P01') console.error("Fetch categories error:", error);
+            set({ isLoaded: true });
         }
-        categories.sort((a, b) => (Number(a.displayOrder) ?? 0) - (Number(b.displayOrder) ?? 0));
-        set({ categories, isLoaded: true });
-      } else {
-        set({ categories: [], isLoaded: true });
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'categories/WQxF5FxiMKWRLemwIVwE');
     });
-    return unsubscribe;
+    
+    const channel = supabase
+      .channel('public:categories')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, (payload) => {
+        supabase.from('categories').select('*').order('displayOrder', { ascending: true })
+            .then(({ data, error }) => {
+                if (!error && data) {
+                    set({ categories: data as Category[], isLoaded: true });
+                }
+            });
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 }));
 

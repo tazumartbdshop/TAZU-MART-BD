@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { getSupabase } from '../lib/supabase';
 
 export interface FAQEntry {
   id: string;
@@ -101,6 +101,9 @@ export interface AIState {
     avgRating: number;
     totalTokens: number;
   };
+  
+  isLoaded: boolean;
+  subscribe: () => () => void;
 
   // Actions
   setAiEnabled: (enabled: boolean) => void;
@@ -139,23 +142,21 @@ const DEFAULT_CUSTOM_ANSWERS: CustomAnswerEntry[] = [
   { id: 'c3', keyword: 'office, address, location, ঠিকানা', answer: 'Our central warehouse is situated in Dhaka, Bangladesh. We process nationwide shipments from this terminal everyday.' }
 ];
 
-export const useAIStore = create<AIState>()(
-  persist(
-    (set, get) => ({
-      aiEnabled: true,
-      settings: {
-        aiName: 'Tazu AI Assistant',
-        model: 'GPT-4o Latest (OpenAI)',
-        temperature: 0.7,
-        welcomeMessage: 'Hello! I am your AI Support Assistant for Tazu Mart. How can I help you find products or solve your issues today? \n\nহ্যালো! আমি তজু মার্টের আপনার এআই সাপোর্ট অ্যাসিস্ট্যান্ট। আজ আমি আপনাকে কীভাবে পণ্য খুঁজে পেতে বা আপনার সমস্যার সমাধান করতে সাহায্য করতে পারি?',
-        apiType: 'hybrid',
-        openAIKey: '',
-        geminiKey: '',
-        defaultLanguage: 'Bengali',
-        secondaryLanguage: 'English'
-      },
-      prompt: {
-        systemPrompt: `You are the official AI Assistant for TAZU MART BD.
+const initialState = {
+  aiEnabled: true,
+  settings: {
+    aiName: 'Tazu AI Assistant',
+    model: 'GPT-4o Latest (OpenAI)',
+    temperature: 0.7,
+    welcomeMessage: 'Hello! I am your AI Support Assistant for Tazu Mart. How can I help you find products or solve your issues today? \n\nহ্যালো! আমি তজু মার্টের আপনার এআই সাপোর্ট অ্যাসিস্ট্যান্ট। আজ আমি আপনাকে কীভাবে পণ্য খুঁজে পেতে বা আপনার সমস্যার সমাধান করতে সাহায্য করতে পারি?',
+    apiType: 'hybrid' as const,
+    openAIKey: '',
+    geminiKey: '',
+    defaultLanguage: 'Bengali',
+    secondaryLanguage: 'English'
+  },
+  prompt: {
+    systemPrompt: `You are the official AI Assistant for TAZU MART BD.
 Your goal is to provide intelligent support and product recommendations based on REAL website data.
 Priority for your responses:
 1. Product Data: If a user asks for products, lists, or specific items, use the products list.
@@ -166,52 +167,337 @@ Priority for your responses:
 
 When showing products, mention prices (৳) and stock if available.
 Always be polite, professional, and sales-oriented. Use {live_context} to get the latest store info.`
-      },
-      productAccess: {
-        products: true,
-        categories: true,
-        brands: true,
-        offers: true,
-        promoCodes: true,
-        reviews: true,
-        bestSelling: true,
-        flashSales: true,
-        stockInfo: true
-      },
-      websiteAccess: {
-        banners: true,
-        categories: true,
-        products: true,
-        offers: true,
-        reviews: true,
-        supportContent: true,
-        paymentMethods: true,
-        deliveryMethods: true
-      },
-      responseRules: {
-        priority: ['product', 'offer', 'website', 'knowledge', 'human']
-      },
-      knowledge: {
-        companyInfo: 'Tazu Mart is a high-growth premium e-commerce marketplace offering fresh food, organic items, local cosmetics, grocery essentials, and home appliances in Bangladesh.',
-        deliveryPolicy: 'Shipping within Dhaka: ৳60 (24-48 Hours). Outside Dhaka: ৳120 (3-5 business days).',
-        returnPolicy: 'Returns within 7 days in original condition. Fresh items must be checked on delivery.',
-        refundPolicy: 'Refunds processed within 3-5 business days after inspection.',
-        termsConditions: 'Standard marketplace terms apply. All orders are subject to availability.',
-        productInfo: 'Premium organic vegetables, gourmet groceries, tech accessories, cosmetics, and more.',
-        customAnswersText: 'You can define custom short triggers matching phrases or keyword tokens here.',
-        customerGuidelines: 'Check products before paying for COD. Report issues within 24 hours.',
-        faqs: DEFAULT_FAQS,
-        customAnswers: DEFAULT_CUSTOM_ANSWERS
-      },
-      syncSettings: {
-        productAdded: true,
-        productUpdated: true,
-        productDeleted: true,
-        bannerAdded: true,
-        bannerUpdated: true,
-        offerAdded: true,
-        categoryUpdated: true
-      },
+  },
+  productAccess: {
+    products: true,
+    categories: true,
+    brands: true,
+    offers: true,
+    promoCodes: true,
+    reviews: true,
+    bestSelling: true,
+    flashSales: true,
+    stockInfo: true
+  },
+  websiteAccess: {
+    banners: true,
+    categories: true,
+    products: true,
+    offers: true,
+    reviews: true,
+    supportContent: true,
+    paymentMethods: true,
+    deliveryMethods: true
+  },
+  responseRules: {
+    priority: ['product', 'offer', 'website', 'knowledge', 'human'] as ('product' | 'offer' | 'website' | 'knowledge' | 'human')[]
+  },
+  knowledge: {
+    companyInfo: 'Tazu Mart is a high-growth premium e-commerce marketplace offering fresh food, organic items, local cosmetics, grocery essentials, and home appliances in Bangladesh.',
+    deliveryPolicy: 'Shipping within Dhaka: ৳60 (24-48 Hours). Outside Dhaka: ৳120 (3-5 business days).',
+    returnPolicy: 'Returns within 7 days in original condition. Fresh items must be checked on delivery.',
+    refundPolicy: 'Refunds processed within 3-5 business days after inspection.',
+    termsConditions: 'Standard marketplace terms apply. All orders are subject to availability.',
+    productInfo: 'Premium organic vegetables, gourmet groceries, tech accessories, cosmetics, and more.',
+    customAnswersText: 'You can define custom short triggers matching phrases or keyword tokens here.',
+    customerGuidelines: 'Check products before paying for COD. Report issues within 24 hours.',
+    faqs: DEFAULT_FAQS,
+    customAnswers: DEFAULT_CUSTOM_ANSWERS
+  },
+  syncSettings: {
+    productAdded: true,
+    productUpdated: true,
+    productDeleted: true,
+    bannerAdded: true,
+    bannerUpdated: true,
+    offerAdded: true,
+    categoryUpdated: true
+  },
+  sessions: [],
+  analytics: {
+    totalConversations: 0,
+    totalQueries: 0,
+    humanHandovers: 0,
+    avgRating: 4.8,
+    totalTokens: 0
+  }
+};
+
+const storeToSupabase = async (stateKey: string, data: any) => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    await supabase.from('settings').upsert([{ id: `ai_${stateKey}`, ...data }]);
+};
+
+export const useAIStore = create<AIState>((set, get) => ({
+  ...initialState,
+  isLoaded: false,
+
+  subscribe: () => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadData = async () => {
+        const { data, error } = await supabase.from('settings').select('*').like('id', 'ai_%');
+        if (!error && data) {
+            const updates: any = {};
+            data.forEach((row: any) => {
+                const key = row.id.replace('ai_', '');
+                if (key === 'sessions') {
+                   // stored as json inside a row
+                   updates[key] = row.data || [];
+                } else if (key === 'analytics') {
+                   updates[key] = { ...initialState.analytics, ...row };
+                } else {
+                   updates[key] = row;
+                }
+            });
+            set({ ...updates, isLoaded: true });
+        } else {
+            set({ isLoaded: true });
+        }
+    };
+    
+    loadData();
+
+    const channel = supabase.channel('public:settings:ai')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: "id=like.ai_*" }, () => {
+         loadData();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  },
+
+  // Actions
+  setAiEnabled: (enabled) => {
+    set({ aiEnabled: enabled });
+    storeToSupabase('enabled', { aiEnabled: enabled });
+  },
+  
+  updateSettings: (newSettings) => {
+      set((state) => ({ settings: { ...state.settings, ...newSettings } }));
+      storeToSupabase('settings', get().settings);
+  },
+
+  updatePrompt: (newPrompt) => {
+      set((state) => ({ prompt: { ...state.prompt, ...newPrompt } }));
+      storeToSupabase('prompt', get().prompt);
+  },
+
+  updateProductAccess: (newAccess) => {
+      set((state) => ({ productAccess: { ...state.productAccess, ...newAccess } }));
+      storeToSupabase('productAccess', get().productAccess);
+  },
+
+  updateWebsiteAccess: (newAccess) => {
+      set((state) => ({ websiteAccess: { ...state.websiteAccess, ...newAccess } }));
+      storeToSupabase('websiteAccess', get().websiteAccess);
+  },
+
+  updateResponseRules: (newRules) => {
+      set((state) => ({ responseRules: { ...state.responseRules, ...newRules } }));
+      storeToSupabase('responseRules', get().responseRules);
+  },
+
+  updateKnowledge: (newKnowledge) => {
+      set((state) => ({ knowledge: { ...state.knowledge, ...newKnowledge } }));
+      storeToSupabase('knowledge', get().knowledge);
+  },
+
+  updateSyncSettings: (newSyncSettings) => {
+      set((state) => ({ syncSettings: { ...state.syncSettings, ...newSyncSettings } }));
+      storeToSupabase('syncSettings', get().syncSettings);
+  },
+
+  addFaq: (question, answer) => {
+      set((state) => ({
+        knowledge: {
+          ...state.knowledge,
+          faqs: [...state.knowledge.faqs, { id: Date.now().toString(), question, answer }]
+        }
+      }));
+      storeToSupabase('knowledge', get().knowledge);
+  },
+
+  removeFaq: (id) => {
+      set((state) => ({
+        knowledge: {
+          ...state.knowledge,
+          faqs: state.knowledge.faqs.filter(f => f.id !== id)
+        }
+      }));
+      storeToSupabase('knowledge', get().knowledge);
+  },
+
+  addCustomAnswer: (keyword, answer) => {
+      set((state) => ({
+        knowledge: {
+          ...state.knowledge,
+          customAnswers: [...state.knowledge.customAnswers, { id: Date.now().toString(), keyword, answer }]
+        }
+      }));
+      storeToSupabase('knowledge', get().knowledge);
+  },
+
+  removeCustomAnswer: (id) => {
+      set((state) => ({
+        knowledge: {
+          ...state.knowledge,
+          customAnswers: state.knowledge.customAnswers.filter(c => c.id !== id)
+        }
+      }));
+      storeToSupabase('knowledge', get().knowledge);
+  },
+
+  startNewSession: (name, phone) => {
+    const newSession: AIChatSession = {
+      id: 'AI-' + Math.floor(1000 + Math.random() * 9000),
+      name: name || 'Guest User',
+      phone: phone || '',
+      language: 'mixed',
+      messages: [
+        {
+          id: 'm-init',
+          sender: 'ai',
+          text: get().settings.welcomeMessage,
+          timestamp: new Date().toISOString()
+        }
+      ],
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      tokensUsed: 0
+    };
+
+    set((state) => {
+        const nextAnaly = { ...state.analytics, totalConversations: state.analytics.totalConversations + 1 };
+        return {
+          sessions: [newSession, ...state.sessions],
+          analytics: nextAnaly
+        };
+    });
+    storeToSupabase('sessions', { data: get().sessions });
+    storeToSupabase('analytics', get().analytics);
+
+    return newSession;
+  },
+
+  addMessageToSession: (sessionId, sender, text) => {
+    set((state) => {
+      const nextSessions = state.sessions.map((s) => {
+        if (s.id === sessionId) {
+          const newMsg: AIMessage = {
+            id: 'msg-' + Date.now() + Math.floor(Math.random() * 100),
+            sender,
+            text,
+            timestamp: new Date().toISOString()
+          };
+          
+          let detectedLang = s.language;
+          if (sender === 'user') {
+            const textLower = text.toLowerCase();
+            const hasBengali = /[\u0980-\u09FF]/.test(textLower);
+            if (hasBengali) {
+              detectedLang = 'bn';
+            } else {
+              detectedLang = 'en';
+            }
+          }
+
+          return {
+            ...s,
+            language: detectedLang,
+            messages: [...s.messages, newMsg]
+          };
+        }
+        return s;
+      });
+
+      const nextAnalytics = { ...state.analytics };
+      if (sender === 'user') {
+        nextAnalytics.totalQueries += 1;
+      }
+
+      return {
+        sessions: nextSessions,
+        analytics: nextAnalytics
+      };
+    });
+    storeToSupabase('sessions', { data: get().sessions });
+    storeToSupabase('analytics', get().analytics);
+  },
+
+  rateMessageInSession: (sessionId, messageId, rating) => {
+    set((state) => {
+      const nextSessions = state.sessions.map((s) => {
+        if (s.id === sessionId) {
+          const nextMessages = s.messages.map((m) => {
+            if (m.id === messageId) {
+              return { ...m, rating };
+            }
+            return m;
+          });
+          return { ...s, messages: nextMessages };
+        }
+        return s;
+      });
+
+      let nextAvg = state.analytics.avgRating;
+      if (rating === 'good') {
+        nextAvg = Math.min(5.0, Number((state.analytics.avgRating * 0.98 + 0.1).toFixed(2)));
+      } else if (rating === 'bad') {
+        nextAvg = Math.max(3.5, Number((state.analytics.avgRating * 0.98 - 0.15).toFixed(2)));
+      }
+
+      return {
+        sessions: nextSessions,
+        analytics: {
+          ...state.analytics,
+          avgRating: nextAvg
+        }
+      };
+    });
+    storeToSupabase('sessions', { data: get().sessions });
+    storeToSupabase('analytics', get().analytics);
+  },
+
+  handoverSession: (sessionId) => {
+    set((state) => {
+      const nextSessions = state.sessions.map((s) => {
+        if (s.id === sessionId) {
+          return { ...s, status: 'handed_over' as const };
+        }
+        return s;
+      });
+
+      return {
+        sessions: nextSessions,
+        analytics: {
+          ...state.analytics,
+          humanHandovers: state.analytics.humanHandovers + 1
+        }
+      };
+    });
+    storeToSupabase('sessions', { data: get().sessions });
+    storeToSupabase('analytics', get().analytics);
+  },
+
+  resolveSession: (sessionId) => {
+    set((state) => ({
+      sessions: state.sessions.map((s) => {
+        if (s.id === sessionId) {
+          return { ...s, status: 'resolved' as const };
+        }
+        return s;
+      })
+    }));
+    storeToSupabase('sessions', { data: get().sessions });
+  },
+
+  clearSessionHistory: () => {
+    set({
       sessions: [],
       analytics: {
         totalConversations: 0,
@@ -219,216 +505,19 @@ Always be polite, professional, and sales-oriented. Use {live_context} to get th
         humanHandovers: 0,
         avgRating: 4.8,
         totalTokens: 0
-      },
+      }
+    });
+    storeToSupabase('sessions', { data: [] });
+    storeToSupabase('analytics', get().analytics);
+  },
 
-      // Actions
-      setAiEnabled: (enabled) => set({ aiEnabled: enabled }),
-      
-      updateSettings: (newSettings) => set((state) => ({
-        settings: { ...state.settings, ...newSettings }
-      })),
-
-      updatePrompt: (newPrompt) => set((state) => ({
-        prompt: { ...state.prompt, ...newPrompt }
-      })),
-
-      updateProductAccess: (newAccess) => set((state) => ({
-        productAccess: { ...state.productAccess, ...newAccess }
-      })),
-
-      updateWebsiteAccess: (newAccess) => set((state) => ({
-        websiteAccess: { ...state.websiteAccess, ...newAccess }
-      })),
-
-      updateResponseRules: (newRules) => set((state) => ({
-        responseRules: { ...state.responseRules, ...newRules }
-      })),
-
-      updateKnowledge: (newKnowledge) => set((state) => ({
-        knowledge: { ...state.knowledge, ...newKnowledge }
-      })),
-
-      updateSyncSettings: (newSyncSettings) => set((state) => ({
-        syncSettings: { ...state.syncSettings, ...newSyncSettings }
-      })),
-
-      addFaq: (question, answer) => set((state) => ({
-        knowledge: {
-          ...state.knowledge,
-          faqs: [...state.knowledge.faqs, { id: Date.now().toString(), question, answer }]
-        }
-      })),
-
-      removeFaq: (id) => set((state) => ({
-        knowledge: {
-          ...state.knowledge,
-          faqs: state.knowledge.faqs.filter(f => f.id !== id)
-        }
-      })),
-
-      addCustomAnswer: (keyword, answer) => set((state) => ({
-        knowledge: {
-          ...state.knowledge,
-          customAnswers: [...state.knowledge.customAnswers, { id: Date.now().toString(), keyword, answer }]
-        }
-      })),
-
-      removeCustomAnswer: (id) => set((state) => ({
-        knowledge: {
-          ...state.knowledge,
-          customAnswers: state.knowledge.customAnswers.filter(c => c.id !== id)
-        }
-      })),
-
-      startNewSession: (name, phone) => {
-        const newSession: AIChatSession = {
-          id: 'AI-' + Math.floor(1000 + Math.random() * 9000),
-          name: name || 'Guest User',
-          phone: phone || '',
-          language: 'mixed',
-          messages: [
-            {
-              id: 'm-init',
-              sender: 'ai',
-              text: get().settings.welcomeMessage,
-              timestamp: new Date().toISOString()
-            }
-          ],
-          status: 'active',
-          createdAt: new Date().toISOString(),
-          tokensUsed: 0
-        };
-
-        set((state) => ({
-          sessions: [newSession, ...state.sessions],
-          analytics: {
-            ...state.analytics,
-            totalConversations: state.analytics.totalConversations + 1
-          }
-        }));
-
-        return newSession;
-      },
-
-      addMessageToSession: (sessionId, sender, text) => set((state) => {
-        const nextSessions = state.sessions.map((s) => {
-          if (s.id === sessionId) {
-            const newMsg: AIMessage = {
-              id: 'msg-' + Date.now() + Math.floor(Math.random() * 100),
-              sender,
-              text,
-              timestamp: new Date().toISOString()
-            };
-            
-            // Basic language detection
-            let detectedLang = s.language;
-            if (sender === 'user') {
-              const textLower = text.toLowerCase();
-              const hasBengali = /[\u0980-\u09FF]/.test(textLower);
-              if (hasBengali) {
-                detectedLang = 'bn';
-              } else {
-                detectedLang = 'en';
-              }
-            }
-
-            return {
-              ...s,
-              language: detectedLang,
-              messages: [...s.messages, newMsg]
-            };
-          }
-          return s;
-        });
-
-        const nextAnalytics = { ...state.analytics };
-        if (sender === 'user') {
-          nextAnalytics.totalQueries += 1;
-        }
-
-        return {
-          sessions: nextSessions,
-          analytics: nextAnalytics
-        };
-      }),
-
-      rateMessageInSession: (sessionId, messageId, rating) => set((state) => {
-        const nextSessions = state.sessions.map((s) => {
-          if (s.id === sessionId) {
-            const nextMessages = s.messages.map((m) => {
-              if (m.id === messageId) {
-                return { ...m, rating };
-              }
-              return m;
-            });
-            return { ...s, messages: nextMessages };
-          }
-          return s;
-        });
-
-        // Recalculate average rating slightly
-        let nextAvg = state.analytics.avgRating;
-        if (rating === 'good') {
-          nextAvg = Math.min(5.0, Number((state.analytics.avgRating * 0.98 + 0.1).toFixed(2)));
-        } else if (rating === 'bad') {
-          nextAvg = Math.max(3.5, Number((state.analytics.avgRating * 0.98 - 0.15).toFixed(2)));
-        }
-
-        return {
-          sessions: nextSessions,
-          analytics: {
-            ...state.analytics,
-            avgRating: nextAvg
-          }
-        };
-      }),
-
-      handoverSession: (sessionId) => set((state) => {
-        const nextSessions = state.sessions.map((s) => {
-          if (s.id === sessionId) {
-            return { ...s, status: 'handed_over' as const };
-          }
-          return s;
-        });
-
-        return {
-          sessions: nextSessions,
-          analytics: {
-            ...state.analytics,
-            humanHandovers: state.analytics.humanHandovers + 1
-          }
-        };
-      }),
-
-      resolveSession: (sessionId) => set((state) => ({
-        sessions: state.sessions.map((s) => {
-          if (s.id === sessionId) {
-            return { ...s, status: 'resolved' as const };
-          }
-          return s;
-        })
-      })),
-
-      clearSessionHistory: () => set({
-        sessions: [],
-        analytics: {
-          totalConversations: 0,
-          totalQueries: 0,
-          humanHandovers: 0,
-          avgRating: 4.8,
-          totalTokens: 0
-        }
-      }),
-
-      incrementTokens: (tokens) => set((state) => ({
-        analytics: {
-          ...state.analytics,
-          totalTokens: state.analytics.totalTokens + tokens
-        }
-      }))
-    }),
-    {
-      name: 'tazu_mart_ai_store'
-    }
-  )
-);
+  incrementTokens: (tokens) => {
+    set((state) => ({
+      analytics: {
+        ...state.analytics,
+        totalTokens: state.analytics.totalTokens + tokens
+      }
+    }));
+    storeToSupabase('analytics', get().analytics);
+  }
+}));

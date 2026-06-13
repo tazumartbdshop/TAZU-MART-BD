@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface MenuSortState {
   mainMenuOrder: string[] | null;
@@ -41,31 +40,40 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
   isLoaded: false,
   
   subscribe: () => {
-    const docRef = doc(db, 'settings', 'menuSort');
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        set({
-          mainMenuOrder: data.mainMenuOrder ?? null,
-          submenuOrders: data.submenuOrders ?? {},
-          memberOrder: data.memberOrder ?? null,
-          renamedMenus: data.renamedMenus ?? {},
-          deletedMenus: data.deletedMenus ?? [],
-          expandedMenus: data.expandedMenus ?? {},
-          isLoaded: true
-        });
-      } else {
-        // Seed initial menu sort document in Firestore
-        setDoc(docRef, defaultState)
-          .then(() => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadSettings = async () => {
+        const { data, error } = await supabase.from('settings').select('*').eq('id', 'menuSort').limit(1);
+        if (!error && data && data.length > 0) {
+            const dataObj = data[0];
+            set({
+              mainMenuOrder: dataObj.mainMenuOrder ?? null,
+              submenuOrders: dataObj.submenuOrders ?? {},
+              memberOrder: dataObj.memberOrder ?? null,
+              renamedMenus: dataObj.renamedMenus ?? {},
+              deletedMenus: dataObj.deletedMenus ?? [],
+              expandedMenus: dataObj.expandedMenus ?? {},
+              isLoaded: true
+            });
+        } else if (!error && data && data.length === 0) {
+            supabase.from('settings').upsert([{ id: 'menuSort', ...defaultState }]).then(({error}) => error && console.warn(error));
             set({ ...defaultState, isLoaded: true });
-          })
-          .catch((err) => console.error("Initial menu sort seed failed:", err));
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'settings/menuSort');
-    });
-    return unsubscribe;
+        }
+    };
+    
+    loadSettings();
+    
+    const channel = supabase
+      .channel('public:settings:menuSort')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.menuSort' }, () => {
+         loadSettings();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   },
 
   updateAllSettings: (mainMenu, submenus, renamed, deleted) => {
@@ -76,8 +84,10 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
       deletedMenus: deleted
     };
     set(updates);
-    setDoc(doc(db, 'settings', 'menuSort'), updates, { merge: true })
-      .catch((err) => handleFirestoreError(err, OperationType.WRITE, 'settings/menuSort'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update(updates).eq('id', 'menuSort').then(({error}) => error && console.warn(error));
+    }
   },
 
   saveOrders: (mainMenu, submenus, members) => {
@@ -87,8 +97,10 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
       memberOrder: members,
     };
     set(updates);
-    setDoc(doc(db, 'settings', 'menuSort'), updates, { merge: true })
-      .catch((err) => handleFirestoreError(err, OperationType.WRITE, 'settings/menuSort'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update(updates).eq('id', 'menuSort').then(({error}) => error && console.warn(error));
+    }
   },
 
   renameMenu: (originalName, newName) => {
@@ -97,8 +109,10 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
       [originalName]: newName,
     };
     set({ renamedMenus: updatedRenamed });
-    setDoc(doc(db, 'settings', 'menuSort'), { renamedMenus: updatedRenamed }, { merge: true })
-      .catch((err) => handleFirestoreError(err, OperationType.WRITE, 'settings/menuSort'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update({ renamedMenus: updatedRenamed }).eq('id', 'menuSort').then(({error}) => error && console.warn(error));
+    }
   },
 
   toggleVisibility: (menuName) => {
@@ -107,13 +121,17 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
       ? currentDeleted.filter((n) => n !== menuName)
       : [...currentDeleted, menuName];
     set({ deletedMenus: updatedDeleted });
-    setDoc(doc(db, 'settings', 'menuSort'), { deletedMenus: updatedDeleted }, { merge: true })
-      .catch((err) => handleFirestoreError(err, OperationType.WRITE, 'settings/menuSort'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update({ deletedMenus: updatedDeleted }).eq('id', 'menuSort').then(({error}) => error && console.warn(error));
+    }
   },
 
   resetToDefault: () => {
     set(defaultState);
-    setDoc(doc(db, 'settings', 'menuSort'), defaultState)
-      .catch((err) => handleFirestoreError(err, OperationType.WRITE, 'settings/menuSort'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').upsert([{ id: 'menuSort', ...defaultState }]).then(({error}) => error && console.warn(error));
+    }
   },
 }));

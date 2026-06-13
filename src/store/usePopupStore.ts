@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { getSupabase } from '../lib/supabase';
 
 export interface PopupConfig {
   id: string;
@@ -178,6 +177,7 @@ interface PopupStore {
   // Fallback config state to sustain backwards-compatibility with static files
   config: PopupConfig;
   updateConfig: (updates: Partial<PopupConfig>) => void;
+  subscribe: () => () => void;
 }
 
 export const usePopupStore = create<PopupStore>()((set) => ({
@@ -191,45 +191,46 @@ export const usePopupStore = create<PopupStore>()((set) => ({
         ...popup,
         id: docId,
       };
-      await setDoc(doc(db, 'popup_campaigns', docId), newPopup);
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('popup_campaigns').upsert([newPopup]);
+      }
     } catch (err) {
-      console.error('Error adding popup campaign to Firestore:', err);
+      console.error('Error adding popup campaign to Supabase:', err);
     }
   },
 
   updatePopupCampaign: async (id, updates) => {
     try {
-      const docRef = doc(db, 'popup_campaigns', id);
-      await updateDoc(docRef, updates);
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('popup_campaigns').update(updates).eq('id', id);
+      }
     } catch (err) {
-      console.error('Error updating popup campaign in Firestore:', err);
+      console.error('Error updating popup campaign in Supabase:', err);
     }
   },
 
   deletePopupCampaign: async (id) => {
     try {
-      const docRef = doc(db, 'popup_campaigns', id);
-      await deleteDoc(docRef);
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('popup_campaigns').delete().eq('id', id);
+      }
     } catch (err) {
-      console.error('Error deleting popup campaign from Firestore:', err);
+      console.error('Error deleting popup campaign from Supabase:', err);
     }
   },
 
   resetPopupCampaigns: async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'popup_campaigns'));
-      const batch = writeBatch(db);
-      querySnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-
-      defaultCampaigns.forEach((camp) => {
-        const docRef = doc(db, 'popup_campaigns', camp.id);
-        batch.set(docRef, camp);
-      });
-      await batch.commit();
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('popup_campaigns').delete().neq('id', '0');
+        await supabase.from('popup_campaigns').upsert(defaultCampaigns);
+      }
     } catch (err) {
-      console.error('Error resetting popup campaigns in Firestore:', err);
+      console.error('Error resetting popup campaigns in Supabase:', err);
     }
   },
 
@@ -238,71 +239,37 @@ export const usePopupStore = create<PopupStore>()((set) => ({
     return {
       config: nextConfig,
     };
-  })
-}));
+  }),
 
-// Setup Real-time listener for popup_campaigns
-onSnapshot(collection(db, 'popup_campaigns'), (snapshot) => {
-  if (snapshot.empty) {
-    // Seed default campaigns if completely empty to give an initially populated database list
-    const batch = writeBatch(db);
-    defaultCampaigns.forEach((camp) => {
-      const docRef = doc(db, 'popup_campaigns', camp.id);
-      batch.set(docRef, camp);
-    });
-    batch.commit().catch((err) => console.error('Error seeding default popup campaigns:', err));
-    return;
+  subscribe: () => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadPopups = async () => {
+      const { data, error } = await supabase.from('popup_campaigns').select('*').order('displayOrder', { ascending: true });
+      if (!error && data && data.length > 0) {
+        set({ popupCampaigns: data as PopupConfig[], config: data[0] as PopupConfig });
+      } else if (!error && data && data.length === 0) {
+        // Seed default campaigns if completely empty to give an initially populated database list
+        await supabase.from('popup_campaigns').upsert(defaultCampaigns);
+        set({ popupCampaigns: defaultCampaigns, config: defaultCampaigns[0] });
+      }
+    };
+    
+    loadPopups();
+
+    const channel = supabase
+      .channel('public:popup_campaigns')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'popup_campaigns' }, () => {
+         loadPopups();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
-
-  const list: PopupConfig[] = [];
-  snapshot.forEach((snap) => {
-    const data = snap.data();
-    list.push({
-      id: snap.id,
-      status: data.status || 'ACTIVE',
-      startDate: data.startDate || '',
-      startTime: data.startTime || '',
-      endDate: data.endDate || '',
-      endTime: data.endTime || '',
-      campaignType: data.campaignType || 'EVENT',
-      campaignValue: data.campaignValue || '',
-      templateId: data.templateId || '1',
-      bannerUrl: data.bannerUrl || '',
-      title: data.title || '',
-      titleFontSize: Number(data.titleFontSize) || 24,
-      discountLabel: data.discountLabel || '',
-      discountPercentage: data.discountPercentage || '',
-      subtitle: data.subtitle || '',
-      subtitleFontSize: Number(data.subtitleFontSize) || 12,
-      buttonText: data.buttonText || '',
-      buttonUrl: data.buttonUrl || '',
-      buttonStyle: data.buttonStyle || 'luxury-gradient',
-      secondaryButtonText: data.secondaryButtonText || '',
-      secondaryButtonUrl: data.secondaryButtonUrl || '',
-      selectedProducts: data.selectedProducts || [],
-      selectedCategories: data.selectedCategories || [],
-      displayDuration: Number(data.displayDuration) || 2,
-      displayOrder: Number(data.displayOrder) || 1,
-      showOncePerUser: !!data.showOncePerUser,
-      showEveryVisit: !!data.showEveryVisit,
-      showAfter3Seconds: !!data.showAfter3Seconds,
-      showAfterScroll: !!data.showAfterScroll,
-      showOnlyHomepage: !!data.showOnlyHomepage,
-      closeButtonVisible: data.closeButtonVisible !== false,
-      backgroundDarkOverlay: data.backgroundDarkOverlay !== false,
-      clickOutsideToClose: data.clickOutsideToClose !== false,
-      autoCloseAfterXSeconds: !!data.autoCloseAfterXSeconds,
-      entranceAnimation: data.entranceAnimation || 'Fade In'
-    } as PopupConfig);
-  });
-
-  // Sort by displayOrder ascending
-  list.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-
-  usePopupStore.setState({ popupCampaigns: list, config: list[0] || defaultCampaigns[0] });
-}, (error) => {
-  handleFirestoreError(error, OperationType.GET, 'popup_campaigns');
-});
+}));
 
 export function getPopupStatus(config: PopupConfig): 'ACTIVE' | 'EXPIRED' | 'SCHEDULED' | 'DISABLED' {
   if (config.status === 'DISABLED') return 'DISABLED';

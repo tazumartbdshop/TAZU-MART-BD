@@ -1,5 +1,4 @@
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/db';
+import { getSupabase } from '../lib/supabase';
 
 export interface LoginProvider {
   id: string; // e.g. 'google', 'facebook', 'email_password'
@@ -28,18 +27,20 @@ export const defaultProviders: LoginProvider[] = [
 export const loginProviderService = {
   getProviders: async (): Promise<LoginProvider[]> => {
     try {
-      const docRef = doc(db, 'settings', 'login_providers');
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data().providers as LoginProvider[];
+      const supabase = getSupabase();
+      if (!supabase) return defaultProviders;
+      
+      const { data, error } = await supabase.from('settings').select('*').eq('id', 'login_providers').single();
+      if (data && !error && data.providers) {
+        const parsedProviders = data.providers as LoginProvider[];
         // Merge with defaults to ensure missing providers are added
         const merged = defaultProviders.map(def => {
-          const found = data.find(p => p.id === def.id);
+          const found = parsedProviders.find(p => p.id === def.id);
           return found ? { ...def, ...found } : def;
         });
         return merged.sort((a, b) => a.order - b.order);
       } else {
-        await setDoc(docRef, { providers: defaultProviders });
+        await supabase.from('settings').upsert([{ id: 'login_providers', providers: defaultProviders }]);
         return defaultProviders;
       }
     } catch (error) {
@@ -50,8 +51,9 @@ export const loginProviderService = {
 
   updateProviders: async (providers: LoginProvider[]): Promise<void> => {
     try {
-      const docRef = doc(db, 'settings', 'login_providers');
-      await setDoc(docRef, { providers }, { merge: true });
+      const supabase = getSupabase();
+      if (!supabase) return;
+      await supabase.from('settings').upsert([{ id: 'login_providers', providers }]);
     } catch (error) {
       console.error("Error updating login providers:", error);
       throw error;

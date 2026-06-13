@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface DynamicWebsite {
   domain: string;
@@ -109,14 +108,28 @@ export const useWebsitesStore = create<WebsitesStore>((set, get) => ({
   websites: loadWebsites(),
   
   subscribe: () => {
-    const q = query(collection(db, 'websites'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const websites = snapshot.docs.map(doc => ({ ...doc.data() } as DynamicWebsite));
-      set({ websites });
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'websites');
-    });
-    return unsubscribe;
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadData = async () => {
+        const { data, error } = await supabase.from('websites').select('*');
+        if (!error && data) {
+            set({ websites: data as DynamicWebsite[] });
+        }
+    };
+    
+    loadData();
+    
+    const channel = supabase
+      .channel('public:websites')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'websites' }, () => {
+         loadData();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   },
 
   addWebsite: async (website) => {
@@ -124,9 +137,13 @@ export const useWebsitesStore = create<WebsitesStore>((set, get) => ({
     const newWebsite = { ...website, domain: sanitizedDomain };
     
     try {
-      await setDoc(doc(db, 'websites', sanitizedDomain), newWebsite);
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('websites').insert([newWebsite]);
+          if(error) throw error;
+      }
     } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, `websites/${sanitizedDomain}`);
+      console.error('Error adding website:', e);
       throw e;
     }
 
@@ -167,9 +184,13 @@ export const useWebsitesStore = create<WebsitesStore>((set, get) => ({
     const sanitized = sanitizeDomain(domain);
     
     try {
-      await deleteDoc(doc(db, 'websites', sanitized));
+      const supabase = getSupabase();
+      if (supabase) {
+          const { error } = await supabase.from('websites').delete().eq('domain', sanitized);
+          if (error) throw error;
+      }
     } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, `websites/${sanitized}`);
+      console.error('Error deleting website:', e);
       throw e;
     }
 
@@ -184,9 +205,13 @@ export const useWebsitesStore = create<WebsitesStore>((set, get) => ({
     if (target) {
       const updatedWebsite = { ...target, ...updates };
       try {
-        await setDoc(doc(db, 'websites', sanitized), updatedWebsite, { merge: true });
+        const supabase = getSupabase();
+        if (supabase) {
+             const { error } = await supabase.from('websites').update(updates).eq('domain', sanitized);
+             if (error) throw error;
+        }
       } catch (e) {
-        handleFirestoreError(e, OperationType.WRITE, `websites/${sanitized}`);
+        console.error('Error updating website:', e);
         throw e;
       }
     }

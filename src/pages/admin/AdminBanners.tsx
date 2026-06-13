@@ -4,8 +4,6 @@ import { Upload, Layers, ArrowLeft, Search, X, Database } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
 import { useProductStore } from '../../store/useProductStore';
-import { db } from '../../lib/db';
-import { doc, setDoc, deleteDoc, collection } from 'firebase/firestore';
 
 enum OperationType {
   CREATE = 'create',
@@ -104,12 +102,13 @@ export default function AdminBanners() {
     setIsSubmitting(true);
     let successCount = 0;
 
-    const { writeBatch, collection, doc } = await import('firebase/firestore');
     const { uploadImage } = await import('../../lib/imageUtils');
-    const batch = writeBatch(db);
+    const supabase = await import('../../lib/supabase').then(m => m.getSupabase());
+    if (!supabase) return;
 
     try {
       const currentBannersLength = useBannerStore.getState().banners.length;
+      const newBanners = [];
 
       for (const file of files) {
         if (!file.type.startsWith('image/')) {
@@ -179,7 +178,7 @@ export default function AdminBanners() {
           // Upload to storage
           const downloadUrl = await uploadImage(bannerBlob, 'banners', file.name);
 
-          const targetId = doc(collection(db, 'banners')).id;
+          const targetId = `ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
           const currentOrder = currentBannersLength + successCount;
 
           const bannerData = {
@@ -199,8 +198,7 @@ export default function AdminBanners() {
             createdDate: new Date().toISOString()
           };
 
-          batch.set(doc(db, 'banners', targetId), bannerData);
-          batch.set(doc(db, 'banners_draft', targetId), bannerData);
+          newBanners.push(bannerData);
           successCount++;
         } catch (innerErr) {
           console.error(innerErr);
@@ -209,7 +207,8 @@ export default function AdminBanners() {
       }
 
       if (successCount > 0) {
-        await batch.commit();
+        await supabase.from('banners').upsert(newBanners);
+        await supabase.from('banners_draft').upsert(newBanners);
         toast.success(`🎉 ${successCount} banners published successfully!`);
       }
     } catch (err) {

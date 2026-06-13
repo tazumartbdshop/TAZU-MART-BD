@@ -14,7 +14,6 @@ import {
   GithubAuthProvider,
   TwitterAuthProvider
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
@@ -79,20 +78,20 @@ export default function Login() {
           const phone = fbUser.phoneNumber || '';
           const photoURL = fbUser.photoURL || '';
 
-          try {
-            setDoc(doc(db, 'users', fbUser.uid), {
-              uid: fbUser.uid,
-              name,
-              email,
-              phone,
-              role: 'customer',
-              status: 'Active',
-              createdAt: serverTimestamp(),
-              lastLoginAt: serverTimestamp(),
-              profileImage: photoURL,
-            }, { merge: true });
-          } catch (fsErr) {
-            handleFirestoreError(fsErr, OperationType.WRITE, `users/${fbUser.uid}`);
+          const supabase = await import('../lib/supabase').then(m => m.getSupabase());
+          if (supabase) {
+             supabase.from('users').upsert([{
+                id: fbUser.uid,
+                uid: fbUser.uid,
+                name,
+                email,
+                phone,
+                role: 'customer',
+                status: 'Active',
+                createdAt: new Date().toISOString(),
+                lastLoginAt: new Date().toISOString(),
+                profileImage: photoURL,
+             }]).then(({error})=> error && console.warn("Supabase upsert failed:", error));
           }
 
           useLoginHistoryStore.getState().addLoginEvent({
@@ -181,18 +180,22 @@ export default function Login() {
 
           if (firebaseUser) {
             try {
-              setDoc(doc(db, 'users', firebaseUser.uid), {
-                uid: firebaseUser.uid,
-                name: matchedSite.website_name + ' Admin',
-                email: matchedSite.admin_email,
-                phone: '',
-                role: 'admin',
-                status: 'Active',
-                createdAt: serverTimestamp(),
-                lastLoginAt: serverTimestamp(),
-              }, { merge: true });
+              const supabase = await import('../lib/supabase').then(m => m.getSupabase());
+              if (supabase) {
+                await supabase.from('users').upsert([{
+                  id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  name: matchedSite.website_name + ' Admin',
+                  email: matchedSite.admin_email,
+                  phone: '',
+                  role: 'admin',
+                  status: 'Active',
+                  createdAt: new Date().toISOString(),
+                  lastLoginAt: new Date().toISOString(),
+                }]);
+              }
             } catch (fsErr) {
-              handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+              console.error("Supabase upsert failed:", fsErr);
             }
 
             useLoginHistoryStore.getState().addLoginEvent({
@@ -242,18 +245,22 @@ export default function Login() {
 
           if (firebaseUser) {
             try {
-              setDoc(doc(db, 'users', firebaseUser.uid), {
-                uid: firebaseUser.uid,
-                name: 'Super Admin',
-                email: ADMIN_EMAIL,
-                phone: '',
-                role: 'admin',
-                status: 'Active',
-                createdAt: serverTimestamp(),
-                lastLoginAt: serverTimestamp(),
-              }, { merge: true });
+              const supabase = await import('../lib/supabase').then(m => m.getSupabase());
+              if (supabase) {
+                await supabase.from('users').upsert([{
+                  id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  name: 'Super Admin',
+                  email: ADMIN_EMAIL,
+                  phone: '',
+                  role: 'admin',
+                  status: 'Active',
+                  createdAt: new Date().toISOString(),
+                  lastLoginAt: new Date().toISOString(),
+                }]);
+              }
             } catch (fsErr) {
-              handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+              console.error("Supabase upsert failed:", fsErr);
             }
 
             useLoginHistoryStore.getState().addLoginEvent({
@@ -304,18 +311,22 @@ export default function Login() {
 
           if (firebaseUser) {
             try {
-              setDoc(doc(db, 'users', firebaseUser.uid), {
-                uid: firebaseUser.uid,
-                name: moderator.name,
-                email: moderator.email,
-                phone: '',
-                role: 'admin',
-                status: 'Active',
-                createdAt: serverTimestamp(),
-                lastLoginAt: serverTimestamp(),
-              }, { merge: true });
+              const supabase = await import('../lib/supabase').then(m => m.getSupabase());
+              if (supabase) {
+                await supabase.from('users').upsert([{
+                  id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  name: moderator.name,
+                  email: moderator.email,
+                  phone: '',
+                  role: 'admin',
+                  status: 'Active',
+                  createdAt: new Date().toISOString(),
+                  lastLoginAt: new Date().toISOString(),
+                }]);
+              }
             } catch (fsErr) {
-              handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+              console.error("Supabase upsert failed:", fsErr);
             }
 
             useLoginHistoryStore.getState().addLoginEvent({
@@ -342,20 +353,20 @@ export default function Login() {
       // 4. Try regular Customer
       let firebaseUser;
       
-      // Let's lookup the user collection in Firestore 1st as a robust source-of-truth fallback
+      // Let's lookup the user collection in Database 1st as a robust source-of-truth fallback
       let dbUser: any = null;
       try {
-        const usersRef = collection(db, 'users');
-        const q = isEmail 
-          ? query(usersRef, where('email', '==', normalizedIdentifier))
-          : query(usersRef, where('phone', '==', normalizedIdentifier));
-        const qSnapshot = await getDocs(q);
-        if (!qSnapshot.empty) {
-          dbUser = qSnapshot.docs[0].data();
-          dbUser.uid = qSnapshot.docs[0].id;
+        const supabase = await import('../lib/supabase').then(m => m.getSupabase());
+        if (supabase) {
+          const { data, error } = isEmail 
+            ? await supabase.from('users').select('*').eq('email', normalizedIdentifier).limit(1).single()
+            : await supabase.from('users').select('*').eq('phone', normalizedIdentifier).limit(1).single();
+          if (data && !error) {
+            dbUser = data;
+          }
         }
       } catch (dbErr) {
-        console.error("Error querying firestore users collection on login:", dbErr);
+        console.error("Error querying db users collection on login:", dbErr);
       }
 
       try {
@@ -450,26 +461,31 @@ export default function Login() {
         const postalCode = dbUser?.postalCode || localCust?.address?.zipCode || '';
 
         try {
-          await setDoc(doc(db, 'users', firebaseUser.uid), {
-            uid: firebaseUser.uid,
-            name,
-            email,
-            phone,
-            role,
-            status,
-            createdAt: dbUser?.createdAt || serverTimestamp(),
-            lastLoginAt: serverTimestamp(),
-            gender,
-            address,
-            division,
-            district,
-            upazila,
-            area,
-            postalCode,
-            profileImage,
-          }, { merge: true });
+          const supabase = await import('../lib/supabase').then(m => m.getSupabase());
+          if (supabase) {
+             const dataToUpsert = {
+                id: firebaseUser.uid,
+                uid: firebaseUser.uid,
+                name,
+                email,
+                phone,
+                role,
+                status,
+                createdAt: dbUser?.createdAt || new Date().toISOString(),
+                lastLoginAt: new Date().toISOString(),
+                gender,
+                address,
+                division,
+                district,
+                upazila,
+                area,
+                postalCode,
+                profileImage
+             };
+             await supabase.from('users').upsert([dataToUpsert]);
+          }
         } catch (fsErr) {
-          handleFirestoreError(fsErr, OperationType.WRITE, `users/${firebaseUser.uid}`);
+          console.error("Supabase upsert fail", fsErr);
         }
 
         useLoginHistoryStore.getState().addLoginEvent({
@@ -714,19 +730,23 @@ export default function Login() {
                       const photoURL = fbUser.photoURL || '';
 
                       try {
-                        setDoc(doc(db, 'users', fbUser.uid), {
-                          uid: fbUser.uid,
-                          name,
-                          email,
-                          phone,
-                          role: 'customer',
-                          status: 'Active',
-                          createdAt: serverTimestamp(),
-                          lastLoginAt: serverTimestamp(),
-                          profileImage: photoURL,
-                        }, { merge: true });
+                        const supabase = await import('../lib/supabase').then(m => m.getSupabase());
+                        if (supabase) {
+                           supabase.from('users').upsert([{
+                              id: fbUser.uid,
+                              uid: fbUser.uid,
+                              name,
+                              email,
+                              phone,
+                              role: 'customer',
+                              status: 'Active',
+                              createdAt: new Date().toISOString(),
+                              lastLoginAt: new Date().toISOString(),
+                              profileImage: photoURL,
+                           }]).then(({error})=> error && console.warn("Supabase upsert failed:", error));
+                        }
                       } catch (fsErr) {
-                        handleFirestoreError(fsErr, OperationType.WRITE, `users/${fbUser.uid}`);
+                        console.error("Supabase fail", fsErr);
                       }
 
                       useLoginHistoryStore.getState().addLoginEvent({

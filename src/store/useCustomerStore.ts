@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { generateDemoCustomers } from '../utils/demoDataGenerator';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface PaymentMethod {
   id: string;
@@ -63,28 +62,6 @@ interface CustomerState {
 
 export const initialDemoCustomers: Customer[] = generateDemoCustomers();
 
-function cleanUndefined(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return null;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(cleanUndefined);
-  }
-  if (typeof obj === 'object') {
-    const clean: any = {};
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        const val = obj[key];
-        if (val !== undefined) {
-          clean[key] = cleanUndefined(val);
-        }
-      }
-    }
-    return clean;
-  }
-  return obj;
-}
-
 export const useCustomerStore = create<CustomerState>((set, get) => ({
   customers: initialDemoCustomers,
   addCustomer: (customerPayload) => {
@@ -96,8 +73,8 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       isRead: false,
     };
     
-    setDoc(doc(db, 'customers', id), cleanUndefined(newCustomer))
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, `customers/${id}`));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('customers').insert([newCustomer]).then(({error}) => error && console.warn(error));
       
     set((state) => ({
       customers: [...state.customers, newCustomer]
@@ -147,37 +124,38 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     }
   },
   updateCustomer: (id, updates) => {
-    setDoc(doc(db, 'customers', id), cleanUndefined(updates), { merge: true })
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, `customers/${id}`));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('customers').update(updates).eq('id', id).then(({error}) => error && console.warn(error));
       
     set((state) => ({
       customers: state.customers.map(c => c.id === id ? { ...c, ...updates } : c)
     }));
   },
   deleteCustomer: (id) => {
-    deleteDoc(doc(db, 'customers', id))
-      .catch(err => handleFirestoreError(err, OperationType.DELETE, `customers/${id}`));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('customers').delete().eq('id', id).then(({error}) => error && console.warn(error));
       
     set((state) => ({
       customers: state.customers.filter(c => c.id !== id)
     }));
   },
   markAsRead: (id) => {
-    setDoc(doc(db, 'customers', id), { isRead: true }, { merge: true })
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, `customers/${id}`));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('customers').update({ isRead: true }).eq('id', id).then(({error}) => error && console.warn(error));
       
     set((state) => ({
       customers: state.customers.map(c => c.id === id ? { ...c, isRead: true } : c)
     }));
   },
   markAllAsRead: () => {
-    get().customers.forEach((c) => {
-      if (!c.isRead) {
-        setDoc(doc(db, 'customers', c.id), { isRead: true }, { merge: true })
-          .catch(err => handleFirestoreError(err, OperationType.WRITE, `customers/${c.id}`));
-      }
-    });
-    
+    const supabase = getSupabase();
+    if (supabase) {
+        get().customers.forEach((c) => {
+          if (!c.isRead) {
+            supabase.from('customers').update({ isRead: true }).eq('id', c.id).then(({error}) => error && console.warn(error));
+          }
+        });
+    }
     set((state) => ({
       customers: state.customers.map(c => ({ ...c, isRead: true }))
     }));
@@ -186,20 +164,30 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     customers: state.customers.filter(c => !c.isDemo)
   })),
   subscribe: () => {
-    const unsubscribe = onSnapshot(collection(db, 'customers'), (snapshot) => {
-      const list: Customer[] = [];
-      snapshot.forEach((doc) => {
-        list.push({ id: doc.id, ...doc.data() } as Customer);
-      });
-      // Fallback
-      if (list.length > 0) {
-        set({ customers: list });
-      } else {
-        set({ customers: initialDemoCustomers });
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'customers');
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    supabase.from('customers').select('*').then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+            set({ customers: data as Customer[] });
+        } else {
+            set({ customers: initialDemoCustomers });
+        }
     });
-    return unsubscribe;
+
+    const channel = supabase
+      .channel('public:customers')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, (payload) => {
+          supabase.from('customers').select('*').then(({ data, error }) => {
+            if (!error && data && data.length > 0) {
+                set({ customers: data as Customer[] });
+            }
+          });
+      })
+      .subscribe();
+      
+    return () => {
+        supabase.removeChannel(channel);
+    };
   }
 }));

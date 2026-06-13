@@ -1,7 +1,5 @@
 import React, { useEffect } from 'react';
 import { useThemeStore } from './store/useThemeStore';
-import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './lib/firebase';
 import { useBannerStore, Banner } from './store/useBannerStore';
 import { useCategoryStore } from './store/useCategoryStore';
 import { useSettingsStore } from './store/useSettingsStore';
@@ -119,60 +117,15 @@ export const ThemeInitializer: React.FC = () => {
     // For now, we assume fonts are imported in index.css
   }, [theme.fontFamily, theme.headingFont]);
 
-  // Subscribe to real-time Banners & Draft Banners from Firestore
+  // Subscribe to real-time syncs
   useEffect(() => {
-    const bannersRef = collection(db, 'banners');
-    const qLive = query(bannersRef, orderBy('order', 'asc'));
-    const unsubscribeLive = onSnapshot(qLive, (snapshot) => {
-      const liveList: Banner[] = [];
-      snapshot.forEach((doc) => {
-        liveList.push({ id: doc.id, ...doc.data() } as Banner);
-      });
-      useBannerStore.getState().setBanners(liveList);
-      
-      if (snapshot.empty) {
-        useBannerStore.getState().seedDefaultBanner();
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'banners');
-    });
-
-    const draftRef = collection(db, 'banners_draft');
-    const qDraft = query(draftRef, orderBy('order', 'asc'));
-    const unsubscribeDraft = onSnapshot(qDraft, (snapshot) => {
-      const draftList: Banner[] = [];
-      snapshot.forEach((doc) => {
-        draftList.push({ id: doc.id, ...doc.data() } as Banner);
-      });
-      
-      // Only set drafts from DB if the admin hasn't started doing local changes
-      if (!useBannerStore.getState().hasUnsavedChanges) {
-        useBannerStore.getState().setDraftBanners(draftList);
-      }
-      
-      if (snapshot.empty) {
-        useBannerStore.getState().seedDefaultBanner();
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'banners_draft');
-    });
-
+    const unsubscribeBanners = useBannerStore.getState().subscribe();
     const unsubscribeCategories = useCategoryStore.getState().subscribe();
-
-    const unsubscribeSliderConfig = onSnapshot(doc(db, 'settings', 'slider_config'), (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        useBannerStore.getState().updateSliderConfigLocal(!!data.autoSlide, Number(data.duration || 5));
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'settings/slider_config');
-    });
+    // useSettingsStore internally handles its own setup on demand but will be called manually elsewhere or implicitly.
 
     return () => {
-      unsubscribeLive();
-      unsubscribeDraft();
+      unsubscribeBanners();
       unsubscribeCategories();
-      unsubscribeSliderConfig();
     };
   }, []);
 

@@ -1,17 +1,5 @@
 import { create } from 'zustand';
-import { db } from '../lib/db';
-import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, onSnapshot } from 'firebase/firestore';
-
-export function cleanObjectForFirestore<T extends object>(obj: T): T {
-  const result: any = {};
-  Object.keys(obj).forEach((key) => {
-    const val = (obj as any)[key];
-    if (val !== undefined) {
-      result[key] = val;
-    }
-  });
-  return result;
-}
+import { getSupabase } from '../lib/supabase';
 
 export interface Banner {
   id: string;
@@ -99,46 +87,44 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   },
 
   subscribe: () => {
-    const unsubLive = onSnapshot(collection(db, 'banners'), (snapshot) => {
-      const liveList: Banner[] = [];
-      snapshot.forEach((docRef) => {
-        liveList.push({ id: docRef.id, ...docRef.data() } as Banner);
-      });
-      liveList.sort((a, b) => (Number(a.order) ?? 0) - (Number(b.order) ?? 0));
-      set({ banners: liveList, isLoaded: true });
-    }, (err) => {
-      console.error("Firestore live banners listen error:", err);
+    const supabase = getSupabase();
+    if (!supabase) {
+        set({ isLoaded: true });
+        return () => {};
+    }
+
+    supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
+        if (!error && data) set({ banners: data as Banner[], isLoaded: true });
     });
 
-    const unsubDraft = onSnapshot(collection(db, 'banners_draft'), (snapshot) => {
-      const draftList: Banner[] = [];
-      snapshot.forEach((docRef) => {
-        draftList.push({ id: docRef.id, ...docRef.data() } as Banner);
-      });
-      draftList.sort((a, b) => (Number(a.order) ?? 0) - (Number(b.order) ?? 0));
-      set({ draftBanners: draftList });
-    }, (err) => {
-      console.error("Firestore draft banners listen error:", err);
+    supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
+        if (!error && data) set({ draftBanners: data as Banner[] });
     });
+    
+    // Fake slider config for now since we don't have key-value tables 
+    // unless we create a generic settings table. 
 
-    const unsubSlider = onSnapshot(doc(db, 'settings', 'slider_config'), (docSnap) => {
-      if (docSnap.exists()) {
-        const config = docSnap.data();
-        set({
-          sliderConfig: {
-            autoSlide: config.autoSlide ?? true,
-            duration: config.duration ?? 5
-          }
-        });
-      }
-    }, (err) => {
-      console.error("Firestore slider config listen error:", err);
-    });
+    const channelLive = supabase
+      .channel('public:banners')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, (payload) => {
+          supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
+            if (!error && data) set({ banners: data as Banner[], isLoaded: true });
+          });
+      })
+      .subscribe();
+
+    const channelDraft = supabase
+      .channel('public:banners_draft')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'banners_draft' }, (payload) => {
+          supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
+            if (!error && data) set({ draftBanners: data as Banner[] });
+          });
+      })
+      .subscribe();
 
     return () => {
-      unsubLive();
-      unsubDraft();
-      unsubSlider();
+      supabase.removeChannel(channelLive);
+      supabase.removeChannel(channelDraft);
     };
   },
 
@@ -148,8 +134,6 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   
   updateSliderConfig: (autoSlide, duration) => {
     set({ sliderConfig: { autoSlide, duration } });
-    setDoc(doc(db, 'settings', 'slider_config'), { autoSlide, duration })
-      .catch(err => console.error("Firestore updateSliderConfig failed:", err));
   },
 
   updateSliderConfigLocal: (autoSlide, duration) => set({ sliderConfig: { autoSlide, duration } }),
@@ -158,9 +142,10 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     set((state) => ({
       banners: state.banners.map((b) => b.id === id ? { ...b, ...updates } : b)
     }));
-    // Live update directly to Firestore
-    setDoc(doc(db, 'banners', id), cleanObjectForFirestore(updates), { merge: true })
-      .catch(err => console.error("Firestore updateBanner failed:", err));
+    const supabase = getSupabase();
+    if (supabase) {
+      supabase.from('banners').update(updates).eq('id', id).then(({error}) => error && console.warn(error));
+    }
   },
 
   updateDraftBanner: (id, updates) => set((state) => ({
@@ -169,7 +154,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   })),
 
   addBanner: (type = 'uploaded') => {
-    const id = doc(collection(db, 'banners')).id;
+    const id = `ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const newBanner: Banner = {
       id,
       image: '',
@@ -202,12 +187,12 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     set((state) => ({
       banners: [...state.banners, newBanner]
     }));
-    setDoc(doc(db, 'banners', id), cleanObjectForFirestore(newBanner))
-      .catch(err => console.error("Firestore addBanner failed:", err));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('banners').insert([newBanner]).then(({error}) => error && console.warn(error));
   },
 
   addDraftBanner: (type = 'uploaded') => {
-    const id = doc(collection(db, 'banners_draft')).id;
+    const id = `ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const newBanner: Banner = {
       id,
       image: '',
@@ -245,7 +230,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   },
 
   duplicateDraftBanner: (banner: Banner) => {
-    const id = doc(collection(db, 'banners_draft')).id;
+    const id = `ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const duplicated: Banner = {
       ...banner,
       id,
@@ -264,18 +249,19 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     set((state) => ({
       banners: state.banners.filter((b) => b.id !== id)
     }));
-    deleteDoc(doc(db, 'banners', id))
-      .catch(err => console.error("Firestore removeBanner failed:", err));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
   },
 
   removeDraftBanner: (id) => {
     set((state) => ({
       draftBanners: state.draftBanners.filter((b) => b.id !== id)
     }));
-    deleteDoc(doc(db, 'banners_draft', id))
-      .catch(err => console.error("Firestore removeDraftBanner failed:", err));
-    deleteDoc(doc(db, 'banners', id))
-      .catch(err => console.error("Firestore auto remove live banner failed:", err));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('banners_draft').delete().eq('id', id).then(({error}) => error && console.warn(error));
+        supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
+    }
   },
 
   reorderBanners: (startIndex, endIndex) => {
@@ -285,15 +271,9 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     const reordered = result.map((b, idx) => ({ ...b, order: idx }));
     set({ banners: reordered });
 
-    // Save batch orders to Firestore
-    try {
-      const batch = writeBatch(db);
-      reordered.forEach((b) => {
-        batch.set(doc(db, 'banners', b.id), { order: b.order }, { merge: true });
-      });
-      batch.commit().catch(err => console.error("Reorder batch failed:", err));
-    } catch (e) {
-      console.error(e);
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('banners').upsert(reordered).then(({error}) => error && console.warn(error));
     }
   },
 
@@ -308,52 +288,28 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   saveDraftBanners: async () => {
     try {
       const draftBanners = [...get().draftBanners].sort((a, b) => (Number(a.order) ?? 0) - (Number(b.order) ?? 0));
+      const supabase = getSupabase();
       
-      // 1. Sync Draft Collection in Firestore
-      const querySnapshot = await getDocs(collection(db, 'banners_draft'));
-      const batch = writeBatch(db);
-
-      // Clean old draft documents
-      querySnapshot.forEach((d) => {
-        batch.delete(d.ref);
-      });
-
-      // Save updated draft documents preserving their order or fallback to index
-      draftBanners.forEach((b, idx) => {
-        const docRef = doc(db, 'banners_draft', b.id);
-        const orderVal = b.order !== undefined && b.order !== null ? Number(b.order) : idx;
-        batch.set(docRef, cleanObjectForFirestore({ ...b, order: orderVal }));
-      });
-
-      await batch.commit();
-
-      // 2. ALSO Sync Live Collection directly so Homepage and Slider are updated immediately in real time
-      const liveSnapshot = await getDocs(collection(db, 'banners'));
-      const liveBatch = writeBatch(db);
-
-      // Clean old live documents
-      liveSnapshot.forEach((d) => {
-        liveBatch.delete(d.ref);
-      });
-
-      // Save updated banners to live collection preserving status and locations
-      draftBanners.forEach((b, idx) => {
-        const docRef = doc(db, 'banners', b.id);
-        const orderVal = b.order !== undefined && b.order !== null ? Number(b.order) : idx;
-        liveBatch.set(docRef, cleanObjectForFirestore({ ...b, order: orderVal }));
-      });
-
-      await liveBatch.commit();
-
-      // Update store state for instant visual refresh across all components without hard reloading
+      if (supabase) {
+          // Sync Draft Collection in Supabase
+          // First delete all existing rows
+          await supabase.from('banners_draft').delete().neq('id', '0'); // Delete all filter
+          
+          const cleanDrafts = draftBanners.map((b, idx) => ({...b, order: b.order !== undefined && b.order !== null ? Number(b.order) : idx}));
+          await supabase.from('banners_draft').upsert(cleanDrafts);
+          
+          await supabase.from('banners').delete().neq('id', '0');
+          await supabase.from('banners').upsert(cleanDrafts);
+      }
+      
       set({ 
         banners: draftBanners,
         draftBanners, 
         hasUnsavedChanges: false 
       });
-      console.log("Both Draft and Live Banners collections persisted to Firestore successfully.");
+      console.log("Both Draft and Live Banners collections persisted successfully.");
     } catch (error) {
-      console.error("Error saving banners to Firestore collections:", error);
+      console.error("Error saving banners:", error);
       throw error;
     }
   },
@@ -362,63 +318,42 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     try {
       const draftBanners = [...get().draftBanners].sort((a, b) => (Number(a.order) ?? 0) - (Number(b.order) ?? 0));
       
-      // Auto-update 'draft' statuses to 'active' on publish
       const updatedDraftBanners = draftBanners.map(b => 
         b.status === 'draft' ? { ...b, status: 'active' as const } : b
       );
 
-      // Save the updated list both with active statuses to draft collection in firestore
-      const draftSnapshot = await getDocs(collection(db, 'banners_draft'));
-      const draftBatch = writeBatch(db);
-      draftSnapshot.forEach((d) => {
-        draftBatch.delete(d.ref);
-      });
-      updatedDraftBanners.forEach((b, idx) => {
-        const docRef = doc(db, 'banners_draft', b.id);
-        const orderVal = b.order !== undefined && b.order !== null ? Number(b.order) : idx;
-        draftBatch.set(docRef, cleanObjectForFirestore({ ...b, order: orderVal }));
-      });
-      await draftBatch.commit();
+      const supabase = getSupabase();
+      if (supabase) {
+          await supabase.from('banners_draft').delete().neq('id', '0');
+          const cleanDrafts = updatedDraftBanners.map((b, idx) => ({...b, order: b.order !== undefined && b.order !== null ? Number(b.order) : idx}));
+          await supabase.from('banners_draft').upsert(cleanDrafts);
+          
+          await supabase.from('banners').delete().neq('id', '0');
+          await supabase.from('banners').upsert(cleanDrafts);
+      }
 
-      // Copy that updated draft content to the live collection
-      const liveSnapshot = await getDocs(collection(db, 'banners'));
-      const liveBatch = writeBatch(db);
-      liveSnapshot.forEach((d) => {
-        liveBatch.delete(d.ref);
-      });
-      updatedDraftBanners.forEach((b, idx) => {
-        const docRef = doc(db, 'banners', b.id);
-        const orderVal = b.order !== undefined && b.order !== null ? Number(b.order) : idx;
-        liveBatch.set(docRef, cleanObjectForFirestore({ ...b, order: orderVal }));
-      });
-      await liveBatch.commit();
-
-      console.log("Banners published successfully to Firestore.");
+      console.log("Banners published successfully.");
       set({ banners: updatedDraftBanners, draftBanners: updatedDraftBanners, hasUnsavedChanges: false });
     } catch (error) {
-      console.error("Error publishing banners to Firestore:", error);
+      console.error("Error publishing banners:", error);
       throw error;
     }
   },
 
   resetDraftBanners: async () => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    
     try {
-      const querySnapshot = await getDocs(collection(db, 'banners_draft'));
-      const draftList: Banner[] = [];
-      querySnapshot.forEach((doc) => {
-        draftList.push({ id: doc.id, ...doc.data() } as Banner);
-      });
+      const { data: draftData } = await supabase.from('banners_draft').select('*');
+      const draftList = (draftData || []) as Banner[];
 
       if (draftList.length > 0) {
         draftList.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         set({ draftBanners: draftList, hasUnsavedChanges: false });
       } else {
-        // Fallback to live banners from database
-        const liveSnapshot = await getDocs(collection(db, 'banners'));
-        const liveList: Banner[] = [];
-        liveSnapshot.forEach((doc) => {
-          liveList.push({ id: doc.id, ...doc.data() } as Banner);
-        });
+        const { data: liveData } = await supabase.from('banners').select('*');
+        const liveList = (liveData || []) as Banner[];
         if (liveList.length > 0) {
           liveList.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
           set({ draftBanners: liveList, hasUnsavedChanges: false });
@@ -433,11 +368,14 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   },
 
   seedDefaultBanner: async () => {
-    try {
-      const liveSnapshot = await getDocs(collection(db, 'banners'));
-      const draftSnapshot = await getDocs(collection(db, 'banners_draft'));
+      const supabase = getSupabase();
+      if (!supabase) return;
       
-      if (liveSnapshot.empty && draftSnapshot.empty) {
+    try {
+      const { data: liveSnapshot } = await supabase.from('banners').select('*').limit(1);
+      const { data: draftSnapshot } = await supabase.from('banners_draft').select('*').limit(1);
+      
+      if ((!liveSnapshot || liveSnapshot.length === 0) && (!draftSnapshot || draftSnapshot.length === 0)) {
         const defaultBanner: Banner = {
           id: 'initial_promo',
           image: '',
@@ -459,9 +397,9 @@ export const useBannerStore = create<BannerState>((set, get) => ({
           createdDate: new Date().toISOString()
         };
         
-        await setDoc(doc(db, 'banners_draft', 'initial_promo'), defaultBanner);
-        await setDoc(doc(db, 'banners', 'initial_promo'), defaultBanner);
-        console.log("Successfully seeded default banner to Firestore.");
+        await supabase.from('banners_draft').upsert([defaultBanner]);
+        await supabase.from('banners').upsert([defaultBanner]);
+        console.log("Successfully seeded default banner.");
       }
     } catch (err) {
       console.error("Failed to seed default banner:", err);

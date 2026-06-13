@@ -111,30 +111,35 @@ const DEFAULT_CONFIG: FlutterConfig = {
   },
 };
 
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/db';
+import { getSupabase } from '../lib/supabase';
 
 export const getFlutterConfig = async (): Promise<FlutterConfig> => {
   try {
-    const docSnap = await getDoc(doc(db, 'settings', 'flutter_config'));
-    if (docSnap.exists()) {
-      return docSnap.data() as FlutterConfig;
+    const supabase = getSupabase();
+    if (!supabase) return DEFAULT_CONFIG;
+    
+    const { data, error } = await supabase.from('settings').select('*').eq('id', 'flutter_config').single();
+    if (data && !error && data.config) {
+      return data.config as FlutterConfig;
     } else {
-      // Seed default config into Firestore on first load
-      await setDoc(doc(db, 'settings', 'flutter_config'), DEFAULT_CONFIG);
+      // Seed default config into DB on first load
+      await supabase.from('settings').upsert([{ id: 'flutter_config', config: DEFAULT_CONFIG }]);
       return DEFAULT_CONFIG;
     }
   } catch (err: any) {
-    console.warn("Could not read flutter config from Firestore:", err?.message || err);
+    console.warn("Could not read flutter config from DB:", err?.message || err);
     return DEFAULT_CONFIG;
   }
 };
 
 export const saveFlutterConfig = async (config: FlutterConfig): Promise<void> => {
   try {
-    await setDoc(doc(db, 'settings', 'flutter_config'), config, { merge: true });
+    const supabase = getSupabase();
+    if (!supabase) return;
+    
+    await supabase.from('settings').upsert([{ id: 'flutter_config', config }]);
   } catch (err: any) {
-    console.error("Could not save flutter config to Firestore:", err?.message || err);
+    console.error("Could not save flutter config to DB:", err?.message || err);
     throw err;
   }
 };

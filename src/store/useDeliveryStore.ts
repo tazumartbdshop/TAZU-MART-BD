@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface CourierAPI {
   id: string;
@@ -58,24 +57,36 @@ export const useDeliveryStore = create<DeliveryStore>((set, get) => ({
   isLoaded: false,
 
   subscribe: () => {
-    const docRef = doc(db, 'settings', 'delivery');
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        set({
-          courierApis: data.courierApis ?? defaultState.courierApis,
-          divisionCharges: data.divisionCharges ?? defaultState.divisionCharges,
-          isLoaded: true
-        });
-      } else {
-        setDoc(docRef, defaultState).then(() => {
-          set({ ...defaultState, isLoaded: true });
-        }).catch(err => console.error("Initial delivery seed failed:", err));
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'settings/delivery');
-    });
-    return unsubscribe;
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadSettings = async () => {
+        const { data, error } = await supabase.from('settings').select('*').eq('id', 'delivery').limit(1);
+        if (!error && data && data.length > 0) {
+            const dataObj = data[0];
+            set({
+              courierApis: dataObj.courierApis ?? defaultState.courierApis,
+              divisionCharges: dataObj.divisionCharges ?? defaultState.divisionCharges,
+              isLoaded: true
+            });
+        } else if (!error && data && data.length === 0) {
+            supabase.from('settings').upsert([{ id: 'delivery', ...defaultState }]).then(({error}) => error && console.warn(error));
+            set({ ...defaultState, isLoaded: true });
+        }
+    };
+    
+    loadSettings();
+    
+    const channel = supabase
+      .channel('public:settings:delivery')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.delivery' }, () => {
+         loadSettings();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   },
 
   updateCourierApi: (id, updates) => {
@@ -87,8 +98,10 @@ export const useDeliveryStore = create<DeliveryStore>((set, get) => ({
     });
 
     set({ courierApis: nextCourierApis });
-    setDoc(doc(db, 'settings', 'delivery'), { courierApis: nextCourierApis }, { merge: true })
-      .catch((err) => handleFirestoreError(err, OperationType.WRITE, 'settings/delivery'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update({ courierApis: nextCourierApis }).eq('id', 'delivery').then(({error}) => error && console.warn(error));
+    }
   },
 
   updateDivisionCharge: (id, charge) => {
@@ -97,8 +110,10 @@ export const useDeliveryStore = create<DeliveryStore>((set, get) => ({
     );
 
     set({ divisionCharges: nextDivisionCharges });
-    setDoc(doc(db, 'settings', 'delivery'), { divisionCharges: nextDivisionCharges }, { merge: true })
-      .catch((err) => handleFirestoreError(err, OperationType.WRITE, 'settings/delivery'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update({ divisionCharges: nextDivisionCharges }).eq('id', 'delivery').then(({error}) => error && console.warn(error));
+    }
   },
 
   getActiveCourier: () => get().courierApis.find(api => api.status === 'active'),

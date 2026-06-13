@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useSupportStore, Broadcast } from '../../../store/useSupportStore';
 import { useProductStore } from '../../../store/useProductStore';
 import { useCategoryStore } from '../../../store/useCategoryStore';
-import { db, handleFirestoreError, OperationType } from '../../../lib/firebase';
-import { collection, query, orderBy, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { Plus, Trash2, Pin, Calendar, Send, Sparkles, Check, Share2, Eye, Signal, BarChart, Layers } from 'lucide-react';
 
 export const BroadcastManager = () => {
@@ -39,56 +37,6 @@ export const BroadcastManager = () => {
 
   // Custom Specific
   const [ctaLink, setCtaLink] = useState('');
-
-  // Real-time Firestore sync of broadcasts under Admin Support Manager
-  useEffect(() => {
-    const broadcastsRef = collection(db, 'broadcasts');
-    const q = query(broadcastsRef, orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const bcs: Broadcast[] = [];
-      snapshot.forEach((d) => {
-        const data = d.data();
-        bcs.push({
-          id: d.id,
-          type: data.type || 'text',
-          title: data.title || '',
-          content: data.content || '',
-          audience: data.audience || 'all',
-          pinned: data.pinned ?? false,
-          createdAt: data.createdAt || new Date().toISOString(),
-          imageUrl: data.imageUrl,
-          productId: data.productId,
-          productName: data.productName,
-          productPrice: data.productPrice,
-          productDiscount: data.productDiscount,
-          categoryName: data.categoryName,
-          offerPercentage: data.offerPercentage,
-          ctaText: data.ctaText,
-          ctaLink: data.ctaLink,
-          priority: data.priority,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          status: data.status,
-          opensCount: data.opensCount ?? 0,
-          clicksCount: data.clicksCount ?? 0,
-          sentCount: data.sentCount ?? 0,
-          likesCount: data.likesCount ?? 0,
-          supportsCount: data.supportsCount ?? 0,
-          viewsCount: data.viewsCount ?? 0,
-          productClicks: data.productClicks ?? 0,
-          categoryClicks: data.categoryClicks ?? 0,
-          campaignClicks: data.campaignClicks ?? 0,
-          purchasesCount: data.purchasesCount ?? 0,
-        });
-      });
-      if (bcs.length > 0) {
-        useSupportStore.setState({ broadcasts: bcs });
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'broadcasts');
-    });
-    return () => unsubscribe();
-  }, []);
 
   // Filtered product suggestions
   const productSuggestions = products.filter(p => 

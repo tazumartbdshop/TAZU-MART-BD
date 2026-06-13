@@ -39,8 +39,6 @@ import { useProductStore } from '../../store/useProductStore';
 import { usePromoStore } from '../../store/usePromoStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { formatPrice } from '../../lib/utils';
-import { db } from '../../lib/db';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 // Web Audio API Synthesizer for pleasant, offline-friendly notification sound feedback
 const playTone = (type: 'send' | 'receive' | 'open') => {

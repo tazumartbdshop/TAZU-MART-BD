@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface BrandShowcaseSlide {
   id: string;
@@ -54,25 +53,38 @@ export const useBrandShowcaseStore = create<BrandShowcaseState>((set, get) => ({
   ...defaultState,
   isLoaded: false,
   subscribe: () => {
-    const unsubscribe = onSnapshot(doc(db, 'settings', 'brandShowcase'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        set({ 
-          slides: data.slides || defaultState.slides, 
-          autoScrollSpeed: data.autoScrollSpeed || defaultState.autoScrollSpeed,
-          companyName: data.companyName || defaultState.companyName,
-          companySubtext: data.companySubtext || defaultState.companySubtext,
-          isLoaded: true 
-        });
-      } else {
-        setDoc(doc(db, 'settings', 'brandShowcase'), defaultState).then(() => {
-          set({ ...defaultState, isLoaded: true });
-        }).catch(err => console.error("Initial brand showcase seed failed", err));
-      }
-    }, (err) => {
-      handleFirestoreError(err, OperationType.GET, 'settings/brandShowcase');
-    });
-    return unsubscribe;
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
+    const loadSettings = async () => {
+        const { data, error } = await supabase.from('settings').select('*').eq('id', 'brandShowcase').limit(1);
+        if (!error && data && data.length > 0) {
+            const dataObj = data[0];
+            set({ 
+              slides: dataObj.slides || defaultState.slides, 
+              autoScrollSpeed: dataObj.autoScrollSpeed || defaultState.autoScrollSpeed,
+              companyName: dataObj.companyName || defaultState.companyName,
+              companySubtext: dataObj.companySubtext || defaultState.companySubtext,
+              isLoaded: true 
+            });
+        } else if (!error && data && data.length === 0) {
+            supabase.from('settings').upsert([{ id: 'brandShowcase', ...defaultState }]).then(({error}) => error && console.warn(error));
+            set({ ...defaultState, isLoaded: true });
+        }
+    };
+    
+    loadSettings();
+    
+    const channel = supabase
+      .channel('public:settings:brandShowcase')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.brandShowcase' }, () => {
+         loadSettings();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   },
   addSlide: (slide) => {
     const state = get();
@@ -89,29 +101,37 @@ export const useBrandShowcaseStore = create<BrandShowcaseState>((set, get) => ({
       }
     ];
     set({ slides: newSlides });
-    setDoc(doc(db, 'settings', 'brandShowcase'), { slides: newSlides }, { merge: true })
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/brandShowcase'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update({ slides: newSlides }).eq('id', 'brandShowcase').then(({error}) => error && console.warn(error));
+    }
   },
   
   updateSlide: (id, updates) => {
     const state = get();
     const newSlides = state.slides.map((s) => s.id === id ? { ...s, ...updates } : s);
     set({ slides: newSlides });
-    setDoc(doc(db, 'settings', 'brandShowcase'), { slides: newSlides }, { merge: true })
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/brandShowcase'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update({ slides: newSlides }).eq('id', 'brandShowcase').then(({error}) => error && console.warn(error));
+    }
   },
   
   removeSlide: (id) => {
     const state = get();
     const newSlides = state.slides.filter((s) => s.id !== id);
     set({ slides: newSlides });
-    setDoc(doc(db, 'settings', 'brandShowcase'), { slides: newSlides }, { merge: true })
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/brandShowcase'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update({ slides: newSlides }).eq('id', 'brandShowcase').then(({error}) => error && console.warn(error));
+    }
   },
   
   setConfig: (updates) => {
     set((state) => ({ ...state, ...updates }));
-    setDoc(doc(db, 'settings', 'brandShowcase'), updates, { merge: true })
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/brandShowcase'));
+    const supabase = getSupabase();
+    if (supabase) {
+        supabase.from('settings').update(updates).eq('id', 'brandShowcase').then(({error}) => error && console.warn(error));
+    }
   }
 }));

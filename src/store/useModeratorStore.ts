@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, getDoc } from 'firebase/firestore';
+import { getSupabase } from '../lib/supabase';
 
 export interface Moderator {
   id: string;
@@ -95,40 +94,52 @@ export const useModeratorStore = create<ModeratorStore>((set, get) => ({
   isLoaded: false,
   
   subscribe: () => {
-    // We store moderators in their own collection, and section password in settings
-    const unsubMods = onSnapshot(collection(db, 'moderators'), (snapshot) => {
-      const list: Moderator[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({ id: docSnap.id, ...docSnap.data() } as Moderator);
-      });
-      // Seed if empty
-      if (list.length === 0) {
-        defaultModerators.forEach(mod => {
-          setDoc(doc(db, 'moderators', mod.id), mod)
-            .catch(err => console.error("Initial mod seed error", err));
-        });
-        set({ moderators: defaultModerators });
-      } else {
-        set({ moderators: list });
-      }
-    }, (error) => handleFirestoreError(error, OperationType.GET, 'moderators'));
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
 
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'moderatorAuth'), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.sectionPassword) {
-          set({ sectionPassword: data.sectionPassword, isLoaded: true });
+    const loadMods = async () => {
+        const { data, error } = await supabase.from('moderators').select('*');
+        if (!error && data && data.length > 0) {
+            set({ moderators: data as Moderator[] });
+        } else if (!error && data && data.length === 0) {
+            supabase.from('moderators').upsert(defaultModerators).then(({error}) => error && console.warn(error));
+            set({ moderators: defaultModerators });
         }
-      } else {
-        setDoc(doc(db, 'settings', 'moderatorAuth'), { sectionPassword: 'Aistudio@2026' }).then(() => {
-          set({ isLoaded: true });
-        }).catch(err => console.error("Initial moderatorAuth seed failed", err));
-      }
-    }, (err) => handleFirestoreError(err, OperationType.GET, 'settings/moderatorAuth'));
+    };
+    
+    const loadSettings = async () => {
+        const { data, error } = await supabase.from('settings').select('*').eq('id', 'moderatorAuth').limit(1);
+        if (!error && data && data.length > 0) {
+            const dataObj = data[0];
+            if (dataObj.sectionPassword) {
+                set({ sectionPassword: dataObj.sectionPassword, isLoaded: true });
+            }
+        } else if (!error && data && data.length === 0) {
+            supabase.from('settings').upsert([{ id: 'moderatorAuth', sectionPassword: 'Aistudio@2026' }]).then(({error}) => error && console.warn(error));
+            set({ isLoaded: true });
+        }
+    };
+
+    loadMods();
+    loadSettings();
+    
+    const channel1 = supabase
+      .channel('public:moderators')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'moderators' }, () => {
+         loadMods();
+      })
+      .subscribe();
+      
+    const channel2 = supabase
+      .channel('public:settings:moderatorAuth')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.moderatorAuth' }, () => {
+         loadSettings();
+      })
+      .subscribe();
 
     return () => {
-      unsubMods();
-      unsubSettings();
+      supabase.removeChannel(channel1);
+      supabase.removeChannel(channel2);
     };
   },
 
@@ -136,8 +147,8 @@ export const useModeratorStore = create<ModeratorStore>((set, get) => ({
   setSimUnlocked: (v) => set({ isSimUnlocked: v }),
   setSectionPassword: (v) => {
     set({ sectionPassword: v });
-    setDoc(doc(db, 'settings', 'moderatorAuth'), { sectionPassword: v }, { merge: true })
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, 'settings/moderatorAuth'));
+    const supabase = getSupabase();
+    if(supabase) supabase.from('settings').update({ sectionPassword: v }).eq('id', 'moderatorAuth').then(({error}) => error && console.warn(error));
   },
 
   addModerator: (moderator) => {
@@ -148,8 +159,8 @@ export const useModeratorStore = create<ModeratorStore>((set, get) => ({
       createdAt: Date.now(),
     };
     set((state) => ({ moderators: [newModerator, ...state.moderators] }));
-    setDoc(doc(db, 'moderators', id), newModerator)
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, `moderators/${id}`));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('moderators').insert([newModerator]).then(({error}) => error && console.warn(error));
   },
 
   updateModerator: (id, updatedModerator) => {
@@ -158,16 +169,16 @@ export const useModeratorStore = create<ModeratorStore>((set, get) => ({
         m.id === id ? { ...m, ...updatedModerator } : m
       ),
     }));
-    setDoc(doc(db, 'moderators', id), updatedModerator, { merge: true })
-      .catch(err => handleFirestoreError(err, OperationType.WRITE, `moderators/${id}`));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('moderators').update(updatedModerator).eq('id', id).then(({error}) => error && console.warn(error));
   },
 
   deleteModerator: (id) => {
     set((state) => ({
       moderators: state.moderators.filter((m) => m.id !== id),
     }));
-    deleteDoc(doc(db, 'moderators', id))
-      .catch(err => handleFirestoreError(err, OperationType.DELETE, `moderators/${id}`));
+    const supabase = getSupabase();
+    if (supabase) supabase.from('moderators').delete().eq('id', id).then(({error}) => error && console.warn(error));
   },
 
   getModeratorByEmail: (email) => {

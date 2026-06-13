@@ -2,8 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs/promises";
 import { createServer as createViteServer } from "vite";
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { createClient } from '@supabase/supabase-js';
 
 const CONFIG_FILE = path.join(process.cwd(), 'game_config.json');
 
@@ -23,31 +22,20 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Initialize Firebase in backend
-  const CONFIG_APPLET_FILE = path.join(process.cwd(), 'firebase-applet-config.json');
-  let db: any = null;
+  // Initialize Supabase in backend
+  let supabaseAdmin: any = null;
   try {
-    const configText = await fs.readFile(CONFIG_APPLET_FILE, 'utf-8');
-    const firebaseConfig = JSON.parse(configText);
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
     
-    // Prioritize production environment variables in the running backend container
-    const backendConfig = {
-      apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || firebaseConfig.apiKey,
-      authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || firebaseConfig.authDomain,
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || firebaseConfig.projectId,
-      appId: process.env.VITE_FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || firebaseConfig.appId,
-      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || firebaseConfig.storageBucket,
-      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || firebaseConfig.messagingSenderId,
-      firestoreDatabaseId: (process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID && process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID !== "default") ? process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID : firebaseConfig.firestoreDatabaseId
-    };
-
-    const firebaseApp = initializeApp(backendConfig);
-    db = (backendConfig.firestoreDatabaseId && backendConfig.firestoreDatabaseId !== "default" && backendConfig.firestoreDatabaseId !== "(default)")
-      ? getFirestore(firebaseApp, backendConfig.firestoreDatabaseId)
-      : getFirestore(firebaseApp);
-    console.log("Firebase Backend initialized successfully with project:", backendConfig.projectId);
-  } catch (fbError) {
-    console.error("Error initializing Firebase App in server:", fbError);
+    if (supabaseUrl && supabaseKey) {
+       supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+       console.log("Supabase Backend initialized successfully");
+    } else {
+       console.warn("Missing Supabase credentials in server.ts");
+    }
+  } catch (err) {
+    console.error("Error initializing Supabase in server:", err);
   }
 
   // API Routes
@@ -92,7 +80,7 @@ async function startServer() {
         });
       }
       
-      if (!db) {
+      if (!supabaseAdmin) {
         return res.json({ 
           isValid: false, 
           state: 'inactive',
@@ -101,16 +89,12 @@ async function startServer() {
         });
       }
       
-      const promoCodesCol = collection(db, "promo_codes");
-      const qSnapshot = await getDocs(promoCodesCol);
+      const { data: promos, error: promoError } = await supabaseAdmin.from('promo_codes').select('*').ilike('code', code.trim());
       
       let matchingPromo: any = null;
-      qSnapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        if (data && data.code && data.code.toUpperCase().trim() === code.toUpperCase().trim()) {
-          matchingPromo = { id: docSnap.id, ...data };
-        }
-      });
+      if (promos && promos.length > 0) {
+         matchingPromo = promos[0];
+      }
       
       // Invalid Promo Code check
       if (!matchingPromo) {

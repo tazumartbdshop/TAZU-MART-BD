@@ -1,5 +1,4 @@
-import { collection, query, where, getDocs, limit, doc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from '../lib/db';
+import { getSupabase } from '../lib/supabase';
 
 export interface LinkPage {
   id: string;
@@ -87,23 +86,27 @@ const DEFAULT_DATA: SiteManagementData = {
 
 export const siteManagementService = {
   async getSettings(): Promise<SiteManagementData> {
+    const supabase = getSupabase();
+    if (!supabase) return DEFAULT_DATA;
+    
     try {
-      const docSnap = await getDoc(doc(db, 'settings', 'siteManagement'));
-      if (docSnap.exists()) {
-        const data = docSnap.data() as Partial<SiteManagementData>;
-        return { ...DEFAULT_DATA, ...data };
+      const { data, error } = await supabase.from('site_management').select('*').eq('id', 'global').limit(1);
+      if (data && data.length > 0) {
+        return { ...DEFAULT_DATA, ...data[0] };
       } else {
-        // Automatically publish default settings to Firestore if does not exist
-        await setDoc(doc(db, 'settings', 'siteManagement'), DEFAULT_DATA);
+        await supabase.from('site_management').upsert([{ id: 'global', ...DEFAULT_DATA }]);
         return DEFAULT_DATA;
       }
     } catch (e) {
-      console.warn("Firestore getSettings failed, using defaults:", e);
+      console.warn("Supabase getSettings failed, using defaults:", e);
       return DEFAULT_DATA;
     }
   },
 
   async updateSettings(updates: Partial<SiteManagementData>): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    
     try {
       const current = await this.getSettings();
       const updated = {
@@ -111,44 +114,54 @@ export const siteManagementService = {
         ...updates,
         updated_at: Date.now()
       };
-      await setDoc(doc(db, 'settings', 'siteManagement'), updated, { merge: true });
+      const { error } = await supabase.from('site_management').upsert([{ id: 'global', ...updated }]);
+      if (error && error.code !== '42P01') throw error;
     } catch (e) {
-      console.error("Firestore updateSettings failed:", e);
+      console.error("Supabase updateSettings failed:", e);
       throw e;
     }
   },
 
   async getLinkPages(): Promise<LinkPage[]> {
+    const supabase = getSupabase();
+    if (!supabase) return [];
+    
     try {
-      const q = query(collection(db, 'link_pages'));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LinkPage));
+      const { data, error } = await supabase.from('link_pages').select('*');
+      if (error && error.code !== '42P01') throw error;
+      return (data || []) as LinkPage[];
     } catch (e) {
-      console.error("Firestore getLinkPages failed:", e);
+      console.error("Supabase getLinkPages failed:", e);
       return [];
     }
   },
 
   async saveLinkPage(page: LinkPage): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    
     try {
-      await setDoc(doc(db, 'link_pages', page.id || page.slug), page);
+      const { error } = await supabase.from('link_pages').upsert([{ ...page }]);
+      if (error && error.code !== '42P01') throw error;
     } catch (err) {
-      console.error("Firestore saveLinkPage failed:", err);
+      console.error("Supabase saveLinkPage failed:", err);
       throw err;
     }
   },
 
   async getLinkPageBySlug(slug: string): Promise<LinkPage | null> {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    
     try {
-      const q = query(collection(db, 'link_pages'), where('slug', '==', slug), limit(1));
-      const querySnapshot = await getDocs(q);
+      const { data, error } = await supabase.from('link_pages').select('*').eq('slug', slug).limit(1);
+      if (error && error.code !== '42P01') throw error;
       
-      if (querySnapshot.empty) {
+      if (!data || data.length === 0) {
         return null;
       }
       
-      const doc = querySnapshot.docs[0];
-      return { id: doc.id, ...doc.data() } as LinkPage;
+      return data[0] as LinkPage;
     } catch (e) {
       console.error('Error fetching link page by slug in siteManagementService:', e);
       return null;
