@@ -117,17 +117,7 @@ export const ThemeInitializer: React.FC = () => {
     // For now, we assume fonts are imported in index.css
   }, [theme.fontFamily, theme.headingFont]);
 
-  // Subscribe to real-time syncs
-  useEffect(() => {
-    const unsubscribeBanners = useBannerStore.getState().subscribe();
-    const unsubscribeCategories = useCategoryStore.getState().subscribe();
-    // useSettingsStore internally handles its own setup on demand but will be called manually elsewhere or implicitly.
-
-    return () => {
-      unsubscribeBanners();
-      unsubscribeCategories();
-    };
-  }, []);
-
+  // All store subscriptions (Categories, Banners, etc.) are centrally handled in App.tsx
+  // to ensure they are only registered after server-side configuration is fully loaded.
   return null;
 };

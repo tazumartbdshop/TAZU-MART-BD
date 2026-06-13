@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { UserLayout } from './components/layout/UserLayout';
 import { useCategoryStore } from './store/useCategoryStore';
 import { useProductStore } from './store/useProductStore';
@@ -53,11 +53,28 @@ import AdminContentPages from './pages/admin/AdminContentPages';
 import DynamicLinkPage from './pages/DynamicLinkPage';
 import { useSiteManagementStore } from './store/useSiteManagementStore';
 import { useWebsitesStore } from './store/useWebsitesStore';
+import { fetchSupabaseConfigFromServer } from './lib/supabase';
 
 export default function App() {
   const { fetchSettings } = useSiteManagementStore();
+  const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
   useEffect(() => {
+    const initConfig = async () => {
+      try {
+        await fetchSupabaseConfigFromServer();
+      } catch (err) {
+        console.error("Failed to fetch Supabase config:", err);
+      } finally {
+        setIsConfigLoaded(true);
+      }
+    };
+    initConfig();
+  }, []);
+
+  useEffect(() => {
+    if (!isConfigLoaded) return;
+
     // Initial fetch for site management data
     fetchSettings();
 
@@ -95,9 +112,10 @@ export default function App() {
       unsubMenuSort();
       unsubDelivery();
     };
-  }, [fetchSettings]);
+  }, [isConfigLoaded, fetchSettings]);
 
   useEffect(() => {
+    if (!isConfigLoaded) return;
     let sub: any = null;
     const initSbAuth = async () => {
       const { getSupabase } = await import('./lib/supabase');
