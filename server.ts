@@ -3,24 +3,6 @@ import path from "path";
 import fs from "fs/promises";
 import { createServer as createViteServer } from "vite";
 import { createClient } from '@supabase/supabase-js';
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-
-// Initialize Firebase Admin for persistent config retrieval
-// Use a more resilient check for app initialization
-let firestore: any;
-try {
-  const apps = getApps();
-  if (apps.length === 0) {
-    initializeApp();
-    console.log("Firebase Admin initialized on server side");
-  } else {
-    console.log(`Firebase Admin already initialized with ${apps.length} apps`);
-  }
-  firestore = getFirestore();
-} catch (e) {
-  console.warn("Firebase Admin failed init or was already initialized:", e);
-}
 
 const CONFIG_FILE = path.join(process.cwd(), 'game_config.json');
 
@@ -57,59 +39,10 @@ async function startServer() {
   }
 
   // API Routes
-  app.get("/api/supabase-config", async (req, res) => {
-    let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
-    let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
-    
-    // Check Firestore (Universal Cloud Cache)
-    if ((!supabaseUrl || !supabaseKey) && firestore) {
-        try {
-            const docSnap = await firestore.collection('configs').doc('supabase').get();
-            if (docSnap.exists) {
-                const data = docSnap.data();
-                if (data?.supabaseUrl && data?.supabaseKey) {
-                    supabaseUrl = data.supabaseUrl;
-                    supabaseKey = data.supabaseKey;
-                    console.log("[Supabase API Proxy] Provided credentials from persistent Cloud Firestore.");
-                }
-            }
-        } catch (e) {
-            console.warn("[Supabase API Proxy] Firestore fetch failed during API request:", e);
-        }
-    }
-
-    // Fallback: load from local server-side JSON file if exists
-    if (!supabaseUrl || !supabaseKey) {
-      try {
-        const localPath = path.join(process.cwd(), 'supabase_config_cache.json');
-        const content = await fs.readFile(localPath, 'utf-8');
-        const parsed = JSON.parse(content);
-        if (parsed.supabaseUrl && parsed.supabaseKey) {
-          supabaseUrl = parsed.supabaseUrl;
-          supabaseKey = parsed.supabaseKey;
-          console.log("[Supabase Config Server] Loaded credentials from local JSON file.");
-        }
-      } catch (err) {
-        // file not found or corrupted, ignore
-      }
-    }
-    
+  app.get("/api/supabase-config", (req, res) => {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
     res.json({ supabaseUrl, supabaseKey });
-  });
-
-  app.post("/api/save-supabase-config", async (req, res) => {
-    try {
-      const { supabaseUrl, supabaseKey } = req.body;
-      if (supabaseUrl && supabaseKey) {
-        const localPath = path.join(process.cwd(), 'supabase_config_cache.json');
-        await fs.writeFile(localPath, JSON.stringify({ supabaseUrl, supabaseKey }, null, 2), 'utf-8');
-        console.log("[Supabase Config Server] Successfully saved credentials to server-side cache!");
-        return res.json({ status: "success" });
-      }
-    } catch (err) {
-      console.error("[Supabase Config Server] Failed to save credentials to disk:", err);
-    }
-    res.status(500).json({ status: "error", error: "Failed to persist credentials" });
   });
 
   app.get("/api/game-config", async (req, res) => {
@@ -650,7 +583,7 @@ Please ask me your query or select a quick question template below!`;
         const indexPath = path.join(distPath, 'index.html');
         let html = await fs.readFile(indexPath, 'utf-8');
 
-        // Capture production container's real environmental variables for Firebase
+        // Capture production container's real environmental variables
         const runtimeConfig = {
           apiKey: process.env.VITE_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || null,
           authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || null,
@@ -661,49 +594,7 @@ Please ask me your query or select a quick question template below!`;
           firestoreDatabaseId: (process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID && process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID !== "default") ? process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID : null
         };
 
-        // Also capture Supabase credentials for production synchronization
-        let supUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || null;
-        let supKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || null;
-        
-        // CRITICAL: Fetch from Cloud Firestore (Source of Truth) if environment is missing
-        if ((!supUrl || !supKey) && firestore) {
-            try {
-                console.log("[Supabase Server Proxy] Fetching credentials from persistent Cloud Firestore...");
-                const docSnap = await firestore.collection('configs').doc('supabase').get();
-                if (docSnap.exists) {
-                    const data = docSnap.data();
-                    if (data?.supabaseUrl && data?.supabaseKey) {
-                        supUrl = data.supabaseUrl;
-                        supKey = data.supabaseKey;
-                        console.log("[Supabase Server Proxy] Successfully synchronized live connection from Cloud Firestore!");
-                    }
-                }
-            } catch (e) {
-                console.warn("[Supabase Server Proxy] Cloud Firestore lookup failed:", e);
-            }
-        }
-
-        // Final fallback to local server cache for Supabase if Firestore failed
-        if (!supUrl || !supKey) {
-            try {
-                const localPath = path.join(process.cwd(), 'supabase_config_cache.json');
-                const content = await fs.readFile(localPath, 'utf-8');
-                const parsed = JSON.parse(content);
-                if (parsed.supabaseUrl && parsed.supabaseKey) {
-                    supUrl = parsed.supabaseUrl;
-                    supKey = parsed.supabaseKey;
-                }
-            } catch (e) {}
-        }
-
-        const supabaseConfig = { supabaseUrl: supUrl, supabaseKey: supKey };
-
-        const configScript = `
-    <script>
-      window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};
-      window.__SUPABASE_CONFIG__ = ${JSON.stringify(supabaseConfig)};
-    </script>`;
-
+        const configScript = `<script>window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};</script>`;
         // Inject runtime variables synchronously before main bundle imports run
         html = html.replace('<head>', `<head>\n    ${configScript}`);
         res.send(html);
@@ -718,14 +609,4 @@ Please ask me your query or select a quick question template below!`;
   });
 }
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-});
-
-startServer().catch(err => {
-  console.error("Critical server startup failure:", err);
-});
+startServer();

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getSupabase, syncSupabaseConfigToFirestore } from '../lib/supabase';
+import { getSupabase } from '../lib/supabase';
 
 export interface AppSettings {
   // 1. Store Identity
@@ -521,23 +521,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (updates.supabaseUrl) localStore.supabaseUrl = updates.supabaseUrl;
       if (updates.supabaseKey) localStore.supabaseKey = updates.supabaseKey;
       localStorage.setItem('supabase_config', JSON.stringify(localStore));
-
-      // Trigger syncing backend credentials through Firestore & Express on save
-      const u = updates.supabaseUrl || localStore.supabaseUrl;
-      const k = updates.supabaseKey || localStore.supabaseKey;
-      if (u && k) {
-        try {
-          syncSupabaseConfigToFirestore(u, k).then(() => {
-            fetch('/api/save-supabase-config', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ supabaseUrl: u, supabaseKey: k })
-            }).catch(() => {});
-          });
-        } catch (err) {
-          console.warn("Could not sync credentials to cloud Firestore/Express:", err);
-        }
-      }
     }
     
     const supabase = getSupabase();
@@ -558,21 +541,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   publishSettings: async () => {
     try {
       const draft = get().draftSettings;
-
-      // Sync draft changes to Cloud Firestore
-      if (draft.supabaseUrl && draft.supabaseKey) {
-        try {
-          await syncSupabaseConfigToFirestore(draft.supabaseUrl, draft.supabaseKey);
-          await fetch('/api/save-supabase-config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ supabaseUrl: draft.supabaseUrl, supabaseKey: draft.supabaseKey })
-          }).catch(() => {});
-        } catch (e) {
-          console.warn("Draft publish credentials sync bypassed:", e);
-        }
-      }
-
       const supabase = getSupabase();
       if (supabase) {
           const { error } = await supabase.from('settings').upsert([{ id: 'global', ...draft }]);

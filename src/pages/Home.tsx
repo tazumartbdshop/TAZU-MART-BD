@@ -89,7 +89,7 @@ export default function Home() {
   console.log("[Home Page Categories Debug] Rendered on homepage after filters:", sortedCategories.length, "Items:", sortedCategories);
 
   const { offers } = useOfferStore();
-  const activeOffers = offers.filter(o => o.status === 'Active');
+  const activeOffers = offers.filter(o => String(o.status || 'Active').toLowerCase() === 'active');
 
   const activeFlashOffers = activeOffers.filter(o => o.homepageVisibility && (o.type === 'Flash Sale' || o.showAsFlashSale));
   const flashOfferProductIds = activeFlashOffers.flatMap(o => [...(o.productIds || []), ...(o.manualProductIds || [])]);
@@ -100,9 +100,11 @@ export default function Home() {
   const activeBestOffers = activeOffers.filter(o => o.homepageVisibility && (o.type === 'Best Selling' || o.showAsBestSelling));
   const bestOfferProductIds = activeBestOffers.flatMap(o => [...(o.productIds || []), ...(o.manualProductIds || [])]);
 
-  const flashSaleProducts = products.filter(p => (p.is_flash_sale || flashOfferProductIds.includes(p.id)) && p.status === 'active');
-  const trendingProducts = products.filter(p => (p.is_trending || trendingOfferProductIds.includes(p.id)) && p.status === 'active');
-  const bestSellingProducts = products.filter(p => (p.is_best_selling || bestOfferProductIds.includes(p.id)) && p.status === 'active');
+  const isProductActive = (p: any) => String(p.status || 'active').toLowerCase() === 'active';
+
+  const flashSaleProducts = products.filter(p => (p.is_flash_sale || flashOfferProductIds.includes(p.id)) && isProductActive(p));
+  const trendingProducts = products.filter(p => (p.is_trending || trendingOfferProductIds.includes(p.id)) && isProductActive(p));
+  const bestSellingProducts = products.filter(p => (p.is_best_selling || bestOfferProductIds.includes(p.id)) && isProductActive(p));
   const displayBestSellingList = [...bestSellingProducts, ...bestSellingProducts, ...bestSellingProducts].slice(0, 15);
 
   return (
