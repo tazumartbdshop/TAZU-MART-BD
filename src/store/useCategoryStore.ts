@@ -49,31 +49,45 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       createdAt: new Date().toISOString(),
     };
     
+    // Optimistic Update
+    const currentCats = get().categories;
+    set({ categories: [...currentCats, newCategory] });
+    
     if (supabase) {
       const { error } = await supabase.from('categories').insert([newCategory]);
-      if (error && error.code !== '42P01') console.error("Supabase insert error", error);
-    } else {
-        const currentCats = get().categories;
-        set({ categories: [...currentCats, newCategory] });
+      if (error) {
+        // Rollback on error
+        set({ categories: currentCats });
+        console.error("Supabase insert error:", error);
+        throw new Error(error.message || "Failed to add category to database");
+      }
     }
   },
   
   updateCategory: async (id, payload) => {
     const supabase = getSupabase();
-    const existing = get().categories.find(c => c.id === id);
+    const currentCats = get().categories;
+    const existing = currentCats.find(c => c.id === id);
     const mergedPayload = existing ? { ...existing, ...payload } : payload;
+    
+    // Optimistic Update
+    const updatedCats = currentCats.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
+    set({ categories: updatedCats as Category[] });
     
     if (supabase) {
       const { error } = await supabase.from('categories').update(mergedPayload).eq('id', id);
-      if (error && error.code !== '42P01') console.error("Supabase update error", error);
-    } else {
-        const newCats = get().categories.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
-        set({ categories: newCats as Category[] });
+      if (error) {
+        // Rollback on error
+        set({ categories: currentCats });
+        console.error("Supabase update error:", error);
+        throw new Error(error.message || "Failed to update category in database");
+      }
     }
   },
   
   deleteCategory: async (id) => {
-    const category = get().categories.find(c => c.id === id);
+    const currentCats = get().categories;
+    const category = currentCats.find(c => c.id === id);
     const supabase = getSupabase();
     
     if (category) {
@@ -96,12 +110,18 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       }
     }
     
+    // Optimistic Update
+    const newCats = currentCats.filter(c => c.id !== id);
+    set({ categories: newCats });
+    
     if (supabase) {
       const { error } = await supabase.from('categories').delete().eq('id', id);
-      if (error && error.code !== '42P01') console.error("Supabase delete error", error);
-    } else {
-        const newCats = get().categories.filter(c => c.id !== id);
-        set({ categories: newCats });
+      if (error) {
+        // Rollback on error
+        set({ categories: currentCats });
+        console.error("Supabase delete error:", error);
+        throw new Error(error.message || "Failed to delete category from database");
+      }
     }
   },
   
@@ -126,7 +146,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     });
     
     const channel = supabase
-      .channel('public:categories')
+      .channel('public:categories:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, (payload) => {
         supabase.from('categories').select('*').order('displayOrder', { ascending: true })
             .then(({ data, error }) => {

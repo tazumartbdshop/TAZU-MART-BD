@@ -257,30 +257,68 @@ export default function Register() {
 
       const signupEmail = formData.email ? formData.email.toLowerCase().trim() : `${formData.phone.trim()}@tazumart.com`;
       
-      let firebaseUser;
-      try {
-        const authResult = await createUserWithEmailAndPassword(auth, signupEmail, formData.password);
-        firebaseUser = authResult.user;
-      } catch (authErr: any) {
-        if (authErr.code === 'auth/operation-not-allowed') {
-          console.warn("Firebase Auth is not enabled. Proceeding with robust local fallback customer direct Firestore write.");
-          // Generate a safe local ID
-          const fallbackUid = 'local_usr_' + Math.floor(Math.random() * 10000000).toString();
-          firebaseUser = {
-            uid: fallbackUid,
+      let registeredUserUid: string | null = null;
+      let registeredUserEmail: string | null = null;
+      let isSupabaseRegistered = false;
+
+      const supabaseSvc = getSupabase();
+      if (supabaseSvc) {
+        try {
+          const { data: authData, error: authError } = await supabaseSvc.auth.signUp({
             email: signupEmail,
-          };
-        } else {
-          throw authErr;
+            password: formData.password,
+            options: {
+              data: {
+                name: formData.fullName,
+                phone: formData.phone.trim(),
+              }
+            }
+          });
+
+          if (!authError && authData.user) {
+            registeredUserUid = authData.user.id;
+            registeredUserEmail = authData.user.email || signupEmail;
+            isSupabaseRegistered = true;
+          } else if (authError) {
+            // Check if duplicate user
+            if (authError.message.includes('User already exists') || authError.status === 400) {
+              const dupError = new Error('User already exists. Please sign in');
+              (dupError as any).code = 'auth/email-already-in-use';
+              throw dupError;
+            } else {
+              console.warn("Supabase auth signUp direct error:", authError.message);
+            }
+          }
+        } catch (sbErr: any) {
+          if (sbErr.code === 'auth/email-already-in-use') {
+            throw sbErr;
+          }
+          console.warn("Supabase signUp failed, trying fallback:", sbErr);
+        }
+      }
+
+      if (!isSupabaseRegistered) {
+        try {
+          const authResult = await createUserWithEmailAndPassword(auth, signupEmail, formData.password);
+          registeredUserUid = authResult.user.uid;
+          registeredUserEmail = authResult.user.email;
+        } catch (authErr: any) {
+          if (authErr.code === 'auth/operation-not-allowed') {
+            console.warn("Firebase Auth is not enabled. Proceeding with robust local fallback customer.");
+            const fallbackUid = 'local_usr_' + Math.floor(Math.random() * 10000000).toString();
+            registeredUserUid = fallbackUid;
+            registeredUserEmail = signupEmail;
+          } else {
+            throw authErr;
+          }
         }
       }
 
       try {
-        const supabase = getSupabase();
-        if (supabase) {
-          await supabase.from('users').upsert([{
-            id: firebaseUser.uid,
-            uid: firebaseUser.uid,
+        if (supabaseSvc && registeredUserUid) {
+          await supabaseSvc.from('users').upsert([{
+            id: registeredUserUid,
+            uid: registeredUserUid,
             name: formData.fullName,
             email: formData.email ? formData.email.toLowerCase().trim() : '',
             phone: formData.phone.trim(),
@@ -301,15 +339,12 @@ export default function Register() {
             specialDate: datesJoined,
           }]);
         }
-        
-        // Note: Subcollections (folders, notes, teamMembers) are implicitly 
-        // ready and will start existing as soon as the user adds their first record.
       } catch (fsErr) {
         console.error("Supabase sign up store err", fsErr);
       }
 
       const newCustomer = {
-        id: firebaseUser.uid,
+        id: registeredUserUid || 'unknown_id',
         name: formData.fullName,
         phones: [formData.phone.trim()],
         emails: formData.email ? [formData.email.toLowerCase().trim()] : [],
@@ -340,7 +375,7 @@ export default function Register() {
       addCustomer(newCustomer);
 
       login({
-        id: firebaseUser.uid,
+        id: registeredUserUid || 'unknown_id',
         name: formData.fullName,
         email: formData.email ? formData.email.toLowerCase().trim() : '',
         phone: formData.phone.trim(),
@@ -355,7 +390,9 @@ export default function Register() {
         specialDate: datesJoined,
       });
 
-      pixelService.trackRegister(firebaseUser.uid);
+      if (registeredUserUid) {
+        pixelService.trackRegister(registeredUserUid);
+      }
 
       setIsLoading(false);
       setSuccess(true);

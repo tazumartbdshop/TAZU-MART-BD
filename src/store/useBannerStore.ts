@@ -105,7 +105,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     // unless we create a generic settings table. 
 
     const channelLive = supabase
-      .channel('public:banners')
+      .channel('public:banners:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, (payload) => {
           supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
             if (!error && data) set({ banners: data as Banner[], isLoaded: true });
@@ -114,7 +114,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       .subscribe();
 
     const channelDraft = supabase
-      .channel('public:banners_draft')
+      .channel('public:banners_draft:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'banners_draft' }, (payload) => {
           supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
             if (!error && data) set({ draftBanners: data as Banner[] });

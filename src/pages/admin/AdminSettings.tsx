@@ -80,14 +80,20 @@ export default function AdminSettings() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Premium 800ms state response delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    updateDraftSettings(formState);
-    setIsSaving(false);
-    setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-    }, 3000);
+    try {
+      updateDraftSettings(formState);
+      await useSettingsStore.getState().publishSettings();
+      // Premium 800ms state response delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {

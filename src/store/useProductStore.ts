@@ -197,15 +197,18 @@ export const useProductStore = create<ProductState>((set, get) => ({
       createdAt: Date.now(),
     };
     
+    // Optimistic Update
+    const currentProducts = get().products;
+    set({ products: [...currentProducts, newProduct] });
+    
     if (supabase) {
       const { error } = await supabase.from('products').insert([newProduct]);
       if (error) {
-        if (error.code !== '42P01') console.error("Supabase insert error", error);
+        // Rollback on error
+        set({ products: currentProducts });
+        console.error("Supabase insert error:", error);
+        throw new Error(error.message || "Failed to add product to database");
       }
-    } else {
-        // Fallback for development if no supabase config
-        const currentProducts = get().products;
-        set({ products: [...currentProducts, newProduct] });
     }
   },
   
@@ -213,7 +216,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const supabase = getSupabase();
     console.log(`[Supabase Log] Preparing to update product document: products/${id}`);
     
-    const currentProduct = get().products.find(p => p.id === id);
+    const currentProducts = get().products;
+    const currentProduct = currentProducts.find(p => p.id === id);
     const finalPayload = { ...payload };
 
     if (
@@ -229,13 +233,18 @@ export const useProductStore = create<ProductState>((set, get) => ({
       finalPayload.keywords = generateKeywords(name, category, brand, description);
     }
     
+    // Optimistic Update
+    const updatedProducts = currentProducts.map(p => p.id === id ? { ...p, ...finalPayload } : p);
+    set({ products: updatedProducts });
+    
     if (supabase) {
       const { error } = await supabase.from('products').update(finalPayload).eq('id', id);
-      if (error && error.code !== '42P01') console.error("Supabase update error", error);
-    } else {
-        // Fallback
-        const newProducts = get().products.map(p => p.id === id ? { ...p, ...finalPayload } : p);
-        set({ products: newProducts });
+      if (error) {
+        // Rollback on error
+        set({ products: currentProducts });
+        console.error("Supabase update error:", error);
+        throw new Error(error.message || "Failed to update product in database");
+      }
     }
   },
   
@@ -243,7 +252,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const supabase = getSupabase();
     console.log(`[Supabase Log] Preparing to delete product document: products/${id}`);
     
-    const product = get().products.find(p => p.id === id);
+    const currentProducts = get().products;
+    const product = currentProducts.find(p => p.id === id);
     if (product) {
       try {
         const urlsToDelete = new Set<string>();
@@ -265,12 +275,18 @@ export const useProductStore = create<ProductState>((set, get) => ({
       }
     }
     
+    // Optimistic Update
+    const newProducts = currentProducts.filter(p => p.id !== id);
+    set({ products: newProducts });
+    
     if (supabase) {
       const { error } = await supabase.from('products').delete().eq('id', id);
-      if (error && error.code !== '42P01') console.error("Supabase delete error", error);
-    } else {
-        const newProducts = get().products.filter(p => p.id !== id);
-        set({ products: newProducts });
+      if (error) {
+        // Rollback on error
+        set({ products: currentProducts });
+        console.error("Supabase delete error:", error);
+        throw new Error(error.message || "Failed to delete product from database");
+      }
     }
   },
   
@@ -293,7 +309,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     });
 
     const channel = supabase
-      .channel('public:products')
+      .channel('public:products:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
         // Simple reload strategy on any change
         supabase.from('products').select('*').then(({ data, error }) => {

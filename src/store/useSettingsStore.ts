@@ -584,12 +584,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     });
 
     const channel = supabase
-      .channel('public:settings')
+      .channel('public:settings:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
         supabase.from('settings').select('*').eq('id', 'global').limit(1).then(({ data, error }) => {
             if (!error && data && data.length > 0) {
                 const mergedSettings = { ...defaultSettings, ...data[0] };
                 set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
+                get().fetchLatestLogo();
             }
         });
       })
@@ -597,7 +598,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     // Setup listener on specialized site_settings table as well
     const channelLogo = supabase
-      .channel('public:site_settings')
+      .channel('public:site_settings:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, (payload) => {
         console.log("Real-time site_settings update received!");
         get().fetchLatestLogo();

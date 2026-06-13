@@ -26,6 +26,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import Account from './pages/Account';
 import AuthGate from './pages/AuthGate';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { useAuthStore } from './store/useAuthStore';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Product from './pages/Product';
 import Orders from './pages/Orders';
@@ -95,6 +96,60 @@ export default function App() {
       unsubDelivery();
     };
   }, [fetchSettings]);
+
+  useEffect(() => {
+    let sub: any = null;
+    const initSbAuth = async () => {
+      const { getSupabase } = await import('./lib/supabase');
+      const supabase = getSupabase();
+      if (supabase) {
+        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_OUT') {
+            useAuthStore.getState().logout();
+          } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+            // Keep state synchronized with database user profile
+            try {
+              const { data: dbUserProfile, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+              if (dbUserProfile && !error) {
+                const currentAuth = useAuthStore.getState();
+                if (!currentAuth.isAuthenticated || currentAuth.user?.id !== session.user.id) {
+                  useAuthStore.getState().login({
+                    id: dbUserProfile.id,
+                    name: dbUserProfile.name,
+                    email: dbUserProfile.email,
+                    role: dbUserProfile.role,
+                    phone: dbUserProfile.phone,
+                    profileImage: dbUserProfile.profileImage,
+                    gender: dbUserProfile.gender,
+                    address: dbUserProfile.address,
+                    division: dbUserProfile.division,
+                    district: dbUserProfile.district,
+                    city: dbUserProfile.district,
+                    upazila: dbUserProfile.upazila,
+                    area: dbUserProfile.area,
+                    postalCode: dbUserProfile.postalCode,
+                  });
+                }
+              }
+            } catch (err) {
+              console.warn("Could not sync profile metadata from Supabase:", err);
+            }
+          }
+        });
+        sub = data?.subscription;
+      }
+    };
+    initSbAuth();
+    return () => {
+      if (sub) {
+        sub.unsubscribe();
+      }
+    };
+  }, []);
 
   return (
     <Router>

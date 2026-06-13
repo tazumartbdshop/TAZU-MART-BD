@@ -351,16 +351,18 @@ export default function Login() {
       }
 
       // 4. Try regular Customer
-      let firebaseUser;
+      let authenticatedUserUid: string | null = null;
+      let authenticatedUserEmail: string | null = null;
+      let isSupabaseAuthed = false;
       
       // Let's lookup the user collection in Database 1st as a robust source-of-truth fallback
       let dbUser: any = null;
+      const supabaseSvc = await import('../lib/supabase').then(m => m.getSupabase());
       try {
-        const supabase = await import('../lib/supabase').then(m => m.getSupabase());
-        if (supabase) {
+        if (supabaseSvc) {
           const { data, error } = isEmail 
-            ? await supabase.from('users').select('*').eq('email', normalizedIdentifier).limit(1).single()
-            : await supabase.from('users').select('*').eq('phone', normalizedIdentifier).limit(1).single();
+            ? await supabaseSvc.from('users').select('*').eq('email', normalizedIdentifier).limit(1).single()
+            : await supabaseSvc.from('users').select('*').eq('phone', normalizedIdentifier).limit(1).single();
           if (data && !error) {
             dbUser = data;
           }
@@ -369,75 +371,111 @@ export default function Login() {
         console.error("Error querying db users collection on login:", dbErr);
       }
 
-      try {
-        const authResult = await signInWithEmailAndPassword(auth, loginEmail, password);
-        firebaseUser = authResult.user;
-      } catch (err: any) {
-        const existingLocalCust = customers.find(c => {
-          if (isEmail) {
-            return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier) && c.password === password;
-          } else {
-            return c.phones.some(p => p.trim() === normalizedIdentifier) && c.password === password;
-          }
-        });
+      // Try Supabase auth first if email-based authentication
+      if (supabaseSvc && isEmail) {
+        try {
+          const { data, error: authError } = await supabaseSvc.auth.signInWithPassword({
+            email: loginEmail,
+            password: password,
+          });
 
-        const isPasswordCorrectFallback = 
-          (existingLocalCust && existingLocalCust.password === password) || 
-          (dbUser && dbUser.password === password);
-
-        if (err.code === 'auth/operation-not-allowed') {
-          if (isPasswordCorrectFallback) {
-            const resolvedUid = dbUser?.uid || existingLocalCust?.id || 'local_fallback_usr_' + Math.floor(Math.random() * 100000);
-            firebaseUser = { uid: resolvedUid, email: loginEmail };
-          } else {
-            // Check if password has mismatched
-            const passwordMismatchedCust = customers.find(c => {
-              if (isEmail) {
-                return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier);
-              } else {
-                return c.phones.some(p => p.trim() === normalizedIdentifier);
-              }
-            }) || dbUser;
-
-            if (passwordMismatchedCust) {
+          if (!authError && data?.user) {
+            authenticatedUserUid = data.user.id;
+            authenticatedUserEmail = data.user.email || loginEmail;
+            isSupabaseAuthed = true;
+          } else if (authError) {
+            // Check if wrong credentials
+            if (authError.message.includes('Invalid login credentials') || authError.status === 400) {
               const wrongPassError = new Error('Email or password is incorrect');
               (wrongPassError as any).code = 'auth/wrong-password';
               throw wrongPassError;
             } else {
-              const userNotFoundError = new Error('Email or password is incorrect');
-              (userNotFoundError as any).code = 'auth/user-not-found';
-              throw userNotFoundError;
+              console.warn("Supabase auth direct error:", authError.message);
             }
           }
-        } else if (isPasswordCorrectFallback && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
-          try {
-            const authResult = await createUserWithEmailAndPassword(auth, loginEmail, password);
-            firebaseUser = authResult.user;
-          } catch (createErr: any) {
-            if (createErr.code === 'auth/operation-not-allowed') {
-              const resolvedUid = dbUser?.uid || existingLocalCust?.id || 'local_fallback_usr_' + Math.floor(Math.random() * 100000);
-              firebaseUser = { uid: resolvedUid, email: loginEmail };
-            } else {
-              throw createErr;
-            }
+        } catch (sbErr: any) {
+          if (sbErr.code === 'auth/wrong-password') {
+            throw sbErr;
           }
-        } else {
-          // If fallback password checked matches but main gave another err, check if user exists at all
-          const hasAccountButWrongPass = 
-            (customers.some(c => isEmail ? c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier) : c.phones.some(p => p.trim() === normalizedIdentifier))) || 
-            (dbUser);
-          
-          if (hasAccountButWrongPass) {
-            const wrongPassErr = new Error('Email or password is incorrect');
-            wrongPassErr.name = 'AuthError';
-            (wrongPassErr as any).code = 'auth/wrong-password';
-            throw wrongPassErr;
-          }
-          throw err;
+          console.warn("Supabase auth failed, trying fallback:", sbErr);
         }
       }
 
-      if (firebaseUser) {
+      if (!isSupabaseAuthed) {
+        try {
+          const authResult = await signInWithEmailAndPassword(auth, loginEmail, password);
+          authenticatedUserUid = authResult.user.uid;
+          authenticatedUserEmail = authResult.user.email;
+        } catch (err: any) {
+          const existingLocalCust = customers.find(c => {
+            if (isEmail) {
+              return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier) && c.password === password;
+            } else {
+              return c.phones.some(p => p.trim() === normalizedIdentifier) && c.password === password;
+            }
+          });
+
+          const isPasswordCorrectFallback = 
+            (existingLocalCust && existingLocalCust.password === password) || 
+            (dbUser && dbUser.password === password);
+
+          if (err.code === 'auth/operation-not-allowed') {
+            if (isPasswordCorrectFallback) {
+              const resolvedUid = dbUser?.uid || existingLocalCust?.id || 'local_fallback_usr_' + Math.floor(Math.random() * 100000);
+              authenticatedUserUid = resolvedUid;
+              authenticatedUserEmail = loginEmail;
+            } else {
+              // Check if password has mismatched
+              const passwordMismatchedCust = customers.find(c => {
+                if (isEmail) {
+                  return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier);
+                } else {
+                  return c.phones.some(p => p.trim() === normalizedIdentifier);
+                }
+              }) || dbUser;
+
+              if (passwordMismatchedCust) {
+                const wrongPassError = new Error('Email or password is incorrect');
+                (wrongPassError as any).code = 'auth/wrong-password';
+                throw wrongPassError;
+              } else {
+                const userNotFoundError = new Error('Email or password is incorrect');
+                (userNotFoundError as any).code = 'auth/user-not-found';
+                throw userNotFoundError;
+              }
+            }
+          } else if (isPasswordCorrectFallback && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+            try {
+              const authResult = await createUserWithEmailAndPassword(auth, loginEmail, password);
+              authenticatedUserUid = authResult.user.uid;
+              authenticatedUserEmail = authResult.user.email;
+            } catch (createErr: any) {
+              if (createErr.code === 'auth/operation-not-allowed') {
+                const resolvedUid = dbUser?.uid || existingLocalCust?.id || 'local_fallback_usr_' + Math.floor(Math.random() * 100000);
+                authenticatedUserUid = resolvedUid;
+                authenticatedUserEmail = loginEmail;
+              } else {
+                throw createErr;
+              }
+            }
+          } else {
+            // If fallback password checked matches but main gave another err, check if user exists at all
+            const hasAccountButWrongPass = 
+              (customers.some(c => isEmail ? c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier) : c.phones.some(p => p.trim() === normalizedIdentifier))) || 
+              (dbUser);
+            
+            if (hasAccountButWrongPass) {
+              const wrongPassErr = new Error('Email or password is incorrect');
+              wrongPassErr.name = 'AuthError';
+              (wrongPassErr as any).code = 'auth/wrong-password';
+              throw wrongPassErr;
+            }
+            throw err;
+          }
+        }
+      }
+
+      if (authenticatedUserUid) {
         const localCust = customers.find(c => {
           if (isEmail) {
             return c.emails.some(e => e.toLowerCase().trim() === normalizedIdentifier);
@@ -448,7 +486,7 @@ export default function Login() {
 
         const name = dbUser?.name || localCust?.name || 'Customer User';
         const phone = dbUser?.phone || localCust?.phones?.[0] || (isEmail ? '' : identifier.trim());
-        const email = dbUser?.email || localCust?.emails?.[0] || (isEmail ? normalizedIdentifier : '');
+        const email = dbUser?.email || localCust?.emails?.[0] || (isEmail ? normalizedIdentifier : (authenticatedUserEmail || ''));
         const profileImage = dbUser?.profileImage || localCust?.profileImage || '';
         const role = dbUser?.role || 'customer';
         const status = dbUser?.status || localCust?.status || 'Active';
@@ -461,11 +499,10 @@ export default function Login() {
         const postalCode = dbUser?.postalCode || localCust?.address?.zipCode || '';
 
         try {
-          const supabase = await import('../lib/supabase').then(m => m.getSupabase());
-          if (supabase) {
+          if (supabaseSvc) {
              const dataToUpsert = {
-                id: firebaseUser.uid,
-                uid: firebaseUser.uid,
+                id: authenticatedUserUid,
+                uid: authenticatedUserUid,
                 name,
                 email,
                 phone,
@@ -482,7 +519,7 @@ export default function Login() {
                 postalCode,
                 profileImage
              };
-             await supabase.from('users').upsert([dataToUpsert]);
+             await supabaseSvc.from('users').upsert([dataToUpsert]);
           }
         } catch (fsErr) {
           console.error("Supabase upsert fail", fsErr);
@@ -497,7 +534,7 @@ export default function Login() {
         });
 
         login({
-          id: firebaseUser.uid,
+          id: authenticatedUserUid,
           name,
           email,
           phone,
@@ -515,7 +552,7 @@ export default function Login() {
           specialDate: dbUser?.specialDate || localCust?.specialDate || '',
         });
 
-        pixelService.trackLogin(firebaseUser.uid);
+        pixelService.trackLogin(authenticatedUserUid);
         navigate('/account/dashboard');
         return;
       }

@@ -74,7 +74,7 @@ export default function AdminBranding() {
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const updates = {
       storeLogo,
@@ -86,10 +86,18 @@ export default function AdminBranding() {
       secondaryColor
     };
 
-    updateSettings(updates);
-    updateDraftSettings(updates);
-
-    triggerFeedback('🎨 Branding assets saved successfully!');
+    setIsUploading('saving');
+    try {
+      await updateSettings(updates);
+      updateDraftSettings(updates);
+      await useSettingsStore.getState().publishSettings();
+      triggerFeedback('🎨 Branding assets saved successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to save branding assets');
+    } finally {
+      setIsUploading(null);
+    }
   };
 
   const ImageUpload = ({ label, value, field }: { label: string, value: string, field: string }) => (

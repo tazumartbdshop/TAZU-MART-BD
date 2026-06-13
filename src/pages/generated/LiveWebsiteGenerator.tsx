@@ -4,10 +4,61 @@ import {
   ShoppingBag, Search, Check, Menu, X, User, Heart, Percent, 
   Phone, MessageSquare, Mail, MapPin, ChevronRight, Compass, 
   Coins, Award, LogOut, ArrowRight, Trash2, CheckCircle, Ticket,
-  Laptop, Smartphone, ShoppingCart, Zap, Star
+  Laptop, Smartphone, ShoppingCart, Zap, Star, Building, Plus, Lock, Unlock, Home, PlusCircle
 } from 'lucide-react';
 import { useWebsitesStore } from '../../store/useWebsitesStore';
 import { useProductStore, Product } from '../../store/useProductStore';
+
+const defaultProperties = [
+  {
+    id: 'prop-1',
+    user_id: 'system',
+    title: 'Luxury 3BR Apartment in Banani',
+    description: 'A gorgeous, spacious 3-bedroom luxury apartment with stunning cityscape views, smart home integrations, dual parking spots, and premium marble flooring.',
+    price: 45000000,
+    address: 'Road 11, Banani, Dhaka',
+    category: 'Apartment',
+    image_url: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600&q=80',
+    status: 'active',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'prop-2',
+    user_id: 'system',
+    title: 'Cozy Duplex Villa in Dhanmondi',
+    description: 'Modern duplex villa with garden terrace, beautifully designed architectural high-ceilings, fully equipped wooden modular kitchen, and secure personal security room.',
+    price: 65000000,
+    address: 'Road 27, Dhanmondi, Dhaka',
+    category: 'Duplex',
+    image_url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&q=80',
+    status: 'active',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'prop-3',
+    user_id: 'system',
+    title: 'Commercial Space near Gulshan Circle-2',
+    description: 'Highly visible executive commercial office space, centralized HVAC cooling, high-speed capsule lift, 24/7 power backup generator, and spacious high prestige reception lobby.',
+    price: 85000000,
+    address: 'Gulshan avenue, Circle-2, Gulshan, Dhaka',
+    category: 'Commercial',
+    image_url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600&q=80',
+    status: 'active',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'prop-4',
+    user_id: 'system',
+    title: 'Scenic Waterfront Residential Land plot',
+    description: 'Fully cleared, prestigious south-facing 5-Katha residential building plot. Connected to dual high-capacity access roads and direct municipal freshwater supply.',
+    price: 32000000,
+    address: 'Sector 15, Uttara Third Phase, Dhaka',
+    category: 'Land',
+    image_url: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600&q=80',
+    status: 'active',
+    created_at: new Date().toISOString()
+  }
+];
 
 export default function LiveWebsiteGenerator() {
   const { storeDomain } = useParams();
@@ -16,7 +67,7 @@ export default function LiveWebsiteGenerator() {
   const { products } = useProductStore();
 
   // Navigation & Tabs
-  const [currentView, setCurrentView] = useState<'home' | 'categories' | 'offers' | 'support' | 'account'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'categories' | 'offers' | 'support' | 'account' | 'properties'>('home');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Search & Filters
@@ -34,6 +85,436 @@ export default function LiveWebsiteGenerator() {
 
   // Order Success Celebration Toast
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Inquiry Form state
+  const [inquiryName, setInquiryName] = useState('');
+  const [inquiryPhone, setInquiryPhone] = useState('');
+  const [inquiryMessage, setInquiryMessage] = useState('');
+  const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false);
+  const [inquirySuccess, setInquirySuccess] = useState<string | null>(null);
+
+  // Property Listing & Liking & Auth State
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [properties, setProperties] = useState<any[]>(defaultProperties);
+  const [likedPropIds, setLikedPropIds] = useState<string[]>([]);
+  const [isFetchingProps, setIsFetchingProps] = useState(false);
+  const [selectedPropCategoryFilter, setSelectedPropCategoryFilter] = useState<string>('All');
+  
+  // Custom property form state
+  const [showListForm, setShowListForm] = useState(false);
+  const [newPropTitle, setNewPropTitle] = useState('');
+  const [newPropDescription, setNewPropDescription] = useState('');
+  const [newPropPrice, setNewPropPrice] = useState('');
+  const [newPropAddress, setNewPropAddress] = useState('');
+  const [newPropCategory, setNewPropCategory] = useState('Apartment');
+  const [newPropImageUrl, setNewPropImageUrl] = useState('');
+  const [isListingProperty, setIsListingProperty] = useState(false);
+
+  // Customer Auth forms state
+  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
+  // Monitor Supabase Auth changes
+  useEffect(() => {
+    let authSub: any = null;
+    const initAuthAndData = async () => {
+      try {
+        const { getSupabase } = await import('../../lib/supabase');
+        const supabase = getSupabase();
+        if (supabase) {
+          // Get current session
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            setCurrentUser(session.user);
+          }
+
+          // Monitor Auth Changes
+          const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+            setCurrentUser(session?.user || null);
+          });
+          authSub = data?.subscription;
+        }
+      } catch (err) {
+        console.warn("Supabase auth error in LiveWebsiteGenerator:", err);
+      }
+    };
+    initAuthAndData();
+    return () => {
+      if (authSub) authSub.unsubscribe();
+    };
+  }, []);
+
+  // Sync Properties & Likes
+  useEffect(() => {
+    const fetchPropertiesAndLikes = async () => {
+      setIsFetchingProps(true);
+      try {
+        const { getSupabase } = await import('../../lib/supabase');
+        const supabase = getSupabase();
+        if (supabase) {
+          // Fetch custom properties from DB
+          const { data: dbProps, error: propsError } = await supabase
+            .from('properties')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!propsError && dbProps) {
+            // Merge custom properties with defaults, unique by ID
+            const merged = [...dbProps];
+            defaultProperties.forEach(def => {
+              if (!merged.some(m => m.id === def.id)) {
+                merged.push(def);
+              }
+            });
+            setProperties(merged);
+          } else {
+            console.warn("properties table read failed (table may not exist yet, using fallback):", propsError);
+            const stored = localStorage.getItem('tazu_local_properties');
+            if (stored) {
+              setProperties(JSON.parse(stored));
+            } else {
+              setProperties(defaultProperties);
+            }
+          }
+
+          // Fetch liked property ids for the logged in user
+          if (currentUser) {
+            const { data: dbLikes, error: likesError } = await supabase
+              .from('liked_properties')
+              .select('property_id')
+              .eq('user_id', currentUser.id);
+
+            if (!likesError && dbLikes) {
+              setLikedPropIds(dbLikes.map((l: any) => l.property_id));
+            } else {
+              const localLikes = localStorage.getItem(`tazu_liked_props_${currentUser.id}`);
+              if (localLikes) {
+                setLikedPropIds(JSON.parse(localLikes));
+              } else {
+                setLikedPropIds([]);
+              }
+            }
+          } else {
+            setLikedPropIds([]);
+          }
+        } else {
+          // Fallback if supabase not configured matching localStorage info
+          const stored = localStorage.getItem('tazu_local_properties');
+          const localLikes = currentUser ? localStorage.getItem(`tazu_liked_props_${currentUser.id}`) : null;
+          
+          if (stored) {
+            setProperties(JSON.parse(stored));
+          } else {
+            setProperties(defaultProperties);
+          }
+
+          if (localLikes) {
+            setLikedPropIds(JSON.parse(localLikes));
+          } else {
+            setLikedPropIds([]);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch properties/likes from Supabase, operating in local fallback:", err);
+        const stored = localStorage.getItem('tazu_local_properties');
+        if (stored) {
+          setProperties(JSON.parse(stored));
+        } else {
+          setProperties(defaultProperties);
+        }
+      } finally {
+        setIsFetchingProps(false);
+      }
+    };
+
+    fetchPropertiesAndLikes();
+  }, [currentUser]);
+
+  // Handle Sign In
+  const handleCustomerSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail.trim() || !authPassword) {
+      setAuthError("Email and Password are required");
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setAuthError(null);
+
+    try {
+      const { getSupabase } = await import('../../lib/supabase');
+      const supabase = getSupabase();
+      if (supabase) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: authEmail.toLowerCase().trim(),
+          password: authPassword,
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data?.user) {
+          setCurrentUser(data.user);
+          setAuthEmail('');
+          setAuthPassword('');
+          setAuthName('');
+        }
+      } else {
+        // Dev Fallback mode
+        const fakeUserId = 'usr_local_dev_' + Math.floor(Math.random() * 1000000);
+        const devUser = { id: fakeUserId, email: authEmail.toLowerCase().trim(), user_metadata: { full_name: authName || 'Valued Member' } };
+        setCurrentUser(devUser);
+        alert("Configured in Developer local mode! Access approved.");
+        setAuthEmail('');
+        setAuthPassword('');
+      }
+    } catch (err: any) {
+      console.error("Auth signin error:", err);
+      setAuthError(err.message || "Invalid login credentials.");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  // Handle Sign Up
+  const handleCustomerSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail.trim() || !authPassword || !authName.trim()) {
+      setAuthError("All fields are required");
+      return;
+    }
+
+    setIsAuthenticating(true);
+    setAuthError(null);
+
+    try {
+      const { getSupabase } = await import('../../lib/supabase');
+      const supabase = getSupabase();
+      if (supabase) {
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail.toLowerCase().trim(),
+          password: authPassword,
+          options: {
+            data: {
+              full_name: authName.trim(),
+            }
+          }
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data?.user) {
+          setCurrentUser(data.user);
+          alert("Registered successfully! Welcome to your digital terminal.");
+          setAuthEmail('');
+          setAuthPassword('');
+          setAuthName('');
+        }
+      } else {
+        // Dev Fallback
+        const fakeUserId = 'usr_local_dev_' + Math.floor(Math.random() * 1000000);
+        const devUser = { id: fakeUserId, email: authEmail.toLowerCase().trim(), user_metadata: { full_name: authName.trim() } };
+        setCurrentUser(devUser);
+        alert("Registered successfully via Developer local mode!");
+        setAuthEmail('');
+        setAuthPassword('');
+        setAuthName('');
+      }
+    } catch (err: any) {
+      console.error("Auth signup error:", err);
+      setAuthError(err.message || "Signup failed. Try again.");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  // Handle Logout
+  const handleCustomerSignOut = async () => {
+    try {
+      const { getSupabase } = await import('../../lib/supabase');
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (e) {
+      console.warn("Sign out err:", e);
+    }
+    setCurrentUser(null);
+    setLikedPropIds([]);
+  };
+
+  // Like or Save property
+  const toggleLikeProperty = async (propertyId: string) => {
+    if (!currentUser) {
+      alert("Please log in from the Customer Terminal / Account tab to save or like properties!");
+      setCurrentView('account');
+      return;
+    }
+
+    const isCurrentlyLiked = likedPropIds.includes(propertyId);
+    let newLikedIds = [...likedPropIds];
+
+    if (isCurrentlyLiked) {
+      newLikedIds = newLikedIds.filter(id => id !== propertyId);
+    } else {
+      newLikedIds.push(propertyId);
+    }
+
+    setLikedPropIds(newLikedIds);
+    localStorage.setItem(`tazu_liked_props_${currentUser.id}`, JSON.stringify(newLikedIds));
+
+    try {
+      const { getSupabase } = await import('../../lib/supabase');
+      const supabase = getSupabase();
+      if (supabase) {
+        if (isCurrentlyLiked) {
+          await supabase
+            .from('liked_properties')
+            .delete()
+            .eq('user_id', currentUser.id)
+            .eq('property_id', propertyId);
+        } else {
+          await supabase
+            .from('liked_properties')
+            .insert([{
+              user_id: currentUser.id,
+              property_id: propertyId
+            }]);
+        }
+      }
+    } catch (err) {
+      console.warn("Supabase background like update failed, fallback saved locally:", err);
+    }
+  };
+
+  // Submitting property listing
+  const handlePropertySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) {
+      alert("Please log in to list properties!");
+      setCurrentView('account');
+      return;
+    }
+
+    if (!newPropTitle.trim() || !newPropPrice || !newPropAddress.trim() || !newPropDescription.trim()) {
+      alert("Please fill out all required fields.");
+      return;
+    }
+
+    setIsListingProperty(true);
+
+    const newProp = {
+      id: 'prop-user-' + Math.floor(Math.random() * 100000),
+      user_id: currentUser.id,
+      title: newPropTitle.trim(),
+      description: newPropDescription.trim(),
+      price: Number(newPropPrice),
+      address: newPropAddress.trim(),
+      category: newPropCategory,
+      image_url: newPropImageUrl.trim() || 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&q=80',
+      status: 'active',
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      const { getSupabase } = await import('../../lib/supabase');
+      const supabase = getSupabase();
+      if (supabase) {
+        const { error } = await supabase
+          .from('properties')
+          .insert([newProp]);
+        if (error) {
+          throw error;
+        }
+      }
+      
+      // Update local state directly
+      const updatedProps = [newProp, ...properties];
+      setProperties(updatedProps);
+      localStorage.setItem('tazu_local_properties', JSON.stringify(updatedProps));
+      
+      alert("🎉 Property listed successfully in corporate archives!");
+      
+      // Reset form
+      setNewPropTitle('');
+      setNewPropDescription('');
+      setNewPropPrice('');
+      setNewPropAddress('');
+      setNewPropImageUrl('');
+      setShowListForm(false);
+    } catch (err: any) {
+      console.warn("Supabase insert error, saving locally:", err);
+      // Fallback
+      const updatedProps = [newProp, ...properties];
+      setProperties(updatedProps);
+      localStorage.setItem('tazu_local_properties', JSON.stringify(updatedProps));
+      alert("Listed successfully in local backup storage!");
+      
+      setNewPropTitle('');
+      setNewPropDescription('');
+      setNewPropPrice('');
+      setNewPropAddress('');
+      setNewPropImageUrl('');
+      setShowListForm(false);
+    } finally {
+      setIsListingProperty(false);
+    }
+  };
+
+  const handleInquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inquiryName.trim() || !inquiryPhone.trim() || !inquiryMessage.trim()) {
+      alert("Please fill out all required fields.");
+      return;
+    }
+
+    setIsSubmittingInquiry(true);
+    setInquirySuccess(null);
+
+    try {
+      const { getSupabase } = await import('../../lib/supabase');
+      const supabase = getSupabase();
+      if (supabase) {
+        // Insert payload into 'inquiries' table
+        const { error } = await supabase.from('inquiries').insert([{
+          website_domain: website?.domain || null,
+          name: inquiryName.trim(),
+          phone: inquiryPhone.trim(),
+          message: inquiryMessage.trim(),
+          status: 'new',
+          created_at: new Date().toISOString()
+        }]);
+
+        if (error) {
+          console.error("Supabase inquiries insert error:", error);
+          throw error;
+        }
+
+        setInquirySuccess("Message successfully transmitted to corporate database!");
+        setInquiryName('');
+        setInquiryPhone('');
+        setInquiryMessage('');
+      } else {
+        // Local Fallback if offline
+        setInquirySuccess("Saved locally! (Database link is currently in fallback mode)");
+        setInquiryName('');
+        setInquiryPhone('');
+        setInquiryMessage('');
+      }
+    } catch (err: any) {
+      console.error("Failed to submit inquiry:", err);
+      alert("Failed to submit message to the corporate desk. Technical error: " + (err.message || err));
+    } finally {
+      setIsSubmittingInquiry(false);
+    }
+  };
 
   // Favicon update
   useEffect(() => {
@@ -299,6 +780,13 @@ export default function LiveWebsiteGenerator() {
             style={{ borderBottomColor: currentView === 'support' ? colPrimary : 'transparent' }}
           >
             Support
+          </button>
+          <button 
+            onClick={() => setCurrentView('properties')} 
+            className={`hover:text-black text-emerald-600 font-bold transition-colors ${currentView === 'properties' ? 'text-black border-b-2' : ''}`}
+            style={{ borderBottomColor: currentView === 'properties' ? colPrimary : 'transparent' }}
+          >
+            🏠 Properties
           </button>
           <button 
             onClick={() => setCurrentView('account')} 
@@ -629,141 +1117,494 @@ export default function LiveWebsiteGenerator() {
               </div>
 
               {/* Secure message sender form right on screen */}
-              <form onSubmit={(e) => { e.preventDefault(); alert("Thanks! Message transmitted to corporate desk."); }} className="border border-zinc-200 p-6 space-y-4">
+              <form onSubmit={handleInquirySubmit} className="border border-zinc-200 p-6 space-y-4">
                 <h3 className="text-base font-black uppercase tracking-wide text-black">Transmit Message</h3>
+                {inquirySuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold uppercase tracking-wide rounded-md">
+                    {inquirySuccess}
+                  </div>
+                )}
                 <div>
                   <label className="block text-[8px] font-black uppercase tracking-widest text-gray-500 mb-1">Your Full Name</label>
-                  <input type="text" required className={inputClass} placeholder="Enter your name" />
+                  <input 
+                    type="text" 
+                    required 
+                    value={inquiryName}
+                    onChange={(e) => setInquiryName(e.target.value)}
+                    className={inputClass} 
+                    placeholder="Enter your name" 
+                  />
                 </div>
                 <div>
                   <label className="block text-[8px] font-black uppercase tracking-widest text-gray-500 mb-1">WhatsApp or Phone</label>
-                  <input type="text" required className={inputClass} placeholder="+880..." />
+                  <input 
+                    type="text" 
+                    required 
+                    value={inquiryPhone}
+                    onChange={(e) => setInquiryPhone(e.target.value)}
+                    className={inputClass} 
+                    placeholder="+880..." 
+                  />
                 </div>
                 <div>
                   <label className="block text-[8px] font-black uppercase tracking-widest text-gray-500 mb-1">Your Message or Issue</label>
-                  <textarea required className={`${inputClass} h-20 resize-none`} placeholder="Write details here..."></textarea>
+                  <textarea 
+                    required 
+                    value={inquiryMessage}
+                    onChange={(e) => setInquiryMessage(e.target.value)}
+                    className={`${inputClass} h-20 resize-none`} 
+                    placeholder="Write details here..."
+                  ></textarea>
                 </div>
-                <button type="submit" style={{ backgroundColor: colPrimary }} className={btnClass}>
-                  Send Message
+                <button 
+                  type="submit" 
+                  disabled={isSubmittingInquiry}
+                  style={{ backgroundColor: colPrimary }} 
+                  className={`${btnClass} disabled:opacity-50`}
+                >
+                  {isSubmittingInquiry ? "Transmitting..." : "Send Message"}
                 </button>
               </form>
             </div>
           </div>
         )}
 
-        {/* VIEW 5: ACCOUNT */}
+        {/* VIEW: PROPERTIES PORTAL */}
+        {currentView === 'properties' && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 text-left">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-150 pb-6 mb-8">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5">Corporate Real Estate</span>
+                <h1 className="text-3xl font-black uppercase tracking-tight text-black mt-2">Executive Properties</h1>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Verified residences, duplexes and commercial plots</p>
+              </div>
+              <button 
+                onClick={() => {
+                  if (!currentUser) {
+                    alert("Please log in from the Account terminal to list a property!");
+                    setCurrentView('account');
+                  } else {
+                    setShowListForm(!showListForm);
+                  }
+                }}
+                className="px-6 py-3.5 bg-black text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-800 transition-colors"
+              >
+                <PlusCircle className="w-4 h-4 text-emerald-400" />
+                List Your Property
+              </button>
+            </div>
+
+            {/* List Property Form Modal/Drawer */}
+            {showListForm && currentUser && (
+              <div className="bg-zinc-50 border border-zinc-150 p-6 mb-8 max-w-2xl">
+                <div className="flex justify-between items-center mb-4 border-b border-zinc-200 pb-2">
+                  <h3 className="font-black text-sm uppercase tracking-wider text-black">New Property Listing</h3>
+                  <button onClick={() => setShowListForm(false)} className="text-neutral-500 hover:text-black">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <form onSubmit={handlePropertySubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] font-black uppercase text-zinc-500 mb-1">Property Title *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={newPropTitle}
+                        onChange={(e) => setNewPropTitle(e.target.value)}
+                        placeholder="e.g. Modern duplex with terrace" 
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black uppercase text-zinc-500 mb-1">Price (numeric, BDT) *</label>
+                      <input 
+                        type="number" 
+                        required 
+                        value={newPropPrice}
+                        onChange={(e) => setNewPropPrice(e.target.value)}
+                        placeholder="e.g. 45000000" 
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] font-black uppercase text-zinc-500 mb-1">Category *</label>
+                      <select 
+                        value={newPropCategory}
+                        onChange={(e) => setNewPropCategory(e.target.value)}
+                        className={inputClass}
+                      >
+                        <option value="Apartment">Apartment</option>
+                        <option value="Duplex">Duplex</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Land">Land</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black uppercase text-zinc-500 mb-1">Address Location *</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={newPropAddress}
+                        onChange={(e) => setNewPropAddress(e.target.value)}
+                        placeholder="e.g. Road 12, Banani, Dhaka" 
+                        className={inputClass}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-black uppercase text-zinc-500 mb-1">Image URL (Optional, defaults to luxury preview)</label>
+                    <input 
+                      type="url" 
+                      value={newPropImageUrl}
+                      onChange={(e) => setNewPropImageUrl(e.target.value)}
+                      placeholder="https://images.unsplash.com/photo-..." 
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-black uppercase text-zinc-500 mb-1">Description *</label>
+                    <textarea 
+                      required 
+                      value={newPropDescription}
+                      onChange={(e) => setNewPropDescription(e.target.value)}
+                      placeholder="Write exact dimensions, bedroom counts, utility information..." 
+                      className={`${inputClass} h-24 resize-none`}
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={isListingProperty}
+                    className="w-full text-center py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50"
+                  >
+                    {isListingProperty ? 'Transmitting to Supabase...' : 'Publish Property Archive'}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Filter Pills */}
+            <div className="flex flex-wrap gap-2 mb-8">
+              {['All', 'Apartment', 'Duplex', 'Commercial', 'Land'].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedPropCategoryFilter(cat)}
+                  className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest border transition-all ${
+                    selectedPropCategoryFilter === cat 
+                      ? 'bg-black border-black text-white' 
+                      : 'bg-white border-zinc-200 text-zinc-600 hover:border-black'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Properties Grid */}
+            {isFetchingProps ? (
+              <div className="py-24 text-center text-zinc-400 font-bold uppercase tracking-widest">
+                Analyzing registry database...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {properties
+                  .filter(p => selectedPropCategoryFilter === 'All' || p.category === selectedPropCategoryFilter)
+                  .map((prop) => {
+                    const isLiked = likedPropIds.includes(prop.id);
+                    return (
+                      <div key={prop.id} className="border border-zinc-200 bg-white group flex flex-col justify-between overflow-hidden">
+                        <div className="aspect-[16/10] w-full relative overflow-hidden bg-zinc-50">
+                          <img 
+                            src={prop.image_url || prop.imageUrl || "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&q=80"} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                            alt={prop.title} 
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute top-4 left-4 bg-black text-white text-[9px] font-black px-2.5 py-1 uppercase tracking-widest">
+                            {prop.category}
+                          </div>
+                          <button 
+                            onClick={() => toggleLikeProperty(prop.id)}
+                            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center bg-white/90 backdrop-blur-sm shadow hover:bg-white text-zinc-800 transition-colors"
+                          >
+                            <Heart className={`w-4 h-4 ${isLiked ? 'text-red-500 fill-current' : 'text-zinc-605'}`} />
+                          </button>
+                        </div>
+                        <div className="p-6 text-left flex-1 flex flex-col justify-between space-y-4">
+                          <div>
+                            <div className="flex justify-between items-baseline mb-2">
+                              <h3 className="text-lg font-black uppercase tracking-tight text-black line-clamp-1">{prop.title}</h3>
+                              <span className="text-base font-black text-emerald-700 shrink-0">
+                                {currSign}{prop.price.toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest flex items-center gap-1.5 mb-3">
+                              <MapPin className="w-3.5 h-3.5 text-zinc-400 shrink-0" /> {prop.address}
+                            </p>
+                            <p className="text-xs font-semibold text-zinc-600 leading-relaxed line-clamp-3">
+                              {prop.description}
+                            </p>
+                          </div>
+                          <div className="pt-4 border-t border-zinc-100 flex gap-2">
+                            <button 
+                              onClick={() => {
+                                setInquiryName(currentUser?.user_metadata?.full_name || '');
+                                setInquiryPhone('');
+                                setInquiryMessage(`Hi, I am interested in property "${prop.title}" (${prop.address}). Please contact me with details.`);
+                                setCurrentView('support');
+                              }}
+                              style={{ backgroundColor: colPrimary }}
+                              className="flex-1 text-center py-2.5 text-white text-[9px] font-black uppercase tracking-widest hover:opacity-90 transition-opacity"
+                            >
+                              Message Representative
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {properties.filter(p => selectedPropCategoryFilter === 'All' || p.category === selectedPropCategoryFilter).length === 0 && (
+                  <div className="col-span-full py-16 text-center text-zinc-400 font-bold uppercase tracking-widest">
+                    No matching properties found in registry
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW 5: ACCOUNT & PROFILE DESK */}
         {currentView === 'account' && (
           <div className="max-w-4xl mx-auto px-4 py-12 text-left">
             <h1 className="text-3xl font-black uppercase tracking-tight mb-8">Customer Terminal</h1>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Profile card & balance */}
-              <div className="md:col-span-1 space-y-6">
-                <div className="bg-zinc-900 text-white p-6 border border-zinc-800 flex flex-col justify-between min-h-[200px] relative overflow-hidden">
-                  <div className="absolute top-2 right-2 opacity-5">
-                    <Coins className="w-32 h-32 text-yellow-400" />
-                  </div>
-                  <div className="relative z-10">
-                     <span className="text-[8px] font-black tracking-widest uppercase bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">Primary Account</span>
-                     <h3 className="text-lg font-black uppercase tracking-tight mt-3">Active Guest Member</h3>
-                     <p className="text-[10px] font-mono text-zinc-400 mt-0.5">UID-249581-G</p>
-                  </div>
-                  
-                  <div className="mt-8 pt-4 border-t border-zinc-800 relative z-10 flex justify-between items-center bg-zinc-950/60 p-2.5">
-                     <div className="flex items-center gap-2">
-                        <span className="text-lg">🎁</span>
-                        <div>
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">Coins Reward Balance</p>
-                          <p className="text-sm font-black text-yellow-400 mt-0.5">{coins} Tazu Coins</p>
-                        </div>
-                     </div>
-                  </div>
+            {!currentUser ? (
+              /* IF NOT LOGGED IN */
+              <div className="max-w-md mx-auto border border-zinc-200 bg-white p-8">
+                <div className="flex border-b border-zinc-200 mb-6">
+                  <button 
+                    onClick={() => { setAuthTab('login'); setAuthError(null); }}
+                    className={`flex-1 text-center py-3 text-xs font-black uppercase tracking-widest ${
+                      authTab === 'login' ? 'border-b-2 border-black text-black' : 'text-zinc-400 hover:text-black'
+                    }`}
+                  >
+                    Account Login
+                  </button>
+                  <button 
+                    onClick={() => { setAuthTab('register'); setAuthError(null); }}
+                    className={`flex-1 text-center py-3 text-xs font-black uppercase tracking-widest ${
+                      authTab === 'register' ? 'border-b-2 border-black text-black' : 'text-zinc-400 hover:text-black'
+                    }`}
+                  >
+                    Register
+                  </button>
                 </div>
 
-                {/* Wishlist panel */}
-                <div className="border border-zinc-200 p-4">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4 flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-red-500 fill-current" /> Saved Items ({wishlist.length})
-                  </h3>
-                  <div className="space-y-3">
-                    {wishlist.map(pId => {
-                      // Match product
-                      const list = getAllSearchableProducts();
-                      const found = list.find(p => p.id === pId);
-                      if (!found) return null;
-                      return (
-                        <div key={pId} className="flex gap-2 items-center justify-between border-b border-zinc-50 pb-2">
-                          <div className="flex gap-2 items-center min-w-0">
-                            <img src={found.image} className="w-8 h-8 object-cover shrink-0" alt="product" referrerPolicy="no-referrer" />
-                            <p className="text-xs font-bold uppercase truncate max-w-[120px]">{found.name}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-extrabold text-black">{currSign}{found.discountPrice || found.price}</span>
-                            <button onClick={() => toggleWishlist(pId)} className="text-red-500 hover:text-red-800"><Trash2 className="w-3.5 h-3.5" /></button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {wishlist.length === 0 && (
-                      <p className="text-xs font-bold text-gray-400 py-4 uppercase tracking-wider text-center">Your wishlist is empty.</p>
-                    )}
+                {authError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs font-bold uppercase tracking-wide mb-4">
+                    ⚠️ {authError}
                   </div>
-                </div>
+                )}
+
+                <form onSubmit={authTab === 'login' ? handleCustomerSignIn : handleCustomerSignUp} className="space-y-4">
+                  {authTab === 'register' && (
+                    <div>
+                      <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Your Full Name</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={authName}
+                        onChange={(e) => setAuthName(e.target.value)}
+                        placeholder="John Doe" 
+                        className={inputClass}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Email Address</label>
+                    <input 
+                      type="email" 
+                      required 
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="user@example.com" 
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Password</label>
+                    <input 
+                      type="password" 
+                      required 
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="••••••••" 
+                      className={inputClass}
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={isAuthenticating}
+                    style={{ backgroundColor: colPrimary }}
+                    className="w-full text-center py-3.5 text-white text-xs font-black uppercase tracking-widest disabled:opacity-50 mt-4"
+                  >
+                    {isAuthenticating ? 'Processing authentication...' : authTab === 'login' ? 'Access Account' : 'Register Account'}
+                  </button>
+                </form>
               </div>
-
-              {/* Dynamic Orders block */}
-              <div className="md:col-span-2 space-y-6">
-                <div className="border border-zinc-200 p-6 bg-white shrink-0">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-black uppercase tracking-tight">Your Orders ({orders.length})</h3>
-                    <span className="text-[10px] font-black uppercase bg-zinc-50 border border-zinc-200 px-2 py-1 text-zinc-500 tracking-wider">Sync Complete</span>
-                  </div>
-
-                  <div className="space-y-4">
-                    {orders.map((o, idx) => (
-                      <div key={idx} className="border border-zinc-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-black text-black">{o.id}</span>
-                            <span className="px-2 py-0.5 text-[8px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200">{o.status}</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 font-extrabold uppercase">{o.date} • {o.itemsCount} Items</p>
-                        </div>
-                        <div className="flex items-center gap-6 justify-between sm:justify-end">
-                          <div className="text-left sm:text-right">
-                            <p className="text-[8px] font-black uppercase tracking-widest text-gray-400">Total Purchase</p>
-                            <p className="text-sm font-black text-black">{currSign}{o.total.toLocaleString()}</p>
-                          </div>
-                          <div className="text-left sm:text-right">
-                            <p className="text-[8px] font-black uppercase tracking-widest text-gray-400">Earned Coins</p>
-                            <p className="text-xs font-black text-yellow-500 flex items-center gap-0.5">+{o.coinsEarned} <Coins className="w-3 h-3" /></p>
-                          </div>
-                        </div>
+            ) : (
+              /* IF LOGGED IN: PROFILE DASHBOARD VIEW with Properties Liked / Listed */
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                
+                {/* Profile Card left */}
+                <div className="md:col-span-1 space-y-6">
+                  <div className="bg-zinc-900 text-white p-6 border border-zinc-850 relative overflow-hidden flex flex-col justify-between min-h-[200px]">
+                    <div className="absolute top-2 right-2 opacity-5 select-none">
+                      <User className="w-32 h-32 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping" />
+                        <span className="text-[8px] font-black tracking-widest uppercase bg-zinc-800 text-emerald-400 px-2 py-0.5">Secure Session Active</span>
                       </div>
-                    ))}
-                    {orders.length === 0 && (
-                      <div className="text-center py-12 text-gray-400 font-bold">You have placed no orders yet!</div>
-                    )}
+                      <h3 className="text-lg font-black uppercase tracking-tight mt-3 truncate">
+                        {currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || 'Executive Member'}
+                      </h3>
+                      <p className="text-[10px] font-mono text-zinc-400 truncate mt-0.5">{currentUser?.email}</p>
+                      <p className="text-[9px] font-mono text-zinc-500 mt-2">UID: {currentUser?.id}</p>
+                    </div>
+
+                    <button 
+                      onClick={handleCustomerSignOut}
+                      className="mt-8 px-4 py-2 bg-zinc-800 hover:bg-red-950 hover:text-red-350 transition-colors text-white text-[9px] font-black uppercase tracking-widest border border-zinc-700 flex items-center justify-center gap-1.5"
+                    >
+                      <LogOut className="w-3.5 h-3.5" /> Sign Out Session
+                    </button>
+                  </div>
+
+                  {/* Coin bonus stats */}
+                  <div className="border border-zinc-200 p-5 bg-white space-y-3">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Bonus Accumulator</h4>
+                    <div className="flex items-center gap-2 bg-yellow-50 p-3 border border-yellow-250 rounded">
+                      <Coins className="w-6 h-6 text-yellow-500 shrink-0" />
+                      <div>
+                        <p className="text-[8px] font-black text-yellow-800 uppercase tracking-widest">Active Balance</p>
+                        <p className="text-base font-black text-yellow-600 mt-0.5">{coins} Tazu Coins</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-zinc-50 border border-zinc-150 p-6">
-                   <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400 mb-2 font-sans font-bold">Support System Info</h4>
-                   <p className="text-[12px] font-bold text-gray-600 leading-relaxed mb-4">
-                     Any inquiries, refund demands or delivery questions regarding your purchases can be directly transacted by ringing our help line.
-                   </p>
-                   <button 
-                     onClick={() => { setCurrentView('support'); }}
-                     style={{ backgroundColor: colPrimary }}
-                     className="px-6 py-2.5 text-[10px] font-extrabold uppercase tracking-widest text-white shadow"
-                   >
-                     Speak to Assistants
-                   </button>
-                </div>
-              </div>
+                {/* Properties Liked/Listed Center Right */}
+                <div className="md:col-span-2 space-y-8">
+                  {/* Saved / Liked Properties Section */}
+                  <div className="border border-zinc-200 bg-white p-6">
+                    <div className="flex justify-between items-center mb-6 pb-2 border-b border-zinc-100">
+                      <h3 className="text-sm font-black uppercase tracking-widest text-black flex items-center gap-2">
+                        <Heart className="w-4 h-4 text-red-500 fill-current" /> Properties Saved ({likedPropIds.length})
+                      </h3>
+                      <button 
+                        onClick={() => setCurrentView('properties')}
+                        className="text-[9px] font-black uppercase text-zinc-400 hover:text-black tracking-widest"
+                      >
+                        Browse All →
+                      </button>
+                    </div>
 
-            </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {properties
+                        .filter(p => likedPropIds.includes(p.id))
+                        .map(p => (
+                          <div key={p.id} className="border border-zinc-150 p-2.5 bg-zinc-50 flex gap-3">
+                            <img 
+                              src={p.image_url || p.imageUrl || "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&q=80"} 
+                              className="w-16 h-20 object-cover shrink-0 bg-white border border-zinc-200" 
+                              alt="liked prop"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="flex-1 flex flex-col justify-between text-left min-w-0">
+                              <div>
+                                <h4 className="text-xs font-black uppercase tracking-tight text-neutral-800 truncate">{p.title}</h4>
+                                <span className="text-[8px] font-black uppercase text-gray-500 block mt-0.5">{p.category} • {p.address}</span>
+                              </div>
+                              <div className="flex justify-between items-center mt-2 font-mono">
+                                <span className="text-xs font-black text-emerald-700">{currSign}{p.price.toLocaleString()}</span>
+                                <button 
+                                  onClick={() => toggleLikeProperty(p.id)} 
+                                  className="text-red-500 hover:text-red-700 font-bold"
+                                  title="Unlike"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                      ))}
+                      {properties.filter(p => likedPropIds.includes(p.id)).length === 0 && (
+                        <p className="text-xs font-bold text-zinc-400 text-center col-span-full py-8 uppercase tracking-widest">
+                          Your saved list is empty
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Properties Listed Section */}
+                  <div className="border border-zinc-200 bg-white p-6">
+                    <div className="flex justify-between items-center mb-6 pb-2 border-b border-zinc-100">
+                      <h3 className="text-sm font-black uppercase tracking-widest text-black flex items-center gap-2">
+                        <Building className="w-4 h-4 text-emerald-600" /> Your Listed Properties ({
+                          properties.filter(p => p.user_id === currentUser.id).length
+                        })
+                      </h3>
+                      <button 
+                        onClick={() => { setCurrentView('properties'); setShowListForm(true); }}
+                        className="text-[9px] font-black uppercase text-emerald-600 hover:opacity-75 tracking-widest"
+                      >
+                        List New +
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {properties
+                        .filter(p => p.user_id === currentUser.id)
+                        .map(p => (
+                          <div key={p.id} className="border border-zinc-150 p-2.5 bg-zinc-50 flex gap-3">
+                            <img 
+                              src={p.image_url || p.imageUrl || "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&q=80"} 
+                              className="w-16 h-20 object-cover shrink-0 bg-white border border-zinc-200" 
+                              alt="user prop"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div className="flex-1 flex flex-col justify-between text-left min-w-0">
+                              <div>
+                                <h4 className="text-xs font-black uppercase tracking-tight text-neutral-800 truncate">{p.title}</h4>
+                                <span className="text-[8px] font-black uppercase text-gray-500 block mt-0.5">{p.category} • {p.address}</span>
+                              </div>
+                              <div className="flex justify-between items-center mt-2 font-mono">
+                                <span className="text-xs font-black text-emerald-700">{currSign}{p.price.toLocaleString()}</span>
+                                <span className="text-[8px] font-black uppercase text-emerald-800 bg-emerald-50 px-1.5 py-0.5 border border-emerald-200">Active</span>
+                              </div>
+                            </div>
+                          </div>
+                      ))}
+                      {properties.filter(p => p.user_id === currentUser.id).length === 0 && (
+                        <p className="text-xs font-bold text-zinc-400 text-center col-span-full py-8 uppercase tracking-widest">
+                          You have listed no properties yet
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
           </div>
         )}
 
@@ -849,6 +1690,15 @@ export default function LiveWebsiteGenerator() {
           <Phone className="w-5 h-5 shrink-0" />
           <span className="text-[9px] font-black uppercase tracking-widest">Support</span>
           {currentView === 'support' && <span className="absolute bottom-[-10px] w-6 h-1 rounded-full" style={{ backgroundColor: colPrimary }} />}
+        </button>
+
+        <button 
+          onClick={() => setCurrentView('properties')} 
+          className={`flex flex-col items-center gap-1 flex-1 relative ${currentView === 'properties' ? 'text-emerald-600' : 'text-gray-400'}`}
+        >
+          <Home className="w-5 h-5 shrink-0" />
+          <span className="text-[9px] font-black uppercase tracking-widest">Properties</span>
+          {currentView === 'properties' && <span className="absolute bottom-[-10px] w-6 h-1 rounded-full" style={{ backgroundColor: colPrimary }} />}
         </button>
 
         <button 
