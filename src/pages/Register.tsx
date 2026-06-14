@@ -271,6 +271,16 @@ export default function Register() {
               data: {
                 name: formData.fullName,
                 phone: formData.phone.trim(),
+                gender: formData.gender,
+                address: formData.address.trim(),
+                division: formData.division,
+                district: formData.district,
+                upazila: formData.upazila,
+                area: formData.area,
+                postalCode: formData.postalCode,
+                profileImage: finalProfileImage || '',
+                occasionName: occasionJoined,
+                specialDate: datesJoined,
               }
             }
           });
@@ -316,7 +326,7 @@ export default function Register() {
 
       try {
         if (supabaseSvc && registeredUserUid) {
-          await supabaseSvc.from('users').upsert([{
+          const { error: upsertErr } = await supabaseSvc.from('users').insert([{
             id: registeredUserUid,
             uid: registeredUserUid,
             name: formData.fullName,
@@ -338,6 +348,35 @@ export default function Register() {
             occasionName: occasionJoined,
             specialDate: datesJoined,
           }]);
+          
+          if (upsertErr) {
+            console.error("Supabase insert failed during registration, trying fallback upsert:", upsertErr);
+            // Fallback to upsert just in case
+            await supabaseSvc.from('users').upsert([{
+              id: registeredUserUid,
+              uid: registeredUserUid,
+              name: formData.fullName,
+              email: formData.email ? formData.email.toLowerCase().trim() : '',
+              phone: formData.phone.trim(),
+              role: 'customer',
+              status: 'Active',
+              password: formData.password,
+              createdAt: new Date().toISOString(),
+              lastLoginAt: new Date().toISOString(),
+              gender: formData.gender,
+              address: formData.address.trim(),
+              division: formData.division,
+              district: formData.district,
+              upazila: formData.upazila,
+              area: formData.area,
+              postalCode: formData.postalCode,
+              profileImage: finalProfileImage || '',
+              occasionName: occasionJoined,
+              specialDate: datesJoined,
+            }]);
+          } else {
+            console.log("Supabase insert succeeded during registration!");
+          }
         }
       } catch (fsErr) {
         console.error("Supabase sign up store err", fsErr);

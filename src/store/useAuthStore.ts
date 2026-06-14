@@ -59,6 +59,11 @@ export const useAuthStore = create<AuthState>()(
       },
       logout: () => {
         signOut(auth).catch((err) => console.error("Firebase signOut failed:", err));
+        import('../lib/supabase').then(m => m.getSupabase()).then(sb => {
+          if (sb) {
+            sb.auth.signOut().catch((err) => console.error("Supabase signOut failed:", err));
+          }
+        });
         set({ user: null, isAuthenticated: false });
       },
       updateUser: (updatedUser) => set((state) => ({

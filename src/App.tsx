@@ -153,6 +153,65 @@ export default function App() {
                     postalCode: dbUserProfile.postalCode,
                   });
                 }
+              } else {
+                // If profile is missing in the public.users database table, automatically create it!
+                console.log("[App Auth] Profile row is missing or not fetched. Attempting automatically to create/sync...");
+                const meta = session.user.user_metadata || {};
+                const name = meta.name || meta.fullName || session.user.email?.split('@')[0] || 'Registered User';
+                const phone = meta.phone || '';
+                
+                const profileData = {
+                  id: session.user.id,
+                  uid: session.user.id,
+                  name: name,
+                  email: session.user.email || '',
+                  phone: phone,
+                  role: 'customer',
+                  status: 'Active',
+                  createdAt: new Date().toISOString(),
+                  lastLoginAt: new Date().toISOString(),
+                  gender: meta.gender || '',
+                  address: meta.address || '',
+                  division: meta.division || '',
+                  district: meta.district || '',
+                  upazila: meta.upazila || '',
+                  area: meta.area || '',
+                  postalCode: meta.postalCode || meta.zipCode || '',
+                  profileImage: meta.profileImage || '',
+                  occasionName: meta.occasionName || '',
+                  specialDate: meta.specialDate || '',
+                };
+
+                const { data: insertedUser, error: insertError } = await supabase
+                  .from('users')
+                  .upsert([profileData])
+                  .select('*')
+                  .single();
+
+                if (!insertError && insertedUser) {
+                  console.log("[App Auth] Database profile successfully created/synchronized!");
+                  const currentAuth = useAuthStore.getState();
+                  if (!currentAuth.isAuthenticated || currentAuth.user?.id !== session.user.id) {
+                    useAuthStore.getState().login({
+                      id: insertedUser.id,
+                      name: insertedUser.name,
+                      email: insertedUser.email,
+                      role: insertedUser.role,
+                      phone: insertedUser.phone,
+                      profileImage: insertedUser.profileImage,
+                      gender: insertedUser.gender,
+                      address: insertedUser.address,
+                      division: insertedUser.division,
+                      district: insertedUser.district,
+                      city: insertedUser.district,
+                      upazila: insertedUser.upazila,
+                      area: insertedUser.area,
+                      postalCode: insertedUser.postalCode,
+                    });
+                  }
+                } else if (insertError) {
+                  console.error("[App Auth] Auto-creation of user database profile failed:", insertError);
+                }
               }
             } catch (err) {
               console.warn("Could not sync profile metadata from Supabase:", err);

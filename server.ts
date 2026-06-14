@@ -614,11 +614,12 @@ Please ask me your query or select a quick question template below!`;
         const configScript = `
           <script>
             window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};
-            window.__SUPABASE_URL = ${JSON.stringify(sbConfig.supabaseUrl)};
-            window.__SUPABASE_KEY = ${JSON.stringify(sbConfig.supabaseKey)};
-            // Legacy/Fallback aliases
-            window.__supabase_url = window.__SUPABASE_URL;
-            window.__supabase_key = window.__SUPABASE_KEY;
+            ${sbConfig.supabaseUrl ? `window.__SUPABASE_URL = ${JSON.stringify(sbConfig.supabaseUrl)};` : ''}
+            ${sbConfig.supabaseKey ? `window.__SUPABASE_KEY = ${JSON.stringify(sbConfig.supabaseKey)};` : ''}
+            if (window.__SUPABASE_URL) {
+              window.__supabase_url = window.__SUPABASE_URL;
+              window.__supabase_key = window.__SUPABASE_KEY;
+            }
           </script>`;
         // Inject runtime variables synchronously before main bundle imports run
         html = html.replace('<head>', `<head>\n    ${configScript}`);
