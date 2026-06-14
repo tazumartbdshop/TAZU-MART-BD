@@ -543,9 +543,24 @@ export default function AdminSettings() {
         </div>
       );
       case 'supabase': return (
-        <div className="space-y-6 max-w-3xl animate-in fade-in">
-           <Input label="Supabase URL" field="supabaseUrl" placeholder="https://xyz.supabase.co" />
-           <Input label="Supabase Key" field="supabaseKey" placeholder="Your Supabase ANON Key" />
+        <div className="space-y-6 max-w-3xl animate-in fade-in bg-zinc-50 border border-zinc-200 p-6 rounded-none">
+           <h3 className="text-sm font-black uppercase tracking-widest text-[#000000]">Supabase Configuration</h3>
+           <p className="text-xs text-zinc-600 leading-relaxed font-mono">
+             To ensure your database synchronizes perfectly between all environments (Live Domain, Studio Preview, and Localhost), Supabase credentials can no longer be set via this Admin Form. 
+           </p>
+           <div className="bg-amber-50 border-l-4 border-amber-500 p-4">
+             <p className="text-xs font-bold text-amber-900 font-sans">
+               Action Required:<br/>
+               You must insert your Supabase credentials into the platform's Environment Variables (or .env file) to guarantee all users see the exact same products, categories, and orders.
+             </p>
+             <ul className="text-xs text-amber-800 list-disc mt-2 ml-4 font-mono">
+               <li>VITE_SUPABASE_URL = "https://your-project.supabase.co"</li>
+               <li>VITE_SUPABASE_ANON_KEY = "your-anon-key"</li>
+             </ul>
+           </div>
+           <p className="text-[10px] uppercase font-bold text-zinc-400 mt-2">
+             * This prevents inconsistent data splits where the Preview domain uses a different database than the Live Cloud domain.
+           </p>
         </div>
       );
       case 'system': return (

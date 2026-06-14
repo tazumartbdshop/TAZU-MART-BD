@@ -40,6 +40,7 @@ async function startServer() {
 
   // API Routes
   app.get("/api/supabase-config", (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
     const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
     res.json({ supabaseUrl, supabaseKey });
@@ -577,11 +578,15 @@ Please ask me your query or select a quick question template below!`;
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { index: false }));
     app.get('*', async (req, res) => {
       try {
         const indexPath = path.join(distPath, 'index.html');
         let html = await fs.readFile(indexPath, 'utf-8');
+
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
 
         // Capture production container's real environmental variables
         const runtimeConfig = {

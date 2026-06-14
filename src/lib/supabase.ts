@@ -19,23 +19,6 @@ export const getSupabase = (): SupabaseClient | null => {
   let url = (window as any).__SUPABASE_URL || (window as any).__supabase_url;
   let key = (window as any).__SUPABASE_KEY || (window as any).__supabase_key;
   
-  // Try localStorage if window vars are missing (persisted from Admin UI)
-  if (!url || !key) {
-    try {
-      const persisted = localStorage.getItem('supabase_config');
-      if (persisted) {
-        const parsed = JSON.parse(persisted);
-        if (parsed.supabaseUrl && parsed.supabaseKey) {
-          url = parsed.supabaseUrl;
-          key = parsed.supabaseKey;
-          console.debug("[Supabase Lib] Using credentials from localStorage fallback.");
-        }
-      }
-    } catch (e) {
-      // Ignored
-    }
-  }
-
   // Final fallback to build-time env vars
   if (!url || !key) {
     url = envUrl;

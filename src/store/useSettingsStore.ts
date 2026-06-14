@@ -515,15 +515,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const newSettings = { ...get().settings, ...updates };
     set({ settings: newSettings });
     
-    // Save supabase creds to localStorage immediately just in case
-    if (updates.supabaseUrl !== undefined || updates.supabaseKey !== undefined) {
-      const localStore = {
-        supabaseUrl: updates.supabaseUrl || get().settings.supabaseUrl,
-        supabaseKey: updates.supabaseKey || get().settings.supabaseKey
-      };
-      localStorage.setItem('supabase_config', JSON.stringify(localStore));
-    }
-    
     const supabase = getSupabase();
     if (supabase) {
         // Assume document structure with id 'global'
@@ -542,14 +533,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   publishSettings: async () => {
     try {
       const draft = get().draftSettings;
-      
-      // Also ensure Supabase config in draft is persisted to localStorage for client fallback
-      if (draft.supabaseUrl || draft.supabaseKey) {
-        localStorage.setItem('supabase_config', JSON.stringify({
-          supabaseUrl: draft.supabaseUrl,
-          supabaseKey: draft.supabaseKey
-        }));
-      }
 
       const supabase = getSupabase();
       if (supabase) {

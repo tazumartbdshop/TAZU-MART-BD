@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { generateDemoOrders, generateDemoProducts, generateDemoCustomers } from '../utils/demoDataGenerator';
+// Removed demo generators to enforce single DB rule
 import { getSupabase } from '../lib/supabase';
 
 export interface OrderItem {
@@ -84,13 +84,8 @@ interface OrderState {
   subscribeTrackingStatuses: () => () => void;
 }
 
-// Generate matching data sets
-const demoProducts = generateDemoProducts();
-const demoCustomers = generateDemoCustomers();
-const initialOrders: Order[] = generateDemoOrders(demoProducts, demoCustomers);
-
 export const useOrderStore = create<OrderState>((set, get) => ({
-  orders: initialOrders,
+  orders: [],
   trackingStatuses: [
     'Placed', 'Pending', 'Processing', 'Confirmed', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'
   ],
@@ -220,10 +215,13 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
     const loadOrders = async () => {
         const { data, error } = await supabase.from('orders').select('*').order('date', { ascending: false });
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
             set({ orders: data as Order[] });
         } else {
-            set({ orders: initialOrders });
+            if (error && error.code !== '42P01') {
+                console.error('Error fetching orders:', error);
+            }
+            set({ orders: [] });
         }
     };
     

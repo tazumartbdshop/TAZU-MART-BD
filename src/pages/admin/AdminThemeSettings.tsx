@@ -40,7 +40,6 @@ import { Header } from '../../components/layout/Header';
 import { Footer } from '../../components/layout/Footer';
 import Product from '../../pages/Product';
 import { CompactProductCard } from '../../components/product/CompactProductCard';
-import { products as mockProducts } from '../../data/mockData';
 import TemplateDraftBar from '../../components/admin/TemplateDraftBar';
 
 const PRESET_THEMES = [
@@ -383,7 +382,7 @@ export default function AdminThemeSettings() {
 // --- Custom Preview Panels (Keep only needed ones) ---
 
 function ButtonPanelPreview({ theme }: { theme: ThemeConfig }) {
-  const sampleProduct = mockProducts[0] || {
+  const sampleProduct: any = {
     id: 'placeholder',
     name: 'Theme Preview Product',
     price: 1000,

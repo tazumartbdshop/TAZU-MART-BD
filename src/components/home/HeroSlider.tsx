@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { banners } from '../../data/mockData';
 import { Link } from 'react-router-dom';
+
+const banners: any[] = []; // Fallback empty array since mockData is removed
+
 
 export function HeroSlider() {
   const [currentIndex, setCurrentIndex] = useState(0);

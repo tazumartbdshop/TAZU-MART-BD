@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { generateDemoCustomers } from '../utils/demoDataGenerator';
 import { getSupabase } from '../lib/supabase';
 
 export interface PaymentMethod {
@@ -60,7 +59,7 @@ interface CustomerState {
   subscribe: () => () => void;
 }
 
-export const initialDemoCustomers: Customer[] = generateDemoCustomers();
+export const initialDemoCustomers: Customer[] = [];
 
 export const useCustomerStore = create<CustomerState>((set, get) => ({
   customers: initialDemoCustomers,
@@ -168,10 +167,11 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     if (!supabase) return () => {};
 
     supabase.from('customers').select('*').then(({ data, error }) => {
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
             set({ customers: data as Customer[] });
         } else {
-            set({ customers: initialDemoCustomers });
+            console.error(error);
+            set({ customers: [] });
         }
     });
 
