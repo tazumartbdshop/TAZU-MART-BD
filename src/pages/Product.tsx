@@ -263,7 +263,10 @@ export default function Product() {
   }, [product.description]);
 
   const relatedProducts = useMemo(() => {
-    return products.filter(p => p.category === product.category && p.id !== product.id).slice(0, 4);
+    return products.filter(p => 
+      String(p.category || '').trim().toLowerCase() === String(product.category || '').trim().toLowerCase() && 
+      p.id !== product.id
+    ).slice(0, 4);
   }, [products, product]);
 
   const isOutOfStock = product.stock === 0;

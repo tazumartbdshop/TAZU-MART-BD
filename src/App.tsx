@@ -54,6 +54,7 @@ import DynamicLinkPage from './pages/DynamicLinkPage';
 import { useSiteManagementStore } from './store/useSiteManagementStore';
 import { useWebsitesStore } from './store/useWebsitesStore';
 import { fetchSupabaseConfigFromServer } from './lib/supabase';
+import { RuntimeDiagnostics } from './components/common/RuntimeDiagnostics';
 
 export default function App() {
   const { fetchSettings } = useSiteManagementStore();
@@ -173,6 +174,7 @@ export default function App() {
     <Router>
       <Toaster />
       <ThemeInitializer />
+      <RuntimeDiagnostics />
       <Routes>
         <Route path="/site/:storeDomain/*" element={<LiveWebsiteGenerator />} />
         <Route path="/site-admin/:storeDomain/*" element={<LiveWebsiteAdmin />} />

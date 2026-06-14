@@ -63,8 +63,8 @@ export default function Home() {
   console.log("[Home Page Categories Debug] Total categories in store:", categories.length, "Items:", categories);
   const sortedCategories = [...categories]
     .filter(c => {
-      const statusStr = String(c.status || 'Active').toLowerCase();
-      const isActive = statusStr === 'active';
+      const statusStr = String(c.status || 'active').trim().toLowerCase();
+      const isActive = statusStr !== 'inactive';
       
       const showOnHome = c.showOnHomepage !== false && (c as any).show_on_homepage !== false;
       const isVisible = (c as any).is_visible !== false && (c as any).isVisible !== false;
@@ -256,7 +256,13 @@ export default function Home() {
 
       {/* 8. Dynamic Category Sections */}
       {sortedCategories.map(cat => {
-        const catProducts = products.filter(p => p.category.toLowerCase() === cat.id.toLowerCase() || p.category.toLowerCase() === cat.name.toLowerCase()).slice(0, 6);
+        const catProducts = products.filter(p => {
+          const pCat = String(p.category || '').trim().toLowerCase();
+          const cId = String(cat.id || '').trim().toLowerCase();
+          const cName = String(cat.name || '').trim().toLowerCase();
+          const cSlug = String(cat.slug || '').trim().toLowerCase();
+          return pCat === cId || pCat === cName || pCat === cSlug;
+        }).slice(0, 6);
         if (catProducts.length === 0) return null;
         
         return (

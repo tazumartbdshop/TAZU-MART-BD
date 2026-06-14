@@ -36,10 +36,13 @@ export default function CategoryPage() {
     );
   }
 
-  const categoryProducts = products.filter(p => 
-    p.category.toLowerCase() === category.id.toLowerCase() || 
-    p.category.toLowerCase() === category.name.toLowerCase()
-  );
+  const categoryProducts = products.filter(p => {
+    const pCat = String(p.category || '').trim().toLowerCase();
+    const cId = String(category.id || '').trim().toLowerCase();
+    const cName = String(category.name || '').trim().toLowerCase();
+    const cSlug = String(category.slug || '').trim().toLowerCase();
+    return pCat === cId || pCat === cName || pCat === cSlug;
+  });
 
   return (
     <div className="bg-gray-50/50 min-h-screen pb-20">

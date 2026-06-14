@@ -18,8 +18,8 @@ export function CategorySection() {
   console.log("[CategorySection Debug] Total categories in store:", categories.length, "Items:", categories);
   const activeCategories = [...categories]
     .filter(c => {
-      const statusStr = String(c.status || 'Active').toLowerCase();
-      const isActive = statusStr === 'active';
+      const statusStr = String(c.status || 'active').trim().toLowerCase();
+      const isActive = statusStr !== 'inactive';
       
       const isVisible = (c as any).is_visible !== false && (c as any).isVisible !== false;
       const isPublished = (c as any).published !== false;

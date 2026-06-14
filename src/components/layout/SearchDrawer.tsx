@@ -28,8 +28,8 @@ export default function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
 
   const activeCategories = useMemo(() => {
     return [...categories]
-      .filter(c => c.status === 'Active')
-      .sort((a, b) => a.displayOrder - b.displayOrder)
+      .filter(c => String(c.status || 'Active').toLowerCase() === 'active')
+      .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0))
       .slice(0, 8);
   }, [categories]);
 
