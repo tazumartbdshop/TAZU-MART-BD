@@ -630,7 +630,7 @@ Please ask me your query or select a quick question template below!`;
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server is listening on 0.0.0.0:${PORT}`);
   });
 }
 
