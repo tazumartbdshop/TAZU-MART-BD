@@ -23,10 +23,22 @@ async function startServer() {
   app.use(express.json());
 
   // Initialize Supabase in backend
+  const SUPABASE_CONFIG_FILE = path.join(process.cwd(), 'supabase_config.json');
+  let savedSupabaseUrl = "";
+  let savedSupabaseKey = "";
+  try {
+    const fileData = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
+    const parsed = JSON.parse(fileData);
+    savedSupabaseUrl = parsed.supabaseUrl || "";
+    savedSupabaseKey = parsed.supabaseKey || "";
+  } catch (e) {
+    // ignore missing or corrupted file
+  }
+
   let supabaseAdmin: any = null;
   try {
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedSupabaseUrl;
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseKey;
     
     if (supabaseUrl && supabaseKey) {
        supabaseAdmin = createClient(supabaseUrl, supabaseKey);
@@ -39,11 +51,37 @@ async function startServer() {
   }
 
   // API Routes
-  app.get("/api/supabase-config", (req, res) => {
+  app.get("/api/supabase-config", async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+    let fileUrl = "";
+    let fileKey = "";
+    try {
+      const data = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
+      const parsed = JSON.parse(data);
+      fileUrl = parsed.supabaseUrl || "";
+      fileKey = parsed.supabaseKey || "";
+    } catch (e) {}
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
     res.json({ supabaseUrl, supabaseKey });
+  });
+
+  app.post("/api/supabase-config", async (req, res) => {
+    try {
+      const { supabaseUrl, supabaseKey } = req.body;
+      if (!supabaseUrl || !supabaseKey) {
+        return res.status(400).json({ error: "supabaseUrl and supabaseKey are required" });
+      }
+
+      await fs.writeFile(SUPABASE_CONFIG_FILE, JSON.stringify({ supabaseUrl, supabaseKey }, null, 2));
+      supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+      console.log(`Supabase Backend configured & re-initialized via API successfully targeting: ${supabaseUrl}`);
+      res.json({ status: "success", supabaseUrl, supabaseKey });
+    } catch (error: any) {
+      console.error("Failed to save Supabase config:", error);
+      res.status(500).json({ error: "Failed to save Supabase configuration on server" });
+    }
   });
 
   app.get("/api/game-config", async (req, res) => {
@@ -599,10 +637,20 @@ Please ask me your query or select a quick question template below!`;
           firestoreDatabaseId: (process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID && process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID !== "default") ? process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID : null
         };
 
-  // Also capture Supabase credentials for production synchronization
+        // Read local server-saved configuration file if exists
+        let savedUrl = null;
+        let savedKey = null;
+        try {
+          const fileData = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
+          const parsed = JSON.parse(fileData);
+          savedUrl = parsed.supabaseUrl || null;
+          savedKey = parsed.supabaseKey || null;
+        } catch (_) {}
+
+        // Also capture Supabase credentials for production synchronization
         const sbConfig = {
-          supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || null,
-          supabaseKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || null,
+          supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedUrl || null,
+          supabaseKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedKey || null,
         };
 
         if (!sbConfig.supabaseUrl || !sbConfig.supabaseKey) {
