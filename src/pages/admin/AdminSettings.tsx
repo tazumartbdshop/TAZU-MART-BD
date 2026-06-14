@@ -987,6 +987,20 @@ function SupabaseConfigForm() {
       });
 
       if (res.ok) {
+        // Also save to Google Cloud Firestore securely as primary persistent synchronization backup
+        try {
+          const { db } = await import('../../lib/firebase');
+          const { doc, setDoc } = await import('firebase/firestore');
+          await setDoc(doc(db, 'settings', 'supabase'), {
+            url: supabaseUrl.trim(),
+            key: supabaseKey.trim(),
+            updatedAt: new Date().toISOString()
+          });
+          console.log("[Supabase Config] Saved live syncing configuration parameters to persistent Cloud Firestore.");
+        } catch (dbErr) {
+          console.warn("[Supabase Config] Firestore redundancy save skipped or unauthorized:", dbErr);
+        }
+
         const { fetchSupabaseConfigFromServer } = await import('../../lib/supabase');
         await fetchSupabaseConfigFromServer();
 
