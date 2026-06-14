@@ -341,9 +341,11 @@ export const useProductStore = create<ProductState>((set, get) => ({
   },
   
   subscribe: () => {
+    set({ isLoading: true });
     const supabase = getSupabase();
     
     if (!supabase) {
+        set({ isLoading: false });
         return () => {}; // No-op if not configured
     }
     
@@ -352,9 +354,12 @@ export const useProductStore = create<ProductState>((set, get) => ({
     // Initial fetch
     supabase.from('products').select('*').then(({ data, error }) => {
         if (!error && data) {
-            set({ products: data.map(mapDbToProduct) });
+            set({ products: data.map(mapDbToProduct), isLoading: false });
         } else if (error && error.code !== '42P01') {
             console.error("Failed to fetch products:", error);
+            set({ isLoading: false });
+        } else {
+            set({ isLoading: false });
         }
     });
 

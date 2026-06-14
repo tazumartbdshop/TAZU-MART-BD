@@ -13,8 +13,8 @@ import { pixelService } from '../utils/pixelService';
 export default function Search() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
-  const { products } = useProductStore();
-  const { categories } = useCategoryStore();
+  const { products, isLoading: productsLoading } = useProductStore();
+  const { categories, isLoaded: categoriesLoaded } = useCategoryStore();
   const { addSearch } = useSearchStore();
   const { addItem } = useCartStore();
   const navigate = useNavigate();
@@ -163,7 +163,12 @@ export default function Search() {
           </div>
         )}
 
-        {filteredProducts.length > 0 ? (
+        {productsLoading ? (
+          <div className="py-20 text-center animate-pulse">
+            <div className="w-12 h-12 border-4 border-black/10 border-t-black rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-xs font-black uppercase tracking-widest text-[#9ca3af]">Searching Database...</p>
+          </div>
+        ) : filteredProducts.length > 0 ? (
           /* Products Grid Layout */
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {filteredProducts.map((product) => {

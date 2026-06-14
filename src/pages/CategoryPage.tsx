@@ -8,11 +8,22 @@ import { ChevronRight, ShoppingBag } from 'lucide-react';
 
 export default function CategoryPage() {
   const { id } = useParams();
-  const { categories } = useCategoryStore();
-  const { products } = useProductStore();
+  const { categories, isLoaded } = useCategoryStore();
+  const { products, isLoading } = useProductStore();
 
   const category = categories.find(c => c.id === id || c.slug === id);
   
+  if (!isLoaded || isLoading) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 flex justify-center items-center">
+        <div className="flex flex-col items-center gap-4 text-neutral-400">
+           <div className="w-12 h-12 border-4 border-black/10 border-t-black rounded-full animate-spin"></div>
+           <p className="text-xs font-bold uppercase tracking-widest">Loading Collection...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!category) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center p-4">

@@ -22,6 +22,19 @@ export default function FlashSaleSection({ products, isLoading }: FlashSaleSecti
   const { addItem } = useCartStore();
   
   if (!settings.flashSaleEnabled) return null;
+  
+  if (isLoading) {
+    return (
+      <section className="pt-0 pb-3 bg-white border-b border-neutral-100 overflow-hidden">
+        <div className="container mx-auto px-4">
+           <div className="flex gap-3 overflow-x-auto pb-4 hide-scrollbar">
+             {[1, 2, 3, 4, 5].map(i => <div key={i} className="w-[145px] sm:w-[170px] shrink-0"><ProductSkeleton /></div>)}
+           </div>
+        </div>
+      </section>
+    );
+  }
+
   if (products.length === 0) return null;
 
   return (

@@ -14,6 +14,18 @@ interface BestSellingSectionProps {
 
 export default function BestSellingSection({ products, isLoading }: BestSellingSectionProps) {
   const navigate = useNavigate();
+  if (isLoading) {
+     return (
+        <section className="py-6 bg-white border-b border-neutral-100">
+           <div className="container mx-auto px-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                 {[1, 2, 3, 4, 5, 6].map(i => <ProductSkeleton key={i} />)}
+              </div>
+           </div>
+        </section>
+     );
+  }
+
   if (products.length === 0) return null;
 
   // Show only top 6 products in the grid

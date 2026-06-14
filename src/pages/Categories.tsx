@@ -5,7 +5,7 @@ import { useCategoryStore } from '../store/useCategoryStore';
 import { Image as ImageIcon } from 'lucide-react';
 
 export default function Categories() {
-  const { categories } = useCategoryStore();
+  const { categories, isLoaded } = useCategoryStore();
 
   console.log("[Categories Page Debug] Total categories in store:", categories.length, "Items:", categories);
   const activeCategories = [...categories]
@@ -36,8 +36,21 @@ export default function Categories() {
   return (
     <div className="bg-white min-h-screen pb-32">
       <div className="p-4">
+        {/* Loading State Floor */}
+        {!isLoaded && (
+          <div className="grid grid-cols-2 gap-4 animate-pulse pt-4">
+             {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="aspect-square bg-neutral-100 rounded-2xl flex flex-col items-center justify-center">
+                   <ImageIcon className="w-8 h-8 text-neutral-300 mb-2" />
+                   <div className="h-3 w-1/2 bg-neutral-200 rounded"></div>
+                </div>
+             ))}
+          </div>
+        )}
+
         {/* Strictly 2 category per row as per instruction */}
-        <div className="grid grid-cols-2 gap-4">
+        {isLoaded && (
+          <div className="grid grid-cols-2 gap-4">
           {activeCategories.map((cat, idx) => {
             const catImage = cat.iconImage || cat.bannerImage;
             
@@ -76,6 +89,7 @@ export default function Categories() {
             );
           })}
         </div>
+        )}
       </div>
     </div>
   );

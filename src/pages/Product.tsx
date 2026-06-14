@@ -24,11 +24,11 @@ export default function Product() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addItem, clearCart } = useCartStore();
-  const { products } = useProductStore();
+  const { products, isLoading } = useProductStore();
   const { offers } = useOfferStore();
   const { addViewedProduct } = useRecentlyViewedStore();
 
-  const product = useMemo(() => products.find(p => p.id === id) || products[0], [products, id]);
+  const product = useMemo(() => products.find(p => p.id === id), [products, id]);
   
   const bannerUrls = useMemo(() => {
     if (!product || !product.banner_image) return [];
@@ -50,6 +50,7 @@ export default function Product() {
 
   // Dynamic gallery image setup
   const images = useMemo(() => {
+    if (!product) return [];
     if (product.images && product.images.length > 0) {
       return product.images;
     }
@@ -134,6 +135,30 @@ export default function Product() {
     }
     return '';
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 flex justify-center items-center">
+        <div className="flex flex-col items-center gap-4 text-neutral-400">
+           <div className="w-12 h-12 border-4 border-black/10 border-t-black rounded-full animate-spin"></div>
+           <p className="text-xs font-bold uppercase tracking-widest">Loading Product...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 flex justify-center items-center text-center">
+        <div className="flex flex-col items-center gap-4 text-neutral-400">
+           <Box className="w-12 h-12 mb-2 opacity-50" />
+           <h2 className="text-xl font-black uppercase tracking-widest text-[#1a1a1a]">Product Not Found</h2>
+           <p className="text-sm font-medium">This product does not exist or has been removed.</p>
+           <button onClick={() => navigate('/')} className="mt-4 bg-black text-white px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors">Return to Shop</button>
+        </div>
+      </div>
+    );
+  }
 
   // Align activeImage state on initial load to show Product Image 1 (index 1) by default if video exists
   useEffect(() => {

@@ -17,7 +17,7 @@ import TrendingSection from '../components/home/TrendingSection';
 import BestSellingSection from '../components/home/BestSellingSection';
 
 import FlashSaleTimer from '../components/home/FlashSaleTimer';
-
+import { CategorySkeleton } from '../components/common/Skeleton';
 
 export default function Home() {
   // Deployment Hash: 1718284042 (Fresh Deploy)
@@ -140,7 +140,17 @@ export default function Home() {
       )}
 
       {/* 4. Redesigned Premium Category Slider */}
-      {sortedCategories.length > 0 && (
+      {!categoriesLoaded && (
+        <section className="bg-white border-b border-gray-100 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative mb-3">
+          <div className="container mx-auto px-4">
+             <div className="flex gap-[16px] overflow-hidden">
+                {[1, 2, 3, 4, 5, 6].map(i => <CategorySkeleton key={i} />)}
+             </div>
+          </div>
+        </section>
+      )}
+
+      {categoriesLoaded && sortedCategories.length > 0 && (
         <section className="bg-white border-b border-gray-100 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative mb-3">
           <div className="container mx-auto px-4">
             <div 
