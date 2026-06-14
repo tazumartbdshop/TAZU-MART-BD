@@ -28,7 +28,6 @@ const SETTING_MODULES = [
   { id: 'support', name: 'Customer Support', icon: HeadphonesIcon, desc: 'Hotline, Chat, Email' },
   { id: 'media', name: 'File & Media', icon: ImageIcon, desc: 'Upload Limits & Types' },
   { id: 'promotion', name: 'Promotion & Offers', icon: Zap, desc: 'Flash Sale, Discounts' },
-  { id: 'supabase', name: 'Supabase Config', icon: Database, desc: 'Supabase Database Connection' },
   { id: 'system', name: 'Backup & System', icon: Database, desc: 'Backups & Cache' },
 ];
 
@@ -542,7 +541,7 @@ export default function AdminSettings() {
            </div>
         </div>
       );
-      case 'supabase': return <SupabaseConfigForm />;
+
       case 'system': return (
         <div className="space-y-8 max-w-4xl animate-in fade-in font-mono">
           {/* Demo & Showcase Data Manager */}
@@ -937,174 +936,4 @@ export default function AdminSettings() {
   );
 }
 
-function SupabaseConfigForm() {
-  const [supabaseUrl, setSupabaseUrl] = useState('');
-  const [supabaseKey, setSupabaseKey] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [status, setStatus] = useState<{ type: 'success' | 'error' | null; text: string }>({ type: null, text: '' });
 
-  useEffect(() => {
-    let active = true;
-    const fetchConfig = async () => {
-      try {
-        const res = await fetch('/api/supabase-config');
-        if (res.ok) {
-          const data = await res.json();
-          if (active) {
-            setSupabaseUrl(data.supabaseUrl || '');
-            setSupabaseKey(data.supabaseKey || '');
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch Supabase config:", err);
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    };
-    fetchConfig();
-    return () => { active = false; };
-  }, []);
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supabaseUrl.trim() || !supabaseKey.trim()) {
-      setStatus({ type: 'error', text: 'Supabase URL and Anon Key are both required!' });
-      return;
-    }
-
-    setIsSaving(true);
-    setStatus({ type: null, text: '' });
-
-    try {
-      const res = await fetch('/api/supabase-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supabaseUrl: supabaseUrl.trim(),
-          supabaseKey: supabaseKey.trim()
-        })
-      });
-
-      if (res.ok) {
-        // Also save to Google Cloud Firestore securely as primary persistent synchronization backup
-        try {
-          const { db } = await import('../../lib/firebase');
-          const { doc, setDoc } = await import('firebase/firestore');
-          await setDoc(doc(db, 'settings', 'supabase'), {
-            url: supabaseUrl.trim(),
-            key: supabaseKey.trim(),
-            updatedAt: new Date().toISOString()
-          });
-          console.log("[Supabase Config] Saved live syncing configuration parameters to persistent Cloud Firestore.");
-        } catch (dbErr) {
-          console.warn("[Supabase Config] Firestore redundancy save skipped or unauthorized:", dbErr);
-        }
-
-        const { fetchSupabaseConfigFromServer } = await import('../../lib/supabase');
-        await fetchSupabaseConfigFromServer();
-
-        // Re-subscribe all stores to the new database instance to reflect sync immediately
-        useCategoryStore.getState().subscribe();
-        useProductStore.getState().subscribe();
-        useCustomerStore.getState().subscribe();
-        useOrderStore.getState().subscribeOrders();
-        useOrderStore.getState().subscribeTrackingStatuses();
-
-        setStatus({ 
-          type: 'success', 
-          text: '✅ ডাটাবেজ সফলভাবে সংযুক্ত এবং সিঙ্ক হয়েছে! এখন সমস্ত ডিভাইস থেকে লাইভ ডোমেইনে একই প্রোডাক্ট ও ক্যাটাগরি দেখা যাবে এবং পৃষ্ঠা রিফ্রেশ করলেও সেটি মুছে যাবে না।' 
-        });
-      } else {
-        const errData = await res.json();
-        setStatus({ type: 'error', text: errData.error || 'Failed to save configuration' });
-      }
-    } catch (err: any) {
-      setStatus({ type: 'error', text: err.message || 'Network error occurred' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 text-zinc-500 font-mono py-8">
-        <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-        <span>Loading database parameters...</span>
-      </div>
-    );
-  }
-
-  return (
-     <form onSubmit={handleSave} className="space-y-6 max-w-3xl animate-in fade-in bg-white border border-zinc-200 p-6 rounded-none">
-       <div className="flex items-center gap-3 pb-2 border-b border-zinc-150">
-          <Database className="w-5 h-5 text-indigo-600" />
-          <h3 className="text-sm font-black uppercase tracking-widest text-[#000000]">Supabase Live Sync Connection</h3>
-       </div>
-
-       <p className="text-xs text-zinc-600 leading-relaxed font-sans">
-         আপনার লাইভ ডোমেইন এবং স্টুডিও প্রিভিউকে একই ডাটাবেজের সাথে যুক্ত করার জন্য এখানে আপনার Supabase সংযোগের বিবরণ প্রদান করুন। একবার সেভ করলে এটি সরাসরি সার্ভারে জমা হবে এবং সমস্ত ভিজিটর ও ডিভাইস একই প্রোডাক্ট, ক্যাটাগরি ও অর্ডার দেখতে পাবে। পৃষ্ঠা রিফ্রেশ করলেও ডাটা মুছে যাবে না।
-       </p>
-
-       <div className="space-y-4">
-         <div>
-           <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-700 mb-1.5 font-sans">
-             VITE_SUPABASE_URL (প্রজেক্ট ইউআরএল)
-           </label>
-           <input
-             type="url"
-             value={supabaseUrl}
-             onChange={(e) => setSupabaseUrl(e.target.value)}
-             placeholder="https://your-project.supabase.co"
-             className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black font-mono text-xs transition-colors"
-             required
-           />
-         </div>
-
-         <div>
-           <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-700 mb-1.5 font-sans">
-             VITE_SUPABASE_ANON_KEY (এপিসেফ কি / নন-রোল কি)
-           </label>
-           <textarea
-             value={supabaseKey}
-             onChange={(e) => setSupabaseKey(e.target.value)}
-             placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-             rows={4}
-             className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black font-mono text-xs transition-colors"
-             required
-           />
-         </div>
-       </div>
-
-       {status.text && (
-         <div className={`p-4 text-xs font-medium border leading-relaxed font-sans ${
-           status.type === 'success' 
-             ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
-             : 'bg-red-50 border-red-200 text-red-800'
-         }`}>
-           {status.text}
-         </div>
-       )}
-
-       <div className="flex justify-end pt-2">
-         <button
-           type="submit"
-           disabled={isSaving}
-           className="px-6 py-3 bg-[#000000] hover:bg-neutral-800 text-white font-mono text-[10px] font-bold uppercase tracking-widest cursor-pointer transition-colors flex items-center gap-2"
-         >
-           {isSaving ? (
-             <>
-               <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-               Connecting & Saving...
-             </>
-           ) : (
-             <>
-               <Save className="w-3.5 h-3.5" />
-               Save Supabase Connection
-             </>
-           )}
-         </button>
-       </div>
-    </form>
-  );
-}
