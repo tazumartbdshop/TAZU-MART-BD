@@ -43,6 +43,19 @@ export const getSupabase = (): SupabaseClient | null => {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
+      },
+      global: {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        fetch: (fetchUrl, fetchOptions) => {
+          return fetch(fetchUrl, {
+            ...fetchOptions,
+            cache: 'no-store'
+          });
+        }
       }
     });
     cachedUrl = url;
@@ -86,19 +99,24 @@ export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
     console.log("[Supabase Config] No pre-injected variables found. Fetching from /api/supabase-config (cache: no-store)...");
     const res = await fetch('/api/supabase-config', { cache: 'no-store' });
     if (res.ok) {
-      const data = await res.json();
-      if (data.supabaseUrl && data.supabaseKey) {
-        (window as any).__supabase_url = data.supabaseUrl;
-        (window as any).__supabase_key = data.supabaseKey;
-        
-        // Also update the __SUPABASE_URL/KEY aliases just in case
-        (window as any).__SUPABASE_URL = data.supabaseUrl;
-        (window as any).__SUPABASE_KEY = data.supabaseKey;
-        
-        console.log("[Supabase Config] Successfully obtained credentials from server API.");
-        return true;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data.supabaseUrl && data.supabaseKey) {
+          (window as any).__supabase_url = data.supabaseUrl;
+          (window as any).__supabase_key = data.supabaseKey;
+          
+          // Also update the __SUPABASE_URL/KEY aliases just in case
+          (window as any).__SUPABASE_URL = data.supabaseUrl;
+          (window as any).__SUPABASE_KEY = data.supabaseKey;
+          
+          console.log("[Supabase Config] Successfully obtained credentials from server API.");
+          return true;
+        } else {
+          console.warn("[Supabase Config] Server API returned empty credentials. Falling back to build defaults.");
+        }
       } else {
-        console.warn("[Supabase Config] Server API returned empty credentials. Falling back to build defaults.");
+        console.log("[Supabase Config] API response content type is not JSON (possibly static host fallback). Bypassing server lookup.");
       }
     } else {
       console.warn("[Supabase Config] Server API fetch failed with status:", res.status);
