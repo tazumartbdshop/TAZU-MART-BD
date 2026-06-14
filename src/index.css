@@ -55,6 +55,12 @@
     --primary-color: #9333ea;
     --secondary-color: #000000;
     scroll-behavior: smooth;
+    overscroll-behavior-y: contain;
+  }
+
+  html, body {
+    overscroll-behavior-y: contain;
+    overscroll-behavior: contain;
   }
 
   body {
