@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 // Get fallback from env if available
 const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -39,7 +40,7 @@ export const getSupabase = (): SupabaseClient | null => {
   
   try {
     console.log(`[Supabase Lib] Initializing new client with URL: ${url}`);
-    cachedClient = createClient(url, key, {
+    cachedClient = createBrowserClient(url, key, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
