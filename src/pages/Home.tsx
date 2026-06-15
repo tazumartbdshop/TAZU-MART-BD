@@ -84,14 +84,10 @@ export default function Home() {
   const isProductActive = (p: any) => {
     if (!p) return false;
     const status = (p.status || '').toString().toLowerCase().trim();
-    // Inclusive check for all possible active-like statuses
-    return status === 'active' || 
-           status === 'published' || 
-           status === 'true' || 
-           status === '' || 
-           status === 'null' ||
-           status === 'undefined' ||
-           !p.status;
+    // In production, we should be slightly more lenient
+    // Only explicitly hide if it's draft or inactive
+    if (status === 'draft' || status === 'inactive') return false;
+    return true;
   };
 
   console.log("[Home Feed Debug] Products Loading:", productsLoading, "Total State Products:", products.length);

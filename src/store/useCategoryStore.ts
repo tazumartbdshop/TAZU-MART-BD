@@ -182,14 +182,17 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     supabase.from('categories').select('*')
       .then(({ data, error }) => {
         if (error) {
-            console.error("[Supabase Categories Fetch ERROR]:", error);
+            console.error("%c[Supabase Categories ERROR]:", "color: #ef4444; font-weight: bold;", error.code, error.message, error.details);
             set({ isLoaded: true });
         } else if (data) {
-            console.log(`[Supabase Categories Fetch SUCCESS] Count: ${data.length}`);
+            console.log(`%c[Supabase Categories SUCCESS] Count: ${data.length}`, "color: #10b981; font-weight: bold;");
+            if (data.length === 0) {
+              console.warn("[Supabase Categories] Table returned 0 rows. This often means RLS is blocking read for 'anon' role.");
+            }
             const mappedData = data.map(mapDbToCategory).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
             set({ categories: mappedData, isLoaded: true });
         } else {
-            console.log("[Supabase Categories Fetch] No data returned from categories table.");
+            console.log("[Supabase Categories Fetch] No data returned.");
             set({ isLoaded: true });
         }
     }, (err) => {

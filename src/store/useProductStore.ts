@@ -354,7 +354,10 @@ export const useProductStore = create<ProductState>((set, get) => ({
     // Initial fetch
     supabase.from('products').select('*').then(({ data, error }) => {
         if (!error && data) {
-            console.log(`[Supabase Product Sync] SUCCESS: Fetched ${data.length} products.`);
+            console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products.`, "color: #10b981; font-weight: bold;");
+            if (data.length === 0) {
+              console.warn("[Supabase Products] Table returned 0 rows. Check RLS policies for 'anon' role.");
+            }
             try {
               const mapped = data.map(mapDbToProduct);
               set({ products: mapped, isLoading: false });
@@ -363,7 +366,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
               set({ isLoading: false });
             }
         } else if (error) {
-            console.error("[Supabase Product Sync] ERROR during initial fetch:", error);
+            console.error("%c[Supabase Product Sync] ERROR during fetch:", "color: #ef4444; font-weight: bold;", error.code, error.message, error.details);
             set({ isLoading: false });
         } else {
             console.log("[Supabase Product Sync] No data returned from products table.");
