@@ -1,5 +1,4 @@
-import { createBrowserClient } from '@supabase/ssr';
-import { SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Get fallback from env if available
 const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -9,43 +8,46 @@ let cachedClient: SupabaseClient | null = null;
 let cachedUrl = '';
 let cachedKey = '';
 
-// Always create a dynamic getter so we can use the latest creds
-export const getSupabase = (): SupabaseClient | null => {
-  // Priority order for credentials:
-  // 1. Primary window variables (Injected via server.ts synchronously into <head>)
-  // 2. Legacy window variables (Lower-case aliases)
-  // 3. LocalStorage persistence (User-set via Admin UI)
-  // 4. Build-time environment variables (VITE_SUPABASE_URL)
-  
+// Helper to get raw credentials from any available source
+export const getSupabaseCredentials = () => {
   let url = (window as any).__SUPABASE_URL || (window as any).__supabase_url;
   let key = (window as any).__SUPABASE_KEY || (window as any).__supabase_key;
   
-  // Persistence Fallback: Check LocalStorage if window variables are missing (Handles Server Restart in Production)
   if (!url || !key) {
     const storedUrl = localStorage.getItem('sb_url_backup');
     const storedKey = localStorage.getItem('sb_key_backup');
     if (storedUrl && storedKey) {
       url = storedUrl;
       key = storedKey;
-      // Re-populate window for other components
-      (window as any).__SUPABASE_URL = url;
-      (window as any).__SUPABASE_KEY = key;
-      console.log("%c[Supabase Lib] Restored credentials from LocalStorage Backup.", "color: #10b981; font-weight: bold;");
     }
   }
 
-  // Final fallback to build-time env vars
   if (!url || !key) {
     url = envUrl;
     key = envKey;
-    if (url && key) {
-      console.debug("[Supabase Lib] Using build-time environment variables (envUrl).");
-    }
   }
+
+  // Absolute fallback for production (gaqyfj)
+  if (!url || !key) {
+    url = "https://gaqyfjztpxvzijouiwwh.supabase.co";
+    key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhcXlmanp0cHh2emlqb3Vpd3doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTgzMzk3NjgsImV4cCI6MjAzMzkxNTc2OH0.C8R-JPV56712gCVSERVfYfvw_EMofJPVU";
+  }
+
+  return { url, key };
+};
+
+// Global for debugging
+if (typeof window !== 'undefined') {
+  (window as any).getSupabaseCredentials = getSupabaseCredentials;
+}
+
+// Always create a dynamic getter so we can use the latest creds
+export const getSupabase = (): SupabaseClient | null => {
+  const { url, key } = getSupabaseCredentials();
   
   if (!url || !key) {
-    console.warn("[Supabase Lib] No credentials found. Supabase services will be disabled.");
-    return null; // Not configured
+    console.warn("[Supabase Lib] No credentials found.");
+    return null;
   }
   
   if (cachedClient && cachedUrl === url && cachedKey === key) {
@@ -53,24 +55,12 @@ export const getSupabase = (): SupabaseClient | null => {
   }
   
   try {
-    console.log(`[Supabase Lib] Initializing new client with URL: ${url}`);
-    cachedClient = createBrowserClient(url, key, {
+    console.log(`[Supabase Lib] Initializing standard client: ${url}`);
+    cachedClient = createClient(url, key, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-      },
-      global: {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        },
-        fetch: (fetchUrl, fetchOptions) => {
-          return fetch(fetchUrl, {
-            ...fetchOptions,
-            cache: 'no-store'
-          });
-        }
+        detectSessionInUrl: true
       }
     });
     cachedUrl = url;

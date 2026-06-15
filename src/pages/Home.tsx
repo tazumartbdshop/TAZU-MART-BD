@@ -108,15 +108,22 @@ export default function Home() {
 
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24">
-      {/* 0. Live Sync Diagnostics (Invisible to general users, useful for debug) */}
+      {/* 0. Live Sync Diagnostics (Visible to general users, useful for debug) */}
       <div className="hidden">
         {(() => {
+           const { url, key } = (window as any).getSupabaseCredentials?.() || { url: (window as any).__SUPABASE_URL, key: '***' };
            console.log("%c[Live Diagnostics] STARTING...", "color: #3b82f6; font-weight: bold;");
-           console.log("- Supabase Loaded:", !!(window as any).__SUPABASE_URL);
-           console.log("- Target URL:", (window as any).__SUPABASE_URL);
+           console.log("- Supabase Configured:", !!url);
+           console.log("- Target URL Origin:", url ? new URL(url).origin : 'N/A');
            console.log("- Products Raw Count:", products.length);
            console.log("- Products Active Count:", products.filter(isProductActive).length);
            console.log("- Categories Count:", categories.length);
+           console.log("- Categories Loaded Status:", categoriesLoaded);
+           console.log("- Products Loaded Status:", !productsLoading);
+           
+           if (!productsLoading && products.length === 0) {
+             console.error("[Live Diagnostics] CRITICAL: Product array is EMPTY after load completion.");
+           }
            return null;
         })()}
       </div>

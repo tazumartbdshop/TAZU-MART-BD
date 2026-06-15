@@ -178,20 +178,23 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     };
 
     console.log("[Supabase Categories Fetch] Querying from 'categories' table...");
+    // Initial fetch
     supabase.from('categories').select('*')
       .then(({ data, error }) => {
         if (error) {
             console.error("[Supabase Categories Fetch ERROR]:", error);
             set({ isLoaded: true });
         } else if (data) {
-            console.log("[Supabase Categories Fetch SUCCESS] Count:", data.length, "Raw Data:", data);
+            console.log(`[Supabase Categories Fetch SUCCESS] Count: ${data.length}`);
             const mappedData = data.map(mapDbToCategory).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
-            console.log("[Supabase Categories Fetch SUCCESS] Mapped & Sorted Data:", mappedData);
             set({ categories: mappedData, isLoaded: true });
         } else {
-            console.log("[Supabase Categories Fetch] Empty table / no data returned from Supabase.");
+            console.log("[Supabase Categories Fetch] No data returned from categories table.");
             set({ isLoaded: true });
         }
+    }, (err) => {
+        console.error("[Supabase Categories Fetch CRITICAL ERROR]:", err);
+        set({ isLoaded: true });
     });
     
     const channel = supabase

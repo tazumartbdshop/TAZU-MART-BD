@@ -355,7 +355,13 @@ export const useProductStore = create<ProductState>((set, get) => ({
     supabase.from('products').select('*').then(({ data, error }) => {
         if (!error && data) {
             console.log(`[Supabase Product Sync] SUCCESS: Fetched ${data.length} products.`);
-            set({ products: data.map(mapDbToProduct), isLoading: false });
+            try {
+              const mapped = data.map(mapDbToProduct);
+              set({ products: mapped, isLoading: false });
+            } catch (mapErr) {
+              console.error("[Supabase Product Sync] Mapping error:", mapErr);
+              set({ isLoading: false });
+            }
         } else if (error) {
             console.error("[Supabase Product Sync] ERROR during initial fetch:", error);
             set({ isLoading: false });
@@ -363,6 +369,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
             console.log("[Supabase Product Sync] No data returned from products table.");
             set({ isLoading: false });
         }
+    }, (pErr) => {
+        console.error("[Supabase Product Sync] CRITICAL PROMISE ERROR:", pErr);
+        set({ isLoading: false });
     });
 
     const channel = supabase
