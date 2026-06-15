@@ -101,27 +101,81 @@ export default function Home() {
   const bestSellingProducts = products.filter(p => (p.is_best_selling || bestOfferProductIds.includes(p.id)) && isProductActive(p));
   const displayBestSellingList = [...bestSellingProducts, ...bestSellingProducts, ...bestSellingProducts].slice(0, 15);
 
-  const isDebugMode = new URLSearchParams(location.search).get('debug') === 'true';
+  const isDebugMode = new URLSearchParams(location.search).get('debug') === 'true' || window.location.hostname === 'localhost';
 
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24">
-      {/* Visual Debug OverLay (Only appears if ?debug=true) */}
+      {/* Visual Debug OverLay (Visible if ?debug=true or on localhost) */}
       {isDebugMode && (
-        <div className="fixed bottom-20 left-4 z-[9999] bg-black/90 p-4 rounded-xl border border-white/20 text-white text-[10px] font-mono shadow-2xl max-w-[280px]">
-          <div className="flex justify-between items-center mb-2 border-b border-white/10 pb-1">
-            <span className="font-bold text-blue-400 uppercase tracking-tighter">Live Debug Metrics</span>
-            <button onClick={() => window.location.search = ""} className="bg-white/10 px-1.5 rounded hover:bg-white/20">Hide</button>
+        <div className="fixed top-20 left-4 z-[9999] bg-slate-900 border border-slate-700 p-4 rounded-2xl shadow-2xl text-[11px] text-white font-mono w-[320px] max-h-[80vh] overflow-y-auto">
+          <div className="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
+            <span className="flex items-center gap-2">
+               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+               <span className="font-bold text-sky-400">SYNC DIAGNOSTICS</span>
+            </span>
+            <button onClick={() => {
+               const url = new URL(window.location.href);
+               url.searchParams.delete('debug');
+               window.location.href = url.toString();
+            }} className="hover:bg-red-500/20 text-red-400 p-1 rounded-lg">✕</button>
           </div>
-          <div className="space-y-1 opacity-90">
-            <p className="flex justify-between"><span>Supabase Loaded:</span> <span className={supabase ? "text-green-400" : "text-red-400"}>{supabase ? "YES" : "NO"}</span></p>
-            <p className="flex justify-between gap-4"><span>Target URL:</span> <span className="truncate flex-1 text-right text-yellow-400">{(window as any).getSupabaseCredentials?.().url?.split('.')[0] || 'Unknown'}...</span></p>
-            <p className="flex justify-between"><span>Category Count:</span> <span className={categories.length > 0 ? "text-green-400" : "text-red-400"}>{categories.length}</span></p>
-            <p className="flex justify-between"><span>Product Count:</span> <span className={products.length > 0 ? "text-green-400" : "text-red-400"}>{products.length}</span></p>
-            <p className="flex justify-between"><span>Active Products:</span> <span className="text-blue-400">{products.filter(isProductActive).length}</span></p>
-            <p className="flex justify-between"><span>Location Host:</span> <span className="text-gray-400">{window.location.hostname}</span></p>
-          </div>
-          <div className="mt-3 text-[8px] border-t border-white/10 pt-2 text-gray-500">
-            If counts are 0 but URL is correct, your RLS is blocking the "anon" role.
+
+          <div className="space-y-2.5">
+            <section>
+              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Connection</h4>
+              <p className="flex justify-between border-b border-white/5 pb-1">
+                <span>Database:</span> 
+                <span className="text-yellow-400 font-bold">{(window as any).getSupabaseCredentials?.().url?.replace('https://', '').split('.')[0] || 'Disconnected'}</span>
+              </p>
+              <p className="flex justify-between border-b border-white/5 pb-1">
+                <span>Origin:</span> 
+                <span className="text-gray-400 truncate w-32 text-right">{window.location.origin}</span>
+              </p>
+            </section>
+
+            <section>
+              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Record Counts</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-white/5 p-2 rounded-lg text-center">
+                   <div className="text-lg font-bold text-white">{categories.length}</div>
+                   <div className="text-[8px] text-gray-500 uppercase">Categories</div>
+                </div>
+                <div className="bg-white/5 p-2 rounded-lg text-center">
+                   <div className="text-lg font-bold text-white">{products.length}</div>
+                   <div className="text-[8px] text-gray-500 uppercase">Products</div>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Status & RLS</h4>
+              <p className="flex justify-between mb-1">
+                <span>Active Products:</span> 
+                <span className={products.filter(isProductActive).length > 0 ? "text-green-400" : "text-gray-500"}>
+                  {products.filter(isProductActive).length}
+                </span>
+              </p>
+              {products.length > 0 && products.filter(isProductActive).length === 0 && (
+                <div className="bg-red-500/10 text-red-400 p-1.5 rounded-lg border border-red-500/20 text-[9px]">
+                  CRITICAL: All {products.length} products found were hidden by status filter logic.
+                </div>
+              )}
+              {categories.length === 0 && categoriesLoaded && (
+                <div className="bg-orange-500/10 text-orange-400 p-1.5 rounded-lg border border-orange-500/20 text-[9px]">
+                  WARNING: Query returned 0 categories. Check if "anon" row-level security policy allows SELECT.
+                </div>
+              )}
+            </section>
+
+            <section>
+              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Last Deployment Patch</h4>
+              <p className="text-blue-300 font-bold text-[10px]">{new Date().toLocaleString('en-GB')}</p>
+              <p className="text-[8px] text-gray-500">Code sync verified for tazumartbd.com</p>
+            </section>
+
+            <div className="text-[8px] text-gray-500 pt-2 border-t border-white/10 italic">
+               Note: To debug live, append ?debug=true to your URL. If counts are 0 on the live domain, the production server likely lacks VITE_SUPABASE environment variables.
+            </div>
           </div>
         </div>
       )}

@@ -155,15 +155,17 @@ CREATE TABLE IF NOT EXISTS public.categories (
   "sliderSettings" JSONB
 );
 
-ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
-
 DO $$ 
 BEGIN
-    DROP POLICY IF EXISTS "Categories read to all" ON public.categories;
-    DROP POLICY IF EXISTS "Admin write to categories" ON public.categories;
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'categories') THEN
+        ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+        
+        DROP POLICY IF EXISTS "Categories read to all" ON public.categories;
+        DROP POLICY IF EXISTS "Admin write to categories" ON public.categories;
 
-    CREATE POLICY "Categories read to all" ON public.categories FOR SELECT TO public USING (true);
-    CREATE POLICY "Admin write to categories" ON public.categories FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+        CREATE POLICY "Categories read to all" ON public.categories FOR SELECT TO public USING (true);
+        CREATE POLICY "Admin write to categories" ON public.categories FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    END IF;
 END $$;
 
 
@@ -210,15 +212,17 @@ CREATE TABLE IF NOT EXISTS public.products (
   keywords TEXT[] DEFAULT '{}'
 );
 
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-
 DO $$ 
 BEGIN
-    DROP POLICY IF EXISTS "Products read to all" ON public.products;
-    DROP POLICY IF EXISTS "Admin write to products" ON public.products;
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'products') THEN
+        ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+        
+        DROP POLICY IF EXISTS "Products read to all" ON public.products;
+        DROP POLICY IF EXISTS "Admin write to products" ON public.products;
 
-    CREATE POLICY "Products read to all" ON public.products FOR SELECT TO public USING (true);
-    CREATE POLICY "Admin write to products" ON public.products FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+        CREATE POLICY "Products read to all" ON public.products FOR SELECT TO public USING (true);
+        CREATE POLICY "Admin write to products" ON public.products FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    END IF;
 END $$;
 
 
