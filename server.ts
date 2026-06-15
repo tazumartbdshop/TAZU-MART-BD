@@ -619,8 +619,10 @@ Please ask me your query or select a quick question template below!`;
     app.use(express.static(distPath, { index: false }));
     app.get('*', async (req, res) => {
       try {
-        const indexPath = path.join(distPath, 'index.html');
+        const indexPath = path.resolve(distPath, 'index.html');
         let html = await fs.readFile(indexPath, 'utf-8');
+        
+        console.log(`[Production] Origin: ${req.get('host')} | Path: ${req.url}`);
 
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');

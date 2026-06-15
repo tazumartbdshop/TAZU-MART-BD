@@ -108,6 +108,19 @@ export default function Home() {
 
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24">
+      {/* 0. Live Sync Diagnostics (Invisible to general users, useful for debug) */}
+      <div className="hidden">
+        {(() => {
+           console.log("%c[Live Diagnostics] STARTING...", "color: #3b82f6; font-weight: bold;");
+           console.log("- Supabase Loaded:", !!(window as any).__SUPABASE_URL);
+           console.log("- Target URL:", (window as any).__SUPABASE_URL);
+           console.log("- Products Raw Count:", products.length);
+           console.log("- Products Active Count:", products.filter(isProductActive).length);
+           console.log("- Categories Count:", categories.length);
+           return null;
+        })()}
+      </div>
+      
       {/* 3. Dynamic Hero Banner Slider */}
       <motion.section 
         initial={{ opacity: 0 }}

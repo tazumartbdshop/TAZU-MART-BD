@@ -20,6 +20,20 @@ export const getSupabase = (): SupabaseClient | null => {
   let url = (window as any).__SUPABASE_URL || (window as any).__supabase_url;
   let key = (window as any).__SUPABASE_KEY || (window as any).__supabase_key;
   
+  // Persistence Fallback: Check LocalStorage if window variables are missing (Handles Server Restart in Production)
+  if (!url || !key) {
+    const storedUrl = localStorage.getItem('sb_url_backup');
+    const storedKey = localStorage.getItem('sb_key_backup');
+    if (storedUrl && storedKey) {
+      url = storedUrl;
+      key = storedKey;
+      // Re-populate window for other components
+      (window as any).__SUPABASE_URL = url;
+      (window as any).__SUPABASE_KEY = key;
+      console.log("%c[Supabase Lib] Restored credentials from LocalStorage Backup.", "color: #10b981; font-weight: bold;");
+    }
+  }
+
   // Final fallback to build-time env vars
   if (!url || !key) {
     url = envUrl;
@@ -90,15 +104,24 @@ export const supabase = supabaseProxy;
 // Secure helper to load configuration from backend
 export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
   try {
-    // If already have window vars from HTML injection, no need to fetch again
-    if (((window as any).__SUPABASE_URL && (window as any).__SUPABASE_KEY) || 
-        ((window as any).__supabase_url && (window as any).__supabase_key)) {
-      console.log("[Supabase Config] Using credentials already present in window/head.");
+    // Check if injected via server-side script first (Production Sync)
+    if ((window as any).__SUPABASE_URL && (window as any).__SUPABASE_KEY) {
+      console.log("%c[Supabase Config] Using credentials injected into HTML by Live Server.", "color: #a855f7; font-weight: bold;");
       return true;
     }
 
-    // Fetch from /api/supabase-config server endpoint
-    console.log(`%c[Supabase Config] Fetching from /api/supabase-config @ ${new Date().toISOString()}`, "color: #3b82f6; font-weight: bold;");
+    // Polling Mechanism: Wait up to 2 seconds for server-side injection if not immediately present
+    // This handles races between HTML render and JS execution
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if ((window as any).__SUPABASE_URL && (window as any).__SUPABASE_KEY) {
+        console.log(`[Supabase Config] Found credentials after ${attempt * 400}ms poll.`);
+        return true;
+      }
+      await new Promise(r => setTimeout(r, 400));
+    }
+
+    // Last Resort: Direct API fetch from backend
+    console.log(`%c[Supabase Config] FETCHING from server API @ ${new Date().toISOString()}`, "color: #3b82f6; font-weight: bold;");
     
     // Add a timeout to the fetch to prevent hanging in production containers
     const controller = new AbortController();
@@ -124,6 +147,10 @@ export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
           // Also update the __SUPABASE_URL/KEY aliases just in case
           (window as any).__SUPABASE_URL = data.supabaseUrl;
           (window as any).__SUPABASE_KEY = data.supabaseKey;
+
+          // Backup to localStorage
+          localStorage.setItem('sb_url_backup', data.supabaseUrl);
+          localStorage.setItem('sb_key_backup', data.supabaseKey);
           
           console.log(`%c[Supabase Config] SUCCESS: Connected to ${data.supabaseUrl}`, "color: #10b981; font-weight: bold;");
           console.log("[Supabase Config] Root credentials synchronized. Future client calls will target this instance.");
