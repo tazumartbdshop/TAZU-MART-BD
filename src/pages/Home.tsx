@@ -125,7 +125,7 @@ export default function Home() {
               <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Connection</h4>
               <p className="flex justify-between border-b border-white/5 pb-1">
                 <span>Database:</span> 
-                <span className="text-yellow-400 font-bold">{(window as any).getSupabaseCredentials?.().url?.replace('https://', '').split('.')[0] || 'Disconnected'}</span>
+                <span className="text-yellow-400 font-bold text-[13px]">{(window as any).getSupabaseCredentials?.().url?.replace('https://', '').split('.')[0] || 'Disconnected'}</span>
               </p>
               <p className="flex justify-between border-b border-white/5 pb-1">
                 <span>Origin:</span> 
@@ -168,9 +168,19 @@ export default function Home() {
             </section>
 
             <section>
-              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Last Deployment Patch</h4>
-              <p className="text-blue-300 font-bold text-[10px]">{new Date().toLocaleString('en-GB')}</p>
-              <p className="text-[8px] text-gray-500">Code sync verified for tazumartbd.com</p>
+              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Data Parity Check</h4>
+              <p className="flex justify-between border-b border-white/5 pb-1">
+                <span>Categories:</span> 
+                <span className={categories.length > 0 ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{categories.length} items</span>
+              </p>
+              <p className="flex justify-between border-b border-white/5 pb-1">
+                <span>Products:</span> 
+                <span className={products.length > 0 ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{products.length} items</span>
+              </p>
+              <p className="flex justify-between border-b border-white/5 pb-1">
+                <span>Loading:</span> 
+                <span>{productsLoading || categoriesLoading ? '🔄 Syncing...' : '✅ Complete'}</span>
+              </p>
             </section>
 
             <div className="text-[8px] text-gray-500 pt-2 border-t border-white/10 italic">
