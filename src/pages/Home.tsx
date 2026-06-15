@@ -83,10 +83,9 @@ export default function Home() {
 
   const isProductActive = (p: any) => {
     if (!p) return false;
+    // VERY lenient status check for production visibility
     const status = (p.status || '').toString().toLowerCase().trim();
-    // In production, we should be slightly more lenient
-    // Only explicitly hide if it's draft or inactive
-    if (status === 'draft' || status === 'inactive') return false;
+    if (status === 'inactive' || status === 'draft' || status === 'hidden') return false;
     return true;
   };
 
@@ -102,23 +101,53 @@ export default function Home() {
   const bestSellingProducts = products.filter(p => (p.is_best_selling || bestOfferProductIds.includes(p.id)) && isProductActive(p));
   const displayBestSellingList = [...bestSellingProducts, ...bestSellingProducts, ...bestSellingProducts].slice(0, 15);
 
+  const isDebugMode = new URLSearchParams(location.search).get('debug') === 'true';
+
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24">
+      {/* Visual Debug OverLay (Only appears if ?debug=true) */}
+      {isDebugMode && (
+        <div className="fixed bottom-20 left-4 z-[9999] bg-black/90 p-4 rounded-xl border border-white/20 text-white text-[10px] font-mono shadow-2xl max-w-[280px]">
+          <div className="flex justify-between items-center mb-2 border-b border-white/10 pb-1">
+            <span className="font-bold text-blue-400 uppercase tracking-tighter">Live Debug Metrics</span>
+            <button onClick={() => window.location.search = ""} className="bg-white/10 px-1.5 rounded hover:bg-white/20">Hide</button>
+          </div>
+          <div className="space-y-1 opacity-90">
+            <p className="flex justify-between"><span>Supabase Loaded:</span> <span className={supabase ? "text-green-400" : "text-red-400"}>{supabase ? "YES" : "NO"}</span></p>
+            <p className="flex justify-between gap-4"><span>Target URL:</span> <span className="truncate flex-1 text-right text-yellow-400">{(window as any).getSupabaseCredentials?.().url?.split('.')[0] || 'Unknown'}...</span></p>
+            <p className="flex justify-between"><span>Category Count:</span> <span className={categories.length > 0 ? "text-green-400" : "text-red-400"}>{categories.length}</span></p>
+            <p className="flex justify-between"><span>Product Count:</span> <span className={products.length > 0 ? "text-green-400" : "text-red-400"}>{products.length}</span></p>
+            <p className="flex justify-between"><span>Active Products:</span> <span className="text-blue-400">{products.filter(isProductActive).length}</span></p>
+            <p className="flex justify-between"><span>Location Host:</span> <span className="text-gray-400">{window.location.hostname}</span></p>
+          </div>
+          <div className="mt-3 text-[8px] border-t border-white/10 pt-2 text-gray-500">
+            If counts are 0 but URL is correct, your RLS is blocking the "anon" role.
+          </div>
+        </div>
+      )}
+
       {/* 0. Live Sync Diagnostics (Visible to general users, useful for debug) */}
       <div className="hidden">
         {(() => {
-           const { url, key } = (window as any).getSupabaseCredentials?.() || { url: (window as any).__SUPABASE_URL, key: '***' };
-           console.log("%c[Live Diagnostics] STARTING...", "color: #3b82f6; font-weight: bold;");
-           console.log("- Supabase Configured:", !!url);
-           console.log("- Target URL Origin:", url ? new URL(url).origin : 'N/A');
-           console.log("- Products Raw Count:", products.length);
-           console.log("- Products Active Count:", products.filter(isProductActive).length);
-           console.log("- Categories Count:", categories.length);
-           console.log("- Categories Loaded Status:", categoriesLoaded);
-           console.log("- Products Loaded Status:", !productsLoading);
+           const { url } = (window as any).getSupabaseCredentials?.() || { url: (window as any).__SUPABASE_URL };
+           console.log("%c[Live Diagnostics] STARTING...", "color: #3b82f6; font-weight: bold; border: 1px solid #3b82f6; padding: 4px;");
+           console.log("- Supabase Target URL:", url || "NULL (Check Environment Variables)");
+           console.log("- Products Total Count:", products.length);
+           console.log("- Products Visible (Active):", products.filter(isProductActive).length);
+           console.log("- Categories Total Count:", categories.length);
            
-           if (!productsLoading && products.length === 0) {
-             console.error("[Live Diagnostics] CRITICAL: Product array is EMPTY after load completion.");
+           if (products.length > 0) {
+             console.log("[Live Diagnostics] Raw Product Sample (First 3):", products.slice(0, 3).map(p => ({
+               id: p.id,
+               name: p.name,
+               status: p.status,
+               category: p.category
+             })));
+           }
+
+           if (products.length > 0 && products.filter(isProductActive).length === 0) {
+             console.warn("[Live Diagnostics] ALL products are being filtered out by isProductActive() logic.");
+             console.log("[Live Diagnostics] Sample Product Statuses:", products.slice(0, 5).map(p => p.status));
            }
            return null;
         })()}

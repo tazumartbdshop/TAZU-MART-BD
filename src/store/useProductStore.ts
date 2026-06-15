@@ -349,31 +349,45 @@ export const useProductStore = create<ProductState>((set, get) => ({
         return () => {}; // No-op if not configured
     }
     
-    console.log("[Supabase Product Sync] Starting initial fetch from 'products' table...");
+    const { url } = (window as any).getSupabaseCredentials?.() || {};
+    console.log(`[Supabase Product Sync] Querying 'products' from: ${url || 'Injected Key'}`);
     
-    // Initial fetch
-    supabase.from('products').select('*').then(({ data, error }) => {
+    supabase.from('products').select('*').then(({ data, error, status, statusText }) => {
         if (!error && data) {
-            console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products.`, "color: #10b981; font-weight: bold;");
+            console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products. (HTTP ${status})`, "color: #10b981; font-weight: bold;");
             if (data.length === 0) {
-              console.warn("[Supabase Products] Table returned 0 rows. Check RLS policies for 'anon' role.");
+              console.warn("[Supabase Products Sync] Table is empty or RLS is blocking access for 'anon' role. Verify that SELECT permission is granted to public/anon.");
             }
             try {
-              const mapped = data.map(mapDbToProduct);
+              const mapped = data.map((row, index) => {
+                try {
+                  return mapDbToProduct(row);
+                } catch (err) {
+                  console.error(`[Supabase Product Sync] Mapping failed for row index ${index}:`, row, err);
+                  throw err;
+                }
+              });
               set({ products: mapped, isLoading: false });
             } catch (mapErr) {
-              console.error("[Supabase Product Sync] Mapping error:", mapErr);
+              console.error("[Supabase Product Sync] Critical mapping error:", mapErr);
               set({ isLoading: false });
             }
         } else if (error) {
-            console.error("%c[Supabase Product Sync] ERROR during fetch:", "color: #ef4444; font-weight: bold;", error.code, error.message, error.details);
+            console.error("%c[Supabase Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
+              code: error.code,
+              message: error.message,
+              hint: (error as any).hint,
+              details: (error as any).details,
+              httpStatus: status,
+              httpStatusText: statusText
+            });
             set({ isLoading: false });
         } else {
-            console.log("[Supabase Product Sync] No data returned from products table.");
+            console.log("[Supabase Product Sync] No data and no error returned (Unexpected).");
             set({ isLoading: false });
         }
     }, (pErr) => {
-        console.error("[Supabase Product Sync] CRITICAL PROMISE ERROR:", pErr);
+        console.error("[Supabase Product Sync] CONNECTION ERROR:", pErr);
         set({ isLoading: false });
     });
 

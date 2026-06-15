@@ -1,5 +1,5 @@
 -- =====================================================================
--- SUPABASE COMPLETE SHEMA & ROW-LEVEL SECURITY (RLS) POLICIES
+-- SUPABASE COMPLETE SCHEMA & ROW-LEVEL SECURITY (RLS) POLICIES
 -- =====================================================================
 -- Run this entire script in the Supabase SQL Editor to provision all
 -- tables, helper functions, and RLS security configurations.
@@ -19,10 +19,10 @@ BEGIN
   END IF;
 
   -- B. Check if user exists in public.users custom target table
-  -- (Support for 'admin' or 'moderator' roles)
   IF EXISTS (
     SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'users'
   ) THEN
+    -- Use dynamic SQL to avoid compilation error if table doesn't exist yet
     EXECUTE 'SELECT EXISTS (SELECT 1 FROM public.users WHERE id = $1 AND role IN (''admin'', ''moderator''))'
     INTO is_sys_admin
     USING auth.uid()::text;
@@ -69,17 +69,20 @@ CREATE TABLE IF NOT EXISTS public.users (
   password TEXT
 );
 
-ALTER TABLE IF EXISTS public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Allow profile read" ON public.users;
-DROP POLICY IF EXISTS "Allow profile insert" ON public.users;
-DROP POLICY IF EXISTS "Allow profile update" ON public.users;
-DROP POLICY IF EXISTS "Allow profile delete" ON public.users;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Allow profile read" ON public.users;
+    DROP POLICY IF EXISTS "Allow profile insert" ON public.users;
+    DROP POLICY IF EXISTS "Allow profile update" ON public.users;
+    DROP POLICY IF EXISTS "Allow profile delete" ON public.users;
 
-CREATE POLICY "Allow profile read" ON public.users FOR SELECT TO public USING (true);
-CREATE POLICY "Allow profile insert" ON public.users FOR INSERT TO public WITH CHECK (true);
-CREATE POLICY "Allow profile update" ON public.users FOR UPDATE TO public USING (auth.uid()::text = id OR public.is_admin()) WITH CHECK (auth.uid()::text = id OR public.is_admin());
-CREATE POLICY "Allow profile delete" ON public.users FOR DELETE TO public USING (auth.uid()::text = id OR public.is_admin());
+    CREATE POLICY "Allow profile read" ON public.users FOR SELECT TO public USING (true);
+    CREATE POLICY "Allow profile insert" ON public.users FOR INSERT TO public WITH CHECK (true);
+    CREATE POLICY "Allow profile update" ON public.users FOR UPDATE TO public USING (auth.uid()::text = id OR public.is_admin()) WITH CHECK (auth.uid()::text = id OR public.is_admin());
+    CREATE POLICY "Allow profile delete" ON public.users FOR DELETE TO public USING (auth.uid()::text = id OR public.is_admin());
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -113,13 +116,16 @@ CREATE TABLE IF NOT EXISTS public.customers (
   "isDemo" BOOLEAN DEFAULT false
 );
 
-ALTER TABLE IF EXISTS public.customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Customers select to anyone" ON public.customers;
-DROP POLICY IF EXISTS "Customers write to anyone" ON public.customers;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Customers select to anyone" ON public.customers;
+    DROP POLICY IF EXISTS "Customers write to anyone" ON public.customers;
 
-CREATE POLICY "Customers select to anyone" ON public.customers FOR SELECT TO public USING (true);
-CREATE POLICY "Customers write to anyone" ON public.customers FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "Customers select to anyone" ON public.customers FOR SELECT TO public USING (true);
+    CREATE POLICY "Customers write to anyone" ON public.customers FOR ALL TO public USING (true) WITH CHECK (true);
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -149,13 +155,16 @@ CREATE TABLE IF NOT EXISTS public.categories (
   "sliderSettings" JSONB
 );
 
-ALTER TABLE IF EXISTS public.categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Categories read to all" ON public.categories;
-DROP POLICY IF EXISTS "Admin write to categories" ON public.categories;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Categories read to all" ON public.categories;
+    DROP POLICY IF EXISTS "Admin write to categories" ON public.categories;
 
-CREATE POLICY "Categories read to all" ON public.categories FOR SELECT TO public USING (true);
-CREATE POLICY "Admin write to categories" ON public.categories FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Categories read to all" ON public.categories FOR SELECT TO public USING (true);
+    CREATE POLICY "Admin write to categories" ON public.categories FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -201,13 +210,16 @@ CREATE TABLE IF NOT EXISTS public.products (
   keywords TEXT[] DEFAULT '{}'
 );
 
-ALTER TABLE IF EXISTS public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Products read to all" ON public.products;
-DROP POLICY IF EXISTS "Admin write to products" ON public.products;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Products read to all" ON public.products;
+    DROP POLICY IF EXISTS "Admin write to products" ON public.products;
 
-CREATE POLICY "Products read to all" ON public.products FOR SELECT TO public USING (true);
-CREATE POLICY "Admin write to products" ON public.products FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Products read to all" ON public.products FOR SELECT TO public USING (true);
+    CREATE POLICY "Admin write to products" ON public.products FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -251,13 +263,16 @@ CREATE TABLE IF NOT EXISTS public.orders (
   "utmParams" JSONB DEFAULT '{}'::jsonb
 );
 
-ALTER TABLE IF EXISTS public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Orders read to public" ON public.orders;
-DROP POLICY IF EXISTS "Orders write to public" ON public.orders;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Orders read to public" ON public.orders;
+    DROP POLICY IF EXISTS "Orders write to public" ON public.orders;
 
-CREATE POLICY "Orders read to public" ON public.orders FOR SELECT TO public USING (true);
-CREATE POLICY "Orders write to public" ON public.orders FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "Orders read to public" ON public.orders FOR SELECT TO public USING (true);
+    CREATE POLICY "Orders write to public" ON public.orders FOR ALL TO public USING (true) WITH CHECK (true);
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -287,18 +302,21 @@ CREATE TABLE IF NOT EXISTS public.banners_draft (
   "createdAt" BIGINT
 );
 
-ALTER TABLE IF EXISTS public.banners ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.banners_draft ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.banners_draft ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Banners read to all" ON public.banners;
-DROP POLICY IF EXISTS "Admin write to banners" ON public.banners;
-DROP POLICY IF EXISTS "Admin select banners_draft" ON public.banners_draft;
-DROP POLICY IF EXISTS "Admin write banners_draft" ON public.banners_draft;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Banners read to all" ON public.banners;
+    DROP POLICY IF EXISTS "Admin write to banners" ON public.banners;
+    DROP POLICY IF EXISTS "Admin select banners_draft" ON public.banners_draft;
+    DROP POLICY IF EXISTS "Admin write banners_draft" ON public.banners_draft;
 
-CREATE POLICY "Banners read to all" ON public.banners FOR SELECT TO public USING (true);
-CREATE POLICY "Admin write to banners" ON public.banners FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Admin select banners_draft" ON public.banners_draft FOR SELECT TO authenticated USING (public.is_admin());
-CREATE POLICY "Admin write banners_draft" ON public.banners_draft FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Banners read to all" ON public.banners FOR SELECT TO public USING (true);
+    CREATE POLICY "Admin write to banners" ON public.banners FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Admin select banners_draft" ON public.banners_draft FOR SELECT TO authenticated USING (public.is_admin());
+    CREATE POLICY "Admin write banners_draft" ON public.banners_draft FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -314,13 +332,16 @@ CREATE TABLE IF NOT EXISTS public.settings (
   value TEXT
 );
 
-ALTER TABLE IF EXISTS public.settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Settings read to all" ON public.settings;
-DROP POLICY IF EXISTS "Settings write to all" ON public.settings;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Settings read to all" ON public.settings;
+    DROP POLICY IF EXISTS "Settings write to all" ON public.settings;
 
-CREATE POLICY "Settings read to all" ON public.settings FOR SELECT TO public USING (true);
-CREATE POLICY "Settings write to all" ON public.settings FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "Settings read to all" ON public.settings FOR SELECT TO public USING (true);
+    CREATE POLICY "Settings write to all" ON public.settings FOR ALL TO public USING (true) WITH CHECK (true);
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -346,18 +367,21 @@ CREATE TABLE IF NOT EXISTS public.logos (
   "updatedAt" TEXT
 );
 
-ALTER TABLE IF EXISTS public.site_settings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.logos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.logos ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Site settings read to all" ON public.site_settings;
-DROP POLICY IF EXISTS "Admin write to site_settings" ON public.site_settings;
-DROP POLICY IF EXISTS "Logos read to all" ON public.logos;
-DROP POLICY IF EXISTS "Admin write to logos" ON public.logos;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Site settings read to all" ON public.site_settings;
+    DROP POLICY IF EXISTS "Admin write to site_settings" ON public.site_settings;
+    DROP POLICY IF EXISTS "Logos read to all" ON public.logos;
+    DROP POLICY IF EXISTS "Admin write to logos" ON public.logos;
 
-CREATE POLICY "Site settings read to all" ON public.site_settings FOR SELECT TO public USING (true);
-CREATE POLICY "Admin write to site_settings" ON public.site_settings FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Logos read to all" ON public.logos FOR SELECT TO public USING (true);
-CREATE POLICY "Admin write to logos" ON public.logos FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Site settings read to all" ON public.site_settings FOR SELECT TO public USING (true);
+    CREATE POLICY "Admin write to site_settings" ON public.site_settings FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Logos read to all" ON public.logos FOR SELECT TO public USING (true);
+    CREATE POLICY "Admin write to logos" ON public.logos FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -396,18 +420,21 @@ CREATE TABLE IF NOT EXISTS public.link_pages (
   "updatedAt" TEXT
 );
 
-ALTER TABLE IF EXISTS public.site_management ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.link_pages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.site_management ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.link_pages ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Site management read to all" ON public.site_management;
-DROP POLICY IF EXISTS "Admin write to site_management" ON public.site_management;
-DROP POLICY IF EXISTS "Link pages read to all" ON public.link_pages;
-DROP POLICY IF EXISTS "Admin write to link_pages" ON public.link_pages;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Site management read to all" ON public.site_management;
+    DROP POLICY IF EXISTS "Admin write to site_management" ON public.site_management;
+    DROP POLICY IF EXISTS "Link pages read to all" ON public.link_pages;
+    DROP POLICY IF EXISTS "Admin write to link_pages" ON public.link_pages;
 
-CREATE POLICY "Site management read to all" ON public.site_management FOR SELECT TO public USING (true);
-CREATE POLICY "Admin write to site_management" ON public.site_management FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Link pages read to all" ON public.link_pages FOR SELECT TO public USING (true);
-CREATE POLICY "Admin write to link_pages" ON public.link_pages FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Site management read to all" ON public.site_management FOR SELECT TO public USING (true);
+    CREATE POLICY "Admin write to site_management" ON public.site_management FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Link pages read to all" ON public.link_pages FOR SELECT TO public USING (true);
+    CREATE POLICY "Admin write to link_pages" ON public.link_pages FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -438,20 +465,23 @@ CREATE TABLE IF NOT EXISTS public.inquiries (
   "createdAt" TEXT
 );
 
-ALTER TABLE IF EXISTS public.offers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.inquiries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.offers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Offers read to all" ON public.offers;
-DROP POLICY IF EXISTS "Admin write to offers" ON public.offers;
-DROP POLICY IF EXISTS "Anyone can submit inquiry" ON public.inquiries;
-DROP POLICY IF EXISTS "Inquiry read management" ON public.inquiries;
-DROP POLICY IF EXISTS "Admin modify inquiries" ON public.inquiries;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Offers read to all" ON public.offers;
+    DROP POLICY IF EXISTS "Admin write to offers" ON public.offers;
+    DROP POLICY IF EXISTS "Anyone can submit inquiry" ON public.inquiries;
+    DROP POLICY IF EXISTS "Inquiry read management" ON public.inquiries;
+    DROP POLICY IF EXISTS "Admin modify inquiries" ON public.inquiries;
 
-CREATE POLICY "Offers read to all" ON public.offers FOR SELECT TO public USING (true);
-CREATE POLICY "Admin write to offers" ON public.offers FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
-CREATE POLICY "Anyone can submit inquiry" ON public.inquiries FOR INSERT TO public WITH CHECK (true);
-CREATE POLICY "Inquiry read management" ON public.inquiries FOR SELECT TO public USING (public.is_admin() OR email = auth.jwt() ->> 'email');
-CREATE POLICY "Admin modify inquiries" ON public.inquiries FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Offers read to all" ON public.offers FOR SELECT TO public USING (true);
+    CREATE POLICY "Admin write to offers" ON public.offers FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Anyone can submit inquiry" ON public.inquiries FOR INSERT TO public WITH CHECK (true);
+    CREATE POLICY "Inquiry read management" ON public.inquiries FOR SELECT TO public USING (public.is_admin() OR email = auth.jwt() ->> 'email');
+    CREATE POLICY "Admin modify inquiries" ON public.inquiries FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -474,16 +504,19 @@ CREATE TABLE IF NOT EXISTS public.liked_properties (
   "createdAt" TEXT
 );
 
-ALTER TABLE IF EXISTS public.properties ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.liked_properties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.properties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.liked_properties ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Anyone can see properties" ON public.properties;
-DROP POLICY IF EXISTS "Property write access" ON public.properties;
-DROP POLICY IF EXISTS "Liked properties control" ON public.liked_properties;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "Anyone can see properties" ON public.properties;
+    DROP POLICY IF EXISTS "Property write access" ON public.properties;
+    DROP POLICY IF EXISTS "Liked properties control" ON public.liked_properties;
 
-CREATE POLICY "Anyone can see properties" ON public.properties FOR SELECT TO public USING (true);
-CREATE POLICY "Property write access" ON public.properties FOR ALL TO public USING (user_id = auth.uid()::text OR public.is_admin()) WITH CHECK (user_id = auth.uid()::text OR public.is_admin());
-CREATE POLICY "Liked properties control" ON public.liked_properties FOR ALL TO public USING (user_id = auth.uid()::text OR public.is_admin()) WITH CHECK (user_id = auth.uid()::text OR public.is_admin());
+    CREATE POLICY "Anyone can see properties" ON public.properties FOR SELECT TO public USING (true);
+    CREATE POLICY "Property write access" ON public.properties FOR ALL TO public USING (user_id = auth.uid()::text OR public.is_admin()) WITH CHECK (user_id = auth.uid()::text OR public.is_admin());
+    CREATE POLICY "Liked properties control" ON public.liked_properties FOR ALL TO public USING (user_id = auth.uid()::text OR public.is_admin()) WITH CHECK (user_id = auth.uid()::text OR public.is_admin());
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -495,13 +528,16 @@ CREATE TABLE IF NOT EXISTS public.tracking_statuses (
   "order" INT NOT NULL
 );
 
-ALTER TABLE IF EXISTS public.tracking_statuses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tracking_statuses ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "tracking_statuses select to public" ON public.tracking_statuses;
-DROP POLICY IF EXISTS "tracking_statuses write to public" ON public.tracking_statuses;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "tracking_statuses select to public" ON public.tracking_statuses;
+    DROP POLICY IF EXISTS "tracking_statuses write to public" ON public.tracking_statuses;
 
-CREATE POLICY "tracking_statuses select to public" ON public.tracking_statuses FOR SELECT TO public USING (true);
-CREATE POLICY "tracking_statuses write to public" ON public.tracking_statuses FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "tracking_statuses select to public" ON public.tracking_statuses FOR SELECT TO public USING (true);
+    CREATE POLICY "tracking_statuses write to public" ON public.tracking_statuses FOR ALL TO public USING (true) WITH CHECK (true);
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -518,13 +554,16 @@ CREATE TABLE IF NOT EXISTS public.popup_campaigns (
   "createdAt" BIGINT
 );
 
-ALTER TABLE IF EXISTS public.popup_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.popup_campaigns ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "popup_campaigns select to public" ON public.popup_campaigns;
-DROP POLICY IF EXISTS "popup_campaigns write to public" ON public.popup_campaigns;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "popup_campaigns select to public" ON public.popup_campaigns;
+    DROP POLICY IF EXISTS "popup_campaigns write to public" ON public.popup_campaigns;
 
-CREATE POLICY "popup_campaigns select to public" ON public.popup_campaigns FOR SELECT TO public USING (true);
-CREATE POLICY "popup_campaigns write to public" ON public.popup_campaigns FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "popup_campaigns select to public" ON public.popup_campaigns FOR SELECT TO public USING (true);
+    CREATE POLICY "popup_campaigns write to public" ON public.popup_campaigns FOR ALL TO public USING (true) WITH CHECK (true);
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -555,14 +594,17 @@ CREATE TABLE IF NOT EXISTS public.conversation_messages (
   attachments JSONB DEFAULT '[]'::jsonb
 );
 
-ALTER TABLE IF EXISTS public.conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS public.conversation_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_messages ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "conversations access" ON public.conversations;
-DROP POLICY IF EXISTS "messages access" ON public.conversation_messages;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "conversations access" ON public.conversations;
+    DROP POLICY IF EXISTS "messages access" ON public.conversation_messages;
 
-CREATE POLICY "conversations access" ON public.conversations FOR ALL TO public USING (true) WITH CHECK (true);
-CREATE POLICY "messages access" ON public.conversation_messages FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "conversations access" ON public.conversations FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "messages access" ON public.conversation_messages FOR ALL TO public USING (true) WITH CHECK (true);
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -576,13 +618,16 @@ CREATE TABLE IF NOT EXISTS public.broadcasts (
   "createdAt" BIGINT
 );
 
-ALTER TABLE IF EXISTS public.broadcasts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.broadcasts ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "broadcasts select" ON public.broadcasts;
-DROP POLICY IF EXISTS "broadcasts write" ON public.broadcasts;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "broadcasts select" ON public.broadcasts;
+    DROP POLICY IF EXISTS "broadcasts write" ON public.broadcasts;
 
-CREATE POLICY "broadcasts select" ON public.broadcasts FOR SELECT TO public USING (true);
-CREATE POLICY "broadcasts write" ON public.broadcasts FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "broadcasts select" ON public.broadcasts FOR SELECT TO public USING (true);
+    CREATE POLICY "broadcasts write" ON public.broadcasts FOR ALL TO public USING (true) WITH CHECK (true);
+END $$;
 
 
 -- ---------------------------------------------------------------------
@@ -602,13 +647,16 @@ CREATE TABLE IF NOT EXISTS public.promo_codes (
   "createdAt" BIGINT
 );
 
-ALTER TABLE IF EXISTS public.promo_codes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.promo_codes ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "promo_codes select" ON public.promo_codes;
-DROP POLICY IF EXISTS "promo_codes write" ON public.promo_codes;
+DO $$ 
+BEGIN
+    DROP POLICY IF EXISTS "promo_codes select" ON public.promo_codes;
+    DROP POLICY IF EXISTS "promo_codes write" ON public.promo_codes;
 
-CREATE POLICY "promo_codes select" ON public.promo_codes FOR SELECT TO public USING (true);
-CREATE POLICY "promo_codes write" ON public.promo_codes FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "promo_codes select" ON public.promo_codes FOR SELECT TO public USING (true);
+    CREATE POLICY "promo_codes write" ON public.promo_codes FOR ALL TO public USING (true) WITH CHECK (true);
+END $$;
 
 -- =====================================================================
 -- Complete Master Setup script compiled successfully!

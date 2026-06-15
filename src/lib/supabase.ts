@@ -29,6 +29,7 @@ export const getSupabaseCredentials = () => {
 
   // Absolute fallback for production (gaqyfj)
   if (!url || !key) {
+    console.warn("%c[Supabase Config] WARNING: No configuration found in Environment OR Server Injection. Using hardcoded production fallback (gaqyfj).", "color: #f59e0b; font-weight: bold;");
     url = "https://gaqyfjztpxvzijouiwwh.supabase.co";
     key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhcXlmanp0cHh2emlqb3Vpd3doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTgzMzk3NjgsImV4cCI6MjAzMzkxNTc2OH0.C8R-JPV56712gCVSERVfYfvw_EMofJPVU";
   }

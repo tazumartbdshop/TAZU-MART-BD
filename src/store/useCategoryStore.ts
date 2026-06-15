@@ -177,26 +177,46 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       };
     };
 
-    console.log("[Supabase Categories Fetch] Querying from 'categories' table...");
-    // Initial fetch
+    const { url } = (window as any).getSupabaseCredentials?.() || {};
+    console.log(`%c[Supabase Categories Fetch] Querying 'categories' from: ${url || 'Current Instance'}`, "color: #3b82f6;");
+    
     supabase.from('categories').select('*')
-      .then(({ data, error }) => {
+      .then(({ data, error, status, statusText }) => {
         if (error) {
-            console.error("%c[Supabase Categories ERROR]:", "color: #ef4444; font-weight: bold;", error.code, error.message, error.details);
+            console.error("%c[Supabase Categories FETCH ERROR]:", "color: #ef4444; font-weight: bold;", {
+              code: error.code,
+              message: error.message,
+              hint: (error as any).hint,
+              details: (error as any).details,
+              httpStatus: status,
+              httpStatusText: statusText
+            });
             set({ isLoaded: true });
         } else if (data) {
-            console.log(`%c[Supabase Categories SUCCESS] Count: ${data.length}`, "color: #10b981; font-weight: bold;");
+            console.log(`%c[Supabase Categories SUCCESS] Rows: ${data.length} (HTTP ${status})`, "color: #10b981; font-weight: bold;");
             if (data.length === 0) {
-              console.warn("[Supabase Categories] Table returned 0 rows. This often means RLS is blocking read for 'anon' role.");
+              console.warn("[Supabase Categories] Table is EMPTY. If you have data, this is almost certainly an RLS 'anon' role read-denied issue.");
             }
-            const mappedData = data.map(mapDbToCategory).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
-            set({ categories: mappedData, isLoaded: true });
+            try {
+              const mappedData = data.map((row, idx) => {
+                try {
+                  return mapDbToCategory(row);
+                } catch (e) {
+                   console.error(`[Supabase Categories] Mapping failed at index ${idx}:`, row, e);
+                   throw e;
+                }
+              }).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
+              set({ categories: mappedData, isLoaded: true });
+            } catch (err) {
+              console.error("[Supabase Categories] Critical processing error:", err);
+              set({ isLoaded: true });
+            }
         } else {
-            console.log("[Supabase Categories Fetch] No data returned.");
+            console.log("[Supabase Categories Fetch] No data or error returned (Unexpected).");
             set({ isLoaded: true });
         }
     }, (err) => {
-        console.error("[Supabase Categories Fetch CRITICAL ERROR]:", err);
+        console.error("[Supabase Categories Fetch CONNECTION ERROR]:", err);
         set({ isLoaded: true });
     });
     
