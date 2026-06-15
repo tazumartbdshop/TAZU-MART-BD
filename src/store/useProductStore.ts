@@ -349,16 +349,18 @@ export const useProductStore = create<ProductState>((set, get) => ({
         return () => {}; // No-op if not configured
     }
     
-    console.log("[Supabase Log] Initializing real-time subscription for collection 'products'");
+    console.log("[Supabase Product Sync] Starting initial fetch from 'products' table...");
     
     // Initial fetch
     supabase.from('products').select('*').then(({ data, error }) => {
         if (!error && data) {
+            console.log(`[Supabase Product Sync] SUCCESS: Fetched ${data.length} products.`);
             set({ products: data.map(mapDbToProduct), isLoading: false });
-        } else if (error && error.code !== '42P01') {
-            console.error("Failed to fetch products:", error);
+        } else if (error) {
+            console.error("[Supabase Product Sync] ERROR during initial fetch:", error);
             set({ isLoading: false });
         } else {
+            console.log("[Supabase Product Sync] No data returned from products table.");
             set({ isLoading: false });
         }
     });

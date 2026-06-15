@@ -661,12 +661,16 @@ Please ask me your query or select a quick question template below!`;
 
         const configScript = `
           <script>
+            console.log("%c[Runtime Config] Injecting Cloud environment variables...", "color: #9333ea; font-weight: bold;");
             window.__FIREBASE_CONFIG__ = ${JSON.stringify(runtimeConfig)};
             ${sbConfig.supabaseUrl ? `window.__SUPABASE_URL = ${JSON.stringify(sbConfig.supabaseUrl)};` : ''}
             ${sbConfig.supabaseKey ? `window.__SUPABASE_KEY = ${JSON.stringify(sbConfig.supabaseKey)};` : ''}
             if (window.__SUPABASE_URL) {
               window.__supabase_url = window.__SUPABASE_URL;
               window.__supabase_key = window.__SUPABASE_KEY;
+              console.log("%c[Runtime Config] Supabase Target:", "color: #0ea5e9; font-weight: bold;", window.__SUPABASE_URL);
+            } else {
+              console.warn("%c[Runtime Config] WARNING: No Supabase URL injected by server.", "color: #ef4444; font-weight: bold;");
             }
           </script>`;
         // Inject runtime variables synchronously before main bundle imports run

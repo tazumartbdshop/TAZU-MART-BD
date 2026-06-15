@@ -21,7 +21,17 @@ export default function Search() {
   
   // Clean products list to process
   const activeProducts = useMemo(() => {
-    return products.filter(p => p.status === 'active' || !p.status);
+    return products.filter(p => {
+      if (!p) return false;
+      const status = (p.status || '').toString().toLowerCase().trim();
+      return status === 'active' || 
+             status === 'published' || 
+             status === 'true' || 
+             status === '' || 
+             status === 'null' ||
+             status === 'undefined' ||
+             !p.status;
+    });
   }, [products]);
 
   const filteredProducts = useMemo(() => {
@@ -37,7 +47,8 @@ export default function Search() {
     const queryWords = rewrittenQuery.split(/\s+/).filter(w => w.length > 0);
 
     return categories.filter(c => {
-      if (c.status !== 'Active') return false;
+      const status = String(c.status || 'active').toLowerCase();
+      if (status === 'inactive') return false;
       const catName = c.name.toLowerCase();
       
       // Exact or direct match

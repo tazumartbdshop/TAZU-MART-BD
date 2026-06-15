@@ -17,23 +17,6 @@ export function CategorySection() {
   
   console.log("[CategorySection Debug] Total categories in store:", categories.length, "Items:", categories);
   const activeCategories = [...categories]
-    .filter(c => {
-      const statusStr = String(c.status || 'active').trim().toLowerCase();
-      const isActive = statusStr !== 'inactive';
-      
-      const isVisible = (c as any).is_visible !== false && (c as any).isVisible !== false;
-      const isPublished = (c as any).published !== false;
-      
-      const keep = isActive && isVisible && isPublished;
-      if (!keep) {
-        console.log(`[CategorySection Debug] Filtering out category: "${c.name}" (ID: ${c.id}) because:`, {
-          isActive,
-          isVisible,
-          isPublished
-        });
-      }
-      return keep;
-    })
     .sort((a, b) => (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0));
   console.log("[CategorySection Debug] Rendered on homepage section after filters:", activeCategories.length, "Items:", activeCategories);
 

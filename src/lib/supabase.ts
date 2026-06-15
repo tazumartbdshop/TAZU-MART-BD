@@ -98,12 +98,25 @@ export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
     }
 
     // Fetch from /api/supabase-config server endpoint
-    console.log("[Supabase Config] Fetching from /api/supabase-config (cache: no-store)...");
-    const res = await fetch('/api/supabase-config', { cache: 'no-store' });
+    console.log(`%c[Supabase Config] Fetching from /api/supabase-config @ ${new Date().toISOString()}`, "color: #3b82f6; font-weight: bold;");
+    
+    // Add a timeout to the fetch to prevent hanging in production containers
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const res = await fetch('/api/supabase-config', { 
+      cache: 'no-store',
+      signal: controller.signal 
+    });
+    
+    clearTimeout(timeoutId);
+
     if (res.ok) {
       const contentType = res.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const data = await res.json();
+        console.log("[Supabase Config] Received JSON response from server:", data);
+        
         if (data.supabaseUrl && data.supabaseKey) {
           (window as any).__supabase_url = data.supabaseUrl;
           (window as any).__supabase_key = data.supabaseKey;
@@ -112,16 +125,18 @@ export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
           (window as any).__SUPABASE_URL = data.supabaseUrl;
           (window as any).__SUPABASE_KEY = data.supabaseKey;
           
-          console.log("[Supabase Config] Successfully obtained credentials from server API.");
+          console.log(`%c[Supabase Config] SUCCESS: Connected to ${data.supabaseUrl}`, "color: #10b981; font-weight: bold;");
+          console.log("[Supabase Config] Root credentials synchronized. Future client calls will target this instance.");
           return true;
         } else {
-          console.warn("[Supabase Config] Server API returned empty credentials. Falling back to build defaults.");
+          console.warn("[Supabase Config] WARNING: Server returned status OK but with empty/null credentials.", data);
         }
       } else {
-        console.log("[Supabase Config] API response content type is not JSON (possibly static host fallback). Bypassing server lookup.");
+        const text = await res.text();
+        console.log("[Supabase Config] API response was not JSON. Recieved text preview:", text.substring(0, 100));
       }
     } else {
-      console.warn("[Supabase Config] Server API fetch failed with status:", res.status);
+      console.warn(`%c[Supabase Config] ERROR: Server API returned ${res.status} ${res.statusText}`, "color: #ef4444; font-weight: bold;");
     }
   } catch (err) {
     console.error("[Supabase Config] Network error while fetching config:", err);

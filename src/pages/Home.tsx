@@ -62,31 +62,12 @@ export default function Home() {
 
   console.log("[Home Page Categories Debug] Total categories in store:", categories.length, "Items:", categories);
   const sortedCategories = [...categories]
-    .filter(c => {
-      const statusStr = String(c.status || 'active').trim().toLowerCase();
-      const isActive = statusStr !== 'inactive';
-      
-      const showOnHome = c.showOnHomepage !== false && (c as any).show_on_homepage !== false;
-      const isVisible = (c as any).is_visible !== false && (c as any).isVisible !== false;
-      const isPublished = (c as any).published !== false;
-      
-      const keep = isActive && showOnHome && isVisible && isPublished;
-      if (!keep) {
-        console.log(`[Home Page Categories Debug] Filtering out category: "${c.name}" (ID: ${c.id}) because:`, {
-          isActive,
-          showOnHome,
-          isVisible,
-          isPublished
-        });
-      }
-      return keep;
-    })
     .sort((a, b) => {
-      const orderA = a.displayOrder !== undefined && a.displayOrder !== null && a.displayOrder !== 0 ? Number(a.displayOrder) : Infinity;
-      const orderB = b.displayOrder !== undefined && b.displayOrder !== null && b.displayOrder !== 0 ? Number(b.displayOrder) : Infinity;
+      const orderA = a.displayOrder !== undefined && a.displayOrder !== null && Number(a.displayOrder) !== 0 ? Number(a.displayOrder) : Infinity;
+      const orderB = b.displayOrder !== undefined && b.displayOrder !== null && Number(b.displayOrder) !== 0 ? Number(b.displayOrder) : Infinity;
       return orderA - orderB;
     });
-  console.log("[Home Page Categories Debug] Rendered on homepage after filters:", sortedCategories.length, "Items:", sortedCategories);
+  console.log("[Home Page Categories Debug] Rendered on homepage after sorting:", sortedCategories.length, "Items:", sortedCategories);
 
   const { offers } = useOfferStore();
   const activeOffers = offers.filter(o => String(o.status || 'Active').toLowerCase() === 'active');
@@ -100,9 +81,27 @@ export default function Home() {
   const activeBestOffers = activeOffers.filter(o => o.homepageVisibility && (o.type === 'Best Selling' || o.showAsBestSelling));
   const bestOfferProductIds = activeBestOffers.flatMap(o => [...(o.productIds || []), ...(o.manualProductIds || [])]);
 
-  const isProductActive = (p: any) => String(p.status || 'active').toLowerCase() === 'active';
+  const isProductActive = (p: any) => {
+    if (!p) return false;
+    const status = (p.status || '').toString().toLowerCase().trim();
+    // Inclusive check for all possible active-like statuses
+    return status === 'active' || 
+           status === 'published' || 
+           status === 'true' || 
+           status === '' || 
+           status === 'null' ||
+           status === 'undefined' ||
+           !p.status;
+  };
+
+  console.log("[Home Feed Debug] Products Loading:", productsLoading, "Total State Products:", products.length);
+  if (!productsLoading && products.length === 0) {
+    console.warn("[Home Feed Debug] WARNING: No products returned from Supabase. Check your tables and RLS policies.");
+  }
 
   const flashSaleProducts = products.filter(p => (p.is_flash_sale || flashOfferProductIds.includes(p.id)) && isProductActive(p));
+  console.log("[Home Feed Debug] Flash Sale Products matched:", flashSaleProducts.length);
+  
   const trendingProducts = products.filter(p => (p.is_trending || trendingOfferProductIds.includes(p.id)) && isProductActive(p));
   const bestSellingProducts = products.filter(p => (p.is_best_selling || bestOfferProductIds.includes(p.id)) && isProductActive(p));
   const displayBestSellingList = [...bestSellingProducts, ...bestSellingProducts, ...bestSellingProducts].slice(0, 15);
@@ -257,11 +256,15 @@ export default function Home() {
       {/* 8. Dynamic Category Sections */}
       {sortedCategories.map(cat => {
         const catProducts = products.filter(p => {
+          if (!isProductActive(p)) return false;
+          
           const pCat = String(p.category || '').trim().toLowerCase();
           const cId = String(cat.id || '').trim().toLowerCase();
           const cName = String(cat.name || '').trim().toLowerCase();
           const cSlug = String(cat.slug || '').trim().toLowerCase();
-          return pCat === cId || pCat === cName || pCat === cSlug;
+          
+          // Match by ID, Name or Slug
+          return pCat === cId || pCat === cName || pCat === cSlug || cId.includes(pCat) || pCat.includes(cId);
         }).slice(0, 6);
         if (catProducts.length === 0) return null;
         
@@ -294,6 +297,37 @@ export default function Home() {
           </section>
         );
       })}
+      {/* 9. FALLBACK: All Other Products Section (Ensures no product is hidden) */}
+      {(() => {
+        const featuredIds = new Set([
+          ...flashSaleProducts.map(p => p.id),
+          ...trendingProducts.map(p => p.id),
+          ...bestSellingProducts.map(p => p.id)
+        ]);
+        
+        const otherProducts = products.filter(p => isProductActive(p) && !featuredIds.has(p.id));
+        
+        if (otherProducts.length === 0) return null;
+        
+        return (
+          <section className="py-12 bg-white">
+            <div className="container mx-auto px-4">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 uppercase tracking-wider">Our Collection</h2>
+                  <p className="text-gray-500 text-xs mt-1 uppercase font-mono tracking-widest">Handpicked items for you</p>
+                </div>
+                <Link to="/shop" className="text-xs font-bold uppercase tracking-widest hover:underline">Explore All Products</Link>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                {otherProducts.slice(0, 18).map(prod => (
+                  <CompactProductCard key={`other-prod-${prod.id}`} product={prod} />
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+      })()}
     </div>
   );
 }

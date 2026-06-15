@@ -2048,6 +2048,16 @@ export default function AdminInfrastructure() {
                         </div>
                         
                         <div className="space-y-3 font-sans">
+                          {/* Supabase Connected */}
+                          <div className="flex items-center justify-between bg-neutral-50 px-3 py-2.5 border border-neutral-100 rounded-lg">
+                            <span className="text-xs font-black text-neutral-700">Supabase Connected</span>
+                            {(window as any).__SUPABASE_URL ? (
+                              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">✅ Active</span>
+                            ) : (
+                              <span className="text-red-500 font-bold text-xs flex items-center gap-1 animate-pulse">❌ Missing</span>
+                            )}
+                          </div>
+
                           {/* Firebase Connected */}
                           <div className="flex items-center justify-between bg-neutral-50 px-3 py-2.5 border border-neutral-100 rounded-lg">
                             <span className="text-xs font-black text-neutral-700">Firebase Connected</span>
@@ -2141,6 +2151,7 @@ export default function AdminInfrastructure() {
                             <h5 className="font-extrabold uppercase text-[10px] text-neutral-400 tracking-widest">Client Environment Context</h5>
                             
                             <div className="space-y-1.5 font-mono text-[10px] text-neutral-700">
+                              <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Supabase URL:</span> {(window as any).__SUPABASE_URL || 'N/A'}</div>
                               <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Project ID:</span> {firebaseConfig.projectId || 'N/A'}</div>
                               <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">App ID:</span> {firebaseConfig.appId || 'N/A'}</div>
                               <div><span className="font-sans font-black text-neutral-500 uppercase text-[9px] mr-1">Auth Domain:</span> {firebaseConfig.authDomain || 'N/A'}</div>

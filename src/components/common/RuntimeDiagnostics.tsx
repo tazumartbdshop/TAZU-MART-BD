@@ -21,12 +21,16 @@ export function RuntimeDiagnostics() {
   useEffect(() => {
     if (!isDebugActive) return;
 
+    let active = true;
+
     const testSupabaseConnection = async () => {
       const client = getSupabase();
       if (!client) {
-        setSupabaseStatus('disconnected');
-        setSupabaseUrlUsed('None (Client empty)');
-        setActiveSource('No credentials found in window/env');
+        if (active) {
+          setSupabaseStatus('disconnected');
+          setSupabaseUrlUsed('None (Client empty)');
+          setActiveSource('No credentials found in window/env');
+        }
         return;
       }
 
@@ -34,33 +38,72 @@ export function RuntimeDiagnostics() {
       const winUrl = (window as any).__SUPABASE_URL || (window as any).__supabase_url;
       const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
       
+      const configSnapshot = {
+        windowUrl: (window as any).__SUPABASE_URL || 'missing',
+        windowKey: (window as any).__SUPABASE_KEY ? 'present' : 'missing',
+        lowerUrl: (window as any).__supabase_url || 'missing',
+        lowerKey: (window as any).__supabase_key ? 'present' : 'missing',
+        envUrl: import.meta.env.VITE_SUPABASE_URL || 'missing',
+        envKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'present' : 'missing'
+      };
+
       if (winUrl) {
-        setSupabaseUrlUsed(winUrl);
-        setActiveSource('Dynamic (Injected / fetched from API)');
+        if (active) {
+          setSupabaseUrlUsed(winUrl);
+          setActiveSource('Dynamic (Injected / fetched from API)');
+        }
       } else if (envUrl) {
-        setSupabaseUrlUsed(envUrl);
-        setActiveSource('Build-time (Vite .env compilation)');
+        if (active) {
+          setSupabaseUrlUsed(envUrl);
+          setActiveSource('Build-time (Vite .env compilation)');
+        }
       } else {
-        setSupabaseUrlUsed('Unknown');
-        setActiveSource('Fallback');
+        if (active) {
+          setSupabaseUrlUsed('Unknown');
+          setActiveSource('Fallback');
+        }
       }
 
+      console.group("[Runtime Diagnostics] Supabase Configuration Audit");
+      console.table(configSnapshot);
+      console.groupEnd();
+
       try {
-        const { data, error } = await client.from('categories').select('id').limit(1);
+        const startTime = performance.now();
+        const { data, error, status, statusText } = await client.from('categories').select('*').limit(50);
+        const endTime = performance.now();
+
+        console.log(`%c[Supabase API Snapshot] Response Status: ${status} ${statusText} in ${(endTime - startTime).toFixed(2)}ms`, "background: #111; color: #10b981; padding: 4px; font-weight: bold;");
+        
+        if (!active) return;
+
         if (error) {
-          console.error("[Debug Diagnostics] categories fetch tested negative:", error);
+          console.error("[Supabase API Snapshot] Fetch Error:", error);
           setSupabaseStatus('error');
         } else {
+          console.log("[Supabase API Snapshot] Data Payload:", data);
           setSupabaseStatus('connected');
         }
       } catch (err) {
-        console.error("[Debug Diagnostics] connection test failure:", err);
-        setSupabaseStatus('error');
+        console.error("[Runtime Diagnostics] Fatal connection test failure:", err);
+        if (active) setSupabaseStatus('error');
       }
     };
 
     testSupabaseConnection();
-  }, [isDebugActive, categories]);
+
+    // Small polling safeguard for late initialization
+    const intervalId = setInterval(() => {
+      if (getSupabase() && supabaseStatus === 'disconnected') {
+        testSupabaseConnection();
+      }
+    }, 1500);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [isDebugActive, categories, categoriesLoaded]);
 
   if (!isDebugActive) return null;
 
@@ -95,6 +138,29 @@ export function RuntimeDiagnostics() {
 
   return (
     <div className="fixed bottom-6 right-6 z-[99999] font-mono leading-relaxed" id="runtime-diagnostics-container">
+      {/* Setup Required Announcement for Live Domain */}
+      {supabaseStatus === 'disconnected' && !isOpen && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 w-full max-w-lg animate-in fade-in slide-in-from-top-4 duration-700 px-4">
+          <div className="bg-red-600 text-white rounded-xl shadow-2xl p-4 border-2 border-white/20 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-white animate-pulse" />
+              <span className="font-sans font-black text-sm uppercase tracking-tighter italic">Supabase Connection Required</span>
+            </div>
+            <p className="text-white/90 text-[11px] font-sans font-medium">
+              The live website is currently disconnected from your database. Categories and Products won't show up until you add your credentials to the project environment.
+            </p>
+            <div className="flex gap-2 mt-1">
+              <button 
+                onClick={() => setIsOpen(true)}
+                className="bg-white text-red-600 px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-wider hover:bg-neutral-100 transition-colors shadow-sm"
+              >
+                Show Steps
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mini floating toggle badge */}
       {!isOpen && (
         <button
