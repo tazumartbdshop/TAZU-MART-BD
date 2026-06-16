@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { 
   ArrowLeft, Share2, Heart, Star, Minus, Plus, 
@@ -20,6 +20,225 @@ import ProductReviews from '../components/product/ProductReviews';
 import BannerSlider from '../components/common/BannerSlider';
 import { pixelService } from '../utils/pixelService';
 
+const ALL_FALLBACK_PRODUCTS = [
+  {
+    id: 'f-1',
+    name: 'Luxury Skeleton Automatic Dark Watch',
+    sku: 'ACC-W091-BD1',
+    category: 'Watches',
+    price: 8500,
+    discountPrice: 6500,
+    stock: 12,
+    image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600',
+    featured_image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600',
+    images: [
+      'https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600',
+      'https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=600',
+      'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=600'
+    ],
+    rating: 4.9,
+    reviews: 380,
+    isNew: true,
+    brand: 'Tazu Executive',
+    status: 'active',
+    description: 'Designed for the bold, this Skeleton automatic winding timepiece showcases a sophisticated mechanical watch face inside a premium stealth-coated casing. Finished with a breathable genuine leather wrap.',
+    createdAt: Date.now(),
+    soldCount: 380,
+    reward_coins: 250,
+    coin_enabled: true,
+    seoPoints: ['Automatic Winding Mechanism', 'Stealth-Coated Premium Casing', 'Genuine Leather Wrap/Strap']
+  },
+  {
+    id: 'f-2',
+    name: 'Vintage Full-Grain Finished Leather Wallet',
+    sku: 'ACC-W091-BD2',
+    category: 'Wallets',
+    price: 3400,
+    discountPrice: 2450,
+    stock: 24,
+    image: 'https://images.unsplash.com/photo-1627124118303-19d4f0735f5e?q=80&w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1627124118303-19d4f0735f5e?q=80&w=600',
+    featured_image: 'https://images.unsplash.com/photo-1627124118303-19d4f0735f5e?q=80&w=600',
+    images: [
+      'https://images.unsplash.com/photo-1627124118303-19d4f0735f5e?q=80&w=600',
+      'https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=600'
+    ],
+    rating: 4.8,
+    reviews: 220,
+    isNew: true,
+    brand: 'Calf & Tannery',
+    status: 'active',
+    description: 'Handcrafted using selected full-grain vegetable-tanned bovine hide, this wallet matures beautifully with an exquisite patina. Organized layout with multiple cash channels and quick-access cards slot.',
+    createdAt: Date.now(),
+    soldCount: 220,
+    reward_coins: 150,
+    coin_enabled: true,
+    seoPoints: ['100% Vegetable-Tanned Genuine Leather', 'Extremely durable handcrafted stitch', 'Intelligent multi-pocket card layout']
+  },
+  {
+    id: 'f-3',
+    name: 'Classic Silver Chronometer Executive',
+    sku: 'ACC-W091-BD3',
+    category: 'Watches',
+    price: 12000,
+    discountPrice: 9800,
+    stock: 8,
+    image: 'https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=600',
+    featured_image: 'https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=600',
+    images: [
+      'https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=600',
+      'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=600'
+    ],
+    rating: 5.0,
+    reviews: 150,
+    isNew: false,
+    brand: 'Tazu Chrono',
+    status: 'active',
+    description: 'Classic brushed silver styling featuring premium Japanese-engineered multi-function chronograph movement. High structural resistance sapphire crystal glass ensures absolute dust and water sealing.',
+    createdAt: Date.now(),
+    soldCount: 150,
+    reward_coins: 300,
+    coin_enabled: true,
+    seoPoints: ['Japanese-Engineered Chronograph Move', 'Heavy Brushed Silver Casing', 'Sapphire Glass Resistance']
+  },
+  {
+    id: 'f-4',
+    name: 'Gold Dial Luxury Royal Heritage mechanical',
+    sku: 'ACC-W091-BD4',
+    category: 'Watches',
+    price: 15500,
+    discountPrice: 13500,
+    stock: 5,
+    image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=600',
+    featured_image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=600',
+    images: [
+      'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=600',
+      'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=600'
+    ],
+    rating: 4.9,
+    reviews: 95,
+    isNew: true,
+    brand: 'Royal Heritage',
+    status: 'active',
+    description: 'Immersive premium legacy mechanical hand-winding timepiece showcasing an intricate golden dial with complex Roman numerals. A genuine hallmark of classical executive lineage.',
+    createdAt: Date.now(),
+    soldCount: 95,
+    reward_coins: 400,
+    coin_enabled: true,
+    seoPoints: ['Gold Woven Intricate Dial', 'Classic Roman Numerals Design', 'Classy Mech Hand-winding caliber']
+  },
+  {
+    id: 'fn-1',
+    name: 'Handcrafted Stitch Minimalist Cardholder',
+    sku: 'ACC-W091-BD5',
+    category: 'Wallets',
+    price: 1800,
+    discountPrice: 1200,
+    stock: 45,
+    image: 'https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=600',
+    featured_image: 'https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=600',
+    images: [
+      'https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=600',
+      'https://images.unsplash.com/photo-1627124118303-19d4f0735f5e?q=80&w=600'
+    ],
+    rating: 4.7,
+    reviews: 110,
+    isNew: true,
+    brand: 'Calf & Tannery',
+    status: 'active',
+    description: 'Constructed from premium full-grain leather offcuts, hand-stitched with durable waxed thread. Holds up to 6 cards securely inside a super slim pocket outline.',
+    createdAt: Date.now(),
+    soldCount: 110,
+    reward_coins: 100,
+    coin_enabled: true,
+    seoPoints: ['Waxed-Thread Handstitching', 'Supports up to 6 credit cards', 'Super slim pocket fitment profile']
+  },
+  {
+    id: 'fn-2',
+    name: 'Presidential Gold Mesh Strap Limited Edition',
+    sku: 'ACC-W091-BD6',
+    category: 'Watches',
+    price: 17500,
+    discountPrice: 14900,
+    stock: 6,
+    image: 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=600',
+    featured_image: 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=600',
+    images: [
+      'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=600',
+      'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=600'
+    ],
+    rating: 4.9,
+    reviews: 65,
+    isNew: true,
+    brand: 'Tazu Executive',
+    status: 'active',
+    description: 'Uncompromising presidential edition watch showcasing a delicate gold-woven mesh bracelet with minimalist dark face. Complements elegant evening attire with sublime grace.',
+    createdAt: Date.now(),
+    soldCount: 65,
+    reward_coins: 500,
+    coin_enabled: true,
+    seoPoints: ['Luxurious Golden Mesh Weave Bracelet', 'Minimalist Dial Presentation', 'Water-Resistant up to 3 atm']
+  },
+  {
+    id: 'fn-3',
+    name: 'Tazu Executive Gift Dual Pen & Watch Set',
+    sku: 'ACC-W091-BD7',
+    category: 'Gift Set',
+    price: 9500,
+    discountPrice: 7200,
+    stock: 15,
+    image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=600',
+    featured_image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=600',
+    images: [
+      'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=600'
+    ],
+    rating: 5.0,
+    reviews: 45,
+    isNew: true,
+    brand: 'Tazu Executive',
+    status: 'active',
+    description: 'Curated premium set including an executive rollerball ink pen paired beautifully with a matching modern quartz timepiece. Presented inside an expensive velvet presentation box.',
+    createdAt: Date.now(),
+    soldCount: 45,
+    reward_coins: 200,
+    coin_enabled: true,
+    seoPoints: ['Gold Accented Executive Fine Roller Pen', 'Premium matching quartz movement', 'Elegant Premium Velvet Case packaging']
+  },
+  {
+    id: 'fn-4',
+    name: 'Tactical Matte Black Stealth Chrono',
+    sku: 'ACC-W091-BD8',
+    category: 'Watches',
+    price: 5500,
+    discountPrice: 4200,
+    stock: 18,
+    image: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=600',
+    imageUrl: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=600',
+    featured_image: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=600',
+    images: [
+      'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=600',
+      'https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=600'
+    ],
+    rating: 4.6,
+    reviews: 140,
+    isNew: false,
+    brand: 'Stealth Gear',
+    status: 'active',
+    description: 'Military-grade rugged shockproof casing enclosing an active multi-dial high-precision split-second chronograph. Perfect companion for adventurous outdoors.',
+    createdAt: Date.now(),
+    soldCount: 140,
+    reward_coins: 180,
+    coin_enabled: true,
+    seoPoints: ['Military-Grade Casing Construction', 'Advanced Multi-dial split-second layout', 'Rugged Waterproof Tactility']
+  }
+];
+
 export default function Product() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -28,7 +247,9 @@ export default function Product() {
   const { offers } = useOfferStore();
   const { addViewedProduct } = useRecentlyViewedStore();
 
-  const product = useMemo(() => products.find(p => p.id === id), [products, id]);
+  const product = useMemo(() => {
+    return products.find(p => p.id === id) || ALL_FALLBACK_PRODUCTS.find(p => p.id === id);
+  }, [products, id]);
   
   const bannerUrls = useMemo(() => {
     if (!product || !product.banner_image) return [];
