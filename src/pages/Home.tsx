@@ -1,540 +1,521 @@
-import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, ChevronRight, Star, Heart, Eye, ShoppingCart, Zap, TrendingUp, Award, Clock, Menu, Image as ImageIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useCartStore } from '../store/useCartStore';
-import { useCategoryStore } from '../store/useCategoryStore';
 import { useProductStore } from '../store/useProductStore';
-import { useOfferStore } from '../store/useOfferStore';
-import { formatPrice } from '../lib/utils';
-import { CompactProductCard } from '../components/product/CompactProductCard';
-import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
-import { AutoScrollCarousel } from '../components/ui/AutoScrollCarousel';
-import { motion } from 'motion/react';
+import { useCategoryStore } from '../store/useCategoryStore';
 import { useBannerStore } from '../store/useBannerStore';
-import MainHeroCarousel from '../components/home/MainHeroCarousel';
-import { useEffect, useState } from 'react';
+import { formatPrice } from '../lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
-import FlashSaleSection from '../components/home/FlashSaleSection';
-import TrendingSection from '../components/home/TrendingSection';
-import BestSellingSection from '../components/home/BestSellingSection';
+import { Star, ShoppingBag, ArrowRight } from 'lucide-react';
 
-import FlashSaleTimer from '../components/home/FlashSaleTimer';
-import { CategorySkeleton } from '../components/common/Skeleton';
+const isProductActive = (p: any) => {
+  if (!p) return false;
+  const status = (p.status || '').toString().toLowerCase().trim();
+  if (status === 'inactive' || status === 'draft' || status === 'hidden') return false;
+  return true;
+};
 
 export default function Home() {
-  // Deployment Hash: 1718284042 (Fresh Deploy)
-  const { categories, isLoaded: categoriesLoaded } = useCategoryStore();
   const { products, isLoading: productsLoading } = useProductStore();
-  const { banners: storeBanners } = useBannerStore();
-  const location = useLocation();
+  const { categories } = useCategoryStore();
+  const { banners } = useBannerStore();
+  const addItem = useCartStore((state) => state.addItem);
 
-  const allActiveBanners = storeBanners.filter(b => b && b.status === 'active' && (b.image || b.bannerType === 'designed'));
+  // 1. YouTube Style Hero Slider control
+  const [currentSlide, setCurrentSlide] = useState(0);
 
-  // Handle hash scrolling for Homepage sections
-  useEffect(() => {
-    const hash = location.hash;
-    if (hash) {
-      setTimeout(() => {
-        const element = document.querySelector(hash);
-        if (element) {
-          const headerHeight = 80; // Account for the sticky header
-          const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
-          window.scrollTo({
-            top: elementPosition - headerHeight,
-            behavior: 'smooth'
-          });
-        }
-      }, 300);
+  // Premium, text-free watch and wallet cover banner series
+  const premiumHeroBanners = [
+    {
+      id: 'h-1',
+      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=1920&q=80',
+    },
+    {
+      id: 'h-2',
+      image: 'https://images.unsplash.com/photo-1627124357626-8e519213fbf5?w=1920&q=80',
+    },
+    {
+      id: 'h-3',
+      image: 'https://images.unsplash.com/photo-1547996160-81dfa63595aa?w=1920&q=80',
     }
-  }, [location.hash]);
+  ];
 
-  // Forced data-flow check on Home component mount to identify silent live domain failures
-  const [dataAlertState, setDataAlertState] = useState<{
-    checked: boolean;
-    failed: boolean;
-    details: string;
-  }>({ checked: false, failed: false, details: '' });
+  const activeBanners = banners && banners.filter(b => b.status === 'active').length > 0 
+    ? banners.filter(b => b.status === 'active')
+    : premiumHeroBanners;
 
   useEffect(() => {
-    // Wait for 3.5 seconds to allow normal subscribing data-flows to fully settle
-    const timer = setTimeout(() => {
-      const dbCategories = useCategoryStore.getState().categories;
-      const dbProducts = useProductStore.getState().products;
-      
-      console.log(`[Forced Mount Data Check] Checking counts: categories=${dbCategories.length}, products=${dbProducts.length}`);
-      
-      if (dbCategories.length === 0 || dbProducts.length === 0) {
-        let details = '';
-        if (dbCategories.length === 0 && dbProducts.length === 0) {
-          details = 'Both Categories and Products tables returned exactly 0 records.';
-        } else if (dbCategories.length === 0) {
-          details = 'Categories table returned 0 records.';
-        } else {
-          details = 'Products table returned 0 records.';
-        }
+    if (activeBanners.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentSlide((prev) => (prev + 1) % activeBanners.length);
+      }, 4500);
+      return () => clearInterval(interval);
+    }
+  }, [activeBanners.length]);
 
-        console.error(`[Forced Mount Data Check] FAILURE DETAILS: ${details}`);
-        
-        setDataAlertState({
-          checked: true,
-          failed: true,
-          details
-        });
+  // 2. Load active catalog data
+  const activeProducts = products.filter(isProductActive);
 
-        // Trigger a noticeable iframe-safe browser toast notification
-        toast.error(`⚠️ DATA RETRIEVAL FAILURE: Live website loaded 0 records! ${details}. Please check credentials or RLS policies immediately.`, {
-          duration: 10000,
-          position: 'top-center'
-        });
-      } else {
-        setDataAlertState({
-          checked: true,
-          failed: false,
-          details: `Success. Retrieved ${dbCategories.length} categories and ${dbProducts.length} products.`
-        });
-        toast.success(`✅ Live Data Sync Verified: Retrieved ${dbCategories.length} Categories and ${dbProducts.length} Products successfully!`, {
-          duration: 4000,
-          position: 'bottom-right'
+  // Trending, New, and Best Selling Lists
+  const trendingProducts = activeProducts.filter(p => p.is_trending).slice(0, 4);
+  const newArrivals = [...activeProducts]
+    .filter(p => p.isNew)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, 4);
+  const bestSellers = activeProducts.filter(p => p.is_best_selling).slice(0, 4);
+
+  // Fallbacks if lists are empty: slice dynamic collections safely
+  const displayTrending = trendingProducts.length > 0 ? trendingProducts : activeProducts.slice(0, 4);
+  const displayNewArrivals = newArrivals.length > 0 ? newArrivals : activeProducts.slice(4, 8);
+  const displayBestSellers = bestSellers.length > 0 ? bestSellers : activeProducts.slice(2, 6);
+
+  // 3. Category Data Source
+  // Merged database category targets + high fidelity fallback references to ensure beautiful circle categories
+  const fallbackCategories = [
+    {
+      id: 'cat-watches',
+      name: 'Watches',
+      slug: 'watches',
+      image: 'https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?w=300&h=300&fit=crop&q=80'
+    },
+    {
+      id: 'cat-wallets',
+      name: 'Wallets',
+      slug: 'wallets',
+      image: 'https://images.unsplash.com/photo-1627124357626-8e519213fbf5?w=300&h=300&fit=crop&q=80'
+    },
+    {
+      id: 'cat-gift',
+      name: 'Gift Set',
+      slug: 'gift-set',
+      image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=300&h=300&fit=crop&q=80'
+    },
+    {
+      id: 'cat-premium',
+      name: 'Premium',
+      slug: 'premium-collection',
+      image: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=300&h=300&fit=crop&q=80'
+    },
+    {
+      id: 'cat-smart',
+      name: 'Smart Watch',
+      slug: 'smart-watch',
+      image: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=300&h=300&fit=crop&q=80'
+    },
+    {
+      id: 'cat-couple',
+      name: 'Couple Watch',
+      slug: 'couple-watch',
+      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop&q=80'
+    },
+    {
+      id: 'cat-leather-wallet',
+      name: 'Leather Wallet',
+      slug: 'leather-wallet',
+      image: 'https://images.unsplash.com/photo-1627124357626-8e519213fbf5?w=300&h=300&fit=crop&q=80'
+    },
+    {
+      id: 'cat-men',
+      name: 'Men Collection',
+      slug: 'men',
+      image: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=300&h=300&fit=crop&q=80'
+    }
+  ];
+
+  // Merge static default list with current database categories to accept any new categories automatically
+  const dynamicCategories = [...fallbackCategories];
+  if (categories && categories.length > 0) {
+    categories.forEach(dbCat => {
+      // Avoid duplication with default slugs
+      const dup = dynamicCategories.find(c => c.slug?.toLowerCase() === dbCat.slug?.toLowerCase() || c.name?.toLowerCase() === dbCat.name?.toLowerCase());
+      if (!dup) {
+        dynamicCategories.push({
+          id: dbCat.id,
+          name: dbCat.name,
+          slug: dbCat.slug || dbCat.name?.toLowerCase().replace(/\s+/g, '-'),
+          image: dbCat.image || dbCat.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop&q=80'
         });
       }
-    }, 3500);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  const mainHeroBanners = allActiveBanners.filter(b => {
-    if (!b.locations || !Array.isArray(b.locations) || b.locations.length === 0) return true;
-    return b.locations.some(loc => {
-      const l = typeof loc === 'string' ? loc.toLowerCase() : '';
-      return l === 'main hero banner' || l === 'homepage hero' || l === 'homepage-hero';
     });
-  }).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const floaterBanners = allActiveBanners.filter(b => 
-    b.locations && Array.isArray(b.locations) && b.locations.some(loc => typeof loc === 'string' && loc.toLowerCase() === 'floater banner')
-  );
-  const underHeroCTABanner = allActiveBanners.find(b => 
-    b.locations && Array.isArray(b.locations) && b.locations.some(loc => typeof loc === 'string' && loc.toLowerCase() === 'under hero cta')
-  );
-
-  console.log("[Home Page Categories Debug] Total categories in store:", categories.length, "Items:", categories);
-  const sortedCategories = [...categories]
-    .sort((a, b) => {
-      const orderA = a.displayOrder !== undefined && a.displayOrder !== null && Number(a.displayOrder) !== 0 ? Number(a.displayOrder) : Infinity;
-      const orderB = b.displayOrder !== undefined && b.displayOrder !== null && Number(b.displayOrder) !== 0 ? Number(b.displayOrder) : Infinity;
-      return orderA - orderB;
-    });
-  console.log("[Home Page Categories Debug] Rendered on homepage after sorting:", sortedCategories.length, "Items:", sortedCategories);
-
-  const { offers } = useOfferStore();
-  const activeOffers = offers.filter(o => String(o.status || 'Active').toLowerCase() === 'active');
-
-  const activeFlashOffers = activeOffers.filter(o => o.homepageVisibility && (o.type === 'Flash Sale' || o.showAsFlashSale));
-  const flashOfferProductIds = activeFlashOffers.flatMap(o => [...(o.productIds || []), ...(o.manualProductIds || [])]);
-
-  const activeTrendingOffers = activeOffers.filter(o => o.homepageVisibility && (o.type === 'Trending Items' || o.showAsTrending));
-  const trendingOfferProductIds = activeTrendingOffers.flatMap(o => [...(o.productIds || []), ...(o.manualProductIds || [])]);
-
-  const activeBestOffers = activeOffers.filter(o => o.homepageVisibility && (o.type === 'Best Selling' || o.showAsBestSelling));
-  const bestOfferProductIds = activeBestOffers.flatMap(o => [...(o.productIds || []), ...(o.manualProductIds || [])]);
-
-  const isProductActive = (p: any) => {
-    if (!p) return false;
-    // VERY lenient status check for production visibility
-    const status = (p.status || '').toString().toLowerCase().trim();
-    if (status === 'inactive' || status === 'draft' || status === 'hidden') return false;
-    return true;
-  };
-
-  console.log("[Home Feed Debug] Products Loading:", productsLoading, "Total State Products:", products.length);
-  if (!productsLoading && products.length === 0) {
-    console.warn("[Home Feed Debug] WARNING: No products returned from Supabase. Check your tables and RLS policies.");
   }
 
-  const flashSaleProducts = products.filter(p => (p.is_flash_sale || flashOfferProductIds.includes(p.id)) && isProductActive(p));
-  console.log("[Home Feed Debug] Flash Sale Products matched:", flashSaleProducts.length);
-  
-  const trendingProducts = products.filter(p => (p.is_trending || trendingOfferProductIds.includes(p.id)) && isProductActive(p));
-  const bestSellingProducts = products.filter(p => (p.is_best_selling || bestOfferProductIds.includes(p.id)) && isProductActive(p));
-  const displayBestSellingList = [...bestSellingProducts, ...bestSellingProducts, ...bestSellingProducts].slice(0, 15);
+  // Find exact link for a category route
+  const getCategoryLink = (cat: any) => {
+    // If it's a fallback static reference, check search store or look inside real categories to match
+    const foundReal = categories?.find(c => c.slug?.toLowerCase() === cat.slug?.toLowerCase() || c.name?.toLowerCase().includes(cat.name?.toLowerCase()));
+    if (foundReal) return `/category/${foundReal.id}`;
+    return `/search?category=${encodeURIComponent(cat.name)}`;
+  };
 
-  const isDebugMode = new URLSearchParams(location.search).get('debug') === 'true' || window.location.hostname === 'localhost';
+  // 4. Dynamic query filters based on actual products in Watches, Wallets, and Gift Set categories
+  const filterProductsByCategory = (catKeywords: string[]) => {
+    return activeProducts.filter(p => {
+      const categoryName = (p.category || '').toLowerCase();
+      const productName = (p.name || '').toLowerCase();
+      return catKeywords.some(keyword => {
+        const kw = keyword.toLowerCase();
+        return categoryName.includes(kw) || productName.includes(kw);
+      });
+    }).slice(0, 4);
+  };
+
+  // Extract products dynamically matching each target collection category
+  const watchProducts = filterProductsByCategory(['watch', 'ঘড়ি', 'watches', 'smartwatch']);
+  const walletProducts = filterProductsByCategory(['wallet', 'মানিব্যাগ', 'wallets', 'leather wallet']);
+  const giftProducts = filterProductsByCategory(['gift', 'গিফট', 'combo', 'giftset']);
+
+  const handleAddToCart = (product: any, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem({ ...product, quantity: 1 });
+    toast.success(`${product.name} added to cart!`, {
+      style: {
+        background: '#000000',
+        color: '#ffffff',
+        fontWeight: 'bold',
+        fontSize: '13px',
+        borderRadius: '8px'
+      }
+    });
+  };
 
   return (
-    <div className="bg-gray-50/50 min-h-screen pb-24">
-      {/* Absolute Mount Warning Banner if data check fails to prevent silent failure */}
-      {dataAlertState.failed && (
-        <div className="bg-red-600 text-white py-3 px-4 shadow-xl sticky top-0 z-[100] transition-all duration-300 border-b border-red-700">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-sm font-semibold">
-            <div className="flex items-center gap-2">
-              <span className="text-xl animate-bounce">🚨</span>
-              <span className="text-left leading-relaxed">
-                <span className="font-bold uppercase tracking-wide bg-white/10 px-1.5 py-0.5 rounded mr-1.5">Live Data Alert</span>
-                {dataAlertState.details} The live website failed to load synchronised records.
-              </span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button 
-                onClick={() => {
-                  toast.loading("Re-dispatching store query subscribers...", { id: 'retry-sub-load' });
-                  useCategoryStore.getState().subscribe();
-                  useProductStore.getState().subscribe();
-                  setTimeout(() => {
-                    const c = useCategoryStore.getState().categories.length;
-                    const p = useProductStore.getState().products.length;
-                    if (c > 0 || p > 0) {
-                      toast.success(`Success! Retrieved ${c} Categories and ${p} Products.`, { id: 'retry-sub-load' });
-                      setDataAlertState({ checked: true, failed: false, details: '' });
-                    } else {
-                      toast.error("Retry failed. Database is still returning 0 records.", { id: 'retry-sub-load' });
-                    }
-                  }, 1500);
-                }} 
-                className="bg-white text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg font-bold transition-transform active:scale-95 shadow-sm"
-              >
-                Force Retry Sync
-              </button>
-              <button 
-                onClick={() => setDataAlertState(prev => ({ ...prev, failed: false }))} 
-                className="bg-black/20 hover:bg-black/35 text-white px-2.5 py-1.5 rounded-lg transition-colors"
-                title="Dismiss warning overlay"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Visual Debug OverLay (Visible if ?debug=true or on localhost) */}
-      {isDebugMode && (
-        <div className="fixed top-20 left-4 z-[9999] bg-slate-900 border border-slate-700 p-4 rounded-2xl shadow-2xl text-[11px] text-white font-mono w-[320px] max-h-[80vh] overflow-y-auto">
-          <div className="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
-            <span className="flex items-center gap-2">
-               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-               <span className="font-bold text-sky-400">SYNC DIAGNOSTICS</span>
-            </span>
-            <button onClick={() => {
-               const url = new URL(window.location.href);
-               url.searchParams.delete('debug');
-               window.location.href = url.toString();
-            }} className="hover:bg-red-500/20 text-red-400 p-1 rounded-lg">✕</button>
-          </div>
-
-          <div className="space-y-2.5">
-            <section>
-              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Connection</h4>
-              <p className="flex justify-between border-b border-white/5 pb-1">
-                <span>Database:</span> 
-                <span className="text-yellow-400 font-bold text-[13px]">{(window as any).getSupabaseCredentials?.().url?.replace('https://', '').split('.')[0] || 'Disconnected'}</span>
-              </p>
-              <p className="flex justify-between border-b border-white/5 pb-1">
-                <span>Origin:</span> 
-                <span className="text-gray-400 truncate w-32 text-right">{window.location.origin}</span>
-              </p>
-            </section>
-
-            <section>
-              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Record Counts</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white/5 p-2 rounded-lg text-center">
-                   <div className="text-lg font-bold text-white">{categories.length}</div>
-                   <div className="text-[8px] text-gray-500 uppercase">Categories</div>
-                </div>
-                <div className="bg-white/5 p-2 rounded-lg text-center">
-                   <div className="text-lg font-bold text-white">{products.length}</div>
-                   <div className="text-[8px] text-gray-500 uppercase">Products</div>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Status & RLS</h4>
-              <p className="flex justify-between mb-1">
-                <span>Active Products:</span> 
-                <span className={products.filter(isProductActive).length > 0 ? "text-green-400" : "text-gray-500"}>
-                  {products.filter(isProductActive).length}
-                </span>
-              </p>
-              {products.length > 0 && products.filter(isProductActive).length === 0 && (
-                <div className="bg-red-500/10 text-red-400 p-1.5 rounded-lg border border-red-500/20 text-[9px]">
-                  CRITICAL: All {products.length} products found were hidden by status filter logic.
-                </div>
-              )}
-              {categories.length === 0 && categoriesLoaded && (
-                <div className="bg-orange-500/10 text-orange-400 p-1.5 rounded-lg border border-orange-500/20 text-[9px]">
-                  WARNING: Query returned 0 categories. Check if "anon" row-level security policy allows SELECT.
-                </div>
-              )}
-            </section>
-
-            <section>
-              <h4 className="text-gray-500 font-bold mb-1 uppercase tracking-widest text-[9px]">Data Parity Check</h4>
-              <p className="flex justify-between border-b border-white/5 pb-1">
-                <span>Categories:</span> 
-                <span className={categories.length > 0 ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{categories.length} items</span>
-              </p>
-              <p className="flex justify-between border-b border-white/5 pb-1">
-                <span>Products:</span> 
-                <span className={products.length > 0 ? "text-green-400 font-bold" : "text-red-400 font-bold"}>{products.length} items</span>
-              </p>
-              <p className="flex justify-between border-b border-white/5 pb-1">
-                <span>Loading:</span> 
-                <span>{productsLoading || !categoriesLoaded ? '🔄 Syncing...' : '✅ Complete'}</span>
-              </p>
-            </section>
-
-            <div className="text-[8px] text-gray-500 pt-2 border-t border-white/10 italic">
-               Note: To debug live, append ?debug=true to your URL. If counts are 0 on the live domain, the production server likely lacks VITE_SUPABASE environment variables.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 0. Live Sync Diagnostics (Visible to general users, useful for debug) */}
-      <div className="hidden">
-        {(() => {
-           const { url } = (window as any).getSupabaseCredentials?.() || { url: (window as any).__SUPABASE_URL };
-           console.log("%c[Live Diagnostics] STARTING...", "color: #3b82f6; font-weight: bold; border: 1px solid #3b82f6; padding: 4px;");
-           console.log("- Supabase Target URL:", url || "NULL (Check Environment Variables)");
-           console.log("- Products Total Count:", products.length);
-           console.log("- Products Visible (Active):", products.filter(isProductActive).length);
-           console.log("- Categories Total Count:", categories.length);
-           
-           if (products.length > 0) {
-             console.log("[Live Diagnostics] Raw Product Sample (First 3):", products.slice(0, 3).map(p => ({
-               id: p.id,
-               name: p.name,
-               status: p.status,
-               category: p.category
-             })));
-           }
-
-           if (products.length > 0 && products.filter(isProductActive).length === 0) {
-             console.warn("[Live Diagnostics] ALL products are being filtered out by isProductActive() logic.");
-             console.log("[Live Diagnostics] Sample Product Statuses:", products.slice(0, 5).map(p => p.status));
-           }
-           return null;
-        })()}
-      </div>
+    <div id="premium-ecommerce-layout" className="bg-neutral-50/50 min-h-screen pb-16 font-sans">
       
-      {/* 3. Dynamic Hero Banner Slider */}
-      <motion.section 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="w-full"
-      >
-        <MainHeroCarousel banners={mainHeroBanners as any} />
-      </motion.section>
+      {/* 1. HERO BANNER (YouTube style ratio 16:9, sharp 0px corners, mobile height matched) */}
+      <section id="hero-slider-section" className="relative w-full aspect-[16/9] h-[180px] sm:h-[220px] md:h-[450px] lg:h-[550px] overflow-hidden bg-neutral-950 select-none">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentSlide}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full h-full"
+          >
+            <img 
+              src={activeBanners[currentSlide]?.image} 
+              alt="Premium Promo Campaign Banner" 
+              className="w-full h-full object-cover object-center"
+              referrerPolicy="no-referrer"
+            />
+          </motion.div>
+        </AnimatePresence>
 
-      {/* Floating Banners (Floater Banners) */}
-      {floaterBanners.length > 0 && (
-        <section className="bg-white py-4 border-b border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-          <div className="container mx-auto px-4">
-            <AutoScrollCarousel speed={25}>
-              {floaterBanners.map((banner) => (
-                <div key={banner.id} className="relative w-[300px] sm:w-[400px] h-[120px] rounded-xl overflow-hidden mx-2 shadow-sm border border-[#EAEAEA] shrink-0">
-                  <Link to={banner.buttonLink || '#'}>
-                    {banner.image ? (
-                      <img src={banner.image} alt={banner.name || 'Floater Banner'} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-zinc-900 flex items-center justify-center text-white font-bold">{banner.name || 'Floater Banner'}</div>
-                    )}
-                  </Link>
+        {/* Dynamic bottom indicator pips */}
+        {activeBanners.length > 1 && (
+          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 z-10">
+            {activeBanners.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentSlide(idx)}
+                className={`h-1 rounded-full transition-all duration-300 ${idx === currentSlide ? 'w-4 bg-white' : 'w-1 bg-white/40'}`}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 2. AUTO SCROLL CATEGORIES (Circle layout, dynamic horizontal flow) */}
+      <section id="auto-category-scroll-section" className="py-6 bg-white border-b border-neutral-100 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex gap-4 sm:gap-6 overflow-x-auto overflow-y-hidden pb-2 snap-x scrollbar-none scroll-smooth">
+            {dynamicCategories.map((cat) => (
+              <Link 
+                key={cat.id} 
+                to={getCategoryLink(cat)}
+                className="flex flex-col items-center flex-shrink-0 group cursor-pointer snap-start w-[72px] sm:w-[100px]"
+              >
+                {/* 200x200 pixel layout scale mapped to circular form values */}
+                <div className="w-[60px] h-[60px] sm:w-[85px] sm:h-[85px] rounded-full overflow-hidden border border-neutral-200 bg-neutral-50 group-hover:scale-105 duration-300 transition-all shadow-sm">
+                  <img 
+                    src={cat.image} 
+                    alt={cat.name} 
+                    className="w-full h-full object-cover"
+                  />
                 </div>
+                <span className="text-[10px] sm:text-xs font-bold text-neutral-800 tracking-tight mt-2 text-center truncate w-full">
+                  {cat.name}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 3. TRENDING PRODUCTS GRID */}
+      <section id="trending-showcase-section" className="py-8 max-w-7xl mx-auto px-4">
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <span className="text-[10px] font-black uppercase text-amber-600 tracking-widest block">CURATED EXCLUSIVES</span>
+            <h2 className="text-lg md:text-2xl font-black text-neutral-900 uppercase tracking-tight">Trending Products</h2>
+          </div>
+          <Link to="/search?filter=trending" className="text-xs font-extrabold text-neutral-800 hover:opacity-85 flex items-center gap-1">
+            See All <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {productsLoading ? (
+          <SkeletonGrid />
+        ) : displayTrending.length === 0 ? (
+          <EmptyProductsPlaceholder />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 md:gap-6">
+            {displayTrending.map((p) => (
+              <ProductCard key={p.id} product={p} handleAddToCart={handleAddToCart} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 4. NEW ARRIVALS GRID */}
+      <section id="new-arrivals-showcase-section" className="py-6 max-w-7xl mx-auto px-4">
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <span className="text-[10px] font-black uppercase text-rose-500 tracking-widest block">FRESH DROPS</span>
+            <h2 className="text-lg md:text-2xl font-black text-neutral-900 uppercase tracking-tight">New Arrivals</h2>
+          </div>
+          <Link to="/search?filter=new" className="text-xs font-extrabold text-neutral-800 hover:opacity-85 flex items-center gap-1">
+            See All <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {productsLoading ? (
+          <SkeletonGrid />
+        ) : displayNewArrivals.length === 0 ? (
+          <EmptyProductsPlaceholder />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 md:gap-6">
+            {displayNewArrivals.map((p) => (
+              <ProductCard key={p.id} product={p} handleAddToCart={handleAddToCart} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 5. BEST SELLERS GRID */}
+      <section id="bestseller-showcase-section" className="py-6 max-w-7xl mx-auto px-4">
+        <div className="flex items-end justify-between mb-5">
+          <div>
+            <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest block">POPULAR PICKS</span>
+            <h2 className="text-lg md:text-2xl font-black text-neutral-900 uppercase tracking-tight">Best Sellers</h2>
+          </div>
+          <Link to="/search?filter=bestseller" className="text-xs font-extrabold text-neutral-800 hover:opacity-85 flex items-center gap-1">
+            See All <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {productsLoading ? (
+          <SkeletonGrid />
+        ) : displayBestSellers.length === 0 ? (
+          <EmptyProductsPlaceholder />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 md:gap-6">
+            {displayBestSellers.map((p) => (
+              <ProductCard key={p.id} product={p} handleAddToCart={handleAddToCart} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 6. WATCHES CATEGORY WISE BANNER & PRODUCTS (DYNAMIC HIDE IF EMPTY) */}
+      {watchProducts.length > 0 && (
+        <section id="category-watches-block" className="py-8 max-w-7xl mx-auto px-4">
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">COLLECTION</span>
+              <h2 className="text-lg md:text-2xl font-black text-neutral-900 uppercase tracking-tight">WATCHES</h2>
+            </div>
+            <Link to="/search?category=Watches" className="text-xs font-extrabold text-neutral-800 hover:opacity-85 flex items-center gap-1">
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {/* WATCH BANNER CARD */}
+          <div className="relative w-full aspect-[3/1] rounded-xl overflow-hidden shadow-sm border border-neutral-150 mb-6 bg-neutral-900">
+            <img 
+              src="https://images.unsplash.com/photo-1434056886845-dac89ffe9b56?w=1500&q=80" 
+              alt="Watches Banner Image" 
+              className="w-full h-full object-cover object-center transform hover:scale-101 transition-transform duration-700"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 md:gap-6">
+            {watchProducts.map((p) => (
+              <ProductCard key={p.id} product={p} handleAddToCart={handleAddToCart} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 7. WALLET CATEGORY WISE BANNER & PRODUCTS (DYNAMIC HIDE IF EMPTY) */}
+      {walletProducts.length > 0 && (
+        <section id="category-wallets-block" className="py-8 max-w-7xl mx-auto px-4">
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">COLLECTION</span>
+              <h2 className="text-lg md:text-2xl font-black text-neutral-900 uppercase tracking-tight">WALLETS</h2>
+            </div>
+            <Link to="/search?category=Wallets" className="text-xs font-extrabold text-neutral-800 hover:opacity-85 flex items-center gap-1">
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {/* WALLET BANNER CARD */}
+          <div className="relative w-full aspect-[3/1] rounded-xl overflow-hidden shadow-sm border border-neutral-150 mb-6 bg-neutral-900">
+            <img 
+              src="https://images.unsplash.com/photo-1627124357626-8e519213fbf5?w=1500&q=80" 
+              alt="Wallet Banner Image" 
+              className="w-full h-full object-cover object-center transform hover:scale-101 transition-transform duration-700"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 md:gap-6">
+            {walletProducts.map((p) => (
+              <ProductCard key={p.id} product={p} handleAddToCart={handleAddToCart} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 8. GIFT SET CATEGORY WISE BANNER & PRODUCTS (DYNAMIC HIDE IF EMPTY) */}
+      {giftProducts.length > 0 && (
+        <section id="category-gifts-block" className="py-8 max-w-7xl mx-auto px-4">
+          <div className="flex items-end justify-between mb-4">
+            <div>
+              <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">COLLECTION</span>
+              <h2 className="text-lg md:text-2xl font-black text-neutral-900 uppercase tracking-tight">GIFT SET</h2>
+            </div>
+            <Link to="/search?category=Gift Set" className="text-xs font-extrabold text-neutral-800 hover:opacity-85 flex items-center gap-1">
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          {/* GIFT COMBO BANNER CARD */}
+          <div className="relative w-full aspect-[3/1] rounded-xl overflow-hidden shadow-sm border border-neutral-150 mb-6 bg-neutral-900">
+            <img 
+              src="https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=1500&q=80" 
+              alt="Gift Combo Box Banner Image" 
+              className="w-full h-full object-cover object-center transform hover:scale-101 transition-transform duration-700"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 md:gap-6">
+            {giftProducts.map((p) => (
+              <ProductCard key={p.id} product={p} handleAddToCart={handleAddToCart} />
+            ))}
+          </div>
+        </section>
+      )}
+
+    </div>
+  );
+}
+
+// 1:1 Aspect ratio rounded product cards matching the layout specifications precisely
+interface ProductCardProps {
+  product: any;
+  handleAddToCart: (product: any, e: React.MouseEvent) => void;
+}
+
+function ProductCard({ product, handleAddToCart }: ProductCardProps) {
+  const discountPercent = product.discountPrice 
+    ? Math.round(((product.price - product.discountPrice) / product.price) * 105 % 100)
+    : 0;
+
+  const resolvedImage = product.imageUrl || product.featured_image || product.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80';
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.35 }}
+      className="bg-white rounded-[12px] border border-neutral-200 overflow-hidden flex flex-col justify-between group shadow-sm hover:shadow-md transition-all duration-300 relative select-none"
+    >
+      {/* 1:1 Aspect square image box */}
+      <Link to={`/product/${product.id}`} className="block relative aspect-square overflow-hidden bg-neutral-50/50 border-b border-neutral-100">
+        <img 
+          src={resolvedImage} 
+          alt={product.name} 
+          className="w-full h-full object-cover group-hover:scale-103 duration-500 transition-transform"
+          referrerPolicy="no-referrer"
+        />
+        
+        {product.discountPrice && (
+          <span className="absolute top-2 right-2 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md font-mono">
+            {discountPercent}% OFF
+          </span>
+        )}
+      </Link>
+
+      <div className="p-3 flex flex-col justify-between flex-1">
+        <div>
+          <span className="text-[8.5px] font-extrabold tracking-widest text-neutral-450 uppercase block mb-1">
+            {product.category || 'EXQUISITE'}
+          </span>
+          <Link 
+            to={`/product/${product.id}`} 
+            className="text-[11px] sm:text-xs font-bold text-neutral-900 uppercase leading-snug tracking-tight block hover:text-neutral-700 line-clamp-2 min-h-[32px]"
+          >
+            {product.name}
+          </Link>
+
+          {/* Mini Ratings Details */}
+          <div className="flex items-center gap-1 mt-1.5 mb-2">
+            <div className="flex items-center">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Star 
+                  key={s} 
+                  className={`w-2.5 h-2.5 ${s <= Math.round(product.rating || 5) ? 'text-amber-400 fill-amber-400' : 'text-neutral-200'}`} 
+                />
               ))}
-            </AutoScrollCarousel>
-          </div>
-        </section>
-      )}
-
-      {/* 4. Redesigned Premium Category Slider */}
-      {!categoriesLoaded && (
-        <section className="bg-white border-b border-gray-100 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative mb-3">
-          <div className="container mx-auto px-4">
-             <div className="flex gap-[16px] overflow-hidden">
-                {[1, 2, 3, 4, 5, 6].map(i => <CategorySkeleton key={i} />)}
-             </div>
-          </div>
-        </section>
-      )}
-
-      {categoriesLoaded && sortedCategories.length > 0 && (
-        <section className="bg-white border-b border-gray-100 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)] relative mb-3">
-          <div className="container mx-auto px-4">
-            <div 
-              className="flex scrollbar-hide scroll-smooth"
-              style={{
-                display: 'flex',
-                gap: '16px',
-                overflowX: 'auto',
-                WebkitOverflowScrolling: 'touch',
-                paddingBottom: '4px'
-              }}
-            >
-              {sortedCategories.slice(0, 6).map((cat) => {
-                const catImage = cat.iconImage || cat.bannerImage;
-                return (
-                  <Link
-                    key={cat.id}
-                    to={`/category/${cat.id}`}
-                    className="relative shrink-0 group transition-all duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer block select-none"
-                    style={{
-                      width: '110px',
-                      height: '150px',
-                      borderRadius: '18px',
-                      overflow: 'hidden'
-                    }}
-                    draggable={false}
-                  >
-                    <div className="w-full h-full relative">
-                      {catImage ? (
-                        <img
-                          src={catImage}
-                          alt={cat.name}
-                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          referrerPolicy="no-referrer"
-                          draggable={false}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                          <ImageIcon className="w-6 h-6 mb-1" />
-                          <span className="text-[8px] font-bold">NO IMAGE</span>
-                        </div>
-                      )}
-                      
-                      {/* Bottom Black Transparent Overlay */}
-                      <div 
-                        className="absolute inset-x-0 bottom-0 py-2 cursor-pointer flex items-center justify-center text-center"
-                        style={{
-                          background: 'rgba(0,0,0,0.55)',
-                          height: '42px'
-                        }}
-                      >
-                        {/* Bold Uppercase Category Name in white */}
-                        <span 
-                          className="text-[10px] tracking-wider text-center line-clamp-2 px-1"
-                          style={{
-                            color: '#ffffff',
-                            fontWeight: 700,
-                            textTransform: 'uppercase'
-                          }}
-                        >
-                          {cat.name}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-
-              {sortedCategories.length > 6 && (
-                <Link
-                  key="view-all-cats"
-                  to="/categories"
-                  className="relative shrink-0 group transition-all duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer flex flex-col items-center justify-center border-2 border-dashed border-neutral-300 hover:border-black bg-neutral-50"
-                  style={{
-                    width: '110px',
-                    height: '150px',
-                    borderRadius: '18px',
-                    overflow: 'hidden'
-                  }}
-                  draggable={false}
-                >
-                  <div className="flex flex-col items-center justify-center p-3 text-center">
-                    <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center mb-1.5 shadow-md">
-                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-900 leading-tight">View All</span>
-                    <span className="text-[7.5px] text-neutral-400 font-bold mt-1 uppercase tracking-wider">{sortedCategories.length} Categories</span>
-                  </div>
-                </Link>
-              )}
             </div>
+            <span className="text-[9px] text-neutral-400 font-bold">({product.reviews || 12})</span>
           </div>
-        </section>
-      )}
+        </div>
 
-      {/* 5. Modern Integrated Offer Sections */}
-      <FlashSaleSection products={flashSaleProducts} isLoading={productsLoading} />
-      <TrendingSection products={trendingProducts} isLoading={productsLoading} />
+        {/* Pricing System + Cart Call To Action */}
+        <div className="mt-1">
+          <div className="flex items-baseline gap-1.5 mb-2">
+            <span className="text-xs sm:text-[13px] font-black text-neutral-950 font-mono">
+              {formatPrice(product.discountPrice || product.price)}
+            </span>
+            {product.discountPrice && (
+              <span className="text-[9.5px] text-neutral-400 line-through font-mono">
+                {formatPrice(product.price)}
+              </span>
+            )}
+          </div>
 
-      {/* 12px ~ 18px Clean Spacing (mt-4 is 16px) */}
-      <div className="mt-4"></div>
-      <BestSellingSection products={bestSellingProducts} isLoading={productsLoading} />
+          <button 
+            type="button"
+            onClick={(e) => handleAddToCart(product, e)}
+            className="w-full py-1.5 bg-neutral-950 text-white hover:bg-neutral-900 font-mono text-[9px] font-extrabold uppercase tracking-wide rounded-md transition-colors flex items-center justify-center gap-1"
+          >
+            <ShoppingBag className="w-3 h-3" /> ADD TO CART
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
-      {/* 8. Dynamic Category Sections */}
-      {sortedCategories.map(cat => {
-        const catProducts = products.filter(p => {
-          if (!isProductActive(p)) return false;
-          
-          const pCat = String(p.category || '').trim().toLowerCase();
-          const cId = String(cat.id || '').trim().toLowerCase();
-          const cName = String(cat.name || '').trim().toLowerCase();
-          const cSlug = String(cat.slug || '').trim().toLowerCase();
-          
-          // Match by ID, Name or Slug
-          return pCat === cId || pCat === cName || pCat === cSlug || cId.includes(pCat) || pCat.includes(cId);
-        }).slice(0, 6);
-        if (catProducts.length === 0) return null;
-        
-        return (
-          <section key={`cat-sec-${cat.id}`} className="py-2 border-b border-neutral-100 last:border-b-0">
-            <div className="container mx-auto px-4">
-              {/* FIRST ROW: Header */}
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm sm:text-base font-black text-gray-900 uppercase tracking-wider">{cat.name}</h2>
-                <Link 
-                  to={`/category/${cat.id}`} 
-                  className="h-10 px-[18px] bg-black text-white hover:opacity-85 rounded-[8px] font-bold text-[10px] sm:text-xs uppercase tracking-[0.5px] items-center justify-center inline-flex transition-all active:scale-[0.97] shrink-0"
-                >
-                  View All
-                </Link>
-              </div>
+function SkeletonGrid() {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-pulse">
+      {[1, 2, 3, 4].map(idx => (
+        <div key={idx} className="bg-white rounded-xl h-[280px] border border-neutral-100" />
+      ))}
+    </div>
+  );
+}
 
-              {/* SECOND ROW: Category Banner Image Slider (Full width compact) */}
-              <div className="mb-4">
-                <CategoryBannerCarousel category={cat} />
-              </div>
-
-              {/* THIRD ROW: Category Products */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 font-sans">
-                {catProducts.map(prod => (
-                  <CompactProductCard key={`cat-prod-${prod.id}`} product={prod} />
-                ))}
-              </div>
-            </div>
-          </section>
-        );
-      })}
-      {/* 9. FALLBACK: All Other Products Section (Ensures no product is hidden) */}
-      {(() => {
-        const featuredIds = new Set([
-          ...flashSaleProducts.map(p => p.id),
-          ...trendingProducts.map(p => p.id),
-          ...bestSellingProducts.map(p => p.id)
-        ]);
-        
-        const otherProducts = products.filter(p => isProductActive(p) && !featuredIds.has(p.id));
-        
-        if (otherProducts.length === 0) return null;
-        
-        return (
-          <section className="py-12 bg-white">
-            <div className="container mx-auto px-4">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h2 className="text-xl font-black text-gray-900 uppercase tracking-wider">Our Collection</h2>
-                  <p className="text-gray-500 text-xs mt-1 uppercase font-mono tracking-widest">Handpicked items for you</p>
-                </div>
-                <Link to="/shop" className="text-xs font-bold uppercase tracking-widest hover:underline">Explore All Products</Link>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                {otherProducts.slice(0, 18).map(prod => (
-                  <CompactProductCard key={`other-prod-${prod.id}`} product={prod} />
-                ))}
-              </div>
-            </div>
-          </section>
-        );
-      })()}
+function EmptyProductsPlaceholder() {
+  return (
+    <div className="bg-white p-6 rounded-2xl text-center border border-neutral-100 text-neutral-400 text-xs">
+      No products available in this active collection list.
     </div>
   );
 }
