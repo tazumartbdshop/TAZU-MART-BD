@@ -11,7 +11,8 @@ import { AutoScrollCarousel } from '../components/ui/AutoScrollCarousel';
 import { motion } from 'motion/react';
 import { useBannerStore } from '../store/useBannerStore';
 import MainHeroCarousel from '../components/home/MainHeroCarousel';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'react-hot-toast';
 import FlashSaleSection from '../components/home/FlashSaleSection';
 import TrendingSection from '../components/home/TrendingSection';
 import BestSellingSection from '../components/home/BestSellingSection';
@@ -45,6 +46,60 @@ export default function Home() {
       }, 300);
     }
   }, [location.hash]);
+
+  // Forced data-flow check on Home component mount to identify silent live domain failures
+  const [dataAlertState, setDataAlertState] = useState<{
+    checked: boolean;
+    failed: boolean;
+    details: string;
+  }>({ checked: false, failed: false, details: '' });
+
+  useEffect(() => {
+    // Wait for 3.5 seconds to allow normal subscribing data-flows to fully settle
+    const timer = setTimeout(() => {
+      const dbCategories = useCategoryStore.getState().categories;
+      const dbProducts = useProductStore.getState().products;
+      
+      console.log(`[Forced Mount Data Check] Checking counts: categories=${dbCategories.length}, products=${dbProducts.length}`);
+      
+      if (dbCategories.length === 0 || dbProducts.length === 0) {
+        let details = '';
+        if (dbCategories.length === 0 && dbProducts.length === 0) {
+          details = 'Both Categories and Products tables returned exactly 0 records.';
+        } else if (dbCategories.length === 0) {
+          details = 'Categories table returned 0 records.';
+        } else {
+          details = 'Products table returned 0 records.';
+        }
+
+        console.error(`[Forced Mount Data Check] FAILURE DETAILS: ${details}`);
+        
+        setDataAlertState({
+          checked: true,
+          failed: true,
+          details
+        });
+
+        // Trigger a noticeable iframe-safe browser toast notification
+        toast.error(`⚠️ DATA RETRIEVAL FAILURE: Live website loaded 0 records! ${details}. Please check credentials or RLS policies immediately.`, {
+          duration: 10000,
+          position: 'top-center'
+        });
+      } else {
+        setDataAlertState({
+          checked: true,
+          failed: false,
+          details: `Success. Retrieved ${dbCategories.length} categories and ${dbProducts.length} products.`
+        });
+        toast.success(`✅ Live Data Sync Verified: Retrieved ${dbCategories.length} Categories and ${dbProducts.length} Products successfully!`, {
+          duration: 4000,
+          position: 'bottom-right'
+        });
+      }
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const mainHeroBanners = allActiveBanners.filter(b => {
     if (!b.locations || !Array.isArray(b.locations) || b.locations.length === 0) return true;
@@ -105,6 +160,49 @@ export default function Home() {
 
   return (
     <div className="bg-gray-50/50 min-h-screen pb-24">
+      {/* Absolute Mount Warning Banner if data check fails to prevent silent failure */}
+      {dataAlertState.failed && (
+        <div className="bg-red-600 text-white py-3 px-4 shadow-xl sticky top-0 z-[100] transition-all duration-300 border-b border-red-700">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-sm font-semibold">
+            <div className="flex items-center gap-2">
+              <span className="text-xl animate-bounce">🚨</span>
+              <span className="text-left leading-relaxed">
+                <span className="font-bold uppercase tracking-wide bg-white/10 px-1.5 py-0.5 rounded mr-1.5">Live Data Alert</span>
+                {dataAlertState.details} The live website failed to load synchronised records.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button 
+                onClick={() => {
+                  toast.loading("Re-dispatching store query subscribers...", { id: 'retry-sub-load' });
+                  useCategoryStore.getState().subscribe();
+                  useProductStore.getState().subscribe();
+                  setTimeout(() => {
+                    const c = useCategoryStore.getState().categories.length;
+                    const p = useProductStore.getState().products.length;
+                    if (c > 0 || p > 0) {
+                      toast.success(`Success! Retrieved ${c} Categories and ${p} Products.`, { id: 'retry-sub-load' });
+                      setDataAlertState({ checked: true, failed: false, details: '' });
+                    } else {
+                      toast.error("Retry failed. Database is still returning 0 records.", { id: 'retry-sub-load' });
+                    }
+                  }, 1500);
+                }} 
+                className="bg-white text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg font-bold transition-transform active:scale-95 shadow-sm"
+              >
+                Force Retry Sync
+              </button>
+              <button 
+                onClick={() => setDataAlertState(prev => ({ ...prev, failed: false }))} 
+                className="bg-black/20 hover:bg-black/35 text-white px-2.5 py-1.5 rounded-lg transition-colors"
+                title="Dismiss warning overlay"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Visual Debug OverLay (Visible if ?debug=true or on localhost) */}
       {isDebugMode && (
         <div className="fixed top-20 left-4 z-[9999] bg-slate-900 border border-slate-700 p-4 rounded-2xl shadow-2xl text-[11px] text-white font-mono w-[320px] max-h-[80vh] overflow-y-auto">
@@ -179,7 +277,7 @@ export default function Home() {
               </p>
               <p className="flex justify-between border-b border-white/5 pb-1">
                 <span>Loading:</span> 
-                <span>{productsLoading || categoriesLoading ? '🔄 Syncing...' : '✅ Complete'}</span>
+                <span>{productsLoading || !categoriesLoaded ? '🔄 Syncing...' : '✅ Complete'}</span>
               </p>
             </section>
 
