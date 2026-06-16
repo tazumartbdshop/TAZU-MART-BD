@@ -26,6 +26,33 @@ export interface Category {
   sliderSettings?: any;
 }
 
+export const CATEGORY_FALLBACKS = [
+  { name: "watches", image: "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop" },
+  { name: "wallets", image: "https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=200&h=200&auto=format&fit=crop" },
+  { name: "gift", image: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=200&h=200&auto=format&fit=crop" },
+  { name: "premium", image: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=200&h=200&auto=format&fit=crop" }
+];
+
+export function resolveCategoryThumbnail(cat: Partial<Category> | null | undefined): string {
+  if (!cat) return "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop";
+  if (cat.iconImage && cat.iconImage.trim() !== '') {
+    return cat.iconImage;
+  }
+  if (cat.bannerImage && cat.bannerImage.trim() !== '') {
+    return cat.bannerImage;
+  }
+  if (cat.bannerImages && Array.isArray(cat.bannerImages) && cat.bannerImages.length > 0 && cat.bannerImages[0]) {
+    return cat.bannerImages[0];
+  }
+  const term = String(cat.name || cat.slug || '').toLowerCase();
+  for (const fallback of CATEGORY_FALLBACKS) {
+    if (term.includes(fallback.name)) {
+      return fallback.image;
+    }
+  }
+  return "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop";
+}
+
 interface CategoryState {
   categories: Category[];
   isLoaded: boolean;
