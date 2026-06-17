@@ -230,10 +230,8 @@ BEGIN
 
     -- Settings Policies
     ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
-    DROP POLICY IF EXISTS "Settings read" ON public.settings;
-    CREATE POLICY "Settings read" ON public.settings FOR SELECT TO public USING (true);
-    DROP POLICY IF EXISTS "Settings write" ON public.settings;
-    CREATE POLICY "Settings write" ON public.settings FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    DROP POLICY IF EXISTS "Settings access" ON public.settings;
+    CREATE POLICY "Settings access" ON public.settings FOR ALL TO public USING (true) WITH CHECK (true);
 
     -- Banners Policies
     ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;
