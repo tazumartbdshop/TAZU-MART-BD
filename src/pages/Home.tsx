@@ -24,30 +24,6 @@ const PRESET_TOP_SLIDERS = [
 const PRESET_FEATURED_BANNER = "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=1500&h=500&auto=format&fit=crop";
 const PRESET_PROMOTIONAL_BANNER = "https://images.unsplash.com/photo-1490367532201-b9bc1dc483f6?q=80&w=1600&h=400&auto=format&fit=crop";
 
-// Hardcoded circle Category Presets matched with free stunning Unsplash images
-const CATEGORY_PRESETS = [
-  {
-    name: "Watches",
-    image: "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop",
-    slug: "watches"
-  },
-  {
-    name: "Wallets",
-    image: "https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=200&h=200&auto=format&fit=crop",
-    slug: "wallets"
-  },
-  {
-    name: "Gift Set",
-    image: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=200&h=200&auto=format&fit=crop",
-    slug: "gift-sets"
-  },
-  {
-    name: "Premium",
-    image: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=200&h=200&auto=format&fit=crop",
-    slug: "premium-collection"
-  }
-];
-
 const CUSTOMER_TESTIMONIALS = [
   {
     name: "Md. Sajjadul Islam",
@@ -97,18 +73,12 @@ export default function Home() {
       return orderA - orderB;
     });
 
-  // Load up to 4 dynamic categories from the database, or fallback beautifully to preset categories inside circles
-  const homeCategories = activeDbCategories.length > 0
-    ? activeDbCategories.slice(0, 4).map(cat => ({
-        name: cat.name,
-        image: resolveCategoryThumbnail(cat),
-        link: `/category/${cat.id}`
-      }))
-    : CATEGORY_PRESETS.map(preset => ({
-        name: preset.name,
-        image: preset.image,
-        link: `/search?q=${encodeURIComponent(preset.slug)}`
-      }));
+  // Load dynamic categories completely from the database, eliminating hardcoded fallback presets as per instructions
+  const homeCategories = activeDbCategories.map(cat => ({
+    name: cat.name,
+    image: resolveCategoryThumbnail(cat),
+    link: `/category/${cat.id}`
+  }));
 
   // Filter Active Banners from DB
   const uploadedBanners = (storeBanners || [])
@@ -246,30 +216,36 @@ export default function Home() {
         )}
       </section>
 
-      {/* 2. CATEGORY SECTION (Circular shape, 200x200px actual source, 4 in single row) */}
+      {/* 2. CATEGORY SECTION (Circular shape, completely database-driven) */}
       <section className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-4 gap-2 md:gap-6 justify-center mx-auto max-w-lg md:max-w-xl">
-            {homeCategories.map((cat, i) => (
-              <Link 
-                key={i} 
-                to={cat.link}
-                className="flex flex-col items-center group select-none text-center"
-              >
-                <div className="relative w-[18vw] h-[18vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full overflow-hidden border border-neutral-100 bg-neutral-50 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-black/25 group-hover:shadow-md">
-                  <img 
-                    src={cat.image} 
-                    alt={cat.name} 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <span className="text-[10px] sm:text-xs font-black uppercase text-neutral-800 tracking-wider mt-2.5 transition-colors group-hover:text-black leading-tight">
-                  {cat.name}
-                </span>
-              </Link>
-            ))}
-          </div>
+          {homeCategories.length > 0 ? (
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl">
+              {homeCategories.map((cat, i) => (
+                <Link 
+                  key={i} 
+                  to={cat.link}
+                  className="flex flex-col items-center group select-none text-center"
+                >
+                  <div className="relative w-[16vw] h-[16vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full overflow-hidden border border-neutral-100 bg-neutral-50 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-black/25 group-hover:shadow-md">
+                    <img 
+                      src={cat.image} 
+                      alt={cat.name} 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                  <span className="text-[10px] sm:text-xs font-black uppercase text-neutral-800 tracking-wider mt-2.5 transition-colors group-hover:text-black leading-tight">
+                    {cat.name}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">No active categories found in database</p>
+            </div>
+          )}
         </div>
       </section>
 
