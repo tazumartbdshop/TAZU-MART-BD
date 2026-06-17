@@ -214,14 +214,14 @@ BEGIN
     DROP POLICY IF EXISTS "Categories read to all" ON public.categories;
     CREATE POLICY "Categories read to all" ON public.categories FOR SELECT TO public USING (true);
     DROP POLICY IF EXISTS "Admin write to categories" ON public.categories;
-    CREATE POLICY "Admin write to categories" ON public.categories FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Admin write to categories" ON public.categories FOR ALL TO public USING (true) WITH CHECK (true);
 
     -- Products Policies
     ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Products read to all" ON public.products;
     CREATE POLICY "Products read to all" ON public.products FOR SELECT TO public USING (true);
     DROP POLICY IF EXISTS "Admin write to products" ON public.products;
-    CREATE POLICY "Admin write to products" ON public.products FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Admin write to products" ON public.products FOR ALL TO public USING (true) WITH CHECK (true);
 
     -- Orders Policies
     ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
@@ -238,5 +238,29 @@ BEGIN
     DROP POLICY IF EXISTS "Banners read" ON public.banners;
     CREATE POLICY "Banners read" ON public.banners FOR SELECT TO public USING (true);
     DROP POLICY IF EXISTS "Banners write" ON public.banners;
-    CREATE POLICY "Banners write" ON public.banners FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
+    CREATE POLICY "Banners write" ON public.banners FOR ALL TO public USING (true) WITH CHECK (true);
 END $$;
+
+-- 4. ENABLE REAL-TIME PUBLICATIONS
+-- ---------------------------------------------------------------------
+DO $$
+BEGIN
+  -- Check and add categories to realtime publication
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'categories'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
+    END IF;
+
+    -- Check and add products to realtime publication
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'products'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
+    END IF;
+  END IF;
+END $$;
+

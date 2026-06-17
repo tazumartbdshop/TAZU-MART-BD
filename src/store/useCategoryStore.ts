@@ -93,7 +93,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       createdAt: new Date().toISOString(),
     };
     
-    // Update local state and backup immediately
+    // Optimistic Update
     const currentCats = get().categories;
     const nextCats = [...currentCats, newCategory];
     set({ categories: nextCats, isLoaded: true });
@@ -105,11 +105,30 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       try {
         const { error } = await supabase.from('categories').insert([newCategory]);
         if (error) {
-          console.warn("[Supabase Insert Warning - Suppressed]:", error.message || error);
+          // Rollback on error
+          set({ categories: currentCats });
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
+          }
+          console.error("Supabase category insert error:", error);
+          throw new Error(error.message || "Failed to add category to database");
         }
-      } catch (err) {
-        console.warn("[Supabase Insert Catch Warning - Suppressed]:", err);
+      } catch (err: any) {
+        // Rollback on catch
+        set({ categories: currentCats });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
+        }
+        console.error("Supabase insert catch exception:", err);
+        throw new Error(err?.message || err || "Failed to connect to database");
       }
+    } else {
+      // Rollback
+      set({ categories: currentCats });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
+      }
+      throw new Error("Database client is not initialized");
     }
   },
   
@@ -119,7 +138,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const existing = currentCats.find(c => c.id === id);
     const mergedPayload = existing ? { ...existing, ...payload } : payload;
     
-    // Update local state and backup immediately
+    // Optimistic Update
     const updatedCats = currentCats.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
     set({ categories: updatedCats as Category[], isLoaded: true });
     if (typeof window !== 'undefined') {
@@ -130,11 +149,30 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       try {
         const { error } = await supabase.from('categories').update(mergedPayload).eq('id', id);
         if (error) {
-          console.warn("[Supabase Update Warning - Suppressed]:", error.message || error);
+          // Rollback on error
+          set({ categories: currentCats });
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
+          }
+          console.error("Supabase category update error:", error);
+          throw new Error(error.message || "Failed to update category in database");
         }
-      } catch (err) {
-        console.warn("[Supabase Update Catch Warning - Suppressed]:", err);
+      } catch (err: any) {
+        // Rollback on catch
+        set({ categories: currentCats });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
+        }
+        console.error("Supabase update catch exception:", err);
+        throw new Error(err?.message || err || "Database connection failure");
       }
+    } else {
+      // Rollback
+      set({ categories: currentCats });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
+      }
+      throw new Error("Database client is not initialized");
     }
   },
   
@@ -163,7 +201,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       }
     }
     
-    // Update local state and backup immediately
+    // Optimistic Update
     const newCats = currentCats.filter(c => c.id !== id);
     set({ categories: newCats, isLoaded: true });
     if (typeof window !== 'undefined') {
@@ -174,11 +212,30 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       try {
         const { error } = await supabase.from('categories').delete().eq('id', id);
         if (error) {
-          console.warn("[Supabase Delete Warning - Suppressed]:", error.message || error);
+          // Rollback on error
+          set({ categories: currentCats });
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
+          }
+          console.error("Supabase category delete error:", error);
+          throw new Error(error.message || "Failed to delete category from database");
         }
-      } catch (err) {
-        console.warn("[Supabase Delete Catch Warning - Suppressed]:", err);
+      } catch (err: any) {
+        // Rollback on catch
+        set({ categories: currentCats });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
+        }
+        console.error("Supabase delete catch exception:", err);
+        throw new Error(err?.message || err || "Database connection failure");
       }
+    } else {
+      // Rollback
+      set({ categories: currentCats });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
+      }
+      throw new Error("Database client is not initialized");
     }
   },
   
