@@ -214,14 +214,14 @@ BEGIN
     DROP POLICY IF EXISTS "Categories read to all" ON public.categories;
     CREATE POLICY "Categories read to all" ON public.categories FOR SELECT TO public USING (true);
     DROP POLICY IF EXISTS "Admin write to categories" ON public.categories;
-    CREATE POLICY "Admin write to categories" ON public.categories FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "Admin write to categories" ON public.categories FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
     -- Products Policies
     ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Products read to all" ON public.products;
     CREATE POLICY "Products read to all" ON public.products FOR SELECT TO public USING (true);
     DROP POLICY IF EXISTS "Admin write to products" ON public.products;
-    CREATE POLICY "Admin write to products" ON public.products FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "Admin write to products" ON public.products FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
     -- Orders Policies
     ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
@@ -230,13 +230,15 @@ BEGIN
 
     -- Settings Policies
     ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;
-    DROP POLICY IF EXISTS "Settings access" ON public.settings;
-    CREATE POLICY "Settings access" ON public.settings FOR ALL TO public USING (true) WITH CHECK (true);
+    DROP POLICY IF EXISTS "Settings read" ON public.settings;
+    CREATE POLICY "Settings read" ON public.settings FOR SELECT TO public USING (true);
+    DROP POLICY IF EXISTS "Settings write" ON public.settings;
+    CREATE POLICY "Settings write" ON public.settings FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 
     -- Banners Policies
     ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Banners read" ON public.banners;
     CREATE POLICY "Banners read" ON public.banners FOR SELECT TO public USING (true);
     DROP POLICY IF EXISTS "Banners write" ON public.banners;
-    CREATE POLICY "Banners write" ON public.banners FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "Banners write" ON public.banners FOR ALL TO authenticated USING (public.is_admin()) WITH CHECK (public.is_admin());
 END $$;

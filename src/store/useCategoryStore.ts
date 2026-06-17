@@ -86,6 +86,10 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   
   addCategory: async (payload) => {
     const supabase = getSupabase();
+    if (!supabase) {
+      throw new Error("Supabase client is not initialized. Please verify your environment configuration.");
+    }
+
     const id = `cat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const newCategory: Category = {
       ...payload,
@@ -93,74 +97,84 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       createdAt: new Date().toISOString(),
     };
     
+    // Durable persistence first
+    const { error } = await supabase.from('categories').insert([newCategory]);
+    if (error) {
+      console.error("[Supabase Database Error] Category insert failed:", error);
+      throw new Error(error.message || "Failed to insert category into cloud database (check your RLS policies / connection).");
+    }
+    
     // Update local state and backup immediately
     const currentCats = get().categories;
-    const nextCats = [...currentCats, newCategory];
+    const nextCats = [...currentCats, newCategory].sort((a, b) => Number(a.displayOrder) - Number(b.displayOrder));
     set({ categories: nextCats, isLoaded: true });
     if (typeof window !== 'undefined') {
       localStorage.setItem('tazu_categories_backup', JSON.stringify(nextCats));
-    }
-    
-    if (supabase) {
-      try {
-        const { error } = await supabase.from('categories').insert([newCategory]);
-        if (error) {
-          console.warn("[Supabase Insert Warning - Suppressed]:", error.message || error);
-        }
-      } catch (err) {
-        console.warn("[Supabase Insert Catch Warning - Suppressed]:", err);
-      }
     }
   },
   
   updateCategory: async (id, payload) => {
     const supabase = getSupabase();
+    if (!supabase) {
+      throw new Error("Supabase client is not initialized. Please verify your environment configuration.");
+    }
+
     const currentCats = get().categories;
     const existing = currentCats.find(c => c.id === id);
-    const mergedPayload = existing ? { ...existing, ...payload } : payload;
+    if (!existing) {
+      throw new Error(`Category with ID ${id} was not found.`);
+    }
+
+    const mergedPayload = { ...existing, ...payload };
+    
+    // Attempt database update
+    const { error } = await supabase.from('categories').update(payload).eq('id', id);
+    if (error) {
+      console.error("[Supabase Database Error] Category update failed:", error);
+      throw new Error(error.message || "Failed to update category in cloud database (check your RLS policies / connection).");
+    }
     
     // Update local state and backup immediately
-    const updatedCats = currentCats.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
+    const updatedCats = currentCats.map(c => c.id === id ? mergedPayload : c).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
     set({ categories: updatedCats as Category[], isLoaded: true });
     if (typeof window !== 'undefined') {
       localStorage.setItem('tazu_categories_backup', JSON.stringify(updatedCats));
     }
-    
-    if (supabase) {
-      try {
-        const { error } = await supabase.from('categories').update(mergedPayload).eq('id', id);
-        if (error) {
-          console.warn("[Supabase Update Warning - Suppressed]:", error.message || error);
-        }
-      } catch (err) {
-        console.warn("[Supabase Update Catch Warning - Suppressed]:", err);
-      }
-    }
   },
   
   deleteCategory: async (id) => {
+    const supabase = getSupabase();
+    if (!supabase) {
+      throw new Error("Supabase client is not initialized. Please verify your environment configuration.");
+    }
+
     const currentCats = get().categories;
     const category = currentCats.find(c => c.id === id);
-    const supabase = getSupabase();
+    if (!category) return;
     
-    if (category) {
-      try {
-        const urlsToDelete = new Set<string>();
-        if (category.iconImage) urlsToDelete.add(category.iconImage);
-        if (category.bannerImage) urlsToDelete.add(category.bannerImage);
-        if (category.wideBannerImage) urlsToDelete.add(category.wideBannerImage);
-        if (category.bannerImages && Array.isArray(category.bannerImages)) {
-          category.bannerImages.forEach(img => {
-            if (img) urlsToDelete.add(img);
-          });
-        }
-        
-        // Execute background deletions securely
-        Promise.all(Array.from(urlsToDelete).map(url => deleteImage(url)))
-          .catch(err => console.warn("Failed to delete some category storage files:", err));
-      } catch (importErr) {
-        console.error("Failed to import imageUtils during deleteCategory:", importErr);
+    // Attempt database deletion first
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+    if (error) {
+      console.error("[Supabase Database Error] Category deletion failed:", error);
+      throw new Error(error.message || "Failed to delete category from cloud database (check your RLS policies / connection).");
+    }
+    
+    try {
+      const urlsToDelete = new Set<string>();
+      if (category.iconImage) urlsToDelete.add(category.iconImage);
+      if (category.bannerImage) urlsToDelete.add(category.bannerImage);
+      if (category.wideBannerImage) urlsToDelete.add(category.wideBannerImage);
+      if (category.bannerImages && Array.isArray(category.bannerImages)) {
+        category.bannerImages.forEach(img => {
+          if (img) urlsToDelete.add(img);
+        });
       }
+      
+      // Execute background deletions securely
+      Promise.all(Array.from(urlsToDelete).map(url => deleteImage(url)))
+        .catch(err => console.warn("Failed to delete some category storage files:", err));
+    } catch (importErr) {
+      console.error("Failed to clean up category storage attachments:", importErr);
     }
     
     // Update local state and backup immediately
@@ -168,17 +182,6 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     set({ categories: newCats, isLoaded: true });
     if (typeof window !== 'undefined') {
       localStorage.setItem('tazu_categories_backup', JSON.stringify(newCats));
-    }
-    
-    if (supabase) {
-      try {
-        const { error } = await supabase.from('categories').delete().eq('id', id);
-        if (error) {
-          console.warn("[Supabase Delete Warning - Suppressed]:", error.message || error);
-        }
-      } catch (err) {
-        console.warn("[Supabase Delete Catch Warning - Suppressed]:", err);
-      }
     }
   },
   
