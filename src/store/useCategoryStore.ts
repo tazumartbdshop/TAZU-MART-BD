@@ -64,28 +64,16 @@ interface CategoryState {
 }
 
 const getInitialCategories = (): Category[] => {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved = localStorage.getItem('tazu_categories_backup');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to parse categories backup from localStorage:", e);
-    }
-  }
   return [];
 };
 
 export const useCategoryStore = create<CategoryState>((set, get) => ({
-  categories: getInitialCategories(),
-  isLoaded: typeof window !== 'undefined' && !!localStorage.getItem('tazu_categories_backup'),
+  categories: [],
+  isLoaded: false,
   
   addCategory: async (payload) => {
     const supabase = getSupabase();
+    const creds = (window as any).getSupabaseCredentials?.() || { url: 'Unknown', key: 'Unknown' };
     const id = `cat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const newCategory: Category = {
       ...payload,
@@ -93,85 +81,96 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       createdAt: new Date().toISOString(),
     };
     
+    console.log(`%c[Supabase Category Insert] Attempting INSERT in 'categories' table`, "color: #3b82f6; font-weight: bold; font-size: 13px;");
+    console.log(`%c[Supabase Connection Details] Targeting URL: ${creds.url}`, "color: #0ea5e9; font-weight: bold;");
+    console.log("[Supabase Category Payload]", newCategory);
+    
     // Optimistic Update
     const currentCats = get().categories;
     const nextCats = [...currentCats, newCategory];
     set({ categories: nextCats, isLoaded: true });
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('tazu_categories_backup', JSON.stringify(nextCats));
-    }
     
     if (supabase) {
       try {
-        const { error } = await supabase.from('categories').insert([newCategory]);
+        const { data, error, status, statusText } = await supabase.from('categories').insert([newCategory]).select();
+        
+        console.log(`%c[Supabase Insert Response] HTTP Status: ${status} (${statusText})`, "color: #a855f7; font-weight: bold;");
+        
         if (error) {
           // Rollback on error
           set({ categories: currentCats });
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
-          }
-          console.error("Supabase category insert error:", error);
-          throw new Error(error.message || "Failed to add category to database");
+          console.error("%c[Supabase DB Insert Fail Error Details]:", "color: #ef4444; font-weight: bold;", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+            status,
+            statusText
+          });
+          throw new Error(`Database Insert Failed [Code: ${error.code}]: ${error.message} (Hint: ${error.hint || 'None'})`);
+        } else {
+          console.log(`%c[Supabase DB Insert SUCCESS] Record written successfully!`, "color: #10b981; font-weight: bold; font-size: 12px;", data);
         }
       } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
-        }
-        console.error("Supabase insert catch exception:", err);
-        throw new Error(err?.message || err || "Failed to connect to database");
+        console.error("%c[Supabase DB Insert Exception]:", "color: #f43f5e; font-weight: bold;", err);
+        throw new Error(err?.message || err || "Database connection failure during insert");
       }
     } else {
       // Rollback
       set({ categories: currentCats });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
-      }
+      console.error("%c[Supabase Client Missing] Cannot write category: Supabase Client not initialized.", "color: #ef4444; font-weight: bold;");
       throw new Error("Database client is not initialized");
     }
   },
   
   updateCategory: async (id, payload) => {
     const supabase = getSupabase();
+    const creds = (window as any).getSupabaseCredentials?.() || { url: 'Unknown', key: 'Unknown' };
     const currentCats = get().categories;
     const existing = currentCats.find(c => c.id === id);
     const mergedPayload = existing ? { ...existing, ...payload } : payload;
     
+    console.log(`%c[Supabase Category Update] Attempting UPDATE in 'categories' for ID: ${id}`, "color: #eab308; font-weight: bold; font-size: 13px;");
+    console.log(`%c[Supabase Connection Details] Targeting URL: ${creds.url}`, "color: #0ea5e9; font-weight: bold;");
+    console.log("[Supabase Category Update Payload]", mergedPayload);
+    
     // Optimistic Update
     const updatedCats = currentCats.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
     set({ categories: updatedCats as Category[], isLoaded: true });
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('tazu_categories_backup', JSON.stringify(updatedCats));
-    }
     
     if (supabase) {
       try {
-        const { error } = await supabase.from('categories').update(mergedPayload).eq('id', id);
+        const { data, error, status, statusText } = await supabase.from('categories').update(mergedPayload).eq('id', id).select();
+        
+        console.log(`%c[Supabase Update Response] HTTP Status: ${status} (${statusText})`, "color: #a855f7; font-weight: bold;");
+        
         if (error) {
           // Rollback on error
           set({ categories: currentCats });
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
-          }
-          console.error("Supabase category update error:", error);
-          throw new Error(error.message || "Failed to update category in database");
+          console.error("%c[Supabase DB Update Fail Error Details]:", "color: #ef4444; font-weight: bold;", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+            status,
+            statusText
+          });
+          throw new Error(`Database Update Failed [Code: ${error.code}]: ${error.message} (Hint: ${error.hint || 'None'})`);
+        } else {
+          console.log(`%c[Supabase DB Update SUCCESS] Record updated successfully!`, "color: #10b981; font-weight: bold; font-size: 12px;", data);
         }
       } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
-        }
-        console.error("Supabase update catch exception:", err);
-        throw new Error(err?.message || err || "Database connection failure");
+        console.error("%c[Supabase DB Update Exception]:", "color: #f43f5e; font-weight: bold;", err);
+        throw new Error(err?.message || err || "Database connection failure during update");
       }
     } else {
       // Rollback
       set({ categories: currentCats });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
-      }
+      console.error("%c[Supabase Client Missing] Cannot update category: Supabase Client not initialized.", "color: #ef4444; font-weight: bold;");
       throw new Error("Database client is not initialized");
     }
   },
@@ -204,9 +203,6 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     // Optimistic Update
     const newCats = currentCats.filter(c => c.id !== id);
     set({ categories: newCats, isLoaded: true });
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('tazu_categories_backup', JSON.stringify(newCats));
-    }
     
     if (supabase) {
       try {
@@ -214,45 +210,33 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         if (error) {
           // Rollback on error
           set({ categories: currentCats });
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
-          }
           console.error("Supabase category delete error:", error);
           throw new Error(error.message || "Failed to delete category from database");
         }
       } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
-        }
         console.error("Supabase delete catch exception:", err);
         throw new Error(err?.message || err || "Database connection failure");
       }
     } else {
       // Rollback
       set({ categories: currentCats });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('tazu_categories_backup', JSON.stringify(currentCats));
-      }
       throw new Error("Database client is not initialized");
     }
   },
   
   clearDemoData: () => {
     set({ categories: [] });
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('tazu_categories_backup');
-    }
   },
   
   subscribe: () => {
-    const existingBackup = typeof window !== 'undefined' ? localStorage.getItem('tazu_categories_backup') : null;
-    set({ isLoaded: !!existingBackup });
+    // Strictly database-driven loading: start with isLoaded false on subscription (refresh)
+    set({ isLoaded: false });
     
     const supabase = getSupabase();
     if (!supabase) {
-        console.warn("[Supabase Categories Sync] Supabase client is not available or configured. Defaulting to empty array or localStorage backup.");
+        console.warn("[Supabase Categories Sync] Supabase client is not available or configured. Defaulting to empty array.");
         set({ isLoaded: true });
         return () => {}; // fallback
     }
@@ -299,77 +283,73 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     };
 
     const { url } = (window as any).getSupabaseCredentials?.() || {};
-    console.log(`%c[Supabase Categories Fetch] Querying 'categories' from: ${url || 'Current Instance'}`, "color: #3b82f6;");
     
-    supabase.from('categories').select('*')
-      .then(({ data, error, status, statusText }) => {
-        if (error) {
-            console.warn("%c[Supabase Categories FETCH ERROR - Suppressed]:", "color: #f59e0b; font-weight: bold;", {
-              code: error.code,
-              message: error.message,
-              hint: (error as any).hint,
-              details: (error as any).details,
-              httpStatus: status,
-              httpStatusText: statusText
-            });
-            set({ isLoaded: true });
-        } else if (data) {
-            console.log(`%c[Supabase Categories SUCCESS] Rows: ${data.length} (HTTP ${status})`, "color: #10b981; font-weight: bold;");
-            if (data.length === 0) {
-              console.warn("[Supabase Categories] Table is EMPTY. If you have data, this is almost certainly an RLS 'anon' role read-denied issue.");
-            }
-            try {
-              const mappedData = data.map((row, idx) => {
-                try {
-                  return mapDbToCategory(row);
-                } catch (e) {
-                   console.error(`[Supabase Categories] Mapping failed at index ${idx}:`, row, e);
-                   throw e;
-                }
-              }).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
-              set({ categories: mappedData, isLoaded: true });
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('tazu_categories_backup', JSON.stringify(mappedData));
-              }
-            } catch (err) {
-              console.error("[Supabase Categories] Critical processing error:", err);
+    // Core Fetch Function
+    const fetchCategoriesData = () => {
+      supabase.from('categories').select('*')
+        .then(({ data, error, status, statusText }) => {
+          if (error) {
+              console.warn("%c[Supabase Categories FETCH ERROR]:", "color: #f59e0b; font-weight: bold;", {
+                code: error.code,
+                message: error.message,
+                hint: (error as any).hint,
+                details: (error as any).details,
+                httpStatus: status,
+                httpStatusText: statusText
+              });
               set({ isLoaded: true });
-            }
-        } else {
-            console.log("[Supabase Categories Fetch] No data or error returned (Unexpected).");
-            set({ isLoaded: true });
-        }
-    }, (err) => {
-        console.warn("[Supabase Categories Fetch CONNECTION ERROR - Suppressed]:", err);
-        set({ isLoaded: true });
-    });
-    
+          } else if (data) {
+              try {
+                const mappedData = data.map((row, idx) => {
+                  try {
+                    return mapDbToCategory(row);
+                  } catch (e) {
+                     console.error(`[Supabase Categories] Mapping failed at index ${idx}:`, row, e);
+                     throw e;
+                  }
+                }).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
+                set({ categories: mappedData, isLoaded: true });
+              } catch (err) {
+                console.error("[Supabase Categories] Critical processing error:", err);
+                set({ isLoaded: true });
+              }
+          } else {
+              set({ isLoaded: true });
+          }
+      }, (err) => {
+          console.warn("[Supabase Categories Fetch CONNECTION ERROR]:", err);
+          set({ isLoaded: true });
+      });
+    };
+
+    // 1. Initial Load immediately
+    fetchCategoriesData();
+
+    // 2. Real-time changes subscription
     let channel: any = null;
     try {
       channel = supabase
         .channel('public:categories:' + Math.random().toString(36).substring(2, 9))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, (payload) => {
-          console.log("[Supabase Categories Sync] postgres_changes change detected:", payload);
-          supabase.from('categories').select('*')
-              .then(({ data, error }) => {
-                  if (!error && data) {
-                      const mappedData = data.map(mapDbToCategory).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
-                      console.log("[Supabase Categories Sync] Reloaded items count:", mappedData.length, "Loaded:", mappedData);
-                      set({ categories: mappedData, isLoaded: true });
-                      if (typeof window !== 'undefined') {
-                        localStorage.setItem('tazu_categories_backup', JSON.stringify(mappedData));
-                      }
-                  }
-              }, () => {});
-          })
-          .subscribe();
+          console.log("[Supabase Categories Sync] Real-time postgres_changes event received:", payload);
+          fetchCategoriesData();
+        })
+        .subscribe();
     } catch (realtimeErr) {
       console.warn("[Supabase Categories Real-time Subscription - Suppressed]:", realtimeErr);
     }
+
+    // 3. Robust background polling interval (every 12 seconds) 
+    // This acts as a bulletproof failsafe if WebSocket drops or during cross-device navigation.
+    const pollInterval = setInterval(() => {
+      fetchCategoriesData();
+    }, 12000);
       
+    // 4. Return complete cleanup
     return () => {
+      clearInterval(pollInterval);
       if (channel) {
-        console.log("[Supabase Categories Sync] Unsubscribing real-time channel");
+        console.log("[Supabase Categories Sync] Unsubscribing real-time channel and polling");
         try {
           supabase.removeChannel(channel);
         } catch (e) {}

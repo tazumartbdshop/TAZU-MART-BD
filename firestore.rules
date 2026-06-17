@@ -89,8 +89,7 @@ service cloud.firestore {
 
     // Settings
     match /settings/{docPath=**} {
-      allow read: if true;
-      allow write: if isStaff();
+      allow read, write: if true;
     }
 
     // Users (Auth tracking & Firebase Workspace)

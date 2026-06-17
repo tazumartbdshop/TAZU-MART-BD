@@ -56,7 +56,7 @@ const CUSTOMER_TESTIMONIALS = [
 ];
 
 export default function Home() {
-  const { categories } = useCategoryStore();
+  const { categories, isLoaded: categoriesLoaded } = useCategoryStore();
   const { products, isLoading: productsLoading } = useProductStore();
   const { banners: storeBanners } = useBannerStore();
   const { settings } = useSettingsStore();
@@ -66,7 +66,7 @@ export default function Home() {
 
   // Dynamic active database categories mapped inside the exact home format
   const activeDbCategories = (categories || [])
-    .filter(c => c && c.status === 'Active')
+    .filter(c => c && (c.status === 'Active' || (c.status as string) === 'active' || !c.status))
     .sort((a, b) => {
       const orderA = a.displayOrder !== undefined && a.displayOrder !== null && Number(a.displayOrder) !== 0 ? Number(a.displayOrder) : Infinity;
       const orderB = b.displayOrder !== undefined && b.displayOrder !== null && Number(b.displayOrder) !== 0 ? Number(b.displayOrder) : Infinity;
@@ -219,7 +219,16 @@ export default function Home() {
       {/* 2. CATEGORY SECTION (Circular shape, completely database-driven) */}
       <section className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
         <div className="container mx-auto px-4">
-          {homeCategories.length > 0 ? (
+          {!categoriesLoaded ? (
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl justify-items-center">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="flex flex-col items-center animate-pulse text-center">
+                  <div className="w-[16vw] h-[16vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full bg-neutral-100 border border-neutral-100 flex items-center justify-center" />
+                  <div className="h-2.5 w-12 bg-neutral-100 rounded mt-2.5" />
+                </div>
+              ))}
+            </div>
+          ) : homeCategories.length > 0 ? (
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl">
               {homeCategories.map((cat, i) => (
                 <Link 

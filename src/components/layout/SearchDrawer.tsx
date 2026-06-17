@@ -111,7 +111,7 @@ export default function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
 
     // 2. Matching Categories (e.g. "Watch in Electronics")
     const matchedCats = categories.filter(c => 
-      c.name.toLowerCase().includes(q) && c.status === 'Active'
+      c.name.toLowerCase().includes(q) && (c.status === 'Active' || (c.status as string) === 'active' || !c.status)
     );
     matchedCats.forEach(cat => {
       list.push({

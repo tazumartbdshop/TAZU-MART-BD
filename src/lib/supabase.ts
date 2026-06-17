@@ -125,37 +125,84 @@ export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
     
     clearTimeout(timeoutId);
 
+    let serverUrl = "";
+    let serverKey = "";
+
     if (res.ok) {
       const contentType = res.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         const data = await res.json();
         console.log("[Supabase Config] Received JSON response from server:", data);
-        
         if (data.supabaseUrl && data.supabaseKey) {
-          (window as any).__supabase_url = data.supabaseUrl;
-          (window as any).__supabase_key = data.supabaseKey;
-          
-          // Also update the __SUPABASE_URL/KEY aliases just in case
-          (window as any).__SUPABASE_URL = data.supabaseUrl;
-          (window as any).__SUPABASE_KEY = data.supabaseKey;
-
-          // Backup to localStorage
-          localStorage.setItem('sb_url_backup', data.supabaseUrl);
-          localStorage.setItem('sb_key_backup', data.supabaseKey);
-          
-          console.log(`%c[Supabase Config] SUCCESS: Connected to ${data.supabaseUrl}`, "color: #10b981; font-weight: bold;");
-          console.log("[Supabase Config] Root credentials synchronized. Future client calls will target this instance.");
-          return true;
-        } else {
-          console.warn("[Supabase Config] WARNING: Server returned status OK but with empty/null credentials.", data);
+          serverUrl = data.supabaseUrl;
+          serverKey = data.supabaseKey;
         }
-      } else {
-        const text = await res.text();
-        console.log("[Supabase Config] API response was not JSON. Recieved text preview:", text.substring(0, 100));
       }
-    } else {
-      console.warn(`%c[Supabase Config] ERROR: Server API returned ${res.status} ${res.statusText}`, "color: #ef4444; font-weight: bold;");
     }
+
+    // If server API returned valid credentials, use them and save them as backup to Firestore
+    if (serverUrl && serverKey) {
+      (window as any).__supabase_url = serverUrl;
+      (window as any).__supabase_key = serverKey;
+      (window as any).__SUPABASE_URL = serverUrl;
+      (window as any).__SUPABASE_KEY = serverKey;
+
+      // Backup to localStorage
+      localStorage.setItem('sb_url_backup', serverUrl);
+      localStorage.setItem('sb_key_backup', serverKey);
+      
+      // Auto-replicate to Firestore so it persists across container restarts/scale-to-zero
+      try {
+        const { doc, setDoc } = await import('firebase/firestore');
+        const { db } = await import('./firebase');
+        if (db) {
+          const docRef = doc(db, 'settings', 'supabase_credential');
+          await setDoc(docRef, {
+            supabaseUrl: serverUrl,
+            supabaseKey: serverKey,
+            updatedAt: Date.now()
+          }, { merge: true });
+          console.log("%c[Supabase Config] SUCCESS: Replicated server-side credentials to Firestore persistent node.", "color: #10b981; font-weight: bold;");
+        }
+      } catch (err) {
+        console.warn("[Supabase Config] Non-blocking Firestore write safeguard skipped:", err);
+      }
+
+      console.log(`%c[Supabase Config] SUCCESS: Connected to ${serverUrl}`, "color: #10b981; font-weight: bold;");
+      return true;
+    }
+
+    // If server returned empty, fall back to reading from Firestore settings collection
+    console.log("%c[Supabase Config] Server config empty. Searching Firestore settings fallback...", "color: #eab308; font-weight: bold;");
+    try {
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('./firebase');
+      if (db) {
+        const docRef = doc(db, 'settings', 'supabase_credential');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const firestoreData = docSnap.data();
+          if (firestoreData.supabaseUrl && firestoreData.supabaseKey) {
+            console.log("%c[Supabase Config] SUCCESS: Retrieved persistent credentials from Firestore settings collection!", "color: #10b981; font-weight: bold;");
+            
+            const finalUrl = firestoreData.supabaseUrl;
+            const finalKey = firestoreData.supabaseKey;
+
+            (window as any).__supabase_url = finalUrl;
+            (window as any).__supabase_key = finalKey;
+            (window as any).__SUPABASE_URL = finalUrl;
+            (window as any).__SUPABASE_KEY = finalKey;
+
+            localStorage.setItem('sb_url_backup', finalUrl);
+            localStorage.setItem('sb_key_backup', finalKey);
+            return true;
+          }
+        }
+      }
+    } catch (fsErr) {
+      console.warn("[Supabase Config] Firestore retrieval failed or bypassed:", fsErr);
+    }
+
   } catch (err) {
     console.error("[Supabase Config] Network error while fetching config:", err);
   }

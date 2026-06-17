@@ -160,6 +160,127 @@ export default function AdminInfrastructure() {
     isBusy: false
   });
 
+  // --- Supabase Custom Settings Modifier ---
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState((window as any).__SUPABASE_URL || localStorage.getItem('sb_url_backup') || '');
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState((window as any).__SUPABASE_KEY || localStorage.getItem('sb_key_backup') || '');
+  const [savingSupabase, setSavingSupabase] = useState(false);
+  const [testingSupabase, setTestingSupabase] = useState(false);
+  const [supabaseTestLogs, setSupabaseTestLogs] = useState<string[]>([]);
+
+  const saveSupabaseConfig = async () => {
+    if (!supabaseUrlInput.trim() || !supabaseKeyInput.trim()) {
+      toast.error("Please enter both Supabase URL and Anon Key.");
+      return;
+    }
+    try {
+      setSavingSupabase(true);
+      const url = supabaseUrlInput.trim();
+      const key = supabaseKeyInput.trim();
+      
+      const response = await fetch('/api/supabase-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ supabaseUrl: url, supabaseKey: key })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server returned HTTP ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.status === 'success') {
+        // Update client window variables
+        (window as any).__SUPABASE_URL = url;
+        (window as any).__SUPABASE_KEY = key;
+        (window as any).__supabase_url = url;
+        (window as any).__supabase_key = key;
+        
+        // Backup in localStorage
+        localStorage.setItem('sb_url_backup', url);
+        localStorage.setItem('sb_key_backup', key);
+        
+        // Force re-initialization of our standard clients
+        const { fetchSupabaseConfigFromServer } = await import('../../lib/supabase');
+        await fetchSupabaseConfigFromServer();
+        
+        toast.success("Supabase Configuration updated successfully! 🟢");
+        
+        setSupabaseTestLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] ✅ Credentials saved to config file & Firestore successfully!`
+        ]);
+      } else {
+        throw new Error(result.error || "Failed to update configuration");
+      }
+    } catch (err: any) {
+      console.error("[Save Supabase] Error:", err);
+      toast.error(`Failed to save configuration: ${err.message || err}`);
+    } finally {
+      setSavingSupabase(false);
+    }
+  };
+
+  const testSupabaseConnection = async () => {
+    try {
+      setTestingSupabase(true);
+      const timestamp = new Date().toLocaleTimeString();
+      setSupabaseTestLogs(prev => [
+        ...prev,
+        `[${timestamp}] 🔍 Initiating connection query... Targeting DB URL: ${supabaseUrlInput || 'N/A'}`
+      ]);
+      
+      const { getSupabase } = await import('../../lib/supabase');
+      const client = getSupabase();
+      if (!client) {
+        setSupabaseTestLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] 🔴 Failure: Supabase Client not initialized.`
+        ]);
+        toast.error("Supabase client not initialized.");
+        return;
+      }
+      
+      setSupabaseTestLogs(prev => [
+        ...prev,
+        `[${new Date().toLocaleTimeString()}] ⏳ Querying database 'categories' schema table...`
+      ]);
+
+      const { data: catData, error: catError, status, statusText } = await client
+        .from('categories')
+        .select('id, name, createdAt')
+        .limit(3);
+      
+      if (catError) {
+        setSupabaseTestLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] 🔴 Error querying categories: ${catError.message} (Code: ${catError.code || 'None'})`,
+          `[${new Date().toLocaleTimeString()}] 💡 Hint: ${catError.hint || 'None'}`,
+          `[${new Date().toLocaleTimeString()}] ℹ️ Server Status: ${status} (${statusText})`
+        ]);
+        toast.error(`Query Failed: ${catError.message}`);
+      } else {
+        setSupabaseTestLogs(prev => [
+          ...prev,
+          `[${new Date().toLocaleTimeString()}] 🟢 Connection successful! Server HTTP Status: ${status} (${statusText})`,
+          `[${new Date().toLocaleTimeString()}] 📁 categories count in list: ${catData?.length || 0}`,
+          `[${new Date().toLocaleTimeString()}] 📑 categories sample: ${JSON.stringify(catData)}`
+        ]);
+        toast.success("Successfully fetched categories table!");
+      }
+    } catch (err: any) {
+      console.error("[Test Supabase] Exception:", err);
+      setSupabaseTestLogs(prev => [
+        ...prev,
+        `[${new Date().toLocaleTimeString()}] 🔴 Exception: ${err.message || err}`
+      ]);
+      toast.error(`Query Connection Exception: ${err.message || err}`);
+    } finally {
+      setTestingSupabase(false);
+    }
+  };
+
   const runFirebaseDiagnostics = async () => {
     setFirebaseDiagnostics(prev => ({
       ...prev,
@@ -2179,6 +2300,92 @@ export default function AdminInfrastructure() {
                             🔒 <strong>Architecture Verification Statement:</strong> Product updates, Category alterations, Banner changes, and Settings updates are executing <strong>Live Firestore Writes</strong>. LocalStorage/fallback states are utilized as fallback caches for full resilience.
                           </span>
                         </div>
+                      </div>
+
+                      {/* NEW SECTION: Supabase Credentials Modifier Card */}
+                      <div className="lg:col-span-3 bg-white border border-neutral-200 rounded-xl p-5 shadow-xs space-y-4 font-sans">
+                        <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
+                          <div className="flex items-center gap-2">
+                            <Database className="w-4 h-4 text-emerald-600 animate-pulse" />
+                            <h4 className="text-xs font-black uppercase tracking-wider text-neutral-900">Supabase Connection Manager & Credentials Sync</h4>
+                          </div>
+                          <span className="text-[9px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-black uppercase">Live DB Connector</span>
+                        </div>
+
+                        <p className="text-[11px] text-neutral-500 leading-relaxed font-sans">
+                          যদি categories বা products টেবিল সেভ করতে <strong>"Could not find the table public.categories..."</strong> এরকম এরর আসে, তার মানে আপনার ব্রাউজার/সার্ভার ভুল Supabase প্রোজেক্টে কানেক্টেড আছে (অথবা হার্ডকোডেড ডিফল্ট প্রোজেক্টে আছে)। এখানে আপনার নিজের নতুন Supabase URL এবং ANON Key লিঙ্ক করুন। এই কনফিগুরেশনটি সরাসরি সার্ভারে এবং Firestore-এ সিঙ্ক হয়ে যাবে, যাতে সব ডিভাইসে একই প্রোজেক্টে কানেক্ট হয়।
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1.5 font-sans">
+                            <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">Supabase URL</label>
+                            <input
+                              type="text"
+                              value={supabaseUrlInput}
+                              onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                              placeholder="https://your-project.supabase.co"
+                              className="w-full h-10 px-3 border border-neutral-200 hover:border-neutral-300 focus:border-neutral-500 rounded-lg text-xs outline-none font-mono transition-all"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5 font-sans">
+                            <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">Supabase Anon Key</label>
+                            <input
+                              type="text"
+                              value={supabaseKeyInput}
+                              onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                              className="w-full h-10 px-3 border border-neutral-200 hover:border-neutral-300 focus:border-neutral-500 rounded-lg text-xs outline-none font-mono transition-all"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 font-sans pt-1">
+                          <button
+                            onClick={saveSupabaseConfig}
+                            disabled={savingSupabase}
+                            className="px-5 h-10 bg-neutral-900 hover:bg-neutral-950 text-white text-xs font-black uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {savingSupabase ? 'সিঙ্ক হচ্ছে...' : '💾 Save & Reconnect'}
+                          </button>
+
+                          <button
+                            onClick={testSupabaseConnection}
+                            disabled={testingSupabase}
+                            className="px-5 h-10 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100/85 text-emerald-950 text-xs font-black uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {testingSupabase ? 'টেস্ট হচ্ছে...' : '🧪 Test Connection / Fetch categories'}
+                          </button>
+                        </div>
+
+                        {/* Connection Test Terminal Log inside this card */}
+                        {supabaseTestLogs.length > 0 && (
+                          <div className="space-y-2 mt-3 font-mono">
+                            <div className="flex items-center justify-between border-t border-neutral-100 pt-3">
+                              <span className="text-[9px] text-neutral-450 font-bold uppercase tracking-wider">Dynamic Supabase Log Output Stream</span>
+                              <button
+                                onClick={() => setSupabaseTestLogs([])}
+                                className="text-[9px] text-red-500 hover:text-red-600 font-extrabold uppercase tracking-wider bg-transparent border-none cursor-pointer"
+                              >
+                                Clear log
+                              </button>
+                            </div>
+                            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3.5 text-[11px] leading-relaxed max-h-48 overflow-y-auto space-y-1.5 scrollbar-thin scrollbar-thumb-zinc-800">
+                              {supabaseTestLogs.map((logLine, index) => {
+                                const isError = logLine.includes('🔴') || logLine.includes('Error') || logLine.includes('Failure:');
+                                const isSuccess = logLine.includes('🟢') || logLine.includes('✅') || logLine.includes('success') || logLine.includes('succeeded');
+                                return (
+                                  <div
+                                    key={index}
+                                    className={isError ? 'text-red-400 font-semibold animate-pulse' : isSuccess ? 'text-emerald-400 font-semibold' : 'text-zinc-300'}
+                                  >
+                                    {logLine}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                     </div>

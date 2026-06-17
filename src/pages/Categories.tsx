@@ -9,7 +9,7 @@ export default function Categories() {
 
   console.log("[Categories Page Debug] Total categories in store:", categories.length, "Items:", categories);
   const activeCategories = [...categories]
-    .filter(c => c && c.status === 'Active')
+    .filter(c => c && (c.status === 'Active' || (c.status as string) === 'active' || !c.status))
     .sort((a, b) => {
       const orderA = a.displayOrder !== undefined && a.displayOrder !== null && Number(a.displayOrder) !== 0 ? Number(a.displayOrder) : Infinity;
       const orderB = b.displayOrder !== undefined && b.displayOrder !== null && Number(b.displayOrder) !== 0 ? Number(b.displayOrder) : Infinity;

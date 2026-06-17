@@ -3,8 +3,67 @@ import path from "path";
 import fs from "fs/promises";
 import { createServer as createViteServer } from "vite";
 import { createClient } from '@supabase/supabase-js';
+import { getApps, initializeApp, getApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const CONFIG_FILE = path.join(process.cwd(), 'game_config.json');
+
+// Dynamic helper to resolve Firestore app and database instances in both Dev and Production (with correct db IDs)
+async function getFirestoreDatabaseInstance() {
+  try {
+    let pId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    let dId = process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || process.env.FIREBASE_FIRESTORE_DATABASE_ID;
+
+    // Fallback to reading the local config file if environment is unpopulated (common in sandbox)
+    if (!pId) {
+      try {
+        const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+        const configRaw = await fs.readFile(configPath, 'utf-8');
+        const config = JSON.parse(configRaw);
+        pId = config.projectId || pId;
+        dId = config.firestoreDatabaseId || dId;
+      } catch (err) {
+        console.warn("[Server Firestore] Could not read firebase-applet-config.json:", err);
+      }
+    }
+
+    // Secondary defaults if everything is empty
+    pId = pId || "gen-lang-client-0838847634";
+    
+    const app = getApps().length === 0 ? initializeApp({ projectId: pId }) : getApp();
+
+    if (dId && dId !== "default" && dId !== "(default)") {
+      return getFirestore(app, dId);
+    } else {
+      return getFirestore(app);
+    }
+  } catch (err) {
+    console.error("[Server Firestore] Failed to resolve Firestore instance:", err);
+    throw err;
+  }
+}
+
+// Helper to load Supabase credentials persistently from Firestore when filesystem/env values are missing
+async function getSupabaseCredentialsFromFirestore(): Promise<{ supabaseUrl: string; supabaseKey: string } | null> {
+  try {
+    const db = await getFirestoreDatabaseInstance();
+    const docRef = db.collection('settings').doc('supabase_credential');
+    const docSnap = await docRef.get();
+    
+    if (docSnap.exists) {
+      const data = docSnap.data();
+      if (data && data.supabaseUrl && data.supabaseKey) {
+        return {
+          supabaseUrl: data.supabaseUrl,
+          supabaseKey: data.supabaseKey
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("[Server Firestore Fallback] Non-blocking read of settings/supabase_credential docs was skipped:", err);
+  }
+  return null;
+}
 
 async function startServer() {
   const app = express();
@@ -37,9 +96,19 @@ async function startServer() {
 
   let supabaseAdmin: any = null;
   try {
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedSupabaseUrl;
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseKey;
+    let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedSupabaseUrl;
+    let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseKey;
     
+    if (!supabaseUrl || !supabaseKey) {
+      console.log("[Server Boot] Supabase credentials empty in env/file. Attempting Firestore fallback...");
+      const firestoreConfig = await getSupabaseCredentialsFromFirestore();
+      if (firestoreConfig) {
+        supabaseUrl = firestoreConfig.supabaseUrl;
+        supabaseKey = firestoreConfig.supabaseKey;
+        console.log(`[Server Boot] Successfully restored Supabase credentials from Firestore settings: ${supabaseUrl}`);
+      }
+    }
+
     if (supabaseUrl && supabaseKey) {
        supabaseAdmin = createClient(supabaseUrl, supabaseKey);
        console.log("Supabase Backend initialized successfully");
@@ -62,8 +131,18 @@ async function startServer() {
       fileKey = parsed.supabaseKey || "";
     } catch (e) {}
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
+    let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
+    let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
+    
+    if (!supabaseUrl || !supabaseKey) {
+      const firestoreConfig = await getSupabaseCredentialsFromFirestore();
+      if (firestoreConfig) {
+        supabaseUrl = firestoreConfig.supabaseUrl;
+        supabaseKey = firestoreConfig.supabaseKey;
+        console.log(`[Server API] Found Supabase configuration in Firestore fallback: ${supabaseUrl}`);
+      }
+    }
+
     res.json({ supabaseUrl, supabaseKey });
   });
 
@@ -77,6 +156,20 @@ async function startServer() {
       await fs.writeFile(SUPABASE_CONFIG_FILE, JSON.stringify({ supabaseUrl, supabaseKey }, null, 2));
       supabaseAdmin = createClient(supabaseUrl, supabaseKey);
       console.log(`Supabase Backend configured & re-initialized via API successfully targeting: ${supabaseUrl}`);
+
+      // Replicate configured credentials to Firestore settings so all containers/devices sync instantly
+      try {
+        const db = await getFirestoreDatabaseInstance();
+        await db.collection('settings').doc('supabase_credential').set({
+          supabaseUrl,
+          supabaseKey,
+          updatedAt: Date.now()
+        }, { merge: true });
+        console.log(`[Server API] Replicated credentials to Firestore settings successfully.`);
+      } catch (fsErr) {
+        console.error("Failed to replicate credentials to Firestore settings:", fsErr);
+      }
+
       res.json({ status: "success", supabaseUrl, supabaseKey });
     } catch (error: any) {
       console.error("Failed to save Supabase config:", error);
@@ -650,9 +743,25 @@ Please ask me your query or select a quick question template below!`;
         } catch (_) {}
 
         // Also capture Supabase credentials for production synchronization
+        let sbUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedUrl || null;
+        let sbKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedKey || null;
+
+        if (!sbUrl || !sbKey) {
+          try {
+            const fsCredsRef = await getSupabaseCredentialsFromFirestore();
+            if (fsCredsRef) {
+              sbUrl = fsCredsRef.supabaseUrl;
+              sbKey = fsCredsRef.supabaseKey;
+              console.log(`[PRODUCTION] Loaded Supabase credentials from Firestore persistent fallback: ${sbUrl}`);
+            }
+          } catch (e) {
+            console.error("[PRODUCTION] Firestore credentials check failed:", e);
+          }
+        }
+
         const sbConfig = {
-          supabaseUrl: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedUrl || null,
-          supabaseKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedKey || null,
+          supabaseUrl: sbUrl,
+          supabaseKey: sbKey,
         };
 
         if (!sbConfig.supabaseUrl || !sbConfig.supabaseKey) {
