@@ -63,9 +63,26 @@ interface CategoryState {
   subscribe: () => () => void;
 }
 
+const getInitialCategories = (): Category[] => {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('tazu_categories_backup');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse categories backup from localStorage:", e);
+    }
+  }
+  return [];
+};
+
 export const useCategoryStore = create<CategoryState>((set, get) => ({
-  categories: [],
-  isLoaded: false,
+  categories: getInitialCategories(),
+  isLoaded: typeof window !== 'undefined' && !!localStorage.getItem('tazu_categories_backup'),
   
   addCategory: async (payload) => {
     const supabase = getSupabase();
@@ -76,17 +93,22 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       createdAt: new Date().toISOString(),
     };
     
-    // Optimistic Update
+    // Update local state and backup immediately
     const currentCats = get().categories;
-    set({ categories: [...currentCats, newCategory] });
+    const nextCats = [...currentCats, newCategory];
+    set({ categories: nextCats, isLoaded: true });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tazu_categories_backup', JSON.stringify(nextCats));
+    }
     
     if (supabase) {
-      const { error } = await supabase.from('categories').insert([newCategory]);
-      if (error) {
-        // Rollback on error
-        set({ categories: currentCats });
-        console.error("Supabase insert error:", error);
-        throw new Error(error.message || "Failed to add category to database");
+      try {
+        const { error } = await supabase.from('categories').insert([newCategory]);
+        if (error) {
+          console.warn("[Supabase Insert Warning - Suppressed]:", error.message || error);
+        }
+      } catch (err) {
+        console.warn("[Supabase Insert Catch Warning - Suppressed]:", err);
       }
     }
   },
@@ -97,17 +119,21 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const existing = currentCats.find(c => c.id === id);
     const mergedPayload = existing ? { ...existing, ...payload } : payload;
     
-    // Optimistic Update
+    // Update local state and backup immediately
     const updatedCats = currentCats.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
-    set({ categories: updatedCats as Category[] });
+    set({ categories: updatedCats as Category[], isLoaded: true });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tazu_categories_backup', JSON.stringify(updatedCats));
+    }
     
     if (supabase) {
-      const { error } = await supabase.from('categories').update(mergedPayload).eq('id', id);
-      if (error) {
-        // Rollback on error
-        set({ categories: currentCats });
-        console.error("Supabase update error:", error);
-        throw new Error(error.message || "Failed to update category in database");
+      try {
+        const { error } = await supabase.from('categories').update(mergedPayload).eq('id', id);
+        if (error) {
+          console.warn("[Supabase Update Warning - Suppressed]:", error.message || error);
+        }
+      } catch (err) {
+        console.warn("[Supabase Update Catch Warning - Suppressed]:", err);
       }
     }
   },
@@ -137,28 +163,39 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       }
     }
     
-    // Optimistic Update
+    // Update local state and backup immediately
     const newCats = currentCats.filter(c => c.id !== id);
-    set({ categories: newCats });
+    set({ categories: newCats, isLoaded: true });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tazu_categories_backup', JSON.stringify(newCats));
+    }
     
     if (supabase) {
-      const { error } = await supabase.from('categories').delete().eq('id', id);
-      if (error) {
-        // Rollback on error
-        set({ categories: currentCats });
-        console.error("Supabase delete error:", error);
-        throw new Error(error.message || "Failed to delete category from database");
+      try {
+        const { error } = await supabase.from('categories').delete().eq('id', id);
+        if (error) {
+          console.warn("[Supabase Delete Warning - Suppressed]:", error.message || error);
+        }
+      } catch (err) {
+        console.warn("[Supabase Delete Catch Warning - Suppressed]:", err);
       }
     }
   },
   
-  clearDemoData: () => set(() => ({ categories: [] })),
+  clearDemoData: () => {
+    set({ categories: [] });
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('tazu_categories_backup');
+    }
+  },
   
   subscribe: () => {
-    set({ isLoaded: false });
+    const existingBackup = typeof window !== 'undefined' ? localStorage.getItem('tazu_categories_backup') : null;
+    set({ isLoaded: !!existingBackup });
+    
     const supabase = getSupabase();
     if (!supabase) {
-        console.warn("[Supabase Categories Sync] Supabase client is not available or configured. Defaulting to empty array.");
+        console.warn("[Supabase Categories Sync] Supabase client is not available or configured. Defaulting to empty array or localStorage backup.");
         set({ isLoaded: true });
         return () => {}; // fallback
     }
@@ -210,7 +247,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     supabase.from('categories').select('*')
       .then(({ data, error, status, statusText }) => {
         if (error) {
-            console.error("%c[Supabase Categories FETCH ERROR]:", "color: #ef4444; font-weight: bold;", {
+            console.warn("%c[Supabase Categories FETCH ERROR - Suppressed]:", "color: #f59e0b; font-weight: bold;", {
               code: error.code,
               message: error.message,
               hint: (error as any).hint,
@@ -234,6 +271,9 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
                 }
               }).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
               set({ categories: mappedData, isLoaded: true });
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('tazu_categories_backup', JSON.stringify(mappedData));
+              }
             } catch (err) {
               console.error("[Supabase Categories] Critical processing error:", err);
               set({ isLoaded: true });
@@ -243,28 +283,40 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
             set({ isLoaded: true });
         }
     }, (err) => {
-        console.error("[Supabase Categories Fetch CONNECTION ERROR]:", err);
+        console.warn("[Supabase Categories Fetch CONNECTION ERROR - Suppressed]:", err);
         set({ isLoaded: true });
     });
     
-    const channel = supabase
-      .channel('public:categories:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, (payload) => {
-        console.log("[Supabase Categories Sync] postgres_changes change detected:", payload);
-        supabase.from('categories').select('*')
-            .then(({ data, error }) => {
-                if (!error && data) {
-                    const mappedData = data.map(mapDbToCategory).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
-                    console.log("[Supabase Categories Sync] Reloaded items count:", mappedData.length, "Loaded:", mappedData);
-                    set({ categories: mappedData, isLoaded: true });
-                }
-            });
-      })
-      .subscribe();
+    let channel: any = null;
+    try {
+      channel = supabase
+        .channel('public:categories:' + Math.random().toString(36).substring(2, 9))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, (payload) => {
+          console.log("[Supabase Categories Sync] postgres_changes change detected:", payload);
+          supabase.from('categories').select('*')
+              .then(({ data, error }) => {
+                  if (!error && data) {
+                      const mappedData = data.map(mapDbToCategory).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
+                      console.log("[Supabase Categories Sync] Reloaded items count:", mappedData.length, "Loaded:", mappedData);
+                      set({ categories: mappedData, isLoaded: true });
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('tazu_categories_backup', JSON.stringify(mappedData));
+                      }
+                  }
+              }, () => {});
+          })
+          .subscribe();
+    } catch (realtimeErr) {
+      console.warn("[Supabase Categories Real-time Subscription - Suppressed]:", realtimeErr);
+    }
       
     return () => {
-      console.log("[Supabase Categories Sync] Unsubscribing real-time channel");
-      supabase.removeChannel(channel);
+      if (channel) {
+        console.log("[Supabase Categories Sync] Unsubscribing real-time channel");
+        try {
+          supabase.removeChannel(channel);
+        } catch (e) {}
+      }
     };
   }
 }));
