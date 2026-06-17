@@ -250,11 +250,23 @@ export const useProductStore = create<ProductState>((set, get) => ({
     
     if (supabase) {
       const dbPayload = objectToSnake(newProduct);
-      const { error } = await supabase.from('products').insert([dbPayload]);
+      const { error, status, statusText } = await supabase.from('products').insert([dbPayload]);
       if (error) {
         // Rollback on error
         set({ products: currentProducts });
-        console.error("Supabase insert error:", error);
+        console.error("%c[Supabase Product Sync] INSERT ERROR:", "color: #ef4444; font-weight: bold;", {
+          code: error.code,
+          message: error.message,
+          hint: (error as any).hint,
+          details: (error as any).details,
+          httpStatus: status,
+          httpStatusText: statusText
+        });
+        
+        if (error.code === 'PGRST205') {
+          throw new Error(`Database Table Not Found [Code: ${error.code}]: The 'products' table was not found. Please ensure you have run the provisioning SQL script and clicked 'Reload Schema' in Supabase Settings.`);
+        }
+        
         throw new Error(error.message || "Failed to add product to database");
       }
     }

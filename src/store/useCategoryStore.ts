@@ -109,8 +109,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
             hint: error.hint,
             code: error.code,
             status,
-            statusText
+            statusText,
+            targetUrl: creds.url
           });
+          
+          if (error.code === 'PGRST205') {
+            throw new Error(`Database Table Not Found [Code: ${error.code}]: The 'categories' table was not found in the Supabase project '${creds.url}'. Please ensure you have run the provisioning SQL script in the correct project and clicked 'Reload Schema' in Supabase Settings.`);
+          }
+          
           throw new Error(`Database Insert Failed [Code: ${error.code}]: ${error.message} (Hint: ${error.hint || 'None'})`);
         } else {
           console.log(`%c[Supabase DB Insert SUCCESS] Record written successfully!`, "color: #10b981; font-weight: bold; font-size: 12px;", data);
