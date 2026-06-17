@@ -6,7 +6,6 @@ import { useProductStore, generateKeywords } from '../../store/useProductStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { toast } from 'react-hot-toast';
 import { uploadImage } from '../../lib/imageUtils';
-import { storage } from '../../lib/firebase';
 
 function AdminProductList() {
   const navigate = useNavigate();
@@ -49,24 +48,24 @@ function AdminProductList() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Database className="w-3.5 h-3.5 text-orange-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Live Firestore Path Inspector</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Live Supabase Table Inspector</span>
             </div>
             <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-850 px-3 py-1.5 font-mono text-[11px] text-green-400">
-              <span className="text-neutral-600">PATH:</span>
+              <span className="text-neutral-600">TABLE:</span>
               products
             </div>
           </div>
 
           <div className="flex gap-8">
             <div className="space-y-0.5">
-              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Document Count</p>
+              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Entry Count</p>
               <p className="text-sm font-black text-white">{products.length}</p>
             </div>
             <div className="space-y-0.5">
-              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Storage Status</p>
+              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">DB Sync Status</p>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs font-black text-white uppercase tracking-wider">Production Live</span>
+                <span className="text-xs font-black text-white uppercase tracking-wider">Cloud Live</span>
               </div>
             </div>
           </div>
@@ -90,11 +89,11 @@ function AdminProductList() {
         </div>
         
         <div className="flex flex-col gap-3 w-full md:w-auto min-w-[280px]">
-          {/* FIRESTORE DEBUG COUNTER CARD */}
+          {/* SUPABASE DEBUG COUNTER CARD */}
           <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-none flex items-center justify-between group hover:border-purple-500 transition-all">
             <div className="flex flex-col">
-              <span className="text-[8px] font-black text-zinc-550 uppercase tracking-[0.2em] text-[#8c32ec]">Firestore Database</span>
-              <span className="text-[10px] font-black text-black uppercase tracking-tight">Total Products Found In Firestore</span>
+              <span className="text-[8px] font-black text-zinc-550 uppercase tracking-[0.2em] text-[#8c32ec]">Supabase Database</span>
+              <span className="text-[10px] font-black text-black uppercase tracking-tight">Total Products Found In Supabase</span>
             </div>
             <div className="text-2xl font-black text-purple-600 bg-white border border-zinc-200 px-3 py-1 font-mono">
               {products.length}
@@ -634,7 +633,7 @@ function AdminProductAdd() {
           )
         };
 
-        console.log("Saving payload to Firestore...");
+        console.log("Saving payload to Supabase...");
         if (isEditing && id) {
           await updateProduct(id, payload);
           console.log("Product updated.");

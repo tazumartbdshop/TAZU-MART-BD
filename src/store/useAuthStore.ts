@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { signOut } from 'firebase/auth';
-import { auth } from '../lib/firebase';
-
+import { getSupabase } from '../lib/supabase';
 import { useCustomerStore } from './useCustomerStore';
 
 type UserRole = 'customer' | 'admin' | 'moderator';
@@ -20,19 +18,19 @@ export interface User {
   country?: string;
   division?: string;
   district?: string;
-  city?: string; // Added city
-  upazila?: string; // Added upazila
-  area?: string; // Added area
-  houseRoad?: string; // Added houseRoad
-  street?: string; // Added street
+  city?: string;
+  upazila?: string;
+  area?: string;
+  houseRoad?: string;
+  street?: string;
   zipCode?: string;
-  postalCode?: string; // Added postalCode
+  postalCode?: string;
   landmark?: string;
   profileImage?: string;
   language?: string;
   occasionName?: string;
   specialDate?: string;
-  interests?: string[]; // Shopping interests
+  interests?: string[];
   marketingEmail?: boolean;
   permissions?: string[];
 }
@@ -58,12 +56,10 @@ export const useAuthStore = create<AuthState>()(
         }, 500);
       },
       logout: () => {
-        signOut(auth).catch((err) => console.error("Firebase signOut failed:", err));
-        import('../lib/supabase').then(m => m.getSupabase()).then(sb => {
-          if (sb) {
-            sb.auth.signOut().catch((err) => console.error("Supabase signOut failed:", err));
-          }
-        });
+        const supabase = getSupabase();
+        if (supabase) {
+          supabase.auth.signOut().catch((err) => console.error("Supabase signOut failed:", err));
+        }
         set({ user: null, isAuthenticated: false });
       },
       updateUser: (updatedUser) => set((state) => ({

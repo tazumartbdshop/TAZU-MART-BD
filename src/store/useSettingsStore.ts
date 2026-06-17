@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
+import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface AppSettings {
   // 1. Store Identity
@@ -432,34 +433,36 @@ const saveLogoToSiteSettings = async (logoUrl: string) => {
   const cleanUrl = logoUrl.split('?')[0];
 
   try {
-    // Attempt 1: ID-column oriented row
-    const { error: err1 } = await supabase.from('site_settings').upsert([{ 
+    const dbPayload = objectToSnake({ 
       id: 'logo', 
-      logo_url: cleanUrl, 
+      logoUrl: cleanUrl, 
       logo: cleanUrl,
       url: cleanUrl,
       value: cleanUrl,
-      updated_at: new Date().toISOString()
-    }]);
+      updatedAt: new Date().toISOString()
+    });
+    // Attempt 1: ID-column oriented row
+    const { error: err1 } = await supabase.from('site_settings').upsert([dbPayload]);
     
     if (err1) {
       console.warn("site_settings upsert format 1 failed, trying format 2...", err1.message);
       // Attempt 2: Key-value oriented row
-      const { error: err2 } = await supabase.from('site_settings').upsert([{ 
+      const dbPayload2 = objectToSnake({ 
         key: 'logo_url', 
         value: cleanUrl,
-        logo_url: cleanUrl,
-        updated_at: new Date().toISOString()
-      }]);
+        logoUrl: cleanUrl,
+        updatedAt: new Date().toISOString()
+      });
+      const { error: err2 } = await supabase.from('site_settings').upsert([dbPayload2]);
       
       if (err2) {
         console.warn("site_settings upsert format 2 failed, trying format 3...", err2.message);
         // Attempt 3: Key-value alternative row
-        await supabase.from('site_settings').upsert([{ 
+        await supabase.from('site_settings').upsert([objectToSnake({ 
           key: 'logo', 
           value: cleanUrl, 
-          updated_at: new Date().toISOString() 
-        }]);
+          updatedAt: new Date().toISOString() 
+        })]);
       }
     }
   } catch (e) {
@@ -483,11 +486,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       
       if (data && data.length > 0) {
         let foundUrl = '';
-        const keysToSearch = ['logo_url', 'value', 'url', 'storeLogo', 'logo'];
+        const keysToSearch = ['logo_url', 'logoUrl', 'value', 'url', 'storeLogo', 'logo'];
         for (const row of data) {
+          const camelRow = objectToCamel(row);
           for (const k of keysToSearch) {
-            if (row[k] && typeof row[k] === 'string' && row[k].startsWith('http')) {
-              foundUrl = row[k];
+            if (camelRow[k] && typeof camelRow[k] === 'string' && camelRow[k].startsWith('http')) {
+              foundUrl = camelRow[k];
               break;
             }
           }
@@ -517,8 +521,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     
     const supabase = getSupabase();
     if (supabase) {
+        const dbPayload = objectToSnake({ id: 'global', ...newSettings });
         // Assume document structure with id 'global'
-        const { error } = await supabase.from('settings').upsert([{ id: 'global', ...newSettings }]);
+        const { error } = await supabase.from('settings').upsert([dbPayload]);
         if (error && error.code !== '42P01') console.error("Supabase settings update fail", error);
         
         // Also save to specialized site_settings table if storeLogo is updated
@@ -536,7 +541,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
       const supabase = getSupabase();
       if (supabase) {
-          const { error } = await supabase.from('settings').upsert([{ id: 'global', ...draft }]);
+          const dbPayload = objectToSnake({ id: 'global', ...draft });
+          const { error } = await supabase.from('settings').upsert([dbPayload]);
           if (error && error.code !== '42P01') throw error;
           
           // Also save to specialized site_settings table if storeLogo exists in draft
@@ -564,11 +570,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     // Load setting collections
     supabase.from('settings').select('*').eq('id', 'global').limit(1).then(({ data, error }) => {
         if (!error && data && data.length > 0) {
-            const mergedSettings = { ...defaultSettings, ...data[0] };
+            const camelData = objectToCamel(data[0]);
+            const mergedSettings = { ...defaultSettings, ...camelData };
             set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
         } else {
             // Initial seed if not exist
-            supabase.from('settings').upsert([{ id: 'global', ...defaultSettings }]).then(({error}) => error && console.warn(error));
+            const dbPayload = objectToSnake({ id: 'global', ...defaultSettings });
+            supabase.from('settings').upsert([dbPayload]).then(({error}) => error && console.warn(error));
             set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
         }
         
@@ -581,7 +589,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
         supabase.from('settings').select('*').eq('id', 'global').limit(1).then(({ data, error }) => {
             if (!error && data && data.length > 0) {
-                const mergedSettings = { ...defaultSettings, ...data[0] };
+                const camelData = objectToCamel(data[0]);
+                const mergedSettings = { ...defaultSettings, ...camelData };
                 set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
                 get().fetchLatestLogo();
             }

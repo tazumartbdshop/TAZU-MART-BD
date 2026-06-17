@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
+import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface FolderType {
   id: string;
@@ -78,27 +79,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set({ isSubscribed: true });
     
     const loadFolders = async () => {
-        const { data, error } = await supabase.from('folders').select('*').eq('user_id', uid).order('createdAt', { ascending: false });
+        const { data, error } = await supabase.from('folders').select('*').eq('user_id', uid).order('created_at', { ascending: false });
         if (!error && data) {
-            set(state => ({ folders: data as FolderType[], isLoading: { ...state.isLoading, folders: false } }));
+            set(state => ({ folders: (data as any[]).map(row => objectToCamel(row)) as FolderType[], isLoading: { ...state.isLoading, folders: false } }));
         } else {
             set(state => ({ isLoading: { ...state.isLoading, folders: false } }));
         }
     };
     
     const loadNotes = async () => {
-        const { data, error } = await supabase.from('notes').select('*').eq('user_id', uid).order('createdAt', { ascending: false });
+        const { data, error } = await supabase.from('notes').select('*').eq('user_id', uid).order('created_at', { ascending: false });
         if (!error && data) {
-             set(state => ({ notes: data as NoteType[], isLoading: { ...state.isLoading, notes: false } }));
+             set(state => ({ notes: (data as any[]).map(row => objectToCamel(row)) as NoteType[], isLoading: { ...state.isLoading, notes: false } }));
         } else {
              set(state => ({ isLoading: { ...state.isLoading, notes: false } }));
         }
     };
     
     const loadMembers = async () => {
-         const { data, error } = await supabase.from('teamMembers').select('*').eq('user_id', uid).order('name', { ascending: true });
+         const { data, error } = await supabase.from('team_members').select('*').eq('user_id', uid).order('name', { ascending: true });
          if (!error && data) {
-             set(state => ({ teamMembers: data as TeamMemberType[], isLoading: { ...state.isLoading, teamMembers: false } }));
+             set(state => ({ teamMembers: (data as any[]).map(row => objectToCamel(row)) as TeamMemberType[], isLoading: { ...state.isLoading, teamMembers: false } }));
          } else {
              set(state => ({ isLoading: { ...state.isLoading, teamMembers: false } }));
          }
@@ -116,8 +117,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         .on('postgres_changes', { event: '*', schema: 'public', table: 'notes', filter: `user_id=eq.${uid}` }, loadNotes)
         .subscribe();
         
-    const channel3 = supabase.channel(`public:teamMembers:${uid}`)
-         .on('postgres_changes', { event: '*', schema: 'public', table: 'teamMembers', filter: `user_id=eq.${uid}` }, loadMembers)
+    const channel3 = supabase.channel(`public:team_members:${uid}`)
+         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members', filter: `user_id=eq.${uid}` }, loadMembers)
          .subscribe();
          
     return () => {
@@ -133,7 +134,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const supabase = getSupabase();
       if (supabase) {
-          const { error } = await supabase.from('folders').insert([{ name, type: 'folder', createdAt: new Date().toISOString(), user_id: uid }]);
+          const dbPayload = objectToSnake({ name, type: 'folder', createdAt: new Date().toISOString(), userId: uid });
+          const { error } = await supabase.from('folders').insert([dbPayload]);
           if (error) throw error;
       }
     } catch (error) {
@@ -147,7 +149,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const supabase = getSupabase();
       if (supabase) {
-          const { error } = await supabase.from('folders').insert([{ name, type: 'file', createdAt: new Date().toISOString(), user_id: uid }]);
+          const dbPayload = objectToSnake({ name, type: 'file', createdAt: new Date().toISOString(), userId: uid });
+          const { error } = await supabase.from('folders').insert([dbPayload]);
           if (error) throw error;
       }
     } catch (error) {
@@ -161,7 +164,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const supabase = getSupabase();
       if(supabase) {
-          const { error } = await supabase.from('notes').insert([{ content, createdAt: new Date().toISOString(), user_id: uid }]);
+          const dbPayload = objectToSnake({ content, createdAt: new Date().toISOString(), userId: uid });
+          const { error } = await supabase.from('notes').insert([dbPayload]);
           if (error) throw error;
       }
     } catch (error) {
@@ -175,7 +179,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const supabase = getSupabase();
       if(supabase) {
-          const { error } = await supabase.from('teamMembers').insert([{ name, email, role, createdAt: new Date().toISOString(), user_id: uid }]);
+          const dbPayload = objectToSnake({ name, email, role, createdAt: new Date().toISOString(), userId: uid });
+          const { error } = await supabase.from('team_members').insert([dbPayload]);
           if(error) throw error;
       }
     } catch (error) {
@@ -231,7 +236,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const supabase = getSupabase();
       if(supabase) {
-         const { error } = await supabase.from('teamMembers').update({ name, email, role }).eq('id', id).eq('user_id', uid);
+         const dbPayload = objectToSnake({ name, email, role });
+         const { error } = await supabase.from('team_members').update(dbPayload).eq('id', id).eq('user_id', uid);
          if (error) throw error;
       }
     } catch (error) {
@@ -245,7 +251,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const supabase = getSupabase();
       if (supabase) {
-          const { error } = await supabase.from(collectionName).delete().eq('id', id).eq('user_id', uid);
+          const activeCollection = collectionName === 'teamMembers' ? 'team_members' : collectionName;
+          const { error } = await supabase.from(activeCollection).delete().eq('id', id).eq('user_id', uid);
           if (error) throw error;
       }
     } catch (error) {

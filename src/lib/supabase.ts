@@ -8,7 +8,13 @@ let cachedClient: SupabaseClient | null = null;
 let cachedUrl = '';
 let cachedKey = '';
 
-// Helper to get raw credentials from any available source
+/**
+ * Helper to retrieve Supabase credentials from available sources:
+ * 1. Window-injected variables (dynamic config from server)
+ * 2. LocalStorage backup
+ * 3. Environment variables (build-time)
+ * 4. Hardcoded fallback (gaqyfj)
+ */
 export const getSupabaseCredentials = () => {
   let url = (window as any).__SUPABASE_URL || (window as any).__supabase_url;
   let key = (window as any).__SUPABASE_KEY || (window as any).__supabase_key;
@@ -29,9 +35,8 @@ export const getSupabaseCredentials = () => {
 
   // Absolute fallback for production (gaqyfj)
   if (!url || !key) {
-    console.warn("%c[Supabase Config] WARNING: No configuration found in Environment OR Server Injection. Using hardcoded production fallback (gaqyfj).", "color: #f59e0b; font-weight: bold;");
     url = "https://gaqyfjztpxvzijouiwwh.supabase.co";
-    key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhcXlmanp0cHh2emlqb3Vpd3doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MTgzMzk3NjgsImV4cCI6MjAzMzkxNTc2OH0.C8R-JPV56712gCVSERVfYfvw_EMofJPVU";
+    key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdhcXlmanp0cHh2emlqb3Vpd3doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1OTM0NTIsImV4cCI6Mj9NMTY5NDUyM00.LdN6jVd5fYi_KsJnjridUl3Gr_RxahnXRvahb5dggsw";
   }
 
   return { url, key };
@@ -42,7 +47,10 @@ if (typeof window !== 'undefined') {
   (window as any).getSupabaseCredentials = getSupabaseCredentials;
 }
 
-// Always create a dynamic getter so we can use the latest creds
+/**
+ * Returns a configured Supabase client instance. 
+ * Re-initializes if credentials have changed.
+ */
 export const getSupabase = (): SupabaseClient | null => {
   const { url, key } = getSupabaseCredentials();
   
@@ -51,12 +59,12 @@ export const getSupabase = (): SupabaseClient | null => {
     return null;
   }
   
+  // Return cached client if credentials haven't changed
   if (cachedClient && cachedUrl === url && cachedKey === key) {
     return cachedClient;
   }
   
   try {
-    console.log(`[Supabase Lib] Initializing standard client: ${url}`);
     cachedClient = createClient(url, key, {
       auth: {
         persistSession: true,
@@ -74,12 +82,14 @@ export const getSupabase = (): SupabaseClient | null => {
   return cachedClient;
 };
 
-// Create a dynamic proxy to avoid stale reference issues across different origins
-const supabaseProxy = new Proxy({} as SupabaseClient, {
+/**
+ * A proxy object that always points to the correctly initialized Supabase client.
+ */
+export const supabase = new Proxy({} as SupabaseClient, {
   get(target, prop) {
     const client = getSupabase();
     if (!client) {
-      console.warn(`[Supabase Proxy] Accessing property '${String(prop)}' but Supabase client is not initialized yet.`);
+      console.warn(`[Supabase Proxy] Accessing '${String(prop)}' but Supabase client is not initialized.`);
       return undefined;
     }
     const val = Reflect.get(client, prop);
@@ -90,31 +100,25 @@ const supabaseProxy = new Proxy({} as SupabaseClient, {
   }
 });
 
-export const supabase = supabaseProxy;
-
-// Secure helper to load configuration from backend
+/**
+ * Securely fetch Supabase configuration from the backend API.
+ */
 export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
   try {
-    // Check if injected via server-side script first (Production Sync)
+    // 1. Check for immediate injection
     if ((window as any).__SUPABASE_URL && (window as any).__SUPABASE_KEY) {
-      console.log("%c[Supabase Config] Using credentials injected into HTML by Live Server.", "color: #a855f7; font-weight: bold;");
       return true;
     }
 
-    // Polling Mechanism: Wait up to 2 seconds for server-side injection if not immediately present
-    // This handles races between HTML render and JS execution
+    // 2. Poll briefly for delayed HTML injection
     for (let attempt = 0; attempt < 5; attempt++) {
       if ((window as any).__SUPABASE_URL && (window as any).__SUPABASE_KEY) {
-        console.log(`[Supabase Config] Found credentials after ${attempt * 400}ms poll.`);
         return true;
       }
       await new Promise(r => setTimeout(r, 400));
     }
 
-    // Last Resort: Direct API fetch from backend
-    console.log(`%c[Supabase Config] FETCHING from server API @ ${new Date().toISOString()}`, "color: #3b82f6; font-weight: bold;");
-    
-    // Add a timeout to the fetch to prevent hanging in production containers
+    // 3. Direct API fetch
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -125,87 +129,23 @@ export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
     
     clearTimeout(timeoutId);
 
-    let serverUrl = "";
-    let serverKey = "";
-
     if (res.ok) {
-      const contentType = res.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await res.json();
-        console.log("[Supabase Config] Received JSON response from server:", data);
-        if (data.supabaseUrl && data.supabaseKey) {
-          serverUrl = data.supabaseUrl;
-          serverKey = data.supabaseKey;
-        }
+      const data = await res.json();
+      if (data.supabaseUrl && data.supabaseKey) {
+        const serverUrl = data.supabaseUrl;
+        const serverKey = data.supabaseKey;
+
+        (window as any).__SUPABASE_URL = serverUrl;
+        (window as any).__SUPABASE_KEY = serverKey;
+
+        localStorage.setItem('sb_url_backup', serverUrl);
+        localStorage.setItem('sb_key_backup', serverKey);
+        
+        return true;
       }
     }
-
-    // If server API returned valid credentials, use them and save them as backup to Firestore
-    if (serverUrl && serverKey) {
-      (window as any).__supabase_url = serverUrl;
-      (window as any).__supabase_key = serverKey;
-      (window as any).__SUPABASE_URL = serverUrl;
-      (window as any).__SUPABASE_KEY = serverKey;
-
-      // Backup to localStorage
-      localStorage.setItem('sb_url_backup', serverUrl);
-      localStorage.setItem('sb_key_backup', serverKey);
-      
-      // Auto-replicate to Firestore so it persists across container restarts/scale-to-zero
-      try {
-        const { doc, setDoc } = await import('firebase/firestore');
-        const { db } = await import('./firebase');
-        if (db) {
-          const docRef = doc(db, 'settings', 'supabase_credential');
-          await setDoc(docRef, {
-            supabaseUrl: serverUrl,
-            supabaseKey: serverKey,
-            updatedAt: Date.now()
-          }, { merge: true });
-          console.log("%c[Supabase Config] SUCCESS: Replicated server-side credentials to Firestore persistent node.", "color: #10b981; font-weight: bold;");
-        }
-      } catch (err) {
-        console.warn("[Supabase Config] Non-blocking Firestore write safeguard skipped:", err);
-      }
-
-      console.log(`%c[Supabase Config] SUCCESS: Connected to ${serverUrl}`, "color: #10b981; font-weight: bold;");
-      return true;
-    }
-
-    // If server returned empty, fall back to reading from Firestore settings collection
-    console.log("%c[Supabase Config] Server config empty. Searching Firestore settings fallback...", "color: #eab308; font-weight: bold;");
-    try {
-      const { doc, getDoc } = await import('firebase/firestore');
-      const { db } = await import('./firebase');
-      if (db) {
-        const docRef = doc(db, 'settings', 'supabase_credential');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const firestoreData = docSnap.data();
-          if (firestoreData.supabaseUrl && firestoreData.supabaseKey) {
-            console.log("%c[Supabase Config] SUCCESS: Retrieved persistent credentials from Firestore settings collection!", "color: #10b981; font-weight: bold;");
-            
-            const finalUrl = firestoreData.supabaseUrl;
-            const finalKey = firestoreData.supabaseKey;
-
-            (window as any).__supabase_url = finalUrl;
-            (window as any).__supabase_key = finalKey;
-            (window as any).__SUPABASE_URL = finalUrl;
-            (window as any).__SUPABASE_KEY = finalKey;
-
-            localStorage.setItem('sb_url_backup', finalUrl);
-            localStorage.setItem('sb_key_backup', finalKey);
-            return true;
-          }
-        }
-      }
-    } catch (fsErr) {
-      console.warn("[Supabase Config] Firestore retrieval failed or bypassed:", fsErr);
-    }
-
   } catch (err) {
     console.error("[Supabase Config] Network error while fetching config:", err);
   }
   return false;
 };
-

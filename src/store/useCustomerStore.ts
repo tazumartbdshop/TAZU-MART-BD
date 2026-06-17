@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
+import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface PaymentMethod {
   id: string;
@@ -73,7 +74,10 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     };
     
     const supabase = getSupabase();
-    if (supabase) supabase.from('customers').insert([newCustomer]).then(({error}) => error && console.warn(error));
+    if (supabase) {
+      const dbPayload = objectToSnake(newCustomer);
+      supabase.from('customers').insert([dbPayload]).then(({error}) => error && console.warn(error));
+    }
       
     set((state) => ({
       customers: [...state.customers, newCustomer]
@@ -124,7 +128,10 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   },
   updateCustomer: (id, updates) => {
     const supabase = getSupabase();
-    if (supabase) supabase.from('customers').update(updates).eq('id', id).then(({error}) => error && console.warn(error));
+    if (supabase) {
+      const dbPayload = objectToSnake(updates);
+      supabase.from('customers').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+    }
       
     set((state) => ({
       customers: state.customers.map(c => c.id === id ? { ...c, ...updates } : c)
@@ -168,7 +175,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
 
     supabase.from('customers').select('*').then(({ data, error }) => {
         if (!error && data) {
-            set({ customers: data as Customer[] });
+            set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
         } else {
             console.error(error);
             set({ customers: [] });
@@ -179,8 +186,8 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       .channel('public:customers')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, (payload) => {
           supabase.from('customers').select('*').then(({ data, error }) => {
-            if (!error && data && data.length > 0) {
-                set({ customers: data as Customer[] });
+            if (!error && data) {
+                set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
             }
           });
       })

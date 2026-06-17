@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
 import { deleteImage } from '../lib/imageUtils';
+import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface Category {
   id: string;
@@ -83,7 +84,10 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     console.log(`%c[Supabase Category Insert] Attempting INSERT in 'categories' table`, "color: #3b82f6; font-weight: bold; font-size: 13px;");
     console.log(`%c[Supabase Connection Details] Targeting URL: ${creds.url}`, "color: #0ea5e9; font-weight: bold;");
-    console.log("[Supabase Category Payload]", newCategory);
+    
+    // Transform to snake_case for Postgres
+    const dbPayload = objectToSnake(newCategory);
+    console.log("[Supabase Category DB Payload]", dbPayload);
     
     // Optimistic Update
     const currentCats = get().categories;
@@ -92,7 +96,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     if (supabase) {
       try {
-        const { data, error, status, statusText } = await supabase.from('categories').insert([newCategory]).select();
+        const { data, error, status, statusText } = await supabase.from('categories').insert([dbPayload]).select();
         
         console.log(`%c[Supabase Insert Response] HTTP Status: ${status} (${statusText})`, "color: #a855f7; font-weight: bold;");
         
@@ -134,7 +138,10 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     console.log(`%c[Supabase Category Update] Attempting UPDATE in 'categories' for ID: ${id}`, "color: #eab308; font-weight: bold; font-size: 13px;");
     console.log(`%c[Supabase Connection Details] Targeting URL: ${creds.url}`, "color: #0ea5e9; font-weight: bold;");
-    console.log("[Supabase Category Update Payload]", mergedPayload);
+    
+    // Transform to snake_case for Postgres
+    const dbPayload = objectToSnake(mergedPayload);
+    console.log("[Supabase Category DB Update Payload]", dbPayload);
     
     // Optimistic Update
     const updatedCats = currentCats.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
@@ -142,7 +149,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     if (supabase) {
       try {
-        const { data, error, status, statusText } = await supabase.from('categories').update(mergedPayload).eq('id', id).select();
+        const { data, error, status, statusText } = await supabase.from('categories').update(dbPayload).eq('id', id).select();
         
         console.log(`%c[Supabase Update Response] HTTP Status: ${status} (${statusText})`, "color: #a855f7; font-weight: bold;");
         
@@ -243,42 +250,31 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
 
     const mapDbToCategory = (row: any): Category => {
       if (!row) return row;
-      const getVal = (exactKey: string, snakeKey: string) => {
-        if (row[exactKey] !== undefined) return row[exactKey];
-        if (row[snakeKey] !== undefined) return row[snakeKey];
-        const lowerExact = exactKey.toLowerCase();
-        const lowerSnake = snakeKey.toLowerCase();
-        for (const k of Object.keys(row)) {
-          const lk = k.toLowerCase();
-          if (lk === lowerExact || lk === lowerSnake) {
-            return row[k];
-          }
-        }
-        return undefined;
-      };
-
+      // Use utility for conversion
+      const camelRow: any = objectToCamel(row);
+      
       return {
-        id: row.id || '',
-        name: row.name || '',
-        slug: row.slug || '',
-        bannerName: getVal('bannerName', 'banner_name') || '',
-        bannerImage: getVal('bannerImage', 'banner_image') || '',
-        bannerImages: getVal('bannerImages', 'banner_images') || (getVal('bannerImage', 'banner_image') ? [getVal('bannerImage', 'banner_image')] : []),
-        iconImage: getVal('iconImage', 'icon_image') || '',
-        wideBannerImage: getVal('wideBannerImage', 'wide_banner_image') || '',
-        buttonText: getVal('buttonText', 'button_text') || '',
-        buttonLink: getVal('buttonLink', 'button_link') || '',
-        featuredProducts: getVal('featuredProducts', 'featured_products') || '',
-        description: row.description || '',
-        displayOrder: Number(getVal('displayOrder', 'display_order') ?? 1),
-        status: getVal('status', 'status') || 'Active',
-        showOnHomepage: getVal('showOnHomepage', 'show_on_homepage') !== false,
-        createdAt: getVal('createdAt', 'created_at') || '',
-        metaTitle: getVal('metaTitle', 'meta_title') || '',
-        metaDescription: getVal('metaDescription', 'meta_description') || '',
-        keywords: getVal('keywords', 'keywords') || '',
-        isDemo: getVal('isDemo', 'is_demo') || false,
-        sliderSettings: getVal('sliderSettings', 'slider_settings') || null
+        id: camelRow.id || '',
+        name: camelRow.name || '',
+        slug: camelRow.slug || '',
+        bannerName: camelRow.bannerName || '',
+        bannerImage: camelRow.bannerImage || '',
+        bannerImages: camelRow.bannerImages || (camelRow.bannerImage ? [camelRow.bannerImage] : []),
+        iconImage: camelRow.iconImage || '',
+        wideBannerImage: camelRow.wideBannerImage || '',
+        buttonText: camelRow.buttonText || '',
+        buttonLink: camelRow.buttonLink || '',
+        featuredProducts: camelRow.featuredProducts || '',
+        description: camelRow.description || '',
+        displayOrder: Number(camelRow.displayOrder ?? 1),
+        status: camelRow.status || 'Active',
+        showOnHomepage: camelRow.showOnHomepage !== false,
+        createdAt: camelRow.createdAt || '',
+        metaTitle: camelRow.metaTitle || '',
+        metaDescription: camelRow.metaDescription || '',
+        keywords: camelRow.keywords || '',
+        isDemo: camelRow.isDemo || false,
+        sliderSettings: camelRow.sliderSettings || null
       };
     };
 

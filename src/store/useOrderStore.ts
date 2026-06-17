@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 // Removed demo generators to enforce single DB rule
 import { getSupabase } from '../lib/supabase';
+import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface OrderItem {
   productId: string;
@@ -109,7 +110,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     };
 
     const supabase = getSupabase();
-    if (supabase) supabase.from('orders').insert([newOrder]).then(({error}) => error && console.warn(error));
+    if (supabase) {
+      const dbPayload = objectToSnake(newOrder);
+      supabase.from('orders').insert([dbPayload]).then(({error}) => error && console.warn(error));
+    }
 
     set((state) => ({ orders: [newOrder, ...state.orders] }));
     return newOrder;
@@ -126,7 +130,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     };
 
     const supabase = getSupabase();
-    if (supabase) supabase.from('orders').update(updates).eq('id', id).then(({error}) => error && console.warn(error));
+    if (supabase) {
+      const dbPayload = objectToSnake(updates);
+      supabase.from('orders').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+    }
 
     set((state) => ({
       orders: state.orders.map(o => o.id === id ? merged : o)
@@ -145,11 +152,14 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     };
 
     const supabase = getSupabase();
-    if (supabase) supabase.from('orders').update({
-        status,
-        status_updated_at: merged.status_updated_at,
-        statusHistory: merged.statusHistory
-    }).eq('id', id).then(({error}) => error && console.warn(error));
+    if (supabase) {
+        const dbPayload = objectToSnake({
+            status,
+            status_updated_at: merged.status_updated_at,
+            statusHistory: merged.statusHistory
+        });
+        supabase.from('orders').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+    }
 
     set((state) => ({
       orders: state.orders.map(o => o.id === id ? merged : o)
@@ -165,7 +175,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     };
 
     const supabase = getSupabase();
-    if (supabase) supabase.from('orders').update({ paymentStatus }).eq('id', id).then(({error}) => error && console.warn(error));
+    if (supabase) {
+        const dbPayload = objectToSnake({ paymentStatus });
+        supabase.from('orders').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+    }
 
     set((state) => ({
       orders: state.orders.map(o => o.id === id ? merged : o)
@@ -216,7 +229,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const loadOrders = async () => {
         const { data, error } = await supabase.from('orders').select('*').order('date', { ascending: false });
         if (!error && data) {
-            set({ orders: data as Order[] });
+            set({ orders: (data as any[]).map(row => objectToCamel(row)) as Order[] });
         } else {
             if (error && error.code !== '42P01') {
                 console.error('Error fetching orders:', error);
@@ -245,7 +258,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const loadStatuses = async () => {
         const { data, error } = await supabase.from('tracking_statuses').select('*').order('order', { ascending: true });
         if (!error && data && data.length > 0) {
-            set({ trackingStatuses: data.map(d => d.name) });
+            set({ trackingStatuses: data.map(d => objectToCamel(d).name) });
         } else {
             const defaultList = [
               'Placed', 'Pending', 'Processing', 'Confirmed', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'

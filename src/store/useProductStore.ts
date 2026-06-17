@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
 import { deleteImage } from '../lib/imageUtils';
+import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface Product {
   id: string;
@@ -162,51 +163,47 @@ export function generateKeywords(name: string, category: string, brand?: string,
 
 // Robust mapper for Product table to handle both snake_case and camelCase variants
 const mapDbToProduct = (row: any): Product => {
-  const getVal = (exactKey: string, snakeKey: string) => {
-    if (row[exactKey] !== undefined) return row[exactKey];
-    if (row[snakeKey] !== undefined) return row[snakeKey];
-    return undefined;
-  };
+  const camelRow: any = objectToCamel(row);
 
   return {
-    ...row,
-    id: row.id || '',
-    name: row.name || '',
-    sku: row.sku || '',
-    category: row.category || '',
-    price: Number(row.price || 0),
-    discountPrice: getVal('discountPrice', 'discount_price'),
-    stock: Number(row.stock || 0),
-    image: getVal('image', 'image_url') || row.imageUrl || row.featured_image || '',
-    imageUrl: getVal('imageUrl', 'image_url') || row.image || '',
-    featured_image: getVal('featured_image', 'featured_image') || row.image || '',
-    banner_image: getVal('banner_image', 'banner_image') || '',
-    images: row.images || [],
-    videoUrl: getVal('videoUrl', 'video_url') || row.mediaUrl || '',
-    mediaUrl: getVal('mediaUrl', 'video_url') || row.videoUrl || '',
-    rating: Number(row.rating || 4.5),
-    reviews: Number(row.reviews || 0),
-    isNew: row.isNew !== undefined ? row.isNew : (row.is_new !== undefined ? row.is_new : true),
-    brand: row.brand || '',
-    status: (row.status || 'active').toLowerCase(),
-    description: row.description || '',
-    createdAt: row.createdAt || (row.created_at ? new Date(row.created_at).getTime() : Date.now()),
-    buyingPrice: getVal('buyingPrice', 'buying_price'),
-    warranty: row.warranty || '',
-    unitName: getVal('unitName', 'unit_name'),
-    soldCount: Number(getVal('soldCount', 'sold_count') || 0),
-    seoPoints: row.seoPoints || row.seo_points || [],
-    variants: row.variants || [],
-    shippingZones: row.shippingZones || row.shipping_zones || [],
-    is_flash_sale: getVal('is_flash_sale', 'isFlashSale'),
-    is_trending: getVal('is_trending', 'isTrending'),
-    is_best_selling: getVal('is_best_selling', 'isBestSelling'),
-    is_regular: getVal('is_regular', 'isRegular'),
-    is_offer: getVal('is_offer', 'isOffer'),
-    reward_coins: getVal('reward_coins', 'rewardCoins'),
-    coin_enabled: getVal('coin_enabled', 'coinEnabled'),
-    isDemo: !!row.isDemo,
-    keywords: row.keywords || []
+    ...camelRow,
+    id: camelRow.id || '',
+    name: camelRow.name || '',
+    sku: camelRow.sku || '',
+    category: camelRow.category || '',
+    price: Number(camelRow.price || 0),
+    discountPrice: camelRow.discountPrice,
+    stock: Number(camelRow.stock || 0),
+    image: camelRow.image || camelRow.imageUrl || camelRow.featuredImage || '',
+    imageUrl: camelRow.imageUrl || camelRow.image || '',
+    featured_image: camelRow.featuredImage || camelRow.image || '',
+    banner_image: camelRow.bannerImage || '',
+    images: camelRow.images || [],
+    videoUrl: camelRow.videoUrl || camelRow.mediaUrl || '',
+    mediaUrl: camelRow.mediaUrl || camelRow.videoUrl || '',
+    rating: Number(camelRow.rating || 4.5),
+    reviews: Number(camelRow.reviews || 0),
+    isNew: camelRow.isNew !== undefined ? camelRow.isNew : true,
+    brand: camelRow.brand || '',
+    status: (camelRow.status || 'active').toLowerCase(),
+    description: camelRow.description || '',
+    createdAt: camelRow.createdAt || Date.now(),
+    buyingPrice: camelRow.buyingPrice,
+    warranty: camelRow.warranty || '',
+    unitName: camelRow.unitName,
+    soldCount: Number(camelRow.soldCount || 0),
+    seoPoints: camelRow.seoPoints || [],
+    variants: camelRow.variants || [],
+    shippingZones: camelRow.shippingZones || [],
+    is_flash_sale: camelRow.isFlashSale,
+    is_trending: camelRow.isTrending,
+    is_best_selling: camelRow.isBestSelling,
+    is_regular: camelRow.isRegular,
+    is_offer: camelRow.isOffer,
+    reward_coins: camelRow.rewardCoins,
+    coin_enabled: camelRow.coinEnabled,
+    isDemo: !!camelRow.isDemo,
+    keywords: camelRow.keywords || []
   };
 };
 
@@ -252,7 +249,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
     set({ products: [...currentProducts, newProduct] });
     
     if (supabase) {
-      const { error } = await supabase.from('products').insert([newProduct]);
+      const dbPayload = objectToSnake(newProduct);
+      const { error } = await supabase.from('products').insert([dbPayload]);
       if (error) {
         // Rollback on error
         set({ products: currentProducts });
@@ -288,7 +286,8 @@ export const useProductStore = create<ProductState>((set, get) => ({
     set({ products: updatedProducts });
     
     if (supabase) {
-      const { error } = await supabase.from('products').update(finalPayload).eq('id', id);
+      const dbPayload = objectToSnake(finalPayload);
+      const { error } = await supabase.from('products').update(dbPayload).eq('id', id);
       if (error) {
         // Rollback on error
         set({ products: currentProducts });

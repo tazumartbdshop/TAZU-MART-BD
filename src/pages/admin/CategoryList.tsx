@@ -47,7 +47,7 @@ export default function CategoryList() {
 
   return (
     <div className="flex flex-col min-h-full space-y-6">
-      {/* Firestore Path Inspector - NEW */}
+      {/* Supabase Table Inspector */}
       <div className="bg-neutral-900 border border-neutral-800 p-4 relative overflow-hidden group mb-4">
         <div className="absolute right-0 top-0 p-4 opacity-5 pointer-events-none">
           <Database className="w-16 h-16 text-white" />
@@ -56,24 +56,24 @@ export default function CategoryList() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <Database className="w-3.5 h-3.5 text-orange-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Live Firestore Path Inspector</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Live Supabase Table Inspector</span>
             </div>
             <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-850 px-3 py-1.5 font-mono text-[11px] text-green-400">
-              <span className="text-neutral-600">PATH:</span>
-              categories/WQxF5FxiMKWRLemwIVwE/categoryList
+              <span className="text-neutral-600">TABLE:</span>
+              categories
             </div>
           </div>
 
           <div className="flex gap-8">
             <div className="space-y-0.5">
-              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Document Count</p>
+              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Entry Count</p>
               <p className="text-sm font-black text-white">{categories.length}</p>
             </div>
             <div className="space-y-0.5">
-              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Storage Status</p>
+              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">DB Sync Status</p>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs font-black text-white uppercase tracking-wider">Production Live</span>
+                <span className="text-xs font-black text-white uppercase tracking-wider">Cloud Live</span>
               </div>
             </div>
           </div>

@@ -237,22 +237,6 @@ export const defaultNavItems: NavItem[] = [
       { name: 'Login Provider', path: '/admin/management/login-provider', icon: Lock }
     ]
   },
-  {
-    name: 'Infrastructure & Connectivity',
-    icon: HardDrive,
-    moduleId: 'settings',
-    subItems: [
-      { name: 'Domain Center', path: '/admin/infrastructure/domain', icon: Globe },
-      { name: 'Hosting Hub', path: '/admin/infrastructure/hosting', icon: Server },
-      { name: 'DNS Control', path: '/admin/infrastructure/dns', icon: Link },
-      { name: 'SSL Security', path: '/admin/infrastructure/ssl', icon: Lock },
-      { name: 'Server Connectivity', path: '/admin/infrastructure/server', icon: Zap },
-      { name: 'CDN & Performance', path: '/admin/infrastructure/cdn', icon: Radio },
-      { name: 'Email Infrastructure', path: '/admin/infrastructure/email', icon: Mail },
-      { name: 'Security Monitor', path: '/admin/infrastructure/security-monitor', icon: Shield },
-      { name: 'Connection Tester', path: '/admin/infrastructure/testing', icon: Terminal }
-    ]
-  },
   { 
     name: 'Support', 
     path: '/admin/support', 
@@ -287,16 +271,6 @@ export const defaultNavItems: NavItem[] = [
       { name: 'Theme Settings', path: '/admin/theme-settings', icon: Palette },
       { name: 'Flutter Manager', path: '/admin/flutter-manager', icon: Smartphone },
       { name: 'Automation', path: '/admin/automation', icon: Zap }
-    ]
-  },
-  {
-    name: '🔥 Firebase Workspace',
-    icon: Flame,
-    moduleId: 'settings',
-    subItems: [
-      { name: 'My Files', path: '/admin/firebase-workspace/files', icon: Folder },
-      { name: 'My Notes', path: '/admin/firebase-workspace/notes', icon: FileText },
-      { name: 'Team Members', path: '/admin/firebase-workspace/team-members', icon: Users }
     ]
   },
   {

@@ -252,13 +252,13 @@ export default function AddCategory() {
           keywords: formData.keywords
         };
 
-        console.log("Uploading payload to Firestore...");
+        console.log("Uploading payload to Supabase...");
         if (isEditing && id) {
           await updateCategory(id, payload);
-          console.log("Category updated.");
+          console.log("Category updated in Supabase.");
         } else {
           await addCategory(payload);
-          console.log("Category added.");
+          console.log("Category added to Supabase.");
         }
         
         toast.success("✅ Category Saved Successfully", {

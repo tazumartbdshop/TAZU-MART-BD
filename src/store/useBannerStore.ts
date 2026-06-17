@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
+import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface Banner {
   id: string;
@@ -94,11 +95,11 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     }
 
     supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-        if (!error && data) set({ banners: data as Banner[], isLoaded: true });
+        if (!error && data) set({ banners: (data as any[]).map(row => objectToCamel(row)) as Banner[], isLoaded: true });
     });
 
     supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-        if (!error && data) set({ draftBanners: data as Banner[] });
+        if (!error && data) set({ draftBanners: (data as any[]).map(row => objectToCamel(row)) as Banner[] });
     });
     
     // Fake slider config for now since we don't have key-value tables 
@@ -108,7 +109,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       .channel('public:banners:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, (payload) => {
           supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-            if (!error && data) set({ banners: data as Banner[], isLoaded: true });
+            if (!error && data) set({ banners: (data as any[]).map(row => objectToCamel(row)) as Banner[], isLoaded: true });
           });
       })
       .subscribe();
@@ -117,7 +118,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       .channel('public:banners_draft:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'banners_draft' }, (payload) => {
           supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-            if (!error && data) set({ draftBanners: data as Banner[] });
+            if (!error && data) set({ draftBanners: (data as any[]).map(row => objectToCamel(row)) as Banner[] });
           });
       })
       .subscribe();
@@ -144,7 +145,8 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     }));
     const supabase = getSupabase();
     if (supabase) {
-      supabase.from('banners').update(updates).eq('id', id).then(({error}) => error && console.warn(error));
+      const dbPayload = objectToSnake(updates);
+      supabase.from('banners').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
     }
   },
 
@@ -188,7 +190,10 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       banners: [...state.banners, newBanner]
     }));
     const supabase = getSupabase();
-    if (supabase) supabase.from('banners').insert([newBanner]).then(({error}) => error && console.warn(error));
+    if (supabase) {
+      const dbPayload = objectToSnake(newBanner);
+      supabase.from('banners').insert([dbPayload]).then(({error}) => error && console.warn(error));
+    }
   },
 
   addDraftBanner: (type = 'uploaded') => {
@@ -273,7 +278,8 @@ export const useBannerStore = create<BannerState>((set, get) => ({
 
     const supabase = getSupabase();
     if (supabase) {
-        supabase.from('banners').upsert(reordered).then(({error}) => error && console.warn(error));
+        const dbPayloads = reordered.map(b => objectToSnake(b));
+        supabase.from('banners').upsert(dbPayloads).then(({error}) => error && console.warn(error));
     }
   },
 
@@ -296,10 +302,11 @@ export const useBannerStore = create<BannerState>((set, get) => ({
           await supabase.from('banners_draft').delete().neq('id', '0'); // Delete all filter
           
           const cleanDrafts = draftBanners.map((b, idx) => ({...b, order: b.order !== undefined && b.order !== null ? Number(b.order) : idx}));
-          await supabase.from('banners_draft').upsert(cleanDrafts);
+          const dbDrafts = cleanDrafts.map(d => objectToSnake(d));
+          await supabase.from('banners_draft').upsert(dbDrafts);
           
           await supabase.from('banners').delete().neq('id', '0');
-          await supabase.from('banners').upsert(cleanDrafts);
+          await supabase.from('banners').upsert(dbDrafts);
       }
       
       set({ 
@@ -326,10 +333,11 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       if (supabase) {
           await supabase.from('banners_draft').delete().neq('id', '0');
           const cleanDrafts = updatedDraftBanners.map((b, idx) => ({...b, order: b.order !== undefined && b.order !== null ? Number(b.order) : idx}));
-          await supabase.from('banners_draft').upsert(cleanDrafts);
+          const dbPayloads = cleanDrafts.map(d => objectToSnake(d));
+          await supabase.from('banners_draft').upsert(dbPayloads);
           
           await supabase.from('banners').delete().neq('id', '0');
-          await supabase.from('banners').upsert(cleanDrafts);
+          await supabase.from('banners').upsert(dbPayloads);
       }
 
       console.log("Banners published successfully.");
@@ -349,14 +357,16 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       const draftList = (draftData || []) as Banner[];
 
       if (draftList.length > 0) {
-        draftList.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        set({ draftBanners: draftList, hasUnsavedChanges: false });
+        const camelList = draftList.map(row => objectToCamel(row)) as Banner[];
+        camelList.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        set({ draftBanners: camelList, hasUnsavedChanges: false });
       } else {
         const { data: liveData } = await supabase.from('banners').select('*');
-        const liveList = (liveData || []) as Banner[];
+        const liveList = (liveData || []) as any[];
         if (liveList.length > 0) {
-          liveList.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-          set({ draftBanners: liveList, hasUnsavedChanges: false });
+          const camelLive = liveList.map(row => objectToCamel(row)) as Banner[];
+          camelLive.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+          set({ draftBanners: camelLive, hasUnsavedChanges: false });
         } else {
           set({ draftBanners: [], hasUnsavedChanges: false });
         }
@@ -397,8 +407,9 @@ export const useBannerStore = create<BannerState>((set, get) => ({
           createdDate: new Date().toISOString()
         };
         
-        await supabase.from('banners_draft').upsert([defaultBanner]);
-        await supabase.from('banners').upsert([defaultBanner]);
+        const dbPayload = objectToSnake(defaultBanner);
+        await supabase.from('banners_draft').upsert([dbPayload]);
+        await supabase.from('banners').upsert([dbPayload]);
         console.log("Successfully seeded default banner.");
       }
     } catch (err) {
