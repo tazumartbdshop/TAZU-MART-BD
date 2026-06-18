@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useFlutterBannerStore, FlutterBanner } from '../../store/useFlutterBannerStore';
 import { Upload, Trash2, Edit2, Sliders, Smartphone, Check, X, ArrowUp, ArrowDown, RefreshCw, Image as ImageIcon } from 'lucide-react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../lib/firebase';
 import { toast } from 'react-hot-toast';
 
 export default function AdminFlutterBanner() {
