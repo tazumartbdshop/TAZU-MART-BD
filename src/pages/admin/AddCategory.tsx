@@ -261,7 +261,7 @@ export default function AddCategory() {
           console.log("Category added to Supabase.");
         }
         
-        toast.success("✅ Category Saved Successfully", {
+        toast.success(isEditing ? "✅ Category Updated Successfully" : "✅ Category Added Successfully", {
           position: "top-center",
           style: {
             background: "#10B981",

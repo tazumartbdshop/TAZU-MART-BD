@@ -68,6 +68,77 @@ const getInitialCategories = (): Category[] => {
   return [];
 };
 
+// Cache of columns detected as non-existent to avoid redundant network attempts
+const knownInvalidColumns = new Set<string>();
+
+async function executeWithSelfHealing(
+  action: (payload: any) => Promise<{ data: any; error: any; status: number; statusText: string }>,
+  initialPayload: any
+): Promise<{ data: any; error: any; status: number; statusText: string }> {
+  let dbPayload = { ...initialPayload };
+  
+  // Prune any column already known to be invalid
+  for (const col of knownInvalidColumns) {
+    delete dbPayload[col];
+  }
+
+  let attempts = 0;
+  const maxAttempts = 25;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    console.log(`[Self-Healing Client] Attempting DB write (Attempt ${attempts}/${maxAttempts}) with keys:`, Object.keys(dbPayload));
+    
+    const result = await action(dbPayload);
+    
+    if (result.error) {
+      const errMsg = String(result.error.message || '');
+      const errCode = String(result.error.code || '');
+      
+      console.warn(`[Self-Healing Error Received] Code: ${errCode} | Status: ${result.status} | Msg: ${errMsg}`);
+      
+      // PGRST204: column not found. PGRST205: table/relation mismatch. 42703: undefined_column.
+      if (errCode === 'PGRST204' || errCode === 'PGRST205' || errCode === '42703' || result.status === 400) {
+        let badCol = '';
+        
+        // Match 1: "Could not find the 'banner_image' column"
+        const match1 = errMsg.match(/['"“]([a-zA-Z0-9_]+)['"”]\s+column/i);
+        if (match1) badCol = match1[1];
+        
+        // Match 2: "column categories.display_order does not exist"
+        if (!badCol) {
+          const match2 = errMsg.match(/column\s+['"“]?(?:[a-zA-Z0-9_]+\.)?([a-zA-Z0-9_]+)/i);
+          if (match2) badCol = match2[1];
+        }
+        
+        // Fallback: find any word term mentioned in quotes that exists in the payload keys
+        if (!badCol) {
+          const matches = errMsg.match(/['"“]([a-zA-Z0-9_]+)['"”]/g);
+          if (matches) {
+            for (const item of matches) {
+              const cleaned = item.replace(/['"“’”]/g, '');
+              if (dbPayload[cleaned] !== undefined) {
+                badCol = cleaned;
+                break;
+              }
+            }
+          }
+        }
+
+        if (badCol) {
+          console.warn(`[Self-Healing Database Engine] Pruning non-existent column '${badCol}' and retrying write...`);
+          knownInvalidColumns.add(badCol);
+          delete dbPayload[badCol];
+          continue;
+        }
+      }
+      return result;
+    }
+    return result;
+  }
+  return { data: null, error: new Error("Too many self-healing retrieval attempts"), status: 400, statusText: "Bad Request" };
+}
+
 export const useCategoryStore = create<CategoryState>((set, get) => ({
   categories: [],
   isLoaded: false,
@@ -96,8 +167,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     if (supabase) {
       try {
-        const { data, error, status, statusText } = await supabase.from('categories').insert([dbPayload]).select();
+        const selfHealResult = await executeWithSelfHealing(
+          async (prunedDbPayload) => {
+            return await supabase.from('categories').insert([prunedDbPayload]).select();
+          },
+          dbPayload
+        );
         
+        const { data, error, status, statusText } = selfHealResult;
         console.log(`%c[Supabase Insert Response] HTTP Status: ${status} (${statusText})`, "color: #a855f7; font-weight: bold;");
         
         if (error) {
@@ -147,6 +224,10 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     // Transform to snake_case for Postgres
     const dbPayload = objectToSnake(mergedPayload);
+    // Remove auto-generated timestamp and id from updates just in case
+    delete dbPayload.id;
+    delete dbPayload.created_at;
+    
     console.log("[Supabase Category DB Update Payload]", dbPayload);
     
     // Optimistic Update
@@ -155,8 +236,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     if (supabase) {
       try {
-        const { data, error, status, statusText } = await supabase.from('categories').update(dbPayload).eq('id', id).select();
+        const selfHealResult = await executeWithSelfHealing(
+          async (prunedDbPayload) => {
+            return await supabase.from('categories').update(prunedDbPayload).eq('id', id).select();
+          },
+          dbPayload
+        );
         
+        const { data, error, status, statusText } = selfHealResult;
         console.log(`%c[Supabase Update Response] HTTP Status: ${status} (${statusText})`, "color: #a855f7; font-weight: bold;");
         
         if (error) {
