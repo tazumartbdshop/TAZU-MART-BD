@@ -122,12 +122,26 @@ export default function Home() {
     return true;
   });
 
-  // Section items (Dynamic filters with fallbacks)
-  const trendingProducts = activeProducts.filter(p => p.is_trending).slice(0, 4);
-  const newArrivals = activeProducts.filter(p => p.isNew || p.is_regular).slice(0, 4);
-  const bestSellers = activeProducts.filter(p => p.is_best_selling).slice(0, 4);
+  // Section items (Dynamic filters with smart database-first fallbacks)
+  let trendingProducts = activeProducts.filter(p => p.is_trending).slice(0, 4);
+  // Auto-fill trendingProducts if empty but we have active products
+  if (trendingProducts.length === 0 && activeProducts.length > 0) {
+    trendingProducts = activeProducts.slice(0, 4);
+  }
 
-  // Solid Fallbacks if database is currently empty (allows pristine presentation)
+  let newArrivals = activeProducts.filter(p => p.isNew || p.is_regular).slice(0, 4);
+  // Auto-fill newArrivals if empty but we have active products
+  if (newArrivals.length === 0 && activeProducts.length > 0) {
+    newArrivals = [...activeProducts].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4);
+  }
+
+  let bestSellers = activeProducts.filter(p => p.is_best_selling).slice(0, 4);
+  // Auto-fill bestSellers if empty but we have active products
+  if (bestSellers.length === 0 && activeProducts.length > 0) {
+    bestSellers = [...activeProducts].sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0) || (b.rating || 0) - (a.rating || 0)).slice(0, 4);
+  }
+
+  // Solid Fallbacks ONLY if database is completely empty (allows pristine presentation)
   const showFallbackProducts = activeProducts.length === 0;
 
   const fallbackTrending = [

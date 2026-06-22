@@ -25,6 +25,8 @@ export interface Category {
   keywords?: string;
   isDemo?: boolean;
   sliderSettings?: any;
+  imageUrl?: string;
+  image_url?: string;
 }
 
 export const CATEGORY_FALLBACKS = [
@@ -36,6 +38,12 @@ export const CATEGORY_FALLBACKS = [
 
 export function resolveCategoryThumbnail(cat: Partial<Category> | null | undefined): string {
   if (!cat) return "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop";
+  if (cat.imageUrl && cat.imageUrl.trim() !== '') {
+    return cat.imageUrl;
+  }
+  if (cat.image_url && cat.image_url.trim() !== '') {
+    return cat.image_url;
+  }
   if (cat.iconImage && cat.iconImage.trim() !== '') {
     return cat.iconImage;
   }

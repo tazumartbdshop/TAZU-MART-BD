@@ -13,9 +13,32 @@ export default function HomeTabs() {
   const { products } = useProductStore();
   const location = useLocation();
 
-  const flashSaleProducts = products.filter(p => p.is_flash_sale).slice(0, 6);
-  const trendingProducts = products.filter(p => p.is_trending).slice(0, 6);
-  const bestSellingProducts = products.filter(p => p.is_best_selling).slice(0, 6);
+  // Dynamically filter active valid products first
+  const activeProductsFromDb = products.filter(p => {
+    if (!p) return false;
+    const status = (p.status || '').toString().toLowerCase().trim();
+    if (status === 'inactive' || status === 'draft' || status === 'hidden') return false;
+    return true;
+  });
+
+  let flashSaleProducts = activeProductsFromDb.filter(p => p.is_flash_sale || p.is_offer).slice(0, 6);
+  if (flashSaleProducts.length === 0 && activeProductsFromDb.length > 0) {
+    // Fallback to products with discountPrice or just the first few products
+    flashSaleProducts = activeProductsFromDb.filter(p => p.discountPrice && p.discountPrice < p.price).slice(0, 6);
+    if (flashSaleProducts.length === 0) {
+      flashSaleProducts = activeProductsFromDb.slice(0, 6);
+    }
+  }
+
+  let trendingProducts = activeProductsFromDb.filter(p => p.is_trending).slice(0, 6);
+  if (trendingProducts.length === 0 && activeProductsFromDb.length > 0) {
+    trendingProducts = activeProductsFromDb.slice(0, 6);
+  }
+
+  let bestSellingProducts = activeProductsFromDb.filter(p => p.is_best_selling).slice(0, 6);
+  if (bestSellingProducts.length === 0 && activeProductsFromDb.length > 0) {
+    bestSellingProducts = [...activeProductsFromDb].sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0)).slice(0, 6);
+  }
 
   useEffect(() => {
     const hash = location.hash;

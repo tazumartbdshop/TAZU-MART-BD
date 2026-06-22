@@ -58,13 +58,19 @@ export const blobToBase64 = (blob: Blob | File): Promise<string> => {
   });
 };
 
-export const uploadImage = async (file: File | Blob, folder: string, originalName?: string): Promise<string> => {
+export const uploadImage = async (
+  file: File | Blob, 
+  folder: string, 
+  originalName?: string,
+  bucketName: string = 'media'
+): Promise<string> => {
   const extension = originalName?.split('.').pop() || 'jpg';
   const cleanName = originalName ? originalName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50) : `img-${Date.now()}`;
   const fileName = `${Date.now()}-${cleanName}.${extension}`;
-  const path = `${folder}/${fileName}`;
+  // If bucket is 'categories', let's place the image in the root directory or categories/ as requested
+  const path = folder ? `${folder}/${fileName}` : fileName;
   
-  console.log(`Starting upload to Supabase: ${path}`);
+  console.log(`Starting upload to Supabase: Bucket: ${bucketName}, Path: ${path}`);
   const supabase = getSupabase();
   
   if (!supabase) {
@@ -74,7 +80,7 @@ export const uploadImage = async (file: File | Blob, folder: string, originalNam
   
   try {
     const uploadPromise = supabase.storage
-      .from('media')
+      .from(bucketName)
       .upload(path, file, { cacheControl: '3600', upsert: true });
 
     const { data, error } = await withTimeout(
@@ -86,7 +92,7 @@ export const uploadImage = async (file: File | Blob, folder: string, originalNam
     if (error) {
        // Attempt to create bucket if it doesn't exist, though usually you create this via dashboard
        if (error.message.includes('bucket not found')) {
-           console.warn("Bucket 'media' not found. Attempting to fall back as we cannot auto-create buckets reliably from client");
+           console.warn(`Bucket '${bucketName}' not found. Attempting to fall back...`);
            throw error;
        }
        throw error;
@@ -95,7 +101,7 @@ export const uploadImage = async (file: File | Blob, folder: string, originalNam
     console.log(`Upload complete:`, data);
     
     const { data: publicData } = supabase.storage
-      .from('media')
+      .from(bucketName)
       .getPublicUrl(path);
       
     if (!publicData || !publicData.publicUrl) {
@@ -124,18 +130,27 @@ async function fallbackToBase64(file: File | Blob): Promise<string> {
 }
 
 export const deleteImage = async (url: string): Promise<void> => {
-  if (!url || !url.includes('supabase.co/storage/v1/object/public/media/')) {
+  if (!url) {
     return;
   }
   try {
     const supabase = getSupabase();
     if (!supabase) return;
     
-    const urlParts = url.split('supabase.co/storage/v1/object/public/media/');
-    if (urlParts.length > 1) {
-       const path = urlParts[1];
-       await supabase.storage.from('media').remove([path]);
-       console.log(`Successfully deleted storage image: ${path}`);
+    // Match any Supabase storage public URL structure automatically
+    const match = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+    if (match) {
+       const bucketName = match[1];
+       const path = match[2];
+       await supabase.storage.from(bucketName).remove([path]);
+       console.log(`Successfully deleted storage image from bucket '${bucketName}': ${path}`);
+    } else if (url.includes('supabase.co/storage/v1/object/public/media/')) {
+       const urlParts = url.split('supabase.co/storage/v1/object/public/media/');
+       if (urlParts.length > 1) {
+          const path = urlParts[1];
+          await supabase.storage.from('media').remove([path]);
+          console.log(`Successfully deleted storage image: ${path}`);
+       }
     }
   } catch (err) {
     console.warn(`Failed to delete image from storage (non-blocking):`, err);

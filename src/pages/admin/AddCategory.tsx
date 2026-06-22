@@ -209,7 +209,7 @@ export default function AddCategory() {
         let iconUrl = formData.iconImage;
         if (thumbnailFile) {
           console.log("Uploading thumbnail...");
-          iconUrl = await uploadImage(thumbnailFile, 'categories', `icon-${formData.slug}`);
+          iconUrl = await uploadImage(thumbnailFile, 'categories', `icon-${formData.slug}`, 'categories');
           console.log("Thumbnail uploaded, URL:", iconUrl);
         }
 
@@ -217,7 +217,7 @@ export default function AddCategory() {
         let wideBannerUrl = formData.wideBannerImage;
         if (wideBannerFile) {
           console.log("Uploading wide banner...");
-          wideBannerUrl = await uploadImage(wideBannerFile, 'categories', `wide-banner-${formData.slug}`);
+          wideBannerUrl = await uploadImage(wideBannerFile, 'categories', `wide-banner-${formData.slug}`, 'categories');
           console.log("Wide banner uploaded, URL:", wideBannerUrl);
         }
 
@@ -226,7 +226,7 @@ export default function AddCategory() {
         const finalBannerUrls = await Promise.all(
           bannerFiles.map(async (fileOrUrl) => {
             if (typeof fileOrUrl === 'string') return fileOrUrl;
-            return await uploadImage(fileOrUrl, 'categories', `banner-${formData.slug}-${Math.random().toString(36).substring(7)}`);
+            return await uploadImage(fileOrUrl, 'categories', `banner-${formData.slug}-${Math.random().toString(36).substring(7)}`, 'categories');
           })
         );
         console.log("Banners uploaded, URLs:", finalBannerUrls);
@@ -249,7 +249,9 @@ export default function AddCategory() {
           showOnHomepage: formData.showOnHomepage,
           metaTitle: formData.metaTitle,
           metaDescription: formData.metaDescription,
-          keywords: formData.keywords
+          keywords: formData.keywords,
+          imageUrl: iconUrl,
+          image_url: iconUrl
         };
 
         console.log("Uploading payload to Supabase...");
