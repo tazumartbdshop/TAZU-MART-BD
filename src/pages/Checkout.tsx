@@ -25,6 +25,54 @@ import { motion, AnimatePresence } from 'motion/react';
 const hubs = [
 ];
 
+const getPaymentTheme = (id: string) => {
+  const normalizedId = id.toLowerCase();
+  
+  if (normalizedId.includes('bkash')) {
+    return {
+      bgColor: 'bg-[#FFF0F6]', // Light pink
+      borderColor: 'border-[#FCC2D7]', // Pink border
+      selectedBorderColor: 'border-[#E2136E]', // Brand pink border
+      iconColor: 'text-[#E2136E]',
+      hoverBorderColor: 'hover:border-[#E2136E]/60'
+    };
+  }
+  if (normalizedId.includes('nagad')) {
+    return {
+      bgColor: 'bg-[#FFF4EC]', // Light orange
+      borderColor: 'border-[#FFE0CC]', // Orange border
+      selectedBorderColor: 'border-[#F25C22]', // Brand orange border
+      iconColor: 'text-[#F25C22]',
+      hoverBorderColor: 'hover:border-[#F25C22]/60'
+    };
+  }
+  if (normalizedId.includes('rocket')) {
+    return {
+      bgColor: 'bg-[#FAF5FF]', // Light purple
+      borderColor: 'border-[#EAD3F5]', // Purple border
+      selectedBorderColor: 'border-[#8C3494]', // Brand purple border
+      iconColor: 'text-[#8C3494]',
+      hoverBorderColor: 'hover:border-[#8C3494]/60'
+    };
+  }
+  if (normalizedId.includes('cod') || normalizedId.includes('delivery')) {
+    return {
+      bgColor: 'bg-[#F0FDF4]', // Light green
+      borderColor: 'border-[#BBF7D0]', // Green border
+      selectedBorderColor: 'border-[#16A34A]', // Brand green border
+      iconColor: 'text-[#16A34A]',
+      hoverBorderColor: 'hover:border-[#16A34A]/60'
+    };
+  }
+  return {
+    bgColor: 'bg-[#F8FAFC]', // Light slate
+    borderColor: 'border-[#E2E8F0]', // border
+    selectedBorderColor: 'border-[#1E293B]', // Slate border
+    iconColor: 'text-[#1E293B]',
+    hoverBorderColor: 'hover:border-[#1E293B]/60'
+  };
+};
+
 export default function Checkout() {
   const orderPlacedRef = useRef(false);
   const { items, getCartTotal, updateQuantity, clearCart } = useCartStore();
@@ -39,6 +87,8 @@ export default function Checkout() {
   const { addOrUpdateLead, deleteLead } = useLeadStore();
   const { addOrUpdateAbandonedCheckout } = useFakeOrderStore();
   const addOrder = useOrderStore((state) => state.addOrder);
+  const addOrderAsync = useOrderStore((state) => state.addOrderAsync);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, isAuthenticated, updateUser } = useAuthStore();
   const { customers, addCustomer } = useCustomerStore();
   const { settings } = useSettingsStore();
@@ -235,19 +285,21 @@ export default function Checkout() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.name.trim()) newErrors.name = 'Please enter your full name';
-    if (!/^01[3-9]\d{8}$/.test(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number (01XXXXXXXXX)';
+    if (formData.name.trim().length < 3) {
+      newErrors.name = 'Full name must be at least 3 characters';
+    }
+
+    const cleanPhone = formData.phone.trim().replace(/\s+/g, '');
+    const isPhoneValid = (cleanPhone.startsWith('01') && cleanPhone.length === 11 && /^\d+$/.test(cleanPhone)) ||
+                         (cleanPhone.startsWith('1') && cleanPhone.length === 10 && /^\d+$/.test(cleanPhone));
+    if (!isPhoneValid) {
+      newErrors.phone = 'Please enter a valid 10 or 11 digit mobile number';
     }
 
     const address = formData.address.trim();
-    if (!address) {
-      newErrors.address = 'Please Enter Full Address';
-    } else {
-      const words = address.split(/\s+/);
-      if (words.length < 2) {
-        newErrors.address = 'Please enter a complete address (minimum 2 words).';
-      }
+    const addressWords = address.split(/\s+/).filter(w => w.length >= 2);
+    if (addressWords.length < 3) {
+      newErrors.address = 'Please enter a detailed address (minimum 3 words describing holding, road, etc).';
     }
 
     if (!paymentMethod) {
@@ -447,17 +499,16 @@ export default function Checkout() {
     });
   }, [formData, items, leadId, total, addOrUpdateLead, addOrUpdateAbandonedCheckout, ipLog, deviceType]);
 
-  const handleUseLocation = () => {
-    handleInputChange('address', 'House 12, Road 5, Block C, Dhanmondi 27, Dhaka-1209');
-  };
-
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     if(e) e.preventDefault();
+    if (isSubmitting) return;
     
     if (!validateForm()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+
+    setIsSubmitting(true);
 
     // Map payment label corresponding to the type constraint
     const gatewayLabel = settings.merchantGateway === 'sslcommerz' ? 'SSLCOMMERZ' :
@@ -472,107 +523,128 @@ export default function Checkout() {
 
     const paymentS = (paymentMethod === 'cod' ? 'Cash on Delivery' : 'Paid') as 'Paid' | 'Partial' | 'Unpaid' | 'Cash on Delivery';
 
-    const placedOrder = addOrder({
-      customerName: formData.name,
-      mobileNumber: formData.phone,
-      fullAddress: `${formData.address}${formData.landmark ? `, Landmark: ${formData.landmark}` : ''}`,
-      cityArea: formData.division || 'Dhaka',
-      deliveryMode: 'Standard Delivery',
-      paymentMethod: paymentM,
-      status: 'Placed',
-      paymentStatus: paymentS,
-      type: 'Online',
-      items: items.map(item => ({
-        productId: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        variant: 'Default',
-        image: item.image
-      })),
-      subtotal: subtotal,
-      discount: activePromo ? { 
-        type: activePromo.type === 'Percentage' ? 'percent' : 'fixed', 
-        value: activePromo.value, 
-        amount: discount
-      } : { type: 'fixed', value: 0, amount: 0 },
-      tax: { percent: 5, amount: vat },
-      deliveryCharge: finalShipping,
-      paidAmount: paymentMethod === 'cod' ? 0 : total,
-      dueAmount: paymentMethod === 'cod' ? total : 0,
-      total: total,
-      notes: formData.note || undefined,
-      promoCodeUsed: activePromo ? activePromo.code : undefined,
-    });
-
-    pixelService.trackPurchase({
-      id: placedOrder.id,
-      total: total,
-      items: items
-    });
-
-    if (activePromo) {
-      usePromoStore.getState().incrementPromoUsedCount(activePromo.id);
-    }
-
-    // Campaign purchase attribution tracking
     try {
-      const activeCampaignId = localStorage.getItem('activeCampaignAttribution');
-      if (activeCampaignId) {
-        const supabase = getSupabase();
-        if (supabase) {
-           supabase.rpc('increment_broadcast_purchases', { broadcast_id: activeCampaignId }).then(({error}: any) => { if (error) console.error("RPC fail", error); });
-        }
-        
-        // Remove tracking to prevent multiple attribution counts for one click
-        localStorage.removeItem('activeCampaignAttribution');
-      }
-    } catch (e) {
-      console.error("Campaign attribution exception:", e);
-    }
-
-    // Update user profile if saveAddress is true
-    if (isAuthenticated && user && formData.saveAddress) {
-      updateUser({
-        name: formData.name,
-        phone: formData.phone,
-        email: formData.email,
-        division: formData.division,
-        district: formData.district,
-        upazila: formData.upazila,
-        area: formData.area,
-        address: formData.address, // Full address/House road
-        zipCode: formData.postalCode,
-        postalCode: formData.postalCode
+      const placedOrder = await addOrderAsync({
+        customerName: formData.name,
+        mobileNumber: formData.phone,
+        fullAddress: `${formData.address}${formData.landmark ? `, Landmark: ${formData.landmark}` : ''}`,
+        cityArea: formData.division || 'Dhaka',
+        deliveryMode: 'Standard Delivery',
+        paymentMethod: paymentM,
+        status: 'Confirmed', // Default value = 'Confirmed'
+        paymentStatus: paymentS,
+        type: 'Online',
+        items: items.map(item => ({
+          productId: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          variant: 'Default',
+          image: item.image
+        })),
+        subtotal: subtotal,
+        discount: activePromo ? { 
+          type: activePromo.type === 'Percentage' ? 'percent' : 'fixed', 
+          value: activePromo.value, 
+          amount: discount
+        } : { type: 'fixed', value: 0, amount: 0 },
+        tax: { percent: 5, amount: vat },
+        deliveryCharge: finalShipping,
+        paidAmount: paymentMethod === 'cod' ? 0 : total,
+        dueAmount: paymentMethod === 'cod' ? total : 0,
+        total: total,
+        notes: formData.note || undefined,
+        promoCodeUsed: activePromo ? activePromo.code : undefined,
       });
-      
-      // Update in database
+
+      pixelService.trackPurchase({
+        id: placedOrder.id,
+        total: total,
+        items: items
+      });
+
+      if (activePromo) {
+        usePromoStore.getState().incrementPromoUsedCount(activePromo.id);
+      }
+
+      // Campaign purchase attribution tracking
       try {
-        const supabase = getSupabase();
-        if (supabase) {
-          supabase.from('users').update({
-            name: formData.name,
-            phone: formData.phone,
-            email: formData.email,
-            division: formData.division,
-            district: formData.district,
-            upazila: formData.upazila,
-            area: formData.area,
-            address: formData.address,
-            zipCode: formData.postalCode,
-            postalCode: formData.postalCode
-          }).eq('id', user.id).then(({error})=> error && console.warn(error));
+        const activeCampaignId = localStorage.getItem('activeCampaignAttribution');
+        if (activeCampaignId) {
+          const supabase = getSupabase();
+          if (supabase) {
+             supabase.rpc('increment_broadcast_purchases', { broadcast_id: activeCampaignId }).then(({error}: any) => { if (error) console.error("RPC fail", error); });
+          }
+          
+          // Remove tracking to prevent multiple attribution counts for one click
+          localStorage.removeItem('activeCampaignAttribution');
         }
       } catch (e) {
-        console.error("User profile update failed:", e);
+        console.error("Campaign attribution exception:", e);
       }
 
-      // Update customer in store
-      const customersStore = useCustomerStore.getState();
-      const currentCustomer = customersStore.customers.find(c => c.id === user.id);
-      if (currentCustomer) {
-        customersStore.updateCustomer(user.id, {
+      // Update user profile if saveAddress is true
+      if (isAuthenticated && user && formData.saveAddress) {
+        updateUser({
           name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          division: formData.division,
+          district: formData.district,
+          upazila: formData.upazila,
+          area: formData.area,
+          address: formData.address, // Full address/House road
+          zipCode: formData.postalCode,
+          postalCode: formData.postalCode
+        });
+        
+        // Update in database
+        try {
+          const supabase = getSupabase();
+          if (supabase) {
+            supabase.from('users').update({
+              name: formData.name,
+              phone: formData.phone,
+              email: formData.email,
+              division: formData.division,
+              district: formData.district,
+              upazila: formData.upazila,
+              area: formData.area,
+              address: formData.address,
+              zipCode: formData.postalCode,
+              postalCode: formData.postalCode
+            }).eq('id', user.id).then(({error})=> error && console.warn(error));
+          }
+        } catch (e) {
+          console.error("User profile update failed:", e);
+        }
+
+        // Update customer in store
+        const customersStore = useCustomerStore.getState();
+        const currentCustomer = customersStore.customers.find(c => c.id === user.id);
+        if (currentCustomer) {
+          customersStore.updateCustomer(user.id, {
+            name: formData.name,
+            address: {
+              country: 'Bangladesh',
+              division: formData.division,
+              district: formData.district,
+              upazila: formData.upazila,
+              area: formData.area,
+              street: formData.address,
+              zipCode: formData.postalCode,
+              city: formData.district || ''
+            }
+          });
+        }
+      }
+
+      // Automatically create/link temporary customer profile if they don't exist
+      const exists = customers.find(c => c.phones.includes(formData.phone));
+      if (!exists) {
+        addCustomer({
+          name: formData.name,
+          phones: [formData.phone],
           address: {
             country: 'Bangladesh',
             division: formData.division,
@@ -582,49 +654,38 @@ export default function Checkout() {
             street: formData.address,
             zipCode: formData.postalCode,
             city: formData.district || ''
-          }
+          },
+          emails: formData.email ? [formData.email] : [],
+          socialLinks: [],
+          note: `Temporary profile created via secure checkout on ${new Date().toLocaleDateString()}`,
+          status: 'Active',
+          customerType: 'New',
+          totalOrders: 1,
+          totalSpend: total,
+          lastLogin: Date.now(),
+          totalLogins: 1,
         });
       }
-    }
 
-    // Automatically create/link temporary customer profile if they don't exist
-    const exists = customers.find(c => c.phones.includes(formData.phone));
-    if (!exists) {
-      addCustomer({
-        name: formData.name,
-        phones: [formData.phone],
-        address: {
-          country: 'Bangladesh',
-          division: formData.division,
-          district: formData.district,
-          upazila: formData.upazila,
-          area: formData.area,
-          street: formData.address,
-          zipCode: formData.postalCode,
-          city: formData.district || ''
-        },
-        emails: formData.email ? [formData.email] : [],
-        socialLinks: [],
-        note: `Temporary profile created via secure checkout on ${new Date().toLocaleDateString()}`,
-        status: 'Active',
-        customerType: 'New',
-        totalOrders: 1,
-        totalSpend: total,
-        lastLogin: Date.now(),
-        totalLogins: 1,
-      });
-    }
-
-    orderPlacedRef.current = true;
-    deleteLead(leadId);
-    useFakeOrderStore.getState().markCheckoutRecovered(leadId);
-    
-    navigate(`/checkout/success/${placedOrder.orderId}`, { replace: true });
-    
-    // Clear cart after navigation to prevent UI flicker
-    setTimeout(() => {
+      orderPlacedRef.current = true;
+      deleteLead(leadId);
+      useFakeOrderStore.getState().markCheckoutRecovered(leadId);
+      
+      // Clear shopping cart state explicitly
       clearCart();
-    }, 100);
+      
+      // Explicitly navigate to the success page using the generated invoice ID
+      navigate(`/checkout/success/${placedOrder.orderId}`, { 
+        state: { order: placedOrder },
+        replace: true 
+      });
+
+    } catch (dbError: any) {
+      console.error("[Supabase DB Error] Checkout order insertion failure logged to AI Studio console:", dbError);
+      alert(`অর্ডার প্লেস করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।\n\nError details: ${dbError?.message || dbError}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   useEffect(() => {
@@ -637,89 +698,153 @@ export default function Checkout() {
     return null;
   }
 
+  const nameVal = formData.name.trim();
+  const isNameEmpty = nameVal === "";
+  const isNameValid = nameVal.length >= 3;
+
+  const phoneVal = formData.phone.trim().replace(/\s+/g, '');
+  const isPhoneEmpty = phoneVal === "";
+  const isPhoneValid = (phoneVal.startsWith('01') && phoneVal.length === 11 && /^\d+$/.test(phoneVal)) ||
+                       (phoneVal.startsWith('1') && phoneVal.length === 10 && /^\d+$/.test(phoneVal));
+
   return (
     <div id="checkout-root" className="bg-neutral-50/55 min-h-screen pb-24 font-sans text-neutral-900 selection:bg-neutral-950 selection:text-white">
-      {/* Premium Compact Header */}
-      <div id="checkout-header" className="sticky top-[72px] z-30 bg-white/95 backdrop-blur-md border-b border-neutral-100 py-3.5 px-4 md:px-8 flex items-center justify-between">
-        <button id="checkout-back-btn" onClick={() => navigate(-1)} className="p-2 -ml-2 text-neutral-900 hover:bg-neutral-50 rounded-full transition-colors flex items-center gap-1 cursor-pointer">
-          <ArrowLeft className="w-4 h-4" />
-          <span className="hidden md:block font-bold text-xs uppercase tracking-wider">Back</span>
-        </button>
-        <span id="checkout-title" className="text-xs md:text-sm font-bold uppercase tracking-[0.25em] text-neutral-950 font-sans leading-none">
-          TAZU MART CHECKOUT
-        </span>
-        <div id="checkout-secure-badge" className="p-1.5 text-neutral-950 flex items-center gap-1 bg-neutral-50 rounded border border-neutral-200">
-          <Lock className="w-3.5 h-3.5" />
-          <span className="text-[9px] font-black uppercase tracking-wider text-neutral-500">SSL SECURE</span>
-        </div>
-      </div>
+      <div id="checkout-content" className="container mx-auto px-4 md:px-8 max-w-5xl pt-3 md:pt-4">
 
-      <div id="checkout-content" className="container mx-auto px-4 md:px-8 max-w-5xl pt-6 md:pt-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-6">
           
           {/* Main Checkout Inputs Area (Exactly aligned step-by-step requested flow) */}
-          <div className="lg:col-span-7 space-y-4">
+          <div className="lg:col-span-7 space-y-3">
             
-            {/* STEP 1: DELIVERY TYPE (Home Delivery vs Point Pickup) */}
-            <div id="checkout-step-delivery" className="bg-white rounded-xl p-5 border border-neutral-150 shadow-sm space-y-3.5">
-              <div className="flex items-center gap-2 pb-1 border-b border-neutral-100">
-                <span className="w-5 h-5 bg-black text-white rounded-md flex items-center justify-center text-[10px] font-bold">1</span>
-                <h3 className="text-xs font-bold uppercase tracking-widest text-[#000000]">Delivery Method</h3>
+            {/* Premium Checkout Welcome Header */}
+            <div id="checkout-step-delivery" className="bg-white rounded-xl p-4 md:p-5 border border-neutral-150 shadow-sm relative flex flex-col items-center select-none">
+              {/* Inside Back Button */}
+              <div className="w-full flex justify-start mb-2 md:mb-3">
+                <button 
+                  id="checkout-back-btn" 
+                  onClick={() => navigate(-1)} 
+                  className="h-9 px-3.5 bg-white hover:bg-neutral-50 text-neutral-800 rounded-[12px] border border-neutral-200 shadow-xs flex items-center gap-1.5 transition-all text-[11px] font-extrabold uppercase cursor-pointer"
+                  title="Back"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-neutral-700" />
+                  <span>Back</span>
+                </button>
               </div>
-              
-              <div className="inline-flex items-center gap-2 h-10 px-4 bg-neutral-950 text-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.06)] justify-start select-none">
-                <Truck className="w-3.5 h-3.5 text-white shrink-0" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-white">Home Delivery</span>
+
+              {/* Centered Brand Title & Colored Subtitle */}
+              <div className="text-center w-full pb-1">
+                <h1 className="text-base font-semibold tracking-widest text-neutral-950 uppercase">
+                  TAZU MART BD
+                </h1>
+                <p className="text-[15px] font-semibold tracking-[0.3px] mt-1">
+                  <span className="text-[#2563EB]">Easy Checkout</span>
+                  <span className="text-black">, </span>
+                  <span className="text-[#16A34A]">Secure Payment</span>
+                </p>
               </div>
             </div>
 
-            {/* STEP 2: CUSTOMER INFORMATION */}
-            <div id="checkout-step-customer" className="bg-white rounded-xl p-5 border border-neutral-150 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 pb-1 border-b border-neutral-100">
-                <span className="w-5 h-5 bg-black text-white rounded-md flex items-center justify-center text-[10px] font-bold">2</span>
-                <h3 className="text-xs font-bold uppercase tracking-widest text-[#000000]">Customer Information</h3>
-              </div>
+              {/* STEP 2: CUSTOMER INFORMATION */}
+              <div id="checkout-step-customer" className="bg-white rounded-[20px] p-4 md:p-5 border border-neutral-150 shadow-sm space-y-3.5">
+                <div className="flex items-center gap-2 pb-2 border-b border-neutral-100">
+                  <span className="w-5 h-5 bg-black text-white rounded-md flex items-center justify-center text-[10px] font-bold">2</span>
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#000000]">Customer Information</h3>
+                </div>
 
-              {/* 1. Full Name */}
-              <div id="input-group-name">
-                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">Full Name *</label>
-                <input 
-                  id="checkout-name"
-                  type="text" 
-                  placeholder="E.g. Imtiaz Khan" 
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  className={cn(
-                    "w-full bg-white border px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-bold transition-all placeholder:font-normal placeholder:text-neutral-400",
-                    errors.name ? "border-red-500 bg-red-50/5" : "border-neutral-250"
-                  )} 
-                />
-                {errors.name && <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1 pl-1 uppercase"><AlertCircle className="w-3.5 h-3.5" /> {errors.name}</p>}
-              </div>
+                {/* 1. Full Name */}
+                <div id="input-group-name" className="space-y-1">
+                  <label className="text-[11px] font-black text-neutral-800 uppercase tracking-widest pl-1 block">
+                    Customer Full Name *
+                  </label>
+                  <div className="relative">
+                    <input 
+                      id="checkout-name"
+                      type="text" 
+                      placeholder="TAZU MART BD" 
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      className={cn(
+                        "w-full bg-white border-2 px-4 h-[54px] rounded-[20px] focus:outline-none text-xs font-bold transition-all duration-300 placeholder:font-normal placeholder:text-neutral-400 shadow-[0_4px_12px_rgba(0,0,0,0.03)]",
+                        isNameEmpty 
+                          ? "border-neutral-200 focus:border-neutral-400"
+                          : isNameValid 
+                            ? "border-emerald-400 focus:border-emerald-500" 
+                            : "border-rose-400 focus:border-rose-500"
+                      )} 
+                    />
+                    {!isNameEmpty && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        {isNameValid ? (
+                          <span className="text-emerald-500 font-extrabold text-[10px] flex items-center gap-1">✓ Valid</span>
+                        ) : (
+                          <span className="text-rose-500 font-extrabold text-[10px]">Too Short</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {!isNameEmpty && !isNameValid && (
+                    <p className="text-[10px] text-rose-500 font-bold mt-1.5 flex items-center gap-1 pl-1 uppercase">
+                      <AlertCircle className="w-3.5 h-3.5" /> Full name must be at least 3 characters
+                    </p>
+                  )}
+                </div>
 
-              {/* 2. Phone Number */}
-              <div id="input-group-phone">
-                <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">Mobile Number *</label>
-                <input 
-                  id="checkout-phone"
-                  type="tel" 
-                  placeholder="01XXXXXXXXX" 
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className={cn(
-                    "w-full bg-white border px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-bold transition-all placeholder:font-normal placeholder:text-neutral-400",
-                    errors.phone ? "border-red-500 bg-red-50/5" : "border-neutral-250"
-                  )} 
-                />
-                {errors.phone && <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1 pl-1 uppercase"><AlertCircle className="w-3.5 h-3.5" /> {errors.phone}</p>}
-              </div>
+                {/* 2. Phone Number */}
+                <div id="input-group-phone" className="space-y-1">
+                  <label className="text-[11px] font-black text-neutral-800 uppercase tracking-widest pl-1 block">
+                    Customer Mobile Number *
+                  </label>
+                  
+                  <div className={cn(
+                    "flex items-center bg-white border-2 rounded-[20px] shadow-[0_4px_12px_rgba(0,0,0,0.03)] transition-all duration-300 overflow-hidden h-[54px]",
+                    isPhoneEmpty
+                      ? "border-neutral-200 focus-within:border-neutral-400"
+                      : isPhoneValid
+                        ? "border-emerald-400 focus-within:border-emerald-500"
+                        : "border-rose-400 focus-within:border-rose-500"
+                  )}>
+                    {/* Automatically select Bangladesh country prefix */}
+                    <div className="flex items-center gap-1.5 bg-neutral-50 border-r border-neutral-100 h-full px-4 shrink-0 select-none">
+                      <span className="text-base">🇧🇩</span>
+                      <span className="text-[11px] font-black text-neutral-600 tracking-wide">+880</span>
+                    </div>
+                    
+                    <input 
+                      id="checkout-phone"
+                      type="tel" 
+                      placeholder="01XXXXXXXXX" 
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value.replace(/\D/g, ''))}
+                      className="flex-1 bg-transparent px-4 h-full focus:outline-none text-xs font-bold transition-all placeholder:font-normal placeholder:text-neutral-400 text-neutral-900"
+                    />
+                    
+                    {!isPhoneEmpty && (
+                      <div className="pr-4 shrink-0">
+                        {isPhoneValid ? (
+                          <span className="text-emerald-500 font-extrabold text-[10px] flex items-center gap-1">
+                            ✓ Correct
+                          </span>
+                        ) : (
+                          <span className="text-rose-500 font-extrabold text-[10px]">
+                            Invalid
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {!isPhoneEmpty && !isPhoneValid && (
+                    <p className="text-[10px] text-rose-500 font-bold mt-1.5 flex items-center gap-1 pl-1 uppercase">
+                      <AlertCircle className="w-3.5 h-3.5" /> Please enter a valid 10 or 11 digit mobile number
+                    </p>
+                  )}
+                </div>
 
               {/* 3. Address Details */}
               <div id="input-group-address">
                 <HomeDeliverySection 
                   formData={formData} 
                   handleInputChange={handleInputChange} 
-                  handleUseLocation={handleUseLocation}
                   errors={errors}
                 />
               </div>
@@ -773,53 +898,62 @@ export default function Checkout() {
               
               {errors.paymentMethod && <p className="text-[10px] text-red-500 font-bold mb-3 flex items-center gap-1 pl-1 uppercase"><AlertCircle className="w-3.5 h-3.5" /> {errors.paymentMethod}</p>}
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {availableMethods.map(method => (
-                  <button 
-                    id={`payment-method-${method.id}`}
-                    key={method.id}
-                    type="button"
-                    onClick={() => setPaymentMethod(method.id)}
-                    className={cn(
-                      "p-3.5 border rounded-xl cursor-pointer transition-all flex items-center justify-between text-left gap-3 min-h-[56px] hover:border-neutral-400",
-                      paymentMethod === method.id 
-                        ? "border-neutral-950 bg-neutral-950 text-white shadow-sm" 
-                        : "border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50"
-                    )}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      {method.logo ? (
-                        <div className="w-12 h-8 bg-neutral-100 flex items-center justify-center border border-neutral-250 shrink-0">
-                          <img 
-                            src={method.logo} 
-                            alt={method.name} 
-                            className="max-h-6 max-w-[40px] object-contain" 
-                            referrerPolicy="no-referrer" 
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-12 h-8 bg-neutral-900 text-white flex items-center justify-center border border-neutral-250 shrink-0 text-[10px] font-bold uppercase">
-                          {method.short}
-                        </div>
+              <div className="grid grid-cols-2 gap-3.5">
+                {availableMethods.map(method => {
+                  const theme = getPaymentTheme(method.id);
+                  const isSelected = paymentMethod === method.id;
+                  return (
+                    <button 
+                      id={`payment-method-${method.id}`}
+                      key={method.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(method.id)}
+                      className={cn(
+                        "p-3.5 rounded-[18px] cursor-pointer transition-all duration-300 flex items-center justify-between text-left gap-3 relative overflow-hidden select-none",
+                        isSelected 
+                          ? `${theme.bgColor} ${theme.selectedBorderColor} shadow-md scale-[1.01]` 
+                          : `${theme.bgColor} ${theme.borderColor} opacity-90 shadow-xs hover:opacity-100 ${theme.hoverBorderColor}`
                       )}
-                      <div className="min-w-0">
-                        <span className="text-xs font-black uppercase tracking-wide truncate block">{method.name}</span>
-                        {method.number && (
-                          <span className={cn("text-[8px] font-mono block tracking-wider leading-none mt-0.5", paymentMethod === method.id ? "text-neutral-300" : "text-neutral-500")}>
-                            {method.number}
+                      style={isSelected ? { borderWidth: '2px' } : { borderWidth: '1px' }}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        {method.logo ? (
+                          <div className="w-12 h-9 bg-white rounded-[10px] flex items-center justify-center p-1 shrink-0 border border-neutral-150/40 shadow-xs">
+                            <img 
+                              src={method.logo} 
+                              alt={method.name} 
+                              className="max-h-6.5 max-w-[38px] object-contain" 
+                              referrerPolicy="no-referrer" 
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-12 h-9 rounded-[10px] bg-neutral-900 text-white flex items-center justify-center shrink-0 text-[10px] font-black uppercase shadow-xs">
+                            {method.short}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-900 block truncate leading-none">
+                            {method.name.replace(/Personal|Merchant/gi, '').trim() || method.short}
                           </span>
+                          <span className="text-[8px] md:text-[9px] font-bold text-neutral-500 font-mono tracking-wider block mt-1 leading-none truncate">
+                            {method.id === 'cod' ? 'Hand Cash' : 'Instant Pay'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Selection Badge */}
+                      <div className="shrink-0 flex items-center justify-center">
+                        {isSelected ? (
+                          <div className={cn("w-5 h-5 rounded-full flex items-center justify-center shadow-xs text-[10px] font-black border-2 border-white bg-current", theme.iconColor)}>
+                            <span className="text-white">✓</span>
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border border-neutral-300 bg-white shrink-0" />
                         )}
                       </div>
-                    </div>
-                    {paymentMethod === method.id ? (
-                      <div className="w-4 h-4 rounded-full bg-white text-black flex items-center justify-center text-[9px] font-black shrink-0">
-                        ✓
-                      </div>
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border border-neutral-300 shrink-0" />
-                    )}
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Conditional payment verification inputs */}
@@ -1254,10 +1388,19 @@ export default function Checkout() {
               <button 
                 id="place-order-desktop-btn"
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => handleSubmit()}
-                className="hidden md:flex w-full bg-neutral-900 hover:bg-black text-white h-[48px] font-black uppercase text-xs tracking-widest transition-all rounded-lg items-center justify-center gap-2 cursor-pointer shadow-sm select-none active:scale-[0.99]"
+                className="hidden md:flex w-full bg-neutral-900 hover:bg-black text-white h-[48px] font-black uppercase text-xs tracking-widest transition-all rounded-lg items-center justify-center gap-2 cursor-pointer shadow-sm select-none active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Place Order <Lock className="w-3.5 h-3.5" />
+                {isSubmitting ? (
+                  <>
+                    Processing... <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  </>
+                ) : (
+                  <>
+                    Place Order <Lock className="w-3.5 h-3.5" />
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -1275,10 +1418,19 @@ export default function Checkout() {
             <button 
               id="place-order-mobile-btn"
               type="button"
+              disabled={isSubmitting}
               onClick={() => handleSubmit()}
-              className="flex-1 h-[44px] bg-neutral-900 hover:bg-black text-white rounded-lg font-black uppercase text-xs tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 h-[44px] bg-neutral-900 hover:bg-black text-white rounded-lg font-black uppercase text-xs tracking-widest shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Place Order <Lock className="w-3.5 h-3.5" />
+              {isSubmitting ? (
+                <>
+                  Processing... <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </>
+              ) : (
+                <>
+                  Place Order <Lock className="w-3.5 h-3.5" />
+                </>
+              )}
             </button>
          </div>
       </div>

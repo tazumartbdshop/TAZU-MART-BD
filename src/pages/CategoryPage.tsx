@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { useCategoryStore } from '../store/useCategoryStore';
+import { useCategoryStore, CATEGORY_FALLBACKS } from '../store/useCategoryStore';
 import { useProductStore } from '../store/useProductStore';
 import { CompactProductCard } from '../components/product/CompactProductCard';
 import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
@@ -11,7 +11,40 @@ export default function CategoryPage() {
   const { categories, isLoaded } = useCategoryStore();
   const { products, isLoading } = useProductStore();
 
-  const category = categories.find(c => c.id === id || c.slug === id);
+  let category = categories.find(c => 
+    String(c.id).toLowerCase() === String(id).toLowerCase() || 
+    String(c.slug).toLowerCase() === String(id).toLowerCase()
+  );
+
+  if (!category && id) {
+    const normId = id.toLowerCase();
+    const matchedFallback = CATEGORY_FALLBACKS.find(f => normId.includes(f.name) || f.name.includes(normId));
+    if (matchedFallback) {
+      category = {
+        id: id,
+        name: matchedFallback.name.toUpperCase(),
+        bannerName: `${matchedFallback.name.toUpperCase()} COLLECTION`,
+        slug: id,
+        bannerImage: matchedFallback.image,
+        displayOrder: 1,
+        status: 'Active',
+        showOnHomepage: true,
+        createdAt: new Date().toISOString()
+      };
+    } else {
+      category = {
+        id: id,
+        name: id.toUpperCase().replace(/-/g, ' '),
+        bannerName: `${id.toUpperCase().replace(/-/g, ' ')} COLLECTION`,
+        slug: id,
+        bannerImage: "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop",
+        displayOrder: 1,
+        status: 'Active',
+        showOnHomepage: true,
+        createdAt: new Date().toISOString()
+      };
+    }
+  }
   
   if (!isLoaded || isLoading) {
     return (

@@ -111,7 +111,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           <div className="flex items-center gap-1">
             <Star className="w-3 h-3 fill-black text-black" />
             <span className="text-[10px] text-black font-extrabold">{liveAverageRating}</span>
-            <span className="text-[9px] text-gray-400 font-bold">({liveReviewsCount > 0 ? liveReviewsCount : product.reviews})</span>
+            <span className="text-[9px] text-gray-400 font-bold">({liveReviewsCount > 0 ? liveReviewsCount : (product.reviews || 0)})</span>
           </div>
           {product.soldCount !== undefined && product.soldCount !== null && (
              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest font-mono">{product.soldCount}+ Sold</span>
@@ -120,18 +120,18 @@ export default function ProductCard({ product }: ProductCardProps) {
         
         <Link to={`/product/${product.id}`}>
           <h3 className="font-extrabold text-black line-clamp-1 group-hover:text-zinc-600 transition-colors text-xs uppercase tracking-tight mb-2">
-            {product.name}
+            {product.name || 'Product'}
           </h3>
         </Link>
         
         <div className="mt-auto flex flex-col gap-3">
           <div className="flex items-baseline gap-2">
             <span className="text-black font-black text-base tracking-tighter">
-              ৳{(finalDiscountPrice || product.price).toLocaleString()}
+              ৳{(finalDiscountPrice || product.price || 0).toLocaleString()}
             </span>
             {finalDiscountPrice && (
               <span className="text-gray-400 text-xs font-semibold line-through tracking-tighter">
-                ৳{product.price.toLocaleString()}
+                ৳{(product.price || 0).toLocaleString()}
               </span>
             )}
           </div>

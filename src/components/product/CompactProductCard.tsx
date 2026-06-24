@@ -31,17 +31,22 @@ export function CompactProductCard({ product, rank }: any) {
   const { reviews } = useReviewStore();
   const [showCoinInfo, setShowCoinInfo] = useState(false);
 
-  const approvedReviewsForProduct = reviews.filter(r => r.productId === product.id && r.status === 'approved');
+  if (!product) {
+    return null;
+  }
+
+  const approvedReviewsForProduct = reviews.filter(r => String(r.productId) === String(product.id) && r.status === 'approved');
   const liveReviewsCount = approvedReviewsForProduct.length;
   const liveAverageRating = liveReviewsCount > 0
     ? Number((approvedReviewsForProduct.reduce((sum, r) => sum + r.rating, 0) / liveReviewsCount).toFixed(1))
-    : product.rating;
+    : (product.rating || 4.5);
   
   const rewardCoins = product.reward_coins || 150;
   const isCoinEnabled = product.coin_enabled !== false;
 
+  const basePrice = product.price || 0;
   const discountPercent = product.discountPrice 
-    ? Math.round(((product.price - product.discountPrice) / product.price) * 100) 
+    ? Math.round(((basePrice - product.discountPrice) / (basePrice || 1)) * 100) 
     : 0;
 
   return (

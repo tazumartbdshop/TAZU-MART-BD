@@ -77,7 +77,7 @@ export default function Home() {
   const homeCategories = activeDbCategories.map(cat => ({
     name: cat.name,
     image: resolveCategoryThumbnail(cat),
-    link: `/category/${cat.id}`
+    link: `/category/${cat.id || cat.slug || 'all'}`
   }));
 
   // Filter Active Banners from DB
@@ -111,7 +111,7 @@ export default function Home() {
       c.name.toLowerCase().includes(term.toLowerCase()) || 
       (c.slug && c.slug.toLowerCase().includes(term.toLowerCase()))
     );
-    return matched ? `/category/${matched.id}` : `/search?q=${encodeURIComponent(term)}`;
+    return matched ? `/category/${matched.id || matched.slug || 'all'}` : `/search?q=${encodeURIComponent(term)}`;
   };
 
   // Filter active valid products

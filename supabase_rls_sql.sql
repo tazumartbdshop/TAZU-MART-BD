@@ -148,8 +148,20 @@ CREATE TABLE IF NOT EXISTS public.orders (
   payment_status TEXT DEFAULT 'Unpaid',
   is_read BOOLEAN DEFAULT false,
   items JSONB DEFAULT '[]'::jsonb,
-  date TEXT,
+  date BIGINT,
   utm_params JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS public.order_items (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  price NUMERIC DEFAULT 0,
+  quantity INT DEFAULT 1,
+  variant TEXT DEFAULT 'Default',
+  image TEXT,
+  created_at BIGINT DEFAULT (extract(epoch from now()) * 1000)::bigint
 );
 
 CREATE TABLE IF NOT EXISTS public.settings (
@@ -227,6 +239,11 @@ BEGIN
     ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Orders access" ON public.orders;
     CREATE POLICY "Orders access" ON public.orders FOR ALL TO public USING (true) WITH CHECK (true);
+
+    -- Order Items Policies
+    ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Order items access" ON public.order_items;
+    CREATE POLICY "Order items access" ON public.order_items FOR ALL TO public USING (true) WITH CHECK (true);
 
     -- Settings Policies
     ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;

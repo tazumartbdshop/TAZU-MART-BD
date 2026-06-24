@@ -248,7 +248,9 @@ export default function Product() {
   const { addViewedProduct } = useRecentlyViewedStore();
 
   const product = useMemo(() => {
-    return products.find(p => p.id === id) || ALL_FALLBACK_PRODUCTS.find(p => p.id === id);
+    if (!id) return null;
+    const found = products.find(p => String(p.id) === String(id)) || ALL_FALLBACK_PRODUCTS.find(p => String(p.id) === String(id));
+    return found || null;
   }, [products, id]);
   
   const bannerUrls = useMemo(() => {
@@ -273,21 +275,31 @@ export default function Product() {
   const images = useMemo(() => {
     if (!product) return [];
     
-    let prodImages = product.images;
-    if (typeof prodImages === 'string') {
-      try {
-        prodImages = JSON.parse(prodImages);
-      } catch (e) {
-        if (prodImages.includes(',')) {
-          prodImages = prodImages.split(',').map((s: string) => s.trim());
-        } else {
-          prodImages = prodImages ? [prodImages] : [];
+    let rawImages: string[] = [];
+    if (Array.isArray(product.images)) {
+      rawImages = product.images;
+    } else if (typeof product.images === 'string') {
+      const trimmed = product.images.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            rawImages = parsed;
+          } else {
+            rawImages = [trimmed];
+          }
+        } catch {
+          rawImages = trimmed.split(',').map((img: string) => img.trim()).filter(Boolean);
         }
+      } else {
+        rawImages = trimmed.split(',').map((img: string) => img.trim()).filter(Boolean);
       }
+    } else if (product.images) {
+      rawImages = [String(product.images)];
     }
-    
-    if (Array.isArray(prodImages) && prodImages.length > 0) {
-      return prodImages;
+
+    if (rawImages && rawImages.length > 0) {
+      return rawImages;
     }
     const list = [product.imageUrl || product.image];
     const category = (product.category || '').toLowerCase();
@@ -341,9 +353,13 @@ export default function Product() {
       list.push({ type: 'video', url: vUrl, thumbnail: thumb });
     }
     
-    images.forEach(img => {
-      list.push({ type: 'image', url: img, thumbnail: img });
-    });
+    if (Array.isArray(images)) {
+      images.forEach(img => {
+        if (img) {
+          list.push({ type: 'image', url: img, thumbnail: img });
+        }
+      });
+    }
     
     return list;
   }, [product, images]);
@@ -371,30 +387,6 @@ export default function Product() {
     return '';
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen pt-24 pb-16 flex justify-center items-center">
-        <div className="flex flex-col items-center gap-4 text-neutral-400">
-           <div className="w-12 h-12 border-4 border-black/10 border-t-black rounded-full animate-spin"></div>
-           <p className="text-xs font-bold uppercase tracking-widest">Loading Product...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!product) {
-    return (
-      <div className="min-h-screen pt-24 pb-16 flex justify-center items-center text-center">
-        <div className="flex flex-col items-center gap-4 text-neutral-400">
-           <Box className="w-12 h-12 mb-2 opacity-50" />
-           <h2 className="text-xl font-black uppercase tracking-widest text-[#1a1a1a]">Product Not Found</h2>
-           <p className="text-sm font-medium">This product does not exist or has been removed.</p>
-           <button onClick={() => navigate('/')} className="mt-4 bg-black text-white px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors">Return to Shop</button>
-        </div>
-      </div>
-    );
-  }
-
   // Align activeImage state on initial load to show Product Image 1 (index 1) by default if video exists
   useEffect(() => {
     if (product && (product.videoUrl || product.mediaUrl)) {
@@ -403,6 +395,13 @@ export default function Product() {
       setActiveImage(0);
     }
   }, [product]);
+
+  // Keep activeImage within valid bounds if gallery size changes
+  useEffect(() => {
+    if (galleryItems.length > 0 && activeImage >= galleryItems.length) {
+      setActiveImage(0);
+    }
+  }, [galleryItems, activeImage]);
 
   // Gestures for swipe action on mobile
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -428,14 +427,26 @@ export default function Product() {
 
   const groupedVariants = useMemo<Record<string, { option: string, price: string }[]>>(() => {
     const groups: Record<string, { option: string, price: string }[]> = {};
-    if (product.variants?.length) {
+    if (product && product.variants && Array.isArray(product.variants)) {
       product.variants.forEach(v => {
+        if (!v || !v.title) return;
         if (!groups[v.title]) groups[v.title] = [];
         groups[v.title].push({ option: v.option, price: v.price });
       });
+    } else if (product && product.variants && typeof product.variants === 'string') {
+      try {
+        const parsed = JSON.parse(product.variants);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((v: any) => {
+            if (!v || !v.title) return;
+            if (!groups[v.title]) groups[v.title] = [];
+            groups[v.title].push({ option: v.option, price: v.price });
+          });
+        }
+      } catch {}
     }
     return groups;
-  }, [product.variants]);
+  }, [product]);
 
   // Handle standard default variation parameters
   useEffect(() => {
@@ -451,7 +462,7 @@ export default function Product() {
     setQuantity(1);
     setActiveImage(0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [product.id, groupedVariants]);
+  }, [product?.id, groupedVariants]);
 
   // Track product view history automatically inside the dynamic store
   useEffect(() => {
@@ -469,14 +480,26 @@ export default function Product() {
   // Variant custom pricing multipliers
   const extraPrice = useMemo(() => {
     let total = 0;
+    if (!product) return 0;
+    
+    let variantsList = product.variants;
+    if (variantsList && typeof variantsList === 'string') {
+      try {
+        const parsed = JSON.parse(variantsList);
+        if (Array.isArray(parsed)) variantsList = parsed;
+      } catch {}
+    }
+    
     for (const [title, option] of Object.entries(selectedVariants)) {
-      const variant = product.variants?.find(v => v.title === title && v.option === option);
-      if (variant && variant.price) {
-        total += parseFloat(variant.price) || 0;
+      if (variantsList && Array.isArray(variantsList)) {
+        const variant = variantsList.find(v => v && v.title === title && v.option === option);
+        if (variant && variant.price) {
+          total += parseFloat(variant.price) || 0;
+        }
       }
     }
     return total;
-  }, [selectedVariants, product.variants]);
+  }, [selectedVariants, product]);
 
   const discountDetails = useMemo(() => {
     return getProductDiscountDetails(product, offers);
@@ -484,7 +507,7 @@ export default function Product() {
 
   const basePrice = discountDetails.discountPrice;
   const currentPrice = basePrice + extraPrice;
-  const originalTotal = product.price + extraPrice;
+  const originalTotal = (product?.price || 0) + extraPrice;
 
   const discountPercent = originalTotal > currentPrice 
     ? Math.round(((originalTotal - currentPrice) / originalTotal) * 100) 
@@ -492,21 +515,22 @@ export default function Product() {
 
   // Short feature highlight description (max 3 lines) formulated from raw description text
   const teaserHighlight = useMemo(() => {
-    if (!product.description) return 'Premium genuine accessories crafted to perfection with durable materials and sleek finish.';
+    if (!product || !product.description) return 'Premium genuine accessories crafted to perfection with durable materials and sleek finish.';
     const clean = product.description.replace(/<[^>]*>/g, '').trim();
     return clean.length > 130 ? clean.substring(0, 130) + '...' : clean;
-  }, [product.description]);
+  }, [product]);
 
   const relatedProducts = useMemo(() => {
+    if (!product) return [];
     return products.filter(p => 
       String(p.category || '').trim().toLowerCase() === String(product.category || '').trim().toLowerCase() && 
       p.id !== product.id
     ).slice(0, 4);
   }, [products, product]);
 
-  const isOutOfStock = product.stock === 0;
+  const isOutOfStock = !product || product.stock === 0 || product.stock === null || product.stock === undefined;
 
-  const handleBuyNow = () => {
+  const handleAddToCart = () => {
     if (isOutOfStock) {
         alert("This product is currently out of stock");
         return;
@@ -515,9 +539,6 @@ export default function Product() {
     const cartItemId = `${product.id}-${Object.values(selectedVariants).join('-')}`;
     const cartItemName = `${product.name}${variantString ? ` - ${variantString}` : ''}`;
     
-    // Clear the cart first for clean direct checkout experience
-    clearCart();
-
     addItem({
       id: cartItemId,
       name: cartItemName,
@@ -534,7 +555,34 @@ export default function Product() {
       quantity: quantity
     });
 
-    // Directly redirect to checkout page
+    toast.success("Product added to cart successfully");
+  };
+
+  const handleBuyNow = () => {
+    if (isOutOfStock) {
+        alert("This product is currently out of stock");
+        return;
+    }
+    const variantString = Object.entries(selectedVariants).map(([k,v]) => `${k}: ${v}`).join(', ');
+    const cartItemId = `${product.id}-${Object.values(selectedVariants).join('-')}`;
+    const cartItemName = `${product.name}${variantString ? ` - ${variantString}` : ''}`;
+    
+    addItem({
+      id: cartItemId,
+      name: cartItemName,
+      price: currentPrice,
+      originalPrice: originalTotal,
+      image: product.imageUrl || product.image,
+      quantity: quantity,
+    });
+
+    pixelService.trackAddToCart({
+      id: product.id,
+      name: product.name,
+      price: currentPrice,
+      quantity: quantity
+    });
+
     navigate('/checkout');
   };
 
@@ -562,14 +610,40 @@ export default function Product() {
 
   // Dynamic Trust Indicators Ticker
   const animatedSold = useMemo(() => {
+    if (!product) return '0';
     const customSeed = product.soldCount || 1200;
     return customSeed >= 1000 ? `${(customSeed / 1000).toFixed(1)}K` : `${customSeed}`;
-  }, [product.soldCount]);
+  }, [product]);
 
   const animatedViews = useMemo(() => {
+    if (!product) return '0';
     const customSeed = product.soldCount ? product.soldCount * 4 : 5800;
     return customSeed >= 1000 ? `${(customSeed / 1000).toFixed(1)}K` : `${customSeed}`;
-  }, [product.soldCount]);
+  }, [product]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 flex justify-center items-center">
+        <div className="flex flex-col items-center gap-4 text-neutral-400">
+           <div className="w-12 h-12 border-4 border-black/10 border-t-black rounded-full animate-spin"></div>
+           <p className="text-xs font-bold uppercase tracking-widest">Loading Product...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 flex justify-center items-center text-center">
+        <div className="flex flex-col items-center gap-4 text-neutral-400">
+           <Box className="w-12 h-12 mb-2 opacity-50" />
+           <h2 className="text-xl font-black uppercase tracking-widest text-[#1a1a1a]">Product Not Found</h2>
+           <p className="text-sm font-medium">This product is unavailable right now.</p>
+           <button onClick={() => navigate('/')} className="mt-4 bg-black text-white px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors">Back to Home</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white min-h-screen pb-32 md:pb-16 font-sans antialiased text-neutral-900 transition-all">
@@ -684,14 +758,14 @@ export default function Product() {
               <AnimatePresence mode="wait">
                 {galleryItems[activeImage]?.type === 'video' ? (
                   <motion.div
-                    key="video-player-main"
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.25 }}
-                    className="w-full h-full aspect-square relative bg-black flex items-center justify-center p-0"
+                     key="video-player-main"
+                     initial={{ opacity: 0, scale: 0.98 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     exit={{ opacity: 0, scale: 0.98 }}
+                     transition={{ duration: 0.25 }}
+                     className="w-full h-full aspect-square relative bg-black flex items-center justify-center p-0"
                   >
-                    {getEmbedUrl(galleryItems[activeImage].url) ? (
+                    {galleryItems[activeImage]?.url && getEmbedUrl(galleryItems[activeImage].url) ? (
                       <iframe
                         src={getEmbedUrl(galleryItems[activeImage].url)}
                         title="Product Video Player"
@@ -702,7 +776,7 @@ export default function Product() {
                       />
                     ) : (
                       <video
-                        src={galleryItems[activeImage].url}
+                        src={galleryItems[activeImage]?.url || ''}
                         className="w-full h-full border-none absolute inset-0 object-contain"
                         controls
                         autoPlay
@@ -725,20 +799,24 @@ export default function Product() {
               </AnimatePresence>
 
               {/* Minimal Left & Right Slider Arrows */}
-              <button 
-                type="button"
-                onClick={() => setActiveImage((prev) => (prev - 1 + galleryItems.length) % galleryItems.length)}
-                className="absolute left-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                type="button"
-                onClick={() => setActiveImage((prev) => (prev + 1) % galleryItems.length)}
-                className="absolute right-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+              {galleryItems.length > 1 && (
+                <>
+                  <button 
+                    type="button"
+                    onClick={() => setActiveImage((prev) => (galleryItems.length > 0 ? (prev - 1 + galleryItems.length) % galleryItems.length : 0))}
+                    className="absolute left-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setActiveImage((prev) => (galleryItems.length > 0 ? (prev + 1) % galleryItems.length : 0))}
+                    className="absolute right-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
 
               {/* Compact Indicator Dots */}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-1 bg-white/80 p-0.5 px-1.5 border border-neutral-150 rounded-full">
@@ -933,15 +1011,16 @@ export default function Product() {
               </div>
             </div>
 
-            {/* 7. Action Button Panel (Desktop only - direct Buy Now) */}
+            {/* 7. Action Button Panel (Desktop only - hidden on mobile bottom bar) */}
             <div className="hidden md:block pt-3">
               <button 
                 type="button"
                 onClick={handleBuyNow}
                 disabled={isOutOfStock}
-                className={`w-full h-[52px] bg-neutral-950 text-white font-black uppercase text-[11px] tracking-widest hover:bg-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center rounded-[16px] ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-neutral-300 text-neutral-400' : ''}`}
+                className={`w-full h-[52px] bg-neutral-950 text-white border border-neutral-950 font-black uppercase text-[11px] tracking-widest hover:bg-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-neutral-300 border-neutral-300 text-neutral-400' : ''}`}
               >
-                <span>{isOutOfStock ? 'OUT OF STOCK' : 'Buy Now'}</span>
+                <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
+                <span>{isOutOfStock ? 'OUT OF STOCK' : 'BUY NOW'}</span>
               </button>
             </div>
 
@@ -977,7 +1056,7 @@ export default function Product() {
                   >
                     {activeTab === 'description' && (
                       <div className="space-y-3.5">
-                        {product.seoPoints && product.seoPoints.length > 0 && (
+                        {product.seoPoints && Array.isArray(product.seoPoints) && product.seoPoints.length > 0 && (
                           <div className="space-y-2 border-b border-neutral-100 pb-3">
                             {product.seoPoints.map((point, index) => point && (
                               <div key={index} className="flex items-start gap-2 text-neutral-800">
@@ -1090,24 +1169,29 @@ export default function Product() {
         </div>
       )}
 
-      {/* Sticky Bottom Purchase Bar (Highly optimized layout across all screens with 1-click Buy Now) */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-neutral-200 px-4 py-4 shadow-[0_-8px_30px_rgb(0,0,0,0.06)] pb-safe">
-        <div className="container mx-auto max-w-lg flex flex-col gap-2.5">
-          <div className="flex items-center justify-between text-neutral-900 px-1">
-            <span className="text-xs font-black uppercase tracking-widest text-neutral-400">Total Price :</span>
-            <span className="text-sm font-black text-neutral-950 font-mono">BDT {formatPrice(currentPrice * quantity)}</span>
-          </div>
-          
-          <button 
-            type="button"
-            onClick={handleBuyNow}
-            disabled={isOutOfStock}
-            className={`w-full h-12 bg-neutral-950 hover:bg-neutral-900 text-white font-black uppercase text-xs tracking-widest transition-all duration-200 active:scale-[0.99] flex items-center justify-center rounded-[16px] shadow-lg shadow-neutral-950/10 select-none ${
-              isOutOfStock ? 'opacity-50 cursor-not-allowed bg-neutral-300 text-neutral-400 shadow-none' : ''
-            }`}
-          >
-            <span>{isOutOfStock ? 'OUT OF STOCK' : 'Buy Now'}</span>
-          </button>
+      {/* Sticky Bottom Purchase Bar (Highly optimized layout across all screens) */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between gap-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+        
+        <div className="flex flex-col flex-shrink-0 min-w-[80px]">
+            <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Total Price</span>
+            <div className="flex items-baseline gap-1">
+                <span className="text-xs font-bold text-gray-900">BDT</span>
+                <span className="text-xl font-black text-gray-950">{formatPrice(currentPrice * quantity)}</span>
+            </div>
+        </div>
+
+        <div className="flex flex-1 gap-3 max-w-xs sm:max-w-md ml-auto">
+            
+            <button 
+              type="button"
+              onClick={handleBuyNow}
+              disabled={isOutOfStock}
+              className={`w-full bg-gray-950 hover:bg-gray-900 text-white font-semibold h-11 px-4 rounded-lg text-sm shadow-md shadow-gray-950/10 transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-300 hover:bg-gray-300 text-gray-400' : ''}`}
+            >
+                <ShoppingBag className="w-4 h-4" />
+                <span>{isOutOfStock ? 'OUT OF STOCK' : 'BUY NOW'}</span>
+            </button>
+
         </div>
       </div>
 

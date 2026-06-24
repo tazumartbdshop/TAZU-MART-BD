@@ -149,7 +149,7 @@ export default function Search() {
               {matchedCategories.map(cat => (
                 <Link 
                   key={cat.id} 
-                  to={`/category/${cat.id}`}
+                  to={`/category/${cat.id || cat.slug || 'all'}`}
                   className="flex items-center gap-4 p-4 bg-neutral-50 hover:bg-neutral-100/50 border border-neutral-200/40 hover:border-black transition-all group cursor-pointer"
                 >
                   <div className="w-12 h-12 overflow-hidden relative border border-neutral-100 bg-neutral-900 shrink-0 select-none">

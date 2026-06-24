@@ -19,7 +19,7 @@ export default function ProductReviews() {
   const { reviews, addReview } = useReviewStore();
   const { products } = useProductStore();
   
-  const product = products.find(p => p.id === id);
+  const product = products.find(p => String(p.id) === String(id));
 
   // Filter & Form States
   const [activeFilter, setActiveFilter] = useState<FilterType>('Latest');

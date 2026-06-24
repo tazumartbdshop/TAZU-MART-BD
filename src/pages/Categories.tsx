@@ -46,7 +46,7 @@ export default function Categories() {
                 transition={{ delay: idx * 0.05 }}
               >
                 <Link
-                  to={`/category/${cat.id}`}
+                  to={`/category/${cat.id || cat.slug || 'all'}`}
                   className="block group"
                 >
                   <div className="aspect-square bg-gray-50 flex items-center justify-center overflow-hidden rounded-2xl border border-gray-100 group-hover:border-black/20 transition-all">

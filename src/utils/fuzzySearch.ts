@@ -176,8 +176,8 @@ export function filterProductsSmart(products: Product[], queryStr: string): Prod
     const brand = (p.brand || '').toLowerCase();
     const sku = (p.sku || '').toLowerCase();
     const desc = (p.description || '').toLowerCase();
-    const tags = (p.seoPoints || []).map(t => t.toLowerCase());
-    const kws = (p.keywords || []).map(k => k.toLowerCase());
+    const tags = (Array.isArray(p.seoPoints) ? p.seoPoints : []).map(t => t.toLowerCase());
+    const kws = (Array.isArray(p.keywords) ? p.keywords : []).map(k => k.toLowerCase());
 
     // Matches SKU directly
     if (sku.includes(cleanQuery)) return true;

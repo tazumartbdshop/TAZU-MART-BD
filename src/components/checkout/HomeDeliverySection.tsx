@@ -1,5 +1,5 @@
 import React from 'react';
-import { Navigation, AlertCircle, Save, MapPin, Home, Building2, Map } from 'lucide-react';
+import { AlertCircle, Save, MapPin, Home, Building2, Map } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { motion } from 'motion/react';
 import { bdAddressData, divisions } from '../../data/addressData';
@@ -7,19 +7,33 @@ import { bdAddressData, divisions } from '../../data/addressData';
 interface HomeDeliverySectionProps {
   formData: any;
   handleInputChange: (field: string, value: any) => void;
-  handleUseLocation: () => void;
   errors: any;
 }
 
 export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({ 
   formData, 
   handleInputChange, 
-  handleUseLocation, 
   errors 
 }) => {
   const districtData = formData.division ? bdAddressData[formData.division as keyof typeof bdAddressData] : null;
   const districts = districtData ? Object.keys(districtData) : [];
   const upazilas = (formData.division && formData.district) ? bdAddressData[formData.division as keyof typeof bdAddressData]?.[formData.district] : [];
+
+  const addressVal = formData.address ? formData.address.trim() : "";
+  const addressWords = addressVal.split(/\s+/).filter((w: string) => w.length >= 2);
+  const isAddressValid = addressWords.length >= 3;
+  const isAddressEmpty = addressVal === "";
+
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const scrollHeight = textareaRef.current.scrollHeight;
+      // initial height is around 54px, but let it grow as text wraps
+      textareaRef.current.style.height = `${Math.max(54, scrollHeight)}px`;
+    }
+  }, [formData.address]);
 
   return (
     <motion.div
@@ -27,42 +41,55 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
       initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -5 }}
-      className="space-y-4"
+      className="space-y-3.5"
     >
       {/* 3. Full Address (Moved to Top) */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block">
-            <span className="flex items-center gap-1"><Home className="w-3 h-3" /> Full Address *</span>
+      <div className="space-y-1">
+        <div className="mb-0.5">
+          <label className="text-[11px] font-black text-neutral-800 uppercase tracking-widest pl-1 block">
+            <span className="flex items-center gap-1"><Home className="w-3.5 h-3.5" /> Full Address *</span>
           </label>
-          <button 
-            type="button"
-            onClick={handleUseLocation}
-            className="text-[9px] font-black uppercase text-[#000000] hover:text-neutral-600 transition-colors flex items-center gap-1 cursor-pointer"
-          >
-            <Navigation className="w-3 h-3 text-neutral-900" /> Auto Fill Demo
-          </button>
         </div>
-        <textarea 
-          id="checkout-address"
-          rows={2}
-          placeholder="Enter your detailed house/road information" 
-          value={formData.address}
-          onChange={(e) => handleInputChange('address', e.target.value)}
-          className={cn(
-            "w-full bg-white border px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-black text-xs font-bold leading-relaxed placeholder:font-normal placeholder:text-neutral-400 resize-none",
-            errors.address ? "border-red-500 bg-red-50/5" : "border-neutral-250"
-          )} 
-        />
-        {errors.address && <p className="text-[10px] text-red-500 font-bold mt-1.5 flex items-center gap-1 pl-1 uppercase"><AlertCircle className="w-3.5 h-3.5" /> {errors.address}</p>}
+        <div className="relative">
+          <textarea 
+            ref={textareaRef}
+            id="checkout-address"
+            rows={1}
+            placeholder="Enter your full address" 
+            value={formData.address || ''}
+            onChange={(e) => handleInputChange('address', e.target.value)}
+            className={cn(
+              "w-full bg-white border-2 px-4 py-3 rounded-[20px] focus:outline-none text-xs font-bold leading-relaxed placeholder:font-normal placeholder:text-neutral-400 resize-none shadow-[0_4px_12px_rgba(0,0,0,0.03)] transition-all duration-300 min-h-[54px] overflow-hidden",
+              isAddressEmpty
+                ? "border-neutral-200 focus:border-neutral-400"
+                : isAddressValid
+                  ? "border-emerald-400 focus:border-emerald-500" 
+                  : "border-rose-400 focus:border-rose-500"
+            )} 
+          />
+          {!isAddressEmpty && (
+            <div className="absolute right-3.5 bottom-3.5">
+              {isAddressValid ? (
+                <span className="text-emerald-500 font-extrabold text-[10px] bg-white px-2 py-0.5 rounded-lg shadow-xs border border-emerald-100">✓ Valid</span>
+              ) : (
+                <span className="text-rose-500 font-extrabold text-[10px] bg-white px-2 py-0.5 rounded-lg shadow-xs border border-rose-100">Too Short</span>
+              )}
+            </div>
+          )}
+        </div>
+        {!isAddressEmpty && !isAddressValid && (
+          <p className="text-[10px] text-rose-500 font-bold mt-1.5 flex items-center gap-1 pl-1 uppercase">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" /> Please enter a detailed address (at least 3 meaningful words describing holding, road, etc.)
+          </p>
+        )}
       </div>
 
       {/* Address Hierarchy Dropdowns (Division & District) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* 4. Division */}
-        <div>
-          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
-            <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Division (Optional)</span>
+        <div className="space-y-1">
+          <label className="text-[11px] font-black text-neutral-800 uppercase tracking-widest pl-1 block">
+            <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> Division (Optional)</span>
           </label>
           <select 
             id="checkout-division"
@@ -72,7 +99,7 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
               handleInputChange('district', '');
               handleInputChange('upazila', '');
             }}
-            className="w-full bg-white border border-neutral-250 px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-bold transition-all cursor-pointer"
+            className="w-full bg-white border-2 border-neutral-200 px-4 h-[54px] rounded-[20px] focus:outline-none focus:border-neutral-400 text-xs font-bold transition-all duration-300 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)]"
           >
             <option value="">Select Division</option>
             {divisions.map(div => (
@@ -82,9 +109,9 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
         </div>
 
         {/* 5. District */}
-        <div>
-          <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
-            <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> District (Optional)</span>
+        <div className="space-y-1">
+          <label className="text-[11px] font-black text-neutral-800 uppercase tracking-widest pl-1 block">
+            <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> District (Optional)</span>
           </label>
           <select 
             id="checkout-district"
@@ -94,7 +121,7 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
               handleInputChange('upazila', '');
             }}
             disabled={!formData.division}
-            className="w-full bg-white border border-neutral-250 px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-bold transition-all cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
+            className="w-full bg-white border-2 border-neutral-200 px-4 h-[54px] rounded-[20px] focus:outline-none focus:border-neutral-400 text-xs font-bold transition-all duration-300 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] disabled:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="">Select District</option>
             {districts.map(dist => (
@@ -105,16 +132,16 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
       </div>
 
       {/* 6. Thana / Upazila */}
-      <div>
-        <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
-          <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Thana / Upazila (Optional)</span>
+      <div className="space-y-1">
+        <label className="text-[11px] font-black text-neutral-800 uppercase tracking-widest pl-1 block">
+          <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> Thana / Upazila (Optional)</span>
         </label>
         <select 
           id="checkout-upazila"
           value={formData.upazila}
           onChange={(e) => handleInputChange('upazila', e.target.value)}
           disabled={!formData.district}
-          className="w-full bg-white border border-neutral-250 px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-bold transition-all cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
+          className="w-full bg-white border-2 border-neutral-200 px-4 h-[54px] rounded-[20px] focus:outline-none focus:border-neutral-400 text-xs font-bold transition-all duration-300 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] disabled:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <option value="">Select Upazila</option>
           {upazilas.map(up => (
@@ -124,9 +151,9 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
       </div>
 
       {/* 7. Nearby Landmark */}
-      <div>
-        <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest pl-0.5 block mb-1">
-          <span className="flex items-center gap-1"><Map className="w-3 h-3" /> Nearby Landmark (Optional)</span>
+      <div className="space-y-1">
+        <label className="text-[11px] font-black text-neutral-800 uppercase tracking-widest pl-1 block">
+          <span className="flex items-center gap-1"><Map className="w-3.5 h-3.5" /> Nearby Landmark (Optional)</span>
         </label>
         <input 
           id="checkout-landmark"
@@ -134,12 +161,12 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
           placeholder="E.g. Opposite Scholastica School" 
           value={formData.landmark}
           onChange={(e) => handleInputChange('landmark', e.target.value)}
-          className="w-full bg-white border border-neutral-250 px-3.5 h-10 rounded-lg focus:outline-none focus:border-black text-xs font-semibold placeholder:font-normal placeholder:text-neutral-400"
+          className="w-full bg-white border-2 border-neutral-200 px-4 h-[54px] rounded-[20px] focus:outline-none focus:border-neutral-400 text-xs font-bold placeholder:font-normal placeholder:text-neutral-400 shadow-[0_4px_12px_rgba(0,0,0,0.03)] transition-all duration-300"
         />
       </div>
 
       {/* Save Address Toggle */}
-      <div className="flex items-center gap-2 mt-2 pl-1">
+      <div className="flex items-center gap-2 mt-1 pl-1">
         <button 
           id="checkout-save-address-check"
           type="button"

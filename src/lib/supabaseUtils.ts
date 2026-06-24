@@ -19,9 +19,10 @@ export const toCamelCase = (str: string): string => {
  * Transform object keys to snake_case recursively
  */
 export const objectToSnake = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) {
     return obj.map(v => objectToSnake(v));
-  } else if (obj !== null && obj.constructor === Object) {
+  } else if (typeof obj === 'object' && obj.constructor === Object) {
     return Object.keys(obj).reduce(
       (result, key) => ({
         ...result,
@@ -37,9 +38,10 @@ export const objectToSnake = (obj: any): any => {
  * Transform object keys to camelCase recursively
  */
 export const objectToCamel = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) {
     return obj.map(v => objectToCamel(v));
-  } else if (obj !== null && obj.constructor === Object) {
+  } else if (typeof obj === 'object' && obj.constructor === Object) {
     return Object.keys(obj).reduce(
       (result, key) => ({
         ...result,

@@ -74,6 +74,7 @@ interface OrderState {
   orders: Order[];
   trackingStatuses: string[];
   addOrder: (order: Omit<Order, 'id' | 'orderId' | 'billId' | 'productLink' | 'date' | 'statusHistory' | 'status_updated_at'>) => Order;
+  addOrderAsync: (order: Omit<Order, 'id' | 'orderId' | 'billId' | 'productLink' | 'date' | 'statusHistory' | 'status_updated_at'>) => Promise<Order>;
   updateOrder: (id: string, updates: Partial<Order>) => void;
   updateOrderStatus: (id: string, status: Order['status']) => void;
   updatePaymentStatus: (id: string, paymentStatus: Order['paymentStatus']) => void;
@@ -91,9 +92,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     'Placed', 'Pending', 'Processing', 'Confirmed', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'
   ],
   addOrder: (orderPayload) => {
-    const nextOrderNum = Math.floor(100000 + Math.random() * 900000);
+    const nextOrderNum = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
     const nextBillNum = Math.floor(100000 + Math.random() * 900000);
-    const orderId = `ORD-${nextOrderNum}`;
+    const orderId = `TMB-${nextOrderNum}`;
     const now = Date.now();
     const id = Math.random().toString(36).substring(2, 9);
     
@@ -112,7 +113,74 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const supabase = getSupabase();
     if (supabase) {
       const dbPayload = objectToSnake(newOrder);
-      supabase.from('orders').insert([dbPayload]).then(({error}) => error && console.warn(error));
+      // Fix numeric discount type mapping for database insert
+      dbPayload.discount = newOrder.discount?.amount || 0;
+      
+      supabase.from('orders').insert([dbPayload]).then(({error}) => error && console.warn("[Supabase Sync Error]", error));
+    }
+
+    set((state) => ({ orders: [newOrder, ...state.orders] }));
+    return newOrder;
+  },
+  addOrderAsync: async (orderPayload) => {
+    const nextOrderNum = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
+    const nextBillNum = Math.floor(100000 + Math.random() * 900000);
+    const orderId = `TMB-${nextOrderNum}`;
+    const now = Date.now();
+    const id = Math.random().toString(36).substring(2, 9);
+    
+    const newOrder: Order = {
+      ...orderPayload,
+      id,
+      orderId,
+      billId: `BILL-${nextBillNum}`,
+      productLink: `https://luxemart.bd/order/${orderId}`,
+      date: now,
+      status_updated_at: now,
+      statusHistory: [{ status: orderPayload.status, timestamp: now, updatedBy: 'Customer' }],
+      isRead: false,
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      const dbPayload = objectToSnake(newOrder);
+      // Convert nested discount object to simple numeric amount for the database column
+      dbPayload.discount = newOrder.discount?.amount || 0;
+
+      console.log("[Supabase Sync] Attempting insertion into orders table:", dbPayload);
+      const { data, error } = await supabase.from('orders').insert([dbPayload]).select();
+      
+      if (error) {
+        console.error("[Supabase Sync] Failed to insert order into Supabase:", error);
+        throw error;
+      }
+      
+      console.log("[Supabase Sync] Order inserted successfully into orders table:", data);
+
+      // Now attempt order items table insertion
+      try {
+        const orderItemsPayload = newOrder.items.map(item => ({
+          id: Math.random().toString(36).substring(2, 9),
+          order_id: orderId,
+          product_id: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          variant: item.variant || 'Default',
+          image: item.image || '',
+          created_at: now
+        }));
+        
+        console.log("[Supabase Sync] Attempting insertion into order_items table:", orderItemsPayload);
+        const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
+        if (itemsError) {
+          console.error("[Supabase Sync] Failed to insert items into order_items:", itemsError);
+        } else {
+          console.log("[Supabase Sync] Order items inserted successfully into order_items table.");
+        }
+      } catch (itemErr) {
+        console.error("[Supabase Sync] Exception saving products to order_items:", itemErr);
+      }
     }
 
     set((state) => ({ orders: [newOrder, ...state.orders] }));

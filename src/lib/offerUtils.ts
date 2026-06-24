@@ -15,7 +15,17 @@ export interface ProductDiscountResult {
  * Calculates a product's current discounted price and metadata based on active offers.
  * If no offer is active but the product has a static discountPrice, we fall back to it.
  */
-export function getProductDiscountDetails(product: Product, offers: Offer[]): ProductDiscountResult {
+export function getProductDiscountDetails(product: Product | null | undefined, offers: Offer[]): ProductDiscountResult {
+  if (!product) {
+    return {
+      discountPrice: 0,
+      discountType: null,
+      discountValue: 0,
+      offerId: null,
+      offerName: null,
+      isOffer: false
+    };
+  }
   // 1. Check if there are active broadcast promotion booster deals matching this specific product or category
   try {
     const broadcasts = useSupportStore.getState().broadcasts || [];

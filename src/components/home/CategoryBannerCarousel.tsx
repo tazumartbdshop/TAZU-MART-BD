@@ -7,9 +7,9 @@ interface CategoryBannerCarouselProps {
 }
 
 export default function CategoryBannerCarousel({ category }: CategoryBannerCarouselProps) {
-  const images = category.bannerImages && category.bannerImages.length > 0 
+  const images = (category.bannerImages && category.bannerImages.length > 0 
     ? category.bannerImages 
-    : [category.bannerImage];
+    : [category.bannerImage]).filter(Boolean);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);

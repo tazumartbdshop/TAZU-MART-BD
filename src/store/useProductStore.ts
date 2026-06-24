@@ -165,6 +165,99 @@ export function generateKeywords(name: string, category: string, brand?: string,
 const mapDbToProduct = (row: any): Product => {
   const camelRow: any = objectToCamel(row);
 
+  let parsedImages: string[] = [];
+  if (Array.isArray(camelRow.images)) {
+    parsedImages = camelRow.images;
+  } else if (typeof camelRow.images === 'string') {
+    const trimmed = camelRow.images.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          parsedImages = parsed;
+        } else {
+          parsedImages = [trimmed];
+        }
+      } catch {
+        parsedImages = trimmed.split(',').map((img: string) => img.trim()).filter(Boolean);
+      }
+    } else {
+      parsedImages = trimmed.split(',').map((img: string) => img.trim()).filter(Boolean);
+    }
+  } else if (camelRow.images) {
+    parsedImages = [String(camelRow.images)];
+  }
+
+  let parsedSeoPoints: string[] = [];
+  if (Array.isArray(camelRow.seoPoints)) {
+    parsedSeoPoints = camelRow.seoPoints;
+  } else if (typeof camelRow.seoPoints === 'string') {
+    const trimmed = camelRow.seoPoints.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          parsedSeoPoints = parsed;
+        } else {
+          parsedSeoPoints = [trimmed];
+        }
+      } catch {
+        parsedSeoPoints = trimmed.split(',').map((p: string) => p.trim()).filter(Boolean);
+      }
+    } else {
+      parsedSeoPoints = trimmed.split(',').map((p: string) => p.trim()).filter(Boolean);
+    }
+  } else if (camelRow.seoPoints) {
+    parsedSeoPoints = [String(camelRow.seoPoints)];
+  }
+
+  let parsedVariants: any[] = [];
+  if (Array.isArray(camelRow.variants)) {
+    parsedVariants = camelRow.variants;
+  } else if (typeof camelRow.variants === 'string') {
+    const trimmed = camelRow.variants.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        parsedVariants = JSON.parse(trimmed);
+      } catch {}
+    }
+  }
+
+  let parsedShippingZones: any[] = [];
+  if (Array.isArray(camelRow.shippingZones)) {
+    parsedShippingZones = camelRow.shippingZones;
+  } else if (typeof camelRow.shippingZones === 'string') {
+    const trimmed = camelRow.shippingZones.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        parsedShippingZones = JSON.parse(trimmed);
+      } catch {}
+    }
+  }
+
+  let parsedKeywords: string[] = [];
+  if (Array.isArray(camelRow.keywords)) {
+    parsedKeywords = camelRow.keywords;
+  } else if (typeof camelRow.keywords === 'string') {
+    const trimmed = camelRow.keywords.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          parsedKeywords = parsed;
+        } else {
+          parsedKeywords = [trimmed];
+        }
+      } catch {
+        parsedKeywords = trimmed.split(',').map((p: string) => p.trim()).filter(Boolean);
+      }
+    } else {
+      parsedKeywords = trimmed.split(',').map((p: string) => p.trim()).filter(Boolean);
+    }
+  } else if (camelRow.keywords) {
+    parsedKeywords = [String(camelRow.keywords)];
+  }
+
   return {
     ...camelRow,
     id: camelRow.id || '',
@@ -178,21 +271,7 @@ const mapDbToProduct = (row: any): Product => {
     imageUrl: camelRow.imageUrl || camelRow.image || '',
     featured_image: camelRow.featuredImage || camelRow.image || '',
     banner_image: camelRow.bannerImage || '',
-    images: (() => {
-      let imgs = camelRow.images;
-      if (typeof imgs === 'string') {
-        try {
-          imgs = JSON.parse(imgs);
-        } catch (e) {
-          if (imgs.includes(',')) {
-            imgs = imgs.split(',').map((s: string) => s.trim());
-          } else {
-            imgs = imgs ? [imgs] : [];
-          }
-        }
-      }
-      return Array.isArray(imgs) ? imgs : [];
-    })(),
+    images: parsedImages,
     videoUrl: camelRow.videoUrl || camelRow.mediaUrl || '',
     mediaUrl: camelRow.mediaUrl || camelRow.videoUrl || '',
     rating: Number(camelRow.rating || 4.5),
@@ -206,9 +285,9 @@ const mapDbToProduct = (row: any): Product => {
     warranty: camelRow.warranty || '',
     unitName: camelRow.unitName,
     soldCount: Number(camelRow.soldCount || 0),
-    seoPoints: camelRow.seoPoints || [],
-    variants: camelRow.variants || [],
-    shippingZones: camelRow.shippingZones || [],
+    seoPoints: parsedSeoPoints,
+    variants: parsedVariants,
+    shippingZones: parsedShippingZones,
     is_flash_sale: camelRow.isFlashSale,
     is_trending: camelRow.isTrending,
     is_best_selling: camelRow.isBestSelling,
@@ -217,7 +296,7 @@ const mapDbToProduct = (row: any): Product => {
     reward_coins: camelRow.rewardCoins,
     coin_enabled: camelRow.coinEnabled,
     isDemo: !!camelRow.isDemo,
-    keywords: camelRow.keywords || []
+    keywords: parsedKeywords
   };
 };
 

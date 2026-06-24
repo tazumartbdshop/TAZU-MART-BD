@@ -251,7 +251,7 @@ export function Header() {
                       {activeCategories.map((cat) => (
                         <Link 
                           key={cat.id} 
-                          to={`/category/${cat.id}`} 
+                          to={`/category/${cat.id || cat.slug || 'all'}`}
                           className="flex items-center justify-between py-3 px-4 rounded-xl hover:bg-primary-50 group transition-colors"
                           onClick={() => setIsMobileMenuOpen(false)}
                         >

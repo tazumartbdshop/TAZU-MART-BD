@@ -129,7 +129,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
           <div className="mb-6">
             <h2 className="text-[18px] font-bold uppercase mb-2 border-b pb-1" style={{ borderColor: '#d1d5db' }}>Order Details</h2>
             <div className="space-y-1">
-              <p><strong>Invoice ID:</strong> {settings.invoicePrefix || 'INV-'}{order.orderId}</p>
+              <p><strong>Invoice ID:</strong> {order.orderId && order.orderId.startsWith('TMB-') ? order.orderId : `${settings.invoicePrefix || 'INV-'}${order.orderId}`}</p>
               <p><strong>Date:</strong> {new Date(order.createdAt).toLocaleDateString()}</p>
               <p><strong>Payment Method:</strong> {order.paymentMethod}</p>
               <p><strong>Status:</strong> Confirmed</p>

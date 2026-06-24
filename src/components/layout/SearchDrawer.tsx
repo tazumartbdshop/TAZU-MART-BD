@@ -344,7 +344,7 @@ export default function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
                       {activeCategories.map((cat) => (
                         <button 
                           key={cat.id}
-                          onClick={() => { onClose(); navigate(`/category/${cat.id}`); }}
+                          onClick={() => { onClose(); navigate(`/category/${cat.id || cat.slug || 'all'}`); }}
                           className="flex flex-col items-center gap-1.5 group active:scale-95 transition-all text-center"
                         >
                           <div className="w-full aspect-square bg-neutral-50 border border-neutral-100 flex items-center justify-center p-0.5 overflow-hidden shadow-sm hover:border-black/20 hover:shadow-md transition-all">
