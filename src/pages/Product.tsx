@@ -272,8 +272,22 @@ export default function Product() {
   // Dynamic gallery image setup
   const images = useMemo(() => {
     if (!product) return [];
-    if (product.images && product.images.length > 0) {
-      return product.images;
+    
+    let prodImages = product.images;
+    if (typeof prodImages === 'string') {
+      try {
+        prodImages = JSON.parse(prodImages);
+      } catch (e) {
+        if (prodImages.includes(',')) {
+          prodImages = prodImages.split(',').map((s: string) => s.trim());
+        } else {
+          prodImages = prodImages ? [prodImages] : [];
+        }
+      }
+    }
+    
+    if (Array.isArray(prodImages) && prodImages.length > 0) {
+      return prodImages;
     }
     const list = [product.imageUrl || product.image];
     const category = (product.category || '').toLowerCase();
@@ -492,7 +506,7 @@ export default function Product() {
 
   const isOutOfStock = product.stock === 0;
 
-  const handleAddToCart = () => {
+  const handleBuyNow = () => {
     if (isOutOfStock) {
         alert("This product is currently out of stock");
         return;
@@ -501,6 +515,9 @@ export default function Product() {
     const cartItemId = `${product.id}-${Object.values(selectedVariants).join('-')}`;
     const cartItemName = `${product.name}${variantString ? ` - ${variantString}` : ''}`;
     
+    // Clear the cart first for clean direct checkout experience
+    clearCart();
+
     addItem({
       id: cartItemId,
       name: cartItemName,
@@ -517,7 +534,8 @@ export default function Product() {
       quantity: quantity
     });
 
-    toast.success("Product added to cart successfully");
+    // Directly redirect to checkout page
+    navigate('/checkout');
   };
 
   const handleShare = async () => {
@@ -915,16 +933,15 @@ export default function Product() {
               </div>
             </div>
 
-            {/* 7. Action Button Panel (Desktop only - hidden on mobile bottom bar) */}
+            {/* 7. Action Button Panel (Desktop only - direct Buy Now) */}
             <div className="hidden md:block pt-3">
               <button 
                 type="button"
-                onClick={handleAddToCart}
+                onClick={handleBuyNow}
                 disabled={isOutOfStock}
-                className={`w-full h-[52px] bg-neutral-950 text-white border border-neutral-950 font-black uppercase text-[11px] tracking-widest hover:bg-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-neutral-300 border-neutral-300 text-neutral-400' : ''}`}
+                className={`w-full h-[52px] bg-neutral-950 text-white font-black uppercase text-[11px] tracking-widest hover:bg-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center rounded-[16px] ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-neutral-300 text-neutral-400' : ''}`}
               >
-                <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
-                <span>{isOutOfStock ? 'OUT OF STOCK' : 'Add to Cart'}</span>
+                <span>{isOutOfStock ? 'OUT OF STOCK' : 'Buy Now'}</span>
               </button>
             </div>
 
@@ -1073,29 +1090,24 @@ export default function Product() {
         </div>
       )}
 
-      {/* Sticky Bottom Purchase Bar (Highly optimized layout across all screens) */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between gap-4 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-        
-        <div className="flex flex-col flex-shrink-0 min-w-[80px]">
-            <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Total Price</span>
-            <div className="flex items-baseline gap-1">
-                <span className="text-xs font-bold text-gray-900">BDT</span>
-                <span className="text-xl font-black text-gray-950">{formatPrice(currentPrice * quantity)}</span>
-            </div>
-        </div>
-
-        <div className="flex flex-1 gap-3 max-w-xs sm:max-w-md ml-auto">
-            
-            <button 
-              type="button"
-              onClick={handleAddToCart}
-              disabled={isOutOfStock}
-              className={`w-full bg-gray-950 hover:bg-gray-900 text-white font-semibold h-11 px-4 rounded-lg text-sm shadow-md shadow-gray-950/10 transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-300 hover:bg-gray-300 text-gray-400' : ''}`}
-            >
-                <ShoppingBag className="w-4 h-4" />
-                <span>{isOutOfStock ? 'OUT OF STOCK' : 'Add to Cart'}</span>
-            </button>
-
+      {/* Sticky Bottom Purchase Bar (Highly optimized layout across all screens with 1-click Buy Now) */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-neutral-200 px-4 py-4 shadow-[0_-8px_30px_rgb(0,0,0,0.06)] pb-safe">
+        <div className="container mx-auto max-w-lg flex flex-col gap-2.5">
+          <div className="flex items-center justify-between text-neutral-900 px-1">
+            <span className="text-xs font-black uppercase tracking-widest text-neutral-400">Total Price :</span>
+            <span className="text-sm font-black text-neutral-950 font-mono">BDT {formatPrice(currentPrice * quantity)}</span>
+          </div>
+          
+          <button 
+            type="button"
+            onClick={handleBuyNow}
+            disabled={isOutOfStock}
+            className={`w-full h-12 bg-neutral-950 hover:bg-neutral-900 text-white font-black uppercase text-xs tracking-widest transition-all duration-200 active:scale-[0.99] flex items-center justify-center rounded-[16px] shadow-lg shadow-neutral-950/10 select-none ${
+              isOutOfStock ? 'opacity-50 cursor-not-allowed bg-neutral-300 text-neutral-400 shadow-none' : ''
+            }`}
+          >
+            <span>{isOutOfStock ? 'OUT OF STOCK' : 'Buy Now'}</span>
+          </button>
         </div>
       </div>
 

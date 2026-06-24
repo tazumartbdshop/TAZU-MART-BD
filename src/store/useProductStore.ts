@@ -178,7 +178,21 @@ const mapDbToProduct = (row: any): Product => {
     imageUrl: camelRow.imageUrl || camelRow.image || '',
     featured_image: camelRow.featuredImage || camelRow.image || '',
     banner_image: camelRow.bannerImage || '',
-    images: camelRow.images || [],
+    images: (() => {
+      let imgs = camelRow.images;
+      if (typeof imgs === 'string') {
+        try {
+          imgs = JSON.parse(imgs);
+        } catch (e) {
+          if (imgs.includes(',')) {
+            imgs = imgs.split(',').map((s: string) => s.trim());
+          } else {
+            imgs = imgs ? [imgs] : [];
+          }
+        }
+      }
+      return Array.isArray(imgs) ? imgs : [];
+    })(),
     videoUrl: camelRow.videoUrl || camelRow.mediaUrl || '',
     mediaUrl: camelRow.mediaUrl || camelRow.videoUrl || '',
     rating: Number(camelRow.rating || 4.5),
