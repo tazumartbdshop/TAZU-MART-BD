@@ -156,6 +156,20 @@ export function filterProductsSmart(products: Product[], queryStr: string): Prod
   const cleanQuery = queryStr.trim().toLowerCase();
   if (!cleanQuery) return products;
 
+  // Direct exact keyword checks for special groups
+  if (cleanQuery === 'flash_sale' || cleanQuery === 'flash sale' || cleanQuery === 'flash') {
+    return products.filter(p => p.is_flash_sale);
+  }
+  if (cleanQuery === 'trending' || cleanQuery === 'trending_item' || cleanQuery === 'trending item') {
+    return products.filter(p => p.is_trending);
+  }
+  if (cleanQuery === 'best_selling' || cleanQuery === 'best selling' || cleanQuery === 'best' || cleanQuery === 'best seller') {
+    return products.filter(p => p.is_best_selling);
+  }
+  if (cleanQuery === 'offer' || cleanQuery === 'offers' || cleanQuery === 'offer_product' || cleanQuery === 'offer product') {
+    return products.filter(p => p.is_offer);
+  }
+
   // Extract the intent
   const { 
     rewrittenQuery, 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Upload, Layers, ArrowLeft, Search, X, Database } from 'lucide-react';
+import { Upload, Layers, ChevronLeft, Search, X, Database, ArrowLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
 import { useProductStore } from '../../store/useProductStore';
@@ -266,9 +266,9 @@ export default function AdminBanners() {
   };
 
   return (
-    <div id="admin-banner-control" className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6 font-sans pb-24">
+    <div id="admin-banner-control" className="w-full max-w-4xl mx-auto p-4 md:p-6 space-y-6 font-sans pb-24">
       {/* Live Table Inspector */}
-      <div className="bg-neutral-900 border border-neutral-800 p-4 relative overflow-hidden group rounded-xl">
+      <div className="bg-neutral-900 border border-neutral-800 p-4 relative overflow-hidden group rounded-none">
         <div className="absolute right-0 top-0 p-4 opacity-5 pointer-events-none">
           <Database className="w-16 h-16 text-white" />
         </div>
@@ -300,174 +300,205 @@ export default function AdminBanners() {
         </div>
       </div>
 
-      {/* Hero Header Card */}
-      <header className="bg-neutral-900 border border-neutral-800 text-white rounded-xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none translate-x-12 translate-y-12">
-          <Layers className="w-64 h-64" />
-        </div>
-        <div className="space-y-2 relative z-10">
-          <div className="flex items-center gap-2">
-            <span className="p-1 px-2.5 bg-neutral-800 rounded-full text-[10px] uppercase font-mono tracking-widest text-zinc-300">SYSTEM CORE</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-            <span className="text-[10px] uppercase text-emerald-400 font-mono">REAL-TIME DB LINK ACTIVE</span>
-          </div>
-          <div className="flex items-center gap-2">
+      {/* Header Container */}
+      <div className="bg-white rounded-none border border-zinc-200 overflow-hidden">
+        <div className="p-6 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-50 gap-4">
+          <div className="flex items-center gap-3">
             <button 
-              onClick={() => navigate('/admin/banner/list')}
-              className="p-1.5 hover:bg-neutral-800 text-zinc-400 hover:text-white rounded-lg transition-colors mr-1"
-              title="Back to Banner Listing"
+              type="button" 
+              onClick={() => navigate('/admin/banner/list')} 
+              className="p-2 border border-zinc-200 rounded-none bg-white hover:bg-gray-100 mr-1 cursor-pointer"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ChevronLeft className="w-4 h-4 text-black" />
             </button>
-            <h1 className="text-2xl font-black uppercase tracking-wider font-mono">
-              Upload Banners
-            </h1>
-          </div>
-          <p className="text-zinc-400 text-xs max-w-2xl uppercase font-mono tracking-wide">
-            Configure and bulk upload new slideshow banners.
-          </p>
-        </div>
-      </header>
-
-      {/* Single Columns Form Container */}
-      <section className="bg-white border border-zinc-200 rounded-xl p-8 shadow-sm space-y-6">
-        <div className="border-b border-zinc-100 pb-3 flex justify-between items-center">
-          <div>
-            <h2 className="text-sm font-black uppercase tracking-wider text-neutral-900">
-              ➕ Create Mode: Insert Banners
-            </h2>
-            <p className="text-[10px] text-zinc-400 uppercase font-black tracking-widest mt-0.5">Fill out all configurations below</p>
+            <div>
+              <h3 className="text-sm font-black text-black uppercase tracking-widest">
+                UPLOAD BANNERS
+              </h3>
+              <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-0.5">
+                Configure and bulk upload new slideshow banners
+              </p>
+            </div>
           </div>
           <button 
             onClick={handleCancel}
-            className="px-3 py-1.5 text-xs bg-zinc-100 text-zinc-700 hover:bg-zinc-200 transition-colors uppercase font-mono rounded-lg"
+            className="px-4 py-2 text-xs bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors uppercase font-black tracking-widest rounded-none cursor-pointer w-full sm:w-auto text-center"
           >
             Cancel & Go Back
           </button>
         </div>
+      </div>
 
-        <div className="space-y-6">
-          {/* 1. Banner Image Upload (Required) */}
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-wider text-neutral-800 block">
+      {/* Form Sections (Each Field inside its own separate card container) */}
+      <div className="space-y-6">
+        
+        {/* 1. Banner Image Upload Card */}
+        <div className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 space-y-4 shadow-sm">
+          <div className="border-b border-zinc-100 pb-3">
+            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
               ১. Banner Image Upload <span className="text-rose-500 font-bold">*</span>
-            </label>
-
-            <div 
-              onDragEnter={handleDrag}
-              onDragOver={handleDrag}
-              onDragLeave={handleDrag}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all aspect-[21/9] sm:aspect-[4/1] max-h-64 w-full ${
-                dragActive 
-                  ? 'border-neutral-900 bg-neutral-50 scale-[0.99]' 
-                  : 'border-zinc-200 bg-zinc-50/50 hover:border-zinc-400 hover:bg-zinc-50'
-              }`}
-            >
-              <input 
-                type="file"
-                multiple
-                ref={fileInputRef}
-                onChange={handleFileInputChange}
-                accept="image/*"
-                className="hidden"
-                id="banner-image-uploader"
-              />
-              <Upload className="w-8 h-8 text-neutral-400 mb-2" />
-              <span className="text-[11px] font-black uppercase text-black">Drag Multiple Images Here or Browse</span>
-              <span className="text-[9px] text-zinc-400 uppercase tracking-wider mt-1 font-bold font-mono">Hero Banner Ratio Recommended</span>
-            </div>
+            </h4>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+              Drag multiple hero banner images or browse to upload instantly
+            </p>
           </div>
 
-          {/* 2. Banner Title (Optional) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-black uppercase tracking-wider text-neutral-800 block">
-              ২. Banner Title <span className="text-zinc-400 font-bold">(Optional)</span>
-            </label>
+          <div 
+            onDragEnter={handleDrag}
+            onDragOver={handleDrag}
+            onDragLeave={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-none flex flex-col items-center justify-center cursor-pointer transition-all aspect-[21/9] sm:aspect-[4/1] max-h-64 w-full ${
+              dragActive 
+                ? 'border-black bg-zinc-50 scale-[0.99]' 
+                : 'border-zinc-200 bg-zinc-50/50 hover:border-black hover:bg-zinc-50'
+            }`}
+          >
             <input 
-              type="text"
-              id="banner-title-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. SUMMER APPARELS 50% FLAT"
-              className="w-full border border-zinc-200 px-3 py-2.5 text-xs font-bold uppercase outline-none focus:border-black rounded-lg h-11 bg-white"
+              type="file"
+              multiple
+              ref={fileInputRef}
+              onChange={handleFileInputChange}
+              accept="image/*"
+              className="hidden"
+              id="banner-image-uploader"
             />
+            <Upload className="w-6 h-6 text-neutral-400 mb-2" />
+            <span className="text-[10px] font-black uppercase text-black tracking-wider">Drag Multiple Images Here or Browse</span>
+            <span className="text-[8px] text-zinc-400 uppercase tracking-widest mt-1.5 font-bold font-mono">Hero Banner Ratio Recommended</span>
           </div>
-
-          {/* 3. Banner Button Text (Optional) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-black uppercase tracking-wider text-neutral-800 block">
-              ৩. Banner Button Text <span className="text-zinc-400 font-bold">(Optional)</span>
-            </label>
-            <input 
-              type="text"
-              id="banner-btn-text-input"
-              value={buttonText}
-              onChange={(e) => setButtonText(e.target.value)}
-              placeholder="e.g. SHOP NOW"
-              className="w-full border border-zinc-200 px-3 py-2.5 text-xs font-bold uppercase outline-none focus:border-black rounded-lg h-11 bg-white"
-            />
-          </div>
-
-          {/* 4. Banner Link Selector & Link (Optional) */}
-          <div className="space-y-3 border-t border-zinc-150 pt-4">
-            <label className="text-xs font-black uppercase tracking-wider text-neutral-800 block">
-              ৪. Banner Navigation Link <span className="text-zinc-400 font-bold">(Optional)</span>
-            </label>
-            
-            {/* Optional Product Shortcut Quick Selector */}
-            <div className="space-y-1.5 relative">
-              <span className="text-[9px] font-mono tracking-wider font-extrabold text-neutral-400 block uppercase">Product Selection Shortcut</span>
-              
-              <ProductSearchDropdown 
-                products={products} 
-                value={connectedProductId} 
-                onChange={(val) => {
-                  setConnectedProductId(val);
-                  if (val) {
-                    setButtonLink(`/product/${val}`);
-                  } else {
-                    setButtonLink('');
-                  }
-                }}
-              />
-            </div>
-
-            {/* Raw link path input */}
-            <div className="space-y-1.5">
-              <span className="text-[9px] font-mono tracking-wider font-extrabold text-neutral-400 block uppercase font-mono">Custom Action Redirection Path</span>
-              <input 
-                type="text"
-                id="banner-redirect-path"
-                value={buttonLink}
-                onChange={(e) => setButtonLink(e.target.value)}
-                placeholder="e.g. /product/product-id-here or /shop or custom URL"
-                className="w-full border border-zinc-200 px-3 py-2.5 text-xs font-bold uppercase outline-none focus:border-black rounded-lg h-11 bg-white"
-              />
-            </div>
-          </div>
-
         </div>
-      </section>
 
-      {/* Main Sequence Panel below Upload */}
+        {/* 2. Banner Title Card */}
+        <div className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 space-y-4 shadow-sm">
+          <div className="border-b border-zinc-100 pb-3">
+            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
+              ২. Banner Title <span className="text-zinc-400 font-bold">(Optional)</span>
+            </h4>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+              Primary text displayed on top of the slideshow banner
+            </p>
+          </div>
+          
+          <input 
+            type="text"
+            id="banner-title-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. SUMMER APPARELS 50% FLAT"
+            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
+          />
+        </div>
+
+        {/* 3. Banner Button Text Card */}
+        <div className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 space-y-4 shadow-sm">
+          <div className="border-b border-zinc-100 pb-3">
+            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
+              ৩. Banner Button Text <span className="text-zinc-400 font-bold">(Optional)</span>
+            </h4>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+              Call to action text inside the action button
+            </p>
+          </div>
+          
+          <input 
+            type="text"
+            id="banner-btn-text-input"
+            value={buttonText}
+            onChange={(e) => setButtonText(e.target.value)}
+            placeholder="e.g. SHOP NOW"
+            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
+          />
+        </div>
+
+        {/* 4. Banner Navigation Link Card */}
+        <div className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 space-y-6 shadow-sm">
+          <div className="border-b border-zinc-100 pb-3">
+            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
+              ৪. Banner Navigation Link <span className="text-zinc-400 font-bold">(Optional)</span>
+            </h4>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+              Select a pre-existing product or specify a custom routing path
+            </p>
+          </div>
+
+          {/* Shortcut Selector */}
+          <div className="space-y-1.5 relative">
+            <span className="text-[8px] font-black tracking-widest text-neutral-400 block uppercase">Product Selection Shortcut</span>
+            <ProductSearchDropdown 
+              products={products} 
+              value={connectedProductId} 
+              onChange={(val) => {
+                setConnectedProductId(val);
+                if (val) {
+                  setButtonLink(`/product/${val}`);
+                } else {
+                  setButtonLink('');
+                }
+              }}
+            />
+          </div>
+
+          {/* Raw Input Redirection Path */}
+          <div className="space-y-1.5">
+            <span className="text-[8px] font-black tracking-widest text-neutral-400 block uppercase">Custom Action Redirection Path</span>
+            <input 
+              type="text"
+              id="banner-redirect-path"
+              value={buttonLink}
+              onChange={(e) => setButtonLink(e.target.value)}
+              placeholder="e.g. /product/product-id-here or /shop"
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-mono font-bold text-xs text-black"
+            />
+          </div>
+        </div>
+
+        {/* 5. Save Banner Action Card */}
+        <div className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
+          <div>
+            <h4 className="text-[10px] font-black uppercase text-black tracking-widest">Ready to Publish?</h4>
+            <p className="text-[9px] text-zinc-400 uppercase font-black tracking-widest mt-1">Upload your images above to save and publish them instantly.</p>
+          </div>
+          <button 
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => fileInputRef.current?.click()}
+            className="px-6 py-3 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-widest transition-all rounded-none duration-150 cursor-pointer disabled:bg-zinc-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 w-full sm:w-auto"
+          >
+            {isSubmitting ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Publishing...
+              </>
+            ) : (
+              <>
+                <Upload className="w-3.5 h-3.5" />
+                Select Image & Save Banner
+              </>
+            )}
+          </button>
+        </div>
+
+      </div>
+
+      {/* Main Sequence Panel */}
       {banners.length >= 2 && (
-        <section className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm space-y-4">
-          <div className="border-b border-zinc-100 pb-2">
+        <section className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 shadow-sm space-y-4">
+          <div className="border-b border-zinc-100 pb-3">
             <h2 className="text-sm font-black uppercase tracking-wider text-neutral-900">
               🗂️ Banner Sequence ({banners.length})
             </h2>
-            <p className="text-[10px] text-zinc-400 uppercase font-black tracking-widest mt-0.5">Drag to reorder</p>
+            <p className="text-[9px] text-zinc-400 uppercase font-black tracking-widest mt-0.5">Drag and drop slides to adjust priority</p>
           </div>
           
-          <div className="flex items-center justify-between text-[10px] font-mono font-black text-zinc-400 uppercase tracking-widest px-2">
+          <div className="flex items-center justify-between text-[8px] font-black text-zinc-400 uppercase tracking-widest px-1">
             <span>← First Slide</span>
             <span>Horizontal Scroll Area</span>
           </div>
           
           <div 
-            className="flex overflow-x-auto gap-3 pb-4 snap-x pt-2"
+            className="flex overflow-x-auto gap-4 pb-4 snap-x pt-2"
             style={{ scrollBehavior: 'smooth' }}
           >
             {banners.map((banner, index) => (

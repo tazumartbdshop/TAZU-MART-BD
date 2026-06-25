@@ -77,7 +77,7 @@ export function Footer() {
 
   return (
     <footer 
-      className="border-t pt-16 pb-24 md:pb-8 transition-all duration-500"
+      className="border-t pt-8 pb-20 md:pb-8 transition-all duration-500"
       style={{ 
         backgroundColor: brand.footerBgColor,
         color: globalContentColor,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -122,6 +122,48 @@ const salesData = [
   { name: 'Jun', revenue: 5500, orders: 380 },
 ];
 
+const RevenueChartTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const index = salesData.findIndex((item) => item.name === label);
+    let growthText = 'N/A';
+    let isPositive = true;
+
+    if (index > 0) {
+      const prevRevenue = salesData[index - 1].revenue;
+      const currentRevenue = data.revenue;
+      const growth = ((currentRevenue - prevRevenue) / prevRevenue) * 100;
+      isPositive = growth >= 0;
+      growthText = `${isPositive ? '+' : ''}${growth.toFixed(1)}%`;
+    } else {
+      growthText = '+0.0%';
+    }
+
+    return (
+      <div className="bg-white border border-zinc-200 p-4 shadow-xl rounded-none text-left min-w-[170px] animate-fade-in select-none">
+        <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-2 font-mono">
+          {label} 2025
+        </p>
+        <div className="space-y-1.5 font-sans">
+          <div className="flex justify-between items-center gap-6">
+            <span className="text-[10px] text-zinc-500 font-black uppercase tracking-wider">Revenue</span>
+            <span className="text-xs font-black text-black">৳{(data.revenue * 10).toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center gap-6">
+            <span className="text-[10px] text-zinc-500 font-black uppercase tracking-wider">Growth</span>
+            <span className={`text-xs font-black ${isPositive ? 'text-green-500' : 'text-red-500'}`}>{growthText}</span>
+          </div>
+          <div className="flex justify-between items-center gap-6">
+            <span className="text-[10px] text-zinc-500 font-black uppercase tracking-wider">Orders</span>
+            <span className="text-xs font-black text-zinc-700">{data.orders}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 interface NavSubItem {
   name: string;
   path: string;
@@ -140,6 +182,31 @@ interface NavItem {
 export default function AdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
+
+  // Solves mobile scroll trap / scroll freeze at boundaries
+  useEffect(() => {
+    const el = sidebarScrollRef.current;
+    if (!el) return;
+
+    const handleTouchStart = () => {
+      const top = el.scrollTop;
+      const totalScroll = el.scrollHeight;
+      const currentScroll = top + el.offsetHeight;
+
+      // Shift slightly off-boundary to guarantee the element remains the active scroll target
+      if (top === 0) {
+        el.scrollTop = 1;
+      } else if (currentScroll >= totalScroll) {
+        el.scrollTop = top - 1;
+      }
+    };
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+    };
+  }, [sidebarOpen]);
   const [logoError, setLogoError] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -327,7 +394,11 @@ export default function AdminDashboard() {
           ${!sidebarOpen && !isSidebarCollapsed ? 'md:w-72' : 'md:w-20'}
         `}
       >
-        <div className="h-full flex flex-col overflow-y-auto custom-scrollbar">
+        <div 
+          ref={sidebarScrollRef}
+          className="h-full flex flex-col overflow-y-auto overscroll-contain custom-scrollbar"
+          style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+        >
             <div className={`p-6 mb-4 shrink-0 flex items-start transition-all duration-300 ${isSidebarCollapsed && !sidebarOpen ? 'justify-center p-4' : 'justify-between'}`}>
               <div className={`${isSidebarCollapsed && !sidebarOpen ? 'hidden' : 'block'}`}>
                 <h2 className="text-xl font-sans font-black tracking-widest uppercase text-white mb-1">TAZU MART</h2>
@@ -694,42 +765,79 @@ function Overview() {
 
       <div className="space-y-6 lg:space-y-10 mb-10">
         {/* Sales Overview */}
-        <div className="bg-white p-6 lg:p-8 rounded-none border border-neutral-100 shadow-[0_4px_25px_rgba(0,0,0,0.02)] relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-1 h-full bg-purple-600"></div>
-          <div className="flex justify-between items-center mb-8 relative z-10">
-            <div className="flex flex-col gap-1">
-              <h3 className="text-xl font-sans font-black text-[#0a0a0a] uppercase tracking-tighter">Marketplace Revenue</h3>
-              <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-[0.2em]">Real-time Transactional Flow</p>
-            </div>
-            <button className="text-[10px] bg-neutral-50 hover:bg-purple-50 text-neutral-900 px-4 py-2 border border-neutral-200 font-black hover:border-purple-200 transition-all uppercase tracking-widest active:scale-95">Download Analytics</button>
-          </div>
-          <div className="h-[340px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={salesData}>
-                <defs>
-                  <linearGradient id="colorRevenueOverview" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 10, fontWeight: 700}} dy={15} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 10, fontWeight: 700}} tickFormatter={(value) => `৳${value}`} dx={-10} />
-                <RechartsTooltip 
-                  contentStyle={{ 
-                    borderRadius: '0px', 
-                    border: '1px solid #f0f0f0', 
-                    boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
-                    padding: '12px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)'
-                  }} 
-                  itemStyle={{ fontSize: '12px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                  labelStyle={{ fontSize: '10px', color: '#9ca3af', marginBottom: '4px', fontWeight: '800' }}
-                />
-                <Area type="monotone" dataKey="revenue" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenueOverview)" animationDuration={2000} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="bg-white p-6 lg:p-8 rounded-none border border-neutral-200 shadow-sm relative overflow-hidden group">
+          {(() => {
+            const currentMonthData = salesData[salesData.length - 1];
+            const previousMonthData = salesData[salesData.length - 2];
+            const revenueGrowthValue = (currentMonthData.revenue - previousMonthData.revenue) * 10;
+            const isRevenueGrowthPositive = revenueGrowthValue >= 0;
+            const activeColor = isRevenueGrowthPositive ? '#22C55E' : '#EF4444';
+            const growthPercentage = ((revenueGrowthValue / (previousMonthData.revenue * 10)) * 100).toFixed(1);
+            const chartDisplayData = salesData.map(item => ({
+              ...item,
+              displayRevenue: item.revenue * 10
+            }));
+            
+            return (
+              <>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-6 pb-6 border-b border-zinc-100 relative z-10">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-sm font-sans font-black text-[#000000] uppercase tracking-widest">Marketplace Revenue</h3>
+                      <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border rounded-none ${
+                        isRevenueGrowthPositive 
+                          ? 'text-green-600 bg-green-50 border-green-200' 
+                          : 'text-red-600 bg-red-50 border-red-200'
+                      }`}>
+                        {isRevenueGrowthPositive ? '▲ Uptrend' : '▼ Downtrend'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Real-time Transactional Flow</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+                    <div>
+                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest block mb-0.5">Total Revenue</span>
+                      <div className="text-base font-black text-black tracking-tight">
+                        ৳{(salesData.reduce((acc, curr) => acc + curr.revenue, 0) * 10).toLocaleString()}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest block mb-0.5">June 2025</span>
+                      <div className="text-base font-black text-black tracking-tight">
+                        ৳{(currentMonthData.revenue * 10).toLocaleString()}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest block mb-0.5">Monthly Growth</span>
+                      <div className={`text-xs font-black flex items-center gap-1 ${isRevenueGrowthPositive ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+                        <span>{isRevenueGrowthPositive ? '▲' : '▼'}</span>
+                        <span>{isRevenueGrowthPositive ? '+' : ''}{growthPercentage}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="h-[280px] sm:h-[350px] md:h-[420px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartDisplayData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorRevenueOverview" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={activeColor} stopOpacity={0.12}/>
+                          <stop offset="95%" stopColor={activeColor} stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 9, fontWeight: 700}} dy={15} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 9, fontWeight: 700}} tickFormatter={(value) => `৳${value.toLocaleString()}`} dx={-5} />
+                      <RechartsTooltip content={<RevenueChartTooltip />} />
+                      <Area type="monotone" dataKey="displayRevenue" stroke={activeColor} strokeWidth={3} fillOpacity={1} fill="url(#colorRevenueOverview)" animationDuration={2000} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            );
+          })()}
         </div>
 
         {/* Order Statistics Chart & Stats side by side or stacked */}

@@ -137,9 +137,9 @@ CREATE TABLE IF NOT EXISTS public.orders (
   payment_method TEXT,
   status TEXT DEFAULT 'Placed',
   status_history JSONB DEFAULT '[]'::jsonb,
-  status_updated_at BIGINT,
+  status_updated_at TIMESTAMP DEFAULT NOW(),
   edited_by_admin TEXT,
-  last_edit_time BIGINT,
+  last_edit_time TIMESTAMP DEFAULT NOW(),
   customer_image TEXT,
   subtotal NUMERIC,
   delivery_charge NUMERIC,
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
   payment_status TEXT DEFAULT 'Unpaid',
   is_read BOOLEAN DEFAULT false,
   items JSONB DEFAULT '[]'::jsonb,
-  date BIGINT,
+  date TIMESTAMP DEFAULT NOW(),
   utm_params JSONB DEFAULT '{}'::jsonb
 );
 
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS public.order_items (
   quantity INT DEFAULT 1,
   variant TEXT DEFAULT 'Default',
   image TEXT,
-  created_at BIGINT DEFAULT (extract(epoch from now()) * 1000)::bigint
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.settings (

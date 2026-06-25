@@ -11,19 +11,10 @@ import { useBannerStore } from '../store/useBannerStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { formatPrice } from '../lib/utils';
 import { CompactProductCard } from '../components/product/CompactProductCard';
+import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Premium Fallback Banners (Only image, no text overlays)
-const PRESET_TOP_SLIDERS = [
-  "https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=1920&h=1080&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1627124118303-19d4f0735f5e?q=80&w=1920&h=1080&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=1920&h=1080&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=1920&h=1080&auto=format&fit=crop"
-];
-
-const PRESET_FEATURED_BANNER = "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=1500&h=500&auto=format&fit=crop";
-const PRESET_PROMOTIONAL_BANNER = "https://images.unsplash.com/photo-1490367532201-b9bc1dc483f6?q=80&w=1600&h=400&auto=format&fit=crop";
-
+// Testimonial values are kept as they represent real customer feedback
 const CUSTOMER_TESTIMONIALS = [
   {
     name: "Md. Sajjadul Islam",
@@ -82,11 +73,10 @@ export default function Home() {
 
   // Filter Active Banners from DB
   const uploadedBanners = (storeBanners || [])
-    .filter(b => b && b.status === 'active' && b.image && b.image.trim() !== '')
-    .map(b => b.image);
+    .filter(b => b && b.status === 'active' && b.image && b.image.trim() !== '');
 
-  // If DB banners are set, use them, otherwise use stunning default watch/wallet images
-  const sliderBanners = uploadedBanners.length > 0 ? uploadedBanners : PRESET_TOP_SLIDERS;
+  // If DB banners are set, use them, otherwise empty array as we do not use demo banners
+  const sliderBanners = uploadedBanners;
 
   // Auto-play for 16:9 banner slider
   useEffect(() => {
@@ -122,47 +112,39 @@ export default function Home() {
     return true;
   });
 
-  // Section items (Dynamic filters with smart database-first fallbacks)
-  let trendingProducts = activeProducts.filter(p => p.is_trending).slice(0, 4);
-  // Auto-fill trendingProducts if empty but we have active products
-  if (trendingProducts.length === 0 && activeProducts.length > 0) {
-    trendingProducts = activeProducts.slice(0, 4);
-  }
+  const finalProducts = activeProducts;
 
-  let newArrivals = activeProducts.filter(p => p.isNew || p.is_regular).slice(0, 4);
-  // Auto-fill newArrivals if empty but we have active products
-  if (newArrivals.length === 0 && activeProducts.length > 0) {
-    newArrivals = [...activeProducts].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4);
-  }
+  // 1. Flash Sale
+  const flashSaleProducts = finalProducts.filter(p => p.is_flash_sale);
 
-  let bestSellers = activeProducts.filter(p => p.is_best_selling).slice(0, 4);
-  // Auto-fill bestSellers if empty but we have active products
-  if (bestSellers.length === 0 && activeProducts.length > 0) {
-    bestSellers = [...activeProducts].sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0) || (b.rating || 0) - (a.rating || 0)).slice(0, 4);
-  }
+  // 2. Trending Item
+  const trendingProducts = finalProducts.filter(p => p.is_trending);
 
-  // Solid Fallbacks ONLY if database is completely empty (allows pristine presentation)
-  const showFallbackProducts = activeProducts.length === 0;
+  // 3. Best Selling
+  const bestSellingProducts = finalProducts.filter(p => p.is_best_selling);
 
-  const fallbackTrending = [
-    { id: 'f-1', name: 'Luxury Skeleton Automatic Dark Watch', price: 8500, discountPrice: 6500, image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?q=80&w=600', rating: 4.9, category: 'Watches', soldCount: 380 },
-    { id: 'f-2', name: 'Vintage Full-Grain Finished Leather Wallet', price: 3400, discountPrice: 2450, image: 'https://images.unsplash.com/photo-1627124118303-19d4f0735f5e?q=80&w=600', rating: 4.8, category: 'Wallets', soldCount: 220 },
-    { id: 'f-3', name: 'Classic Silver Chronometer Executive', price: 12000, discountPrice: 9800, image: 'https://images.unsplash.com/photo-1547996160-81dfa63595aa?q=80&w=600', rating: 5.0, category: 'Watches', soldCount: 150 },
-    { id: 'f-4', name: 'Gold Dial Luxury Royal Heritage mechanical', price: 15500, discountPrice: 13500, image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=600', rating: 4.9, category: 'Watches', soldCount: 95 }
-  ];
+  // 4. Offer Product
+  const offerProducts = finalProducts.filter(p => p.is_offer);
 
-  const fallbackNew = [
-    { id: 'fn-1', name: 'Handcrafted Stitch Minimalist Cardholder', price: 1800, discountPrice: 1200, image: 'https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=600', rating: 4.7, category: 'Wallets', soldCount: 110 },
-    { id: 'fn-2', name: 'Presidential Gold Mesh Strap Limited Edition', price: 17500, discountPrice: 14900, image: 'https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=600', rating: 4.9, category: 'Watches', soldCount: 65 },
-    { id: 'fn-3', name: 'Tazu Executive Gift Dual Pen & Watch Set', price: 9500, discountPrice: 7200, image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=600', rating: 5.0, category: 'Gift Set', soldCount: 45 },
-    { id: 'fn-4', name: 'Tactical Matte Black Stealth Chrono', price: 5500, discountPrice: 4200, image: 'https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=600', rating: 4.6, category: 'Watches', soldCount: 140 }
-  ];
+  const renderProductGrid = (items: any[]) => {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-6">
+        {items.map((prod) => (
+          <div key={prod.id} className="h-full">
+            <CompactProductCard product={{
+              ...prod,
+              imageUrl: prod.imageUrl || prod.image || null
+            }} />
+          </div>
+        ))}
+      </div>
+    );
+  };
 
-  const renderProductList = (items: any[], fallbackItems: any[]) => {
-    const renderList = items.length > 0 ? items : fallbackItems;
+  const renderCategoryGrid = (items: any[]) => {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
-        {renderList.map((prod) => (
+        {items.map((prod) => (
           <div key={prod.id} className="h-full">
             <CompactProductCard product={{
               ...prod,
@@ -178,57 +160,104 @@ export default function Home() {
   const hotlineNumber = settings.hotlineNumber || settings.contactNumber || settings.phone || "+8801314541738";
 
   return (
-    <div className="bg-neutral-50/50 min-h-screen pb-12 overflow-x-hidden font-sans">
+    <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-hidden font-sans">
       
-      {/* 1. MAIN SLIDER BANNER (16:9, Pure Images, Center Focus) */}
-      <section className="relative w-full aspect-[16/9] bg-neutral-950 overflow-hidden select-none">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeSlide}
-            initial={{ opacity: 0, scale: 1.01 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: 'easeInOut' }}
-            className="absolute inset-0 w-full h-full"
-          >
-            <img 
-              src={sliderBanners[activeSlide]} 
-              alt="Luxury Banner Graphic" 
-              className="w-full h-full object-cover object-center pointer-events-none select-none"
-              referrerPolicy="no-referrer"
-            />
-          </motion.div>
-        </AnimatePresence>
+      {/* 1. MAIN SLIDER BANNER (16:9, Dynamic Overlays and Optional Button Actions) */}
+      {sliderBanners.length > 0 && (
+        <section className="relative w-full aspect-[16/9] bg-neutral-950 overflow-hidden select-none">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeSlide}
+              initial={{ opacity: 0, scale: 1.01 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6, ease: 'easeInOut' }}
+              className="absolute inset-0 w-full h-full"
+            >
+              {/* Main Banner Image */}
+              <img 
+                src={sliderBanners[activeSlide].image} 
+                alt={sliderBanners[activeSlide].name || "Luxury Banner Graphic"} 
+                className="w-full h-full object-cover object-center pointer-events-none select-none"
+                referrerPolicy="no-referrer"
+              />
 
-        {/* Previous and Next Navigation Arrows */}
-        {sliderBanners.length > 1 && (
-          <>
-            <button 
-              onClick={() => setActiveSlide((prev) => (prev - 1 + sliderBanners.length) % sliderBanners.length)}
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => setActiveSlide((prev) => (prev + 1) % sliderBanners.length)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-            
-            {/* Custom Dot Bullets */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-25">
-              {sliderBanners.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveSlide(idx)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeSlide ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </section>
+              {/* Text and CTA Button Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 flex flex-col justify-end pb-8 sm:pb-12 md:pb-16 px-4 md:px-12 z-10 select-text">
+                <div className="max-w-2xl space-y-2 sm:space-y-4">
+                  {sliderBanners[activeSlide].name && (
+                    <motion.h2 
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15, duration: 0.4 }}
+                      className="text-lg sm:text-2xl md:text-4xl lg:text-5xl font-black text-white uppercase tracking-wider drop-shadow-md font-sans"
+                    >
+                      {sliderBanners[activeSlide].name}
+                    </motion.h2>
+                  )}
+                  
+                  {sliderBanners[activeSlide].description && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.25, duration: 0.4 }}
+                      className="text-white/90 text-[10px] sm:text-xs md:text-sm font-semibold uppercase tracking-widest max-w-xl drop-shadow-sm"
+                    >
+                      {sliderBanners[activeSlide].description}
+                    </motion.p>
+                  )}
+
+                  {sliderBanners[activeSlide].buttonText && sliderBanners[activeSlide].buttonLink && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.35, duration: 0.4 }}
+                      className="pt-1.5 sm:pt-3"
+                    >
+                      <Link 
+                        to={sliderBanners[activeSlide].buttonLink}
+                        className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-black hover:bg-neutral-900 border border-white/20 hover:border-white/40 text-white text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-150 active:scale-95 shadow-lg"
+                      >
+                        {sliderBanners[activeSlide].buttonText}
+                        <span className="text-[10px] sm:text-xs font-light">&rarr;</span>
+                      </Link>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Previous and Next Navigation Arrows */}
+          {sliderBanners.length > 1 && (
+            <>
+              <button 
+                onClick={() => setActiveSlide((prev) => (prev - 1 + sliderBanners.length) % sliderBanners.length)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => setActiveSlide((prev) => (prev + 1) % sliderBanners.length)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              
+              {/* Custom Dot Bullets */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-25">
+                {sliderBanners.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveSlide(idx)}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeSlide ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {/* 2. CATEGORY SECTION (Circular shape, completely database-driven) */}
       <section className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
@@ -265,97 +294,172 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-4">
-              <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">No active categories found in database</p>
+            <div className="text-center py-6">
+              <p className="text-xs font-black uppercase tracking-widest text-neutral-400">No Categories Available</p>
             </div>
           )}
         </div>
       </section>
 
-      {/* 3. FEATURED BANNER (Ratio: 3:1, Size: 1500x500px, Image only) */}
-      <section className="py-6 md:py-8 container mx-auto px-4">
-        <Link to="/shop" className="block relative w-full aspect-[3/1] rounded-2xl overflow-hidden shadow-md group border border-neutral-100">
-          <img 
-            src={PRESET_FEATURED_BANNER} 
-            alt="Featured Collection Watch Banner" 
-            className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.02] select-none pointer-events-none"
-            referrerPolicy="no-referrer"
-          />
-        </Link>
-      </section>
-
-      {/* 4. TRENDING PRODUCTS */}
-      <section className="py-6 md:py-8 container mx-auto px-4">
-        <div className="flex items-center justify-between mb-4 md:mb-6">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping shrink-0" />
-            <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">Trending Collections</h2>
-          </div>
-          <Link 
-            to="/shop" 
-            className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
-          >
-            Explore <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+      {/* Products loading or empty state */}
+      {productsLoading ? (
+        <div className="flex flex-wrap items-center justify-center gap-6 mx-auto py-12">
+          {[1, 2, 3, 4].map(n => (
+            <div key={n} className="w-48 h-64 bg-neutral-100 animate-pulse rounded-xl" />
+          ))}
         </div>
-        {renderProductList(trendingProducts, fallbackTrending)}
-      </section>
-
-      {/* 5. PROMOTIONAL BANNER (Ratio: 4:1, Size: 1600x400px, Lifestyle image only) */}
-      <section className="py-4 md:py-6 container mx-auto px-4">
-        <Link to="/shop" className="block relative w-full aspect-[4/1] rounded-2xl overflow-hidden shadow-sm group border border-neutral-100">
-          <img 
-            src={PRESET_PROMOTIONAL_BANNER} 
-            alt="Lifestyle watch craftsmanship" 
-            className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-[1.01] select-none"
-            referrerPolicy="no-referrer"
-          />
-        </Link>
-      </section>
-
-      {/* 6. NEW ARRIVALS */}
-      <section className="py-6 md:py-8 container mx-auto px-4">
-        <div className="flex items-center justify-between mb-4 md:mb-6">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-amber-500 fill-amber-500" />
-            <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">New Arrivals</h2>
+      ) : activeProducts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white rounded-2xl border border-neutral-100 max-w-md mx-auto my-12 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-neutral-50 flex items-center justify-center text-neutral-400 mb-3 border border-neutral-100">
+            <Sparkles className="w-6 h-6 animate-pulse" />
           </div>
-          <Link 
-            to="/shop" 
-            className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
-          >
-            View all <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          <h3 className="text-sm md:text-base font-black uppercase tracking-wider text-neutral-900 font-display">Products Coming Soon</h3>
+          <p className="text-[10px] md:text-xs text-neutral-400 font-bold uppercase tracking-wider mt-1.5">We are updating our premium stock. Check back shortly!</p>
         </div>
-        {renderProductList(newArrivals, fallbackNew)}
-      </section>
+      ) : null}
 
-      {/* 7. BEST SELLERS */}
-      <section className="py-6 md:py-8 container mx-auto px-4">
-        <div className="flex items-center justify-between mb-4 md:mb-6">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-neutral-900" />
-            <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">Best Sellers</h2>
+      {/* 4. DYNAMIC SPECIAL SECTIONS */}
+      {/* 1) Flash Sale Section */}
+      {flashSaleProducts.length > 0 && (
+        <section className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-pulse" />
+              <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">FLASH SALE</h2>
+            </div>
+            <Link 
+              to="/search?q=flash_sale" 
+              className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
+            >
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-          <Link 
-            to="/shop" 
-            className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
-          >
-            All Best Sellers <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-        {renderProductList(bestSellers, fallbackTrending)}
-      </section>
+          {renderProductGrid(flashSaleProducts.slice(0, 6))}
+        </section>
+      )}
+
+      {/* 2) Trending Item Section */}
+      {trendingProducts.length > 0 && (
+        <section className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0 animate-pulse" />
+              <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">TRENDING ITEM</h2>
+            </div>
+            <Link 
+              to="/search?q=trending" 
+              className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
+            >
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          {renderProductGrid(trendingProducts.slice(0, 6))}
+        </section>
+      )}
+
+      {/* 3) Best Selling Section */}
+      {bestSellingProducts.length > 0 && (
+        <section className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 animate-pulse" />
+              <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">BEST SELLING</h2>
+            </div>
+            <Link 
+              to="/search?q=best_selling" 
+              className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
+            >
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          {renderProductGrid(bestSellingProducts.slice(0, 6))}
+        </section>
+      )}
+
+      {/* 4) Offer Product Section */}
+      {offerProducts.length > 0 && (
+        <section className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+          <div className="flex items-center justify-between mb-4 md:mb-6">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0 animate-pulse" />
+              <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">OFFER PRODUCT</h2>
+            </div>
+            <Link 
+              to="/search?q=offer" 
+              className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
+            >
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          {renderProductGrid(offerProducts.slice(0, 6))}
+        </section>
+      )}
+
+      {/* 6. DYNAMIC CATEGORY BASED SECTIONS */}
+      {(() => {
+        const finalCategories = categories.filter(c => {
+          const status = (c.status || '').toString().toLowerCase().trim();
+          return status === 'active' || status === '';
+        });
+
+        return finalCategories.map((cat: any) => {
+          // Find products belonging to this category
+          const categoryProducts = finalProducts.filter(p => {
+            const pCat = String(p.category || '').trim().toLowerCase();
+            const cId = String(cat.id || '').trim().toLowerCase();
+            const cName = String(cat.name || '').trim().toLowerCase();
+            const cSlug = String(cat.slug || '').trim().toLowerCase();
+            return pCat === cId || pCat === cName || pCat === cSlug;
+          });
+
+          // Skip category section if there are no products in it
+          if (categoryProducts.length === 0) return null;
+
+          const displayCategoryProducts = categoryProducts.slice(0, 4);
+
+          return (
+            <section key={cat.id} className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+              {/* Category Banner (Only Category Sections have banners) */}
+              {cat.bannerImage && (
+                <div className="mb-4 rounded-xl overflow-hidden shadow-sm">
+                  <CategoryBannerCarousel category={cat} />
+                </div>
+              )}
+
+              {/* Category Name & View All */}
+              <div className="flex items-center justify-between mb-3 md:mb-5">
+                <div className="flex flex-col">
+                  <h2 className="text-xs md:text-base font-black uppercase tracking-wider text-neutral-900 font-display">
+                    {cat.name}
+                  </h2>
+                  <p className="text-[9px] md:text-xs text-neutral-400 font-bold uppercase tracking-wider mt-0.5">
+                    {cat.bannerName || `${cat.name} Collection`}
+                  </p>
+                </div>
+                <Link 
+                  to={`/category/${cat.id}`} 
+                  className="text-[9px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
+                >
+                  View All <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              {/* Products grid */}
+              {renderCategoryGrid(displayCategoryProducts)}
+            </section>
+          );
+        });
+      })()}
 
       {/* 8. CUSTOMER REVIEW SECTION (Height: 250-300px, beautiful cards) */}
-      <section className="py-8 bg-neutral-900 text-white select-none">
+      <section className="py-6 bg-neutral-900 text-white select-none">
         <div className="container mx-auto px-4 max-w-xl">
-          <div className="text-center mb-6">
-            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400">Trusted By Thousands</span>
-            <h2 className="text-base md:text-lg font-black uppercase tracking-wider mt-1 font-display">Customer Feedback</h2>
+          <div className="text-center mb-4">
+            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-amber-400">Trusted By Thousands</span>
+            <h2 className="text-xs md:text-base font-black uppercase tracking-wider mt-1 font-display">Customer Feedback</h2>
           </div>
 
-          <div className="h-[140px] md:h-[130px] flex flex-col justify-center text-center px-4 relative">
+          <div className="h-[130px] md:h-[120px] flex flex-col justify-center text-center px-4 relative">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeReview}
@@ -363,22 +467,22 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.4 }}
-                className="space-y-3"
+                className="space-y-2"
               >
                 {/* 5-Star Feedback */}
                 <div className="flex justify-center items-center gap-1 text-amber-400">
                   {[...Array(CUSTOMER_TESTIMONIALS[activeReview].rating)].map((_, i) => (
-                    <Star key={i} className="w-4.5 h-4.5 fill-amber-400 text-amber-400" />
+                    <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
                   ))}
                 </div>
-                <p className="text-xs md:text-sm font-medium text-neutral-200 italic leading-relaxed line-clamp-3 px-2">
+                <p className="text-[11px] md:text-xs font-medium text-neutral-200 italic leading-relaxed line-clamp-3 px-2">
                   " {CUSTOMER_TESTIMONIALS[activeReview].comment} "
                 </p>
                 <div className="pt-1">
-                  <h4 className="text-[11px] font-black uppercase tracking-widest text-white leading-tight">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-white leading-tight">
                     {CUSTOMER_TESTIMONIALS[activeReview].name}
                   </h4>
-                  <p className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider mt-0.5">
+                  <p className="text-[8px] font-bold text-neutral-400 uppercase tracking-wider mt-0.5">
                     {CUSTOMER_TESTIMONIALS[activeReview].location} • {CUSTOMER_TESTIMONIALS[activeReview].date}
                   </p>
                 </div>
@@ -387,12 +491,12 @@ export default function Home() {
           </div>
 
           {/* Testimonial Select Dots */}
-          <div className="flex justify-center items-center gap-1.5 mt-4">
+          <div className="flex justify-center items-center gap-1 mt-3">
             {CUSTOMER_TESTIMONIALS.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setActiveReview(i)}
-                className={`h-1.5 rounded-full transition-all duration-300 ${i === activeReview ? 'w-5 bg-white' : 'w-1.5 bg-neutral-600'}`}
+                className={`h-1 rounded-full transition-all duration-300 ${i === activeReview ? 'w-4 bg-white' : 'w-1 bg-neutral-600'}`}
               />
             ))}
           </div>
@@ -400,30 +504,30 @@ export default function Home() {
       </section>
 
       {/* 9. CONTACT SECTION (WhatsApp + Call Actions) */}
-      <section className="py-8 container mx-auto px-4 max-w-sm">
-        <div className="bg-white rounded-2xl border border-neutral-150 p-5 shadow-sm text-center">
-          <div className="flex justify-center mb-3">
-            <div className="w-10 h-10 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center text-neutral-900 shadow-sm shrink-0">
-               <ShieldCheck className="w-5 h-5 text-emerald-500" />
+      <section className="py-4 mb-2 container mx-auto px-4 max-w-sm">
+        <div className="bg-white rounded-xl border border-neutral-150 p-4 shadow-sm text-center">
+          <div className="flex justify-center mb-2">
+            <div className="w-8 h-8 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center text-neutral-900 shadow-sm shrink-0">
+               <ShieldCheck className="w-4 h-4 text-emerald-500" />
             </div>
           </div>
           <h3 className="font-black text-xs md:text-sm uppercase tracking-wider text-neutral-900 leading-tight">Authentic Customer Support</h3>
-          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1.5 mb-5">Have queries? Talk directly with our team</p>
+          <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-1 mb-3">Have queries? Talk directly with our team</p>
           
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             <a 
               href={`https://wa.me/${whatsappNumber}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 h-11 px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 text-center"
+              className="flex items-center justify-center gap-1.5 h-9 px-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 text-center"
             >
-              <MessageCircle className="w-4 h-4 shrink-0 fill-white" /> WhatsApp
+              <MessageCircle className="w-3.5 h-3.5 shrink-0 fill-white" /> WhatsApp
             </a>
             <a 
               href={`tel:${hotlineNumber}`}
-              className="flex items-center justify-center gap-2 h-11 px-4 bg-black hover:bg-neutral-800 text-white rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 text-center"
+              className="flex items-center justify-center gap-1.5 h-9 px-3 bg-black hover:bg-neutral-800 text-white rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 text-center"
             >
-              <Phone className="w-4 h-4 shrink-0 fill-white" /> Direct Call
+              <Phone className="w-3.5 h-3.5 shrink-0 fill-white" /> Direct Call
             </a>
           </div>
         </div>

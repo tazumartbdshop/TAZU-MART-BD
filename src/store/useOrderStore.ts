@@ -32,10 +32,10 @@ export interface Order {
   deliveryMode: 'Express Delivery' | 'Standard Delivery';
   paymentMethod: string;
   status: 'Placed' | 'Confirmed' | 'Processing' | 'Shipping' | 'Delivered' | 'Cancelled' | 'Pending' | 'Packaging' | 'Returned';
-  statusHistory: { status: string; timestamp: number; updatedBy?: string }[];
-  status_updated_at: number;
+  statusHistory: { status: string; timestamp: string; updatedBy?: string }[];
+  status_updated_at: string;
   edited_by_admin?: string;
-  last_edit_time?: number;
+  last_edit_time?: string;
   customerImage?: string;
   paymentStatus: 'Paid' | 'Partial' | 'Unpaid' | 'Cash on Delivery';
   type: 'Online' | 'Offline';
@@ -47,7 +47,7 @@ export interface Order {
   paidAmount: number;
   dueAmount: number;
   total: number;
-  date: number;
+  date: string;
   notes?: string;
   isRead?: boolean;
   isDemo?: boolean;
@@ -95,7 +95,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const nextOrderNum = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
     const nextBillNum = Math.floor(100000 + Math.random() * 900000);
     const orderId = `TMB-${nextOrderNum}`;
-    const now = Date.now();
+    const now = new Date().toISOString();
     const id = Math.random().toString(36).substring(2, 9);
     
     const newOrder: Order = {
@@ -126,7 +126,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const nextOrderNum = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
     const nextBillNum = Math.floor(100000 + Math.random() * 900000);
     const orderId = `TMB-${nextOrderNum}`;
-    const now = Date.now();
+    const now = new Date().toISOString();
     const id = Math.random().toString(36).substring(2, 9);
     
     const newOrder: Order = {
@@ -193,13 +193,17 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const merged: Order = {
       ...existingOrder,
       ...updates,
-      last_edit_time: Date.now(),
+      last_edit_time: new Date().toISOString(),
       edited_by_admin: 'Admin'
     };
 
     const supabase = getSupabase();
     if (supabase) {
-      const dbPayload = objectToSnake(updates);
+      const dbPayload = objectToSnake({
+        ...updates,
+        last_edit_time: merged.last_edit_time,
+        edited_by_admin: merged.edited_by_admin
+      });
       supabase.from('orders').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
     }
 
@@ -211,7 +215,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const existingOrder = get().orders.find(o => o.id === id);
     if (!existingOrder) return;
 
-    const now = Date.now();
+    const now = new Date().toISOString();
     const merged: Order = {
       ...existingOrder,
       status,

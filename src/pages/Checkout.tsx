@@ -263,25 +263,103 @@ export default function Checkout() {
     }
   }, [showGatewayModal]);
 
-  // Auto-fill logged-in user details if available
+  // Auto-fill logged-in user details if available (Fetched dynamically from database)
   useEffect(() => {
-    if (isAuthenticated && user) {
-      setFormData(prev => ({
-        ...prev,
-        name: user.name || prev.name,
-        phone: user.phone || prev.phone || '',
-        email: user.email || prev.email || '',
-        address: user.address || prev.address || '',
-        houseRoad: user.houseRoad || user.street || prev.houseRoad || '',
-        landmark: user.landmark || prev.landmark || '',
-        division: user.division || prev.division || '',
-        district: user.district || prev.district || '',
-        upazila: user.upazila || prev.upazila || '',
-        area: user.area || prev.area || '',
-        postalCode: user.postalCode || user.zipCode || prev.postalCode || '',
-      }));
+    async function fetchLatestUserProfile() {
+      if (isAuthenticated && user) {
+        const supabase = getSupabase();
+        if (supabase) {
+          try {
+            let dbUser = null;
+
+            // 1. Try to fetch from database 'users' table using user.id
+            if (user.id) {
+              const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', user.id)
+                .maybeSingle();
+              if (data && !error) {
+                dbUser = data;
+              }
+            }
+
+            // 2. If not found, try to fetch from database 'users' table using email
+            if (!dbUser && user.email) {
+              const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', user.email)
+                .maybeSingle();
+              if (data && !error) {
+                dbUser = data;
+              }
+            }
+
+            // 3. If still not found, try to fetch from database 'users' table using phone
+            if (!dbUser && user.phone) {
+              const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('phone', user.phone)
+                .maybeSingle();
+              if (data && !error) {
+                dbUser = data;
+              }
+            }
+
+            // If profile found, load it into local Auth Store state & Fill Checkout Form automatically
+            if (dbUser) {
+              updateUser({
+                name: dbUser.name || user.name || '',
+                phone: dbUser.phone || user.phone || '',
+                email: dbUser.email || user.email || '',
+                address: dbUser.address || user.address || '',
+                division: dbUser.division || user.division || '',
+                district: dbUser.district || user.district || '',
+                upazila: dbUser.upazila || dbUser.area || user.upazila || '',
+                area: dbUser.area || dbUser.upazila || user.area || '',
+                postalCode: dbUser.postalCode || dbUser.zipCode || user.postalCode || '',
+                landmark: dbUser.landmark || user.landmark || ''
+              });
+
+              setFormData(prev => ({
+                ...prev,
+                name: dbUser.name || prev.name,
+                phone: dbUser.phone || prev.phone || '',
+                email: dbUser.email || prev.email || '',
+                address: dbUser.address || prev.address || '',
+                division: dbUser.division || prev.division || '',
+                district: dbUser.district || prev.district || '',
+                upazila: dbUser.upazila || dbUser.area || prev.upazila || '',
+                area: dbUser.area || dbUser.upazila || prev.area || '',
+                postalCode: dbUser.postalCode || dbUser.zipCode || prev.postalCode || '',
+                landmark: dbUser.landmark || prev.landmark || '',
+              }));
+            } else {
+              // Fallback to local auth store values if no db profile row exists yet
+              setFormData(prev => ({
+                ...prev,
+                name: user.name || prev.name,
+                phone: user.phone || prev.phone || '',
+                email: user.email || prev.email || '',
+                address: user.address || prev.address || '',
+                division: user.division || prev.division || '',
+                district: user.district || prev.district || '',
+                upazila: user.upazila || prev.upazila || '',
+                area: user.area || prev.area || '',
+                postalCode: user.postalCode || user.zipCode || prev.postalCode || '',
+                landmark: user.landmark || prev.landmark || '',
+              }));
+            }
+          } catch (e) {
+            console.error("[Checkout Profile Fetch Error] Fail to fetch:", e);
+          }
+        }
+      }
     }
-  }, [user, isAuthenticated]);
+    fetchLatestUserProfile();
+  }, [user?.id, user?.email, user?.phone, isAuthenticated]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -583,40 +661,67 @@ export default function Checkout() {
         console.error("Campaign attribution exception:", e);
       }
 
-      // Update user profile if saveAddress is true
-      if (isAuthenticated && user && formData.saveAddress) {
-        updateUser({
+      // Update/Upsert user profile if authenticated
+      if (isAuthenticated && user) {
+        const updatedProfile = {
+          id: user.id,
+          uid: user.id,
           name: formData.name,
           phone: formData.phone,
-          email: formData.email,
+          email: formData.email || user.email || '',
           division: formData.division,
           district: formData.district,
           upazila: formData.upazila,
-          area: formData.area,
-          address: formData.address, // Full address/House road
+          area: formData.upazila || formData.area, // map to both
+          address: formData.address,
+          postalCode: formData.postalCode,
           zipCode: formData.postalCode,
-          postalCode: formData.postalCode
+          lastLoginAt: new Date().toISOString(),
+        };
+
+        updateUser({
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email || user.email || '',
+          division: formData.division,
+          district: formData.district,
+          upazila: formData.upazila,
+          area: formData.upazila || formData.area,
+          address: formData.address,
+          postalCode: formData.postalCode,
+          zipCode: formData.postalCode
         });
         
-        // Update in database
+        // Save/Update in database using upsert so that first-time users also get a profile created
         try {
           const supabase = getSupabase();
           if (supabase) {
-            supabase.from('users').update({
-              name: formData.name,
-              phone: formData.phone,
-              email: formData.email,
-              division: formData.division,
-              district: formData.district,
-              upazila: formData.upazila,
-              area: formData.area,
-              address: formData.address,
-              zipCode: formData.postalCode,
-              postalCode: formData.postalCode
-            }).eq('id', user.id).then(({error})=> error && console.warn(error));
+            supabase.from('users')
+              .upsert([updatedProfile])
+              .then(({ error }) => {
+                if (error) {
+                  console.warn("User profile upsert failed, trying update instead:", error);
+                  // fallback to standard update
+                  supabase.from('users')
+                    .update({
+                      name: formData.name,
+                      phone: formData.phone,
+                      email: formData.email || user.email || '',
+                      division: formData.division,
+                      district: formData.district,
+                      upazila: formData.upazila,
+                      area: formData.upazila || formData.area,
+                      address: formData.address,
+                      postalCode: formData.postalCode,
+                      zipCode: formData.postalCode
+                    })
+                    .eq('id', user.id)
+                    .then(({ error: updErr }) => updErr && console.warn("Update fallback failed:", updErr));
+                }
+              });
           }
         } catch (e) {
-          console.error("User profile update failed:", e);
+          console.error("User profile update/upsert failed:", e);
         }
 
         // Update customer in store
@@ -630,7 +735,7 @@ export default function Checkout() {
               division: formData.division,
               district: formData.district,
               upazila: formData.upazila,
-              area: formData.area,
+              area: formData.upazila || formData.area,
               street: formData.address,
               zipCode: formData.postalCode,
               city: formData.district || ''
