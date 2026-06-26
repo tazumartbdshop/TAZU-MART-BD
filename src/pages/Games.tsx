@@ -39,11 +39,16 @@ interface GameConfig {
     pattern: string;
   }[];
   reviveAd: {
+    enableRewardAd: boolean;
+    enableVideoAd: boolean;
+    enableImageAd: boolean;
     videoUrl: string;
-    thumbnailUrl: string;
+    imageUrl: string;
     title: string;
     duration: number;
-    skipTime: number;
+    skipEnabled: boolean;
+    skipAfter: number;
+    continueFromPreviousState: boolean;
   };
 }
 
@@ -137,6 +142,7 @@ export default function Games() {
   const cameraRef = useRef({ x: 2000, y: 2000, zoom: 1.0 });
   const isBoostActive = useRef(false);
   const requestRef = useRef<number>(null);
+  const targetReviveLengthRef = useRef<number | null>(null);
   const worldRef = useRef<{ foods: Food[], snakes: Snake[], particles: Particle[] }>({ 
     foods: [], 
     snakes: [], 
@@ -253,6 +259,7 @@ export default function Games() {
     setReviveCount(0); // Reset revives
     setIsShielded(false);
     setLastSnakeState(null);
+    targetReviveLengthRef.current = null;
     
     const interval = setInterval(() => {
       setLoadingProgress(prev => {
@@ -298,17 +305,18 @@ export default function Games() {
         coins: Math.floor(snake.score / 10) + (snake.kills * 50)
       });
 
-      // Save for revive
+       // Save for revive
       setLastSnakeState({
         name: snake.name,
         color: snake.color,
         glowColor: snake.glowColor,
-        body: [...snake.body], // Clone body
+        body: snake.body.map(p => ({ x: p.x, y: p.y })), // Deep clone body!
         angle: snake.angle,
         targetAngle: snake.targetAngle,
         speed: snake.speed,
         kills: snake.kills,
-        coins: snake.coins
+        coins: snake.coins,
+        score: snake.score
       });
 
       // Cinematic delay before showing UI
@@ -320,22 +328,39 @@ export default function Games() {
 
   const handleRevive = () => {
     if (reviveCount >= (config?.settings.reviveCount || 1) || !lastSnakeState) return;
+    
+    // Check if Reward Ad is disabled
+    if (config?.reviveAd.enableRewardAd === false) {
+      finalizeRevive();
+      return;
+    }
     setGameState('REVIVE_AD');
   };
 
   const finalizeRevive = () => {
+    if (!lastSnakeState) return;
+
+    const targetLength = lastSnakeState.score;
+    // Set auto growth compensation: start slightly shorter so it visually grows back to the exact previous length
+    // Before Ad: 171 -> After Resume: 140. Auto grow back to 171.
+    const initialRevivedLength = targetLength > 140 ? 140 : Math.max(15, Math.floor(targetLength * 0.8));
+    const slicedBody = lastSnakeState.body.slice(0, initialRevivedLength);
+
+    // Set target length for the game loop to grow back to
+    targetReviveLengthRef.current = targetLength;
+
     // Restore Snake
     const revivedSnake: Snake = {
       id: 'player',
       name: lastSnakeState.name,
       color: lastSnakeState.color,
       glowColor: lastSnakeState.glowColor,
-      body: lastSnakeState.body,
+      body: slicedBody,
       angle: lastSnakeState.angle,
       targetAngle: lastSnakeState.targetAngle,
       speed: lastSnakeState.speed,
       isBoosting: false,
-      score: lastSnakeState.body.length,
+      score: targetLength, // Score matches previous exact score immediately
       kills: lastSnakeState.kills,
       isDead: false,
       isAI: false,
@@ -349,7 +374,7 @@ export default function Games() {
     // Re-inject into world
     worldRef.current.snakes.unshift(revivedSnake);
     setPlayer(revivedSnake);
-    cameraRef.current = { x: revivedSnake.body[0].x, y: revivedSnake.body[0].y };
+    cameraRef.current = { x: revivedSnake.body[0].x, y: revivedSnake.body[0].y, zoom: cameraRef.current.zoom };
     
     setReviveCount(prev => prev + 1);
     setIsShielded(true);
@@ -471,7 +496,16 @@ export default function Games() {
       snake.body.unshift(newHead);
       
       // Length management
-      if (snake.isBoosting) {
+      let shouldGrow = false;
+      if (snake.id === 'player' && targetReviveLengthRef.current !== null) {
+        if (snake.body.length < targetReviveLengthRef.current) {
+          shouldGrow = true;
+        } else {
+          targetReviveLengthRef.current = null; // Reached target length!
+        }
+      }
+
+      if (snake.isBoosting && !shouldGrow) {
         if (Math.random() < 0.2) {
           snake.body.pop(); 
           if (Math.random() < 0.5) {
@@ -479,11 +513,16 @@ export default function Games() {
           }
         }
         snake.body.pop(); 
-      } else {
+      } else if (!shouldGrow) {
         snake.body.pop();
       }
 
-      snake.score = snake.body.length;
+      // If we are performing growth compensation, show the real score
+      if (snake.id === 'player' && targetReviveLengthRef.current !== null) {
+        snake.score = targetReviveLengthRef.current;
+      } else {
+        snake.score = snake.body.length;
+      }
     });
 
     // 3. Food Collision
@@ -1381,59 +1420,115 @@ export default function Games() {
 // --- SUB-COMPONENTS ---
 
 function ReviveAdOverlay({ config, onComplete, onClose }: { config: GameConfig, onComplete: () => void, onClose: () => void }) {
-  const [timeLeft, setTimeLeft] = useState(config.reviveAd.duration);
-  const [canSkip, setCanSkip] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  const duration = config.reviveAd.duration || 15;
+  const skipEnabled = config.reviveAd.skipEnabled;
+  const skipAfter = config.reviveAd.skipAfter ?? 5;
+  const isVideo = config.reviveAd.enableVideoAd;
+  const isImage = config.reviveAd.enableImageAd;
+
+  const timeLeft = Math.max(0, duration - elapsedTime);
+  const canSkip = skipEnabled && (elapsedTime >= skipAfter);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
+      setElapsedTime(prev => {
+        const next = prev + 1;
+        if (next >= duration) {
           clearInterval(timer);
-          return 0;
+          onComplete();
+          return duration;
         }
-        if (prev <= (config.reviveAd.duration - config.reviveAd.skipTime)) {
-          setCanSkip(true);
-        }
-        return prev - 1;
+        return next;
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [config]);
+  }, [duration, onComplete]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.play().catch(err => console.log("Autoplay prevented:", err));
+    }
+  }, [isVideo]);
 
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center"
+      className="fixed inset-0 z-[1000] bg-[#020408] flex flex-col items-center justify-center"
     >
-      <div className="absolute top-10 right-10 flex items-center gap-4 z-50">
-        <div className="bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 font-black text-xl tabular-nums">
-          {timeLeft}s
+      {/* Top Bar with Timer and Skip */}
+      <div className="absolute top-10 left-10 right-10 flex items-center justify-between z-50">
+        <div className="bg-black/80 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 flex items-center gap-3">
+          <span className="w-2 h-2 rounded-full bg-[#00C2FF] animate-ping" />
+          <span className="text-[10px] font-black uppercase tracking-[2px] text-white/40">Reward Ad</span>
+          <span className="text-white font-black text-lg font-mono tabular-nums">{timeLeft}s</span>
         </div>
-        {canSkip && (
+        
+        <div className="flex items-center gap-4">
+          {canSkip ? (
+            <button 
+              onClick={onComplete}
+              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-8 py-3 rounded-full font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+            >
+              SKIP AD <ChevronRight className="w-5 h-5" />
+            </button>
+          ) : skipEnabled ? (
+            <div className="bg-black/80 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 text-[11px] font-black uppercase tracking-widest text-white/40">
+              Skip after {Math.max(0, skipAfter - elapsedTime)}s
+            </div>
+          ) : null}
+
           <button 
-            onClick={onComplete}
-            className="bg-white text-black px-8 py-3 rounded-full font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center gap-2"
+            onClick={onClose}
+            className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all"
           >
-            SKIP AD <ChevronRight className="w-5 h-5" />
+            <X className="w-5 h-5" />
           </button>
-        )}
+        </div>
       </div>
 
-      <div className="w-full h-full relative">
-         <video 
-           ref={videoRef}
-           src={config.reviveAd.videoUrl || null} 
-           autoPlay 
-           className="w-full h-full object-cover" 
-           onEnded={onComplete}
-         />
+      {/* Main Ad Content (Video or Image) */}
+      <div className="w-full h-full relative flex items-center justify-center">
+         {isVideo && config.reviveAd.videoUrl ? (
+           <video 
+             ref={videoRef}
+             src={config.reviveAd.videoUrl} 
+             autoPlay 
+             muted
+             playsInline
+             className="w-full h-full object-cover" 
+             onEnded={onComplete}
+           />
+         ) : isImage && config.reviveAd.imageUrl ? (
+           <motion.img 
+             initial={{ scale: 1.0 }}
+             animate={{ scale: 1.05 }}
+             transition={{ duration: duration, ease: "linear" }}
+             src={config.reviveAd.imageUrl} 
+             className="w-full h-full object-cover" 
+             alt="Advertisement"
+           />
+         ) : (
+           // Fallback premium graphic if no video or image URL is set
+           <div className="text-center p-8 max-w-sm">
+             <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[#00C2FF] to-blue-600 mx-auto flex items-center justify-center shadow-lg shadow-cyan-500/20 mb-6">
+               <Trophy className="w-12 h-12 text-white" />
+             </div>
+             <h2 className="text-2xl font-black uppercase tracking-tight mb-2">TAZU REWARD ZONE</h2>
+             <p className="text-white/40 text-xs font-bold uppercase tracking-widest leading-relaxed">
+               Please wait while your gaming credit is being authorized...
+             </p>
+           </div>
+         )}
          
-         <div className="absolute bottom-10 left-10 right-10">
-            <h3 className="text-[10px] font-black uppercase tracking-[4px] text-white/40 mb-2">SPONSORED PROTOCOL</h3>
-            <h2 className="text-3xl font-black uppercase italic tracking-tighter">{config.reviveAd.title}</h2>
+         {/* Bottom Information Bar */}
+         <div className="absolute bottom-10 left-10 right-10 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
+            <h3 className="text-[10px] font-black uppercase tracking-[3px] text-[#00C2FF] mb-1">PROMOTIONAL OFFER</h3>
+            <h2 className="text-2xl font-black uppercase italic tracking-tight">{config.reviveAd.title || 'Exclusive Reward'}</h2>
          </div>
       </div>
     </motion.div>

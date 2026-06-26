@@ -33,11 +33,16 @@ interface GameConfig {
   };
   themes: SnakeTheme[];
   reviveAd: {
+    enableRewardAd: boolean;
+    enableVideoAd: boolean;
+    enableImageAd: boolean;
     videoUrl: string;
-    thumbnailUrl: string;
+    imageUrl: string;
     title: string;
     duration: number;
-    skipTime: number;
+    skipEnabled: boolean;
+    skipAfter: number;
+    continueFromPreviousState: boolean;
   };
 }
 
@@ -379,74 +384,209 @@ export default function AdminGameControl() {
                <div className="lg:col-span-2 space-y-8">
                   <div className="pb-8 border-b border-gray-200">
                     <div className="flex items-center gap-3 mb-6">
-                      <Video className="w-5 h-5 text-gray-400" />
+                      <Video className="w-5 h-5 text-[#00C2FF]" />
                       <h3 className="text-xl font-black uppercase tracking-widest text-gray-900">Revive Ad Manager</h3>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                       <div className="space-y-6">
-                          <div className="space-y-2">
-                             <label className="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Ad Title</label>
-                             <input 
-                               type="text" 
-                               value={config.reviveAd.title}
-                               onChange={(e) => setConfig({ ...config, reviveAd: { ...config.reviveAd, title: e.target.value }})}
-                               className="w-full h-12 bg-white border-b-2 border-gray-200 px-0 font-bold outline-none text-gray-900 focus:border-[#00C2FF] transition-colors"
-                             />
+                    <div className="space-y-6">
+                       {/* Row 1: Main Toggles */}
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                             <div>
+                                <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider">Enable Reward Ad</h4>
+                                <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Revive system active status</p>
+                             </div>
+                             <button 
+                                onClick={() => setConfig({ ...config, reviveAd: { ...config.reviveAd, enableRewardAd: !config.reviveAd.enableRewardAd }})}
+                                className={cn(
+                                   "px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all",
+                                   config.reviveAd.enableRewardAd ? "bg-[#00C2FF]/10 text-[#00C2FF]" : "bg-gray-200 text-gray-500"
+                                )}
+                             >
+                                {config.reviveAd.enableRewardAd ? "ACTIVE" : "INACTIVE"}
+                             </button>
                           </div>
-                          <div className="space-y-2">
-                             <label className="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Video URL (MP4)</label>
-                             <div className="flex items-end gap-4">
-                                <input 
-                                  type="text" 
-                                  value={config.reviveAd.videoUrl}
-                                  onChange={(e) => setConfig({ ...config, reviveAd: { ...config.reviveAd, videoUrl: e.target.value }})}
-                                  className="flex-1 h-12 bg-white border-b-2 border-gray-200 px-0 font-bold outline-none text-gray-900 focus:border-[#00C2FF] transition-colors"
-                                />
+
+                          <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between">
+                             <div>
+                                <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider">Continue From Previous State</h4>
+                                <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">Restore exact length/score on revive</p>
                              </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-8">
-                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Duration (s)</label>
-                                <input 
-                                  type="number" 
-                                  value={config.reviveAd.duration}
-                                  onChange={(e) => setConfig({ ...config, reviveAd: { ...config.reviveAd, duration: parseInt(e.target.value) }})}
-                                  className="w-full h-12 bg-white border-b-2 border-gray-200 px-0 font-bold outline-none text-gray-900 focus:border-[#00C2FF] transition-colors"
-                                />
-                             </div>
-                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Skip After (s)</label>
-                                <input 
-                                  type="number" 
-                                  value={config.reviveAd.skipTime}
-                                  onChange={(e) => setConfig({ ...config, reviveAd: { ...config.reviveAd, skipTime: parseInt(e.target.value) }})}
-                                  className="w-full h-12 bg-white border-b-2 border-gray-200 px-0 font-bold outline-none text-gray-900 focus:border-[#00C2FF] transition-colors"
-                                />
-                             </div>
+                             <button 
+                                onClick={() => setConfig({ ...config, reviveAd: { ...config.reviveAd, continueFromPreviousState: !config.reviveAd.continueFromPreviousState }})}
+                                className={cn(
+                                   "px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all",
+                                   config.reviveAd.continueFromPreviousState ? "bg-emerald-500/10 text-emerald-500" : "bg-gray-200 text-gray-500"
+                                )}
+                             >
+                                {config.reviveAd.continueFromPreviousState ? "RESTORE" : "RESET"}
+                             </button>
                           </div>
                        </div>
 
-                       {/* Video Player Mockup */}
-                       <div className="bg-gray-100 rounded-[12px] border border-gray-200 overflow-hidden group relative shadow-inner h-[240px]">
-                          <video 
-                            src={config.reviveAd.videoUrl || null} 
-                            className="w-full h-full object-cover"
-                            poster={config.reviveAd.thumbnailUrl}
-                          />
-                          <div className="absolute inset-0 bg-black/20" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                             <div className="w-16 h-16 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center group-hover:bg-white transition-all shadow-lg text-[#00C2FF]">
-                                <Play className="w-7 h-7 fill-current" />
+                       {/* Row 2: Ad Format Selection */}
+                       <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                          <h4 className="text-xs font-black text-gray-900 uppercase tracking-wider">Ad Format Configuration</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <button 
+                                onClick={() => setConfig({ ...config, reviveAd: { ...config.reviveAd, enableVideoAd: true, enableImageAd: false }})}
+                                className={cn(
+                                   "p-4 rounded-xl border-2 text-left transition-all flex items-center justify-between",
+                                   config.reviveAd.enableVideoAd ? "bg-[#00C2FF]/5 border-[#00C2FF]" : "bg-white border-transparent"
+                                )}
+                             >
+                                <div>
+                                   <span className="text-[10px] font-black uppercase tracking-wider block text-gray-900">Video Ad Format</span>
+                                   <span className="text-[9px] text-gray-400 font-bold block mt-1">Show custom video URL (.mp4)</span>
+                                </div>
+                                <div className={cn("w-4 h-4 rounded-full border-2 flex items-center justify-center", config.reviveAd.enableVideoAd ? "border-[#00C2FF]" : "border-gray-300")}>
+                                   {config.reviveAd.enableVideoAd && <div className="w-2 h-2 rounded-full bg-[#00C2FF]" />}
+                                </div>
+                             </button>
+
+                             <button 
+                                onClick={() => setConfig({ ...config, reviveAd: { ...config.reviveAd, enableVideoAd: false, enableImageAd: true }})}
+                                className={cn(
+                                   "p-4 rounded-xl border-2 text-left transition-all flex items-center justify-between",
+                                   config.reviveAd.enableImageAd ? "bg-[#00C2FF]/5 border-[#00C2FF]" : "bg-white border-transparent"
+                                )}
+                             >
+                                <div>
+                                   <span className="text-[10px] font-black uppercase tracking-wider block text-gray-900">Image Ad Format</span>
+                                   <span className="text-[9px] text-gray-400 font-bold block mt-1">Show premium static graphic image</span>
+                                </div>
+                                <div className={cn("w-4 h-4 rounded-full border-2 flex items-center justify-center", config.reviveAd.enableImageAd ? "border-[#00C2FF]" : "border-gray-300")}>
+                                   {config.reviveAd.enableImageAd && <div className="w-2 h-2 rounded-full bg-[#00C2FF]" />}
+                                </div>
+                             </button>
+                          </div>
+                       </div>
+
+                       {/* Fields based on formats */}
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-4">
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Ad Title</label>
+                                <input 
+                                  type="text" 
+                                  value={config.reviveAd.title}
+                                  onChange={(e) => setConfig({ ...config, reviveAd: { ...config.reviveAd, title: e.target.value }})}
+                                  className="w-full h-12 bg-white border-b-2 border-gray-200 px-0 font-bold outline-none text-gray-900 focus:border-[#00C2FF] transition-colors"
+                                />
+                             </div>
+
+                             {config.reviveAd.enableVideoAd && (
+                                <div className="space-y-2">
+                                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Video URL (MP4)</label>
+                                   <input 
+                                     type="text" 
+                                     value={config.reviveAd.videoUrl}
+                                     onChange={(e) => setConfig({ ...config, reviveAd: { ...config.reviveAd, videoUrl: e.target.value }})}
+                                     className="w-full h-12 bg-white border-b-2 border-gray-200 px-0 font-bold outline-none text-gray-900 focus:border-[#00C2FF] transition-colors"
+                                     placeholder="https://example.com/video.mp4"
+                                   />
+                                </div>
+                             )}
+
+                             {config.reviveAd.enableImageAd && (
+                                <div className="space-y-2">
+                                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Image URL (JPG/PNG)</label>
+                                   <input 
+                                     type="text" 
+                                     value={config.reviveAd.imageUrl}
+                                     onChange={(e) => setConfig({ ...config, reviveAd: { ...config.reviveAd, imageUrl: e.target.value }})}
+                                     className="w-full h-12 bg-white border-b-2 border-gray-200 px-0 font-bold outline-none text-gray-900 focus:border-[#00C2FF] transition-colors"
+                                     placeholder="https://example.com/image.jpg"
+                                   />
+                                </div>
+                             )}
+
+                             <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Duration (s)</label>
+                                   <select 
+                                     value={config.reviveAd.duration}
+                                     onChange={(e) => setConfig({ ...config, reviveAd: { ...config.reviveAd, duration: parseInt(e.target.value) }})}
+                                     className="w-full h-12 bg-white border-b-2 border-gray-200 px-0 font-bold outline-none text-gray-900 focus:border-[#00C2FF] transition-colors"
+                                   >
+                                      {[5, 10, 15, 20, 30].map(sec => (
+                                         <option key={sec} value={sec}>{sec} Seconds</option>
+                                      ))}
+                                   </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-[4px]">Skip After (s)</label>
+                                   <input 
+                                     type="number" 
+                                     disabled={!config.reviveAd.skipEnabled}
+                                     value={config.reviveAd.skipAfter}
+                                     onChange={(e) => setConfig({ ...config, reviveAd: { ...config.reviveAd, skipAfter: Math.min(config.reviveAd.duration, parseInt(e.target.value) || 0) }})}
+                                     className="w-full h-12 bg-white border-b-2 border-gray-200 px-0 font-bold outline-none text-gray-900 focus:border-[#00C2FF] transition-colors disabled:opacity-50"
+                                   />
+                                </div>
+                             </div>
+
+                             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <div>
+                                   <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-wider">Skip Button Enabled</h4>
+                                   <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Allow skipping after configured time</p>
+                                </div>
+                                <button 
+                                   onClick={() => setConfig({ ...config, reviveAd: { ...config.reviveAd, skipEnabled: !config.reviveAd.skipEnabled }})}
+                                   className={cn(
+                                      "px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all",
+                                      config.reviveAd.skipEnabled ? "bg-[#00C2FF]/10 text-[#00C2FF]" : "bg-gray-200 text-gray-500"
+                                   )}
+                                 >
+                                    {config.reviveAd.skipEnabled ? "ENABLED" : "DISABLED"}
+                                 </button>
                              </div>
                           </div>
-                          <div className="absolute bottom-6 left-6 right-6">
-                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-[10px] font-black text-white drop-shadow-md uppercase tracking-widest">{config.reviveAd.title}</span>
-                                <span className="text-[10px] font-bold text-white drop-shadow-md">00:00 / 00:{config.reviveAd.duration}</span>
-                             </div>
-                             <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden backdrop-blur-sm">
-                                <div className="w-1/3 h-full bg-[#00C2FF]" />
+
+                          {/* Preview Box */}
+                          <div className="bg-gray-100 rounded-[20px] border border-gray-200 overflow-hidden group relative shadow-inner h-[320px] flex items-center justify-center">
+                             {config.reviveAd.enableVideoAd && config.reviveAd.videoUrl ? (
+                                <>
+                                   <video 
+                                     key={config.reviveAd.videoUrl}
+                                     src={config.reviveAd.videoUrl} 
+                                     className="w-full h-full object-cover"
+                                     autoPlay
+                                     muted
+                                     loop
+                                   />
+                                   <div className="absolute inset-0 bg-black/20" />
+                                   <div className="absolute top-4 right-4 bg-black/60 px-3 py-1 rounded-full text-[10px] font-mono font-bold text-white/90">
+                                      Video Preview
+                                   </div>
+                                </>
+                             ) : config.reviveAd.enableImageAd && config.reviveAd.imageUrl ? (
+                                <>
+                                   <img 
+                                     src={config.reviveAd.imageUrl} 
+                                     className="w-full h-full object-cover"
+                                     alt="Ad Preview"
+                                   />
+                                   <div className="absolute top-4 right-4 bg-black/60 px-3 py-1 rounded-full text-[10px] font-mono font-bold text-white/90">
+                                      Image Preview
+                                   </div>
+                                </>
+                             ) : (
+                                <div className="text-center p-6">
+                                   <Video className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">No Media Selected</span>
+                                </div>
+                             )}
+                             
+                             <div className="absolute bottom-6 left-6 right-6">
+                                <div className="flex items-center justify-between mb-2">
+                                   <span className="text-[10px] font-black text-white drop-shadow-md uppercase tracking-widest">{config.reviveAd.title || 'Exclusive Ad Offer'}</span>
+                                   <span className="text-[10px] font-bold text-white drop-shadow-md">00:00 / 00:{config.reviveAd.duration}</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-white/30 rounded-full overflow-hidden backdrop-blur-sm">
+                                   <div className="w-1/3 h-full bg-[#00C2FF]" />
+                                </div>
                              </div>
                           </div>
                        </div>

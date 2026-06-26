@@ -311,10 +311,10 @@ export default function Home() {
       ) : activeProducts.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white rounded-2xl border border-neutral-100 max-w-md mx-auto my-12 shadow-sm">
           <div className="w-12 h-12 rounded-full bg-neutral-50 flex items-center justify-center text-neutral-400 mb-3 border border-neutral-100">
-            <Sparkles className="w-6 h-6 animate-pulse" />
+            <Sparkles className="w-6 h-6" />
           </div>
-          <h3 className="text-sm md:text-base font-black uppercase tracking-wider text-neutral-900 font-display">Products Coming Soon</h3>
-          <p className="text-[10px] md:text-xs text-neutral-400 font-bold uppercase tracking-wider mt-1.5">We are updating our premium stock. Check back shortly!</p>
+          <h3 className="text-sm md:text-base font-black uppercase tracking-wider text-neutral-900 font-display">No Products Available</h3>
+          <p className="text-[10px] md:text-xs text-neutral-400 font-bold uppercase tracking-wider mt-1.5">Our inventory is currently being updated. Please check back later!</p>
         </div>
       ) : null}
 

@@ -23,10 +23,15 @@
     { "id": "lava-orange", "name": "Lava Orange", "head": "#ff7a00", "tail": "#ff3b3b", "primary": "#ff7a00", "secondary": "#ff3b3b", "glow": "#ff7a00", "pattern": "Electric" }
   ],
   "reviveAd": {
+    "enableRewardAd": true,
+    "enableVideoAd": true,
+    "enableImageAd": false,
     "videoUrl": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    "thumbnailUrl": "https://via.placeholder.com/1280x720",
+    "imageUrl": "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=1280&q=80",
     "title": "Watch Ad for Revive",
-    "duration": 30,
-    "skipTime": 27
+    "duration": 15,
+    "skipEnabled": true,
+    "skipAfter": 5,
+    "continueFromPreviousState": true
   }
 }

@@ -13,36 +13,11 @@ export default function MainHeroCarousel({ banners }: MainHeroCarouselProps) {
   // Filter user uploaded active banners with real image
   const uploadedBanners = (banners || []).filter(b => b && b.status === 'active' && b.image && b.image.trim() !== '');
 
-  // Define a high-fidelity default banner to render so the Hero block never collapses or creates blank spaces
-  const fallbackBanners: Banner[] = [
-    {
-      id: 'default-designed-promo',
-      image: '',
-      name: 'Welcome to Tazu Mart BD',
-      description: 'Discover premium gadgets, elegant fashion, authentic perfumes & luxury watches.',
-      bannerType: 'designed',
-      buttonEnabled: true,
-      buttonText: 'Shop Now',
-      isCustomButtonText: false,
-      connectedProductId: '',
-      status: 'active',
-      order: 0,
-      backgroundColor: '#0a0a0a',
-      backgroundGradient: '#1e1b4b',
-      isGradient: true,
-      textColor: '#ffffff',
-      buttonColor: '#ff6e40',
-      buttonTextColor: '#ffffff',
-      borderColor: '#ffffff',
-      fontFamily: 'sans',
-      fontSize: '3xl',
-      fontWeight: 'bold',
-      alignment: 'center',
-    }
-  ];
+  const activeBannersToRender = uploadedBanners;
 
-  // PRIORITY: If there are uploaded banners, completely hide default designed fallback banner
-  const activeBannersToRender = uploadedBanners.length > 0 ? uploadedBanners : fallbackBanners;
+  if (activeBannersToRender.length === 0) {
+    return null;
+  }
 
   const { sliderConfig } = useBannerStore();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -97,7 +72,7 @@ export default function MainHeroCarousel({ banners }: MainHeroCarouselProps) {
     return '/shop';
   };
 
-  const currentBanner = activeBannersToRender[currentIndex] || fallbackBanners[0];
+  const currentBanner = activeBannersToRender[currentIndex] || activeBannersToRender[0];
 
   // Mobile touch handlers
   const handleTouchStart = (e: React.TouchEvent) => {

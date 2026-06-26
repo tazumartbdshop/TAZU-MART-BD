@@ -302,7 +302,7 @@ const mapDbToProduct = (row: any): Product => {
 
 export const useProductStore = create<ProductState>((set, get) => ({
   products: [],
-  isLoading: false,
+  isLoading: true,
   autoRankTrending: () => {
     const products = get().products;
     const sorted = [...products].sort((a, b) => (b.reviews || 0) * (b.rating || 0) - (a.reviews || 0) * (a.rating || 0));

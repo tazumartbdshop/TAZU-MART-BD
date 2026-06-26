@@ -6,6 +6,7 @@ import { useProductStore, generateKeywords } from '../../store/useProductStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { toast } from 'react-hot-toast';
 import { uploadImage } from '../../lib/imageUtils';
+import { AutoExpandingRichTextEditor, AutoExpandingTextarea } from '../../components/admin/AutoExpandingRichTextEditor';
 
 function AdminProductList() {
   const navigate = useNavigate();
@@ -38,39 +39,6 @@ function AdminProductList() {
           {toastMessage}
         </div>
       )}
-
-      {/* Top Header Section */}
-      <div className="bg-neutral-900 border border-neutral-800 p-4 relative overflow-hidden group mb-4">
-        <div className="absolute right-0 top-0 p-4 opacity-5 pointer-events-none">
-          <Database className="w-16 h-16 text-white" />
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-6 relative z-10">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Database className="w-3.5 h-3.5 text-orange-500" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Live Supabase Table Inspector</span>
-            </div>
-            <div className="flex items-center gap-2 bg-neutral-950 border border-neutral-850 px-3 py-1.5 font-mono text-[11px] text-green-400">
-              <span className="text-neutral-600">TABLE:</span>
-              products
-            </div>
-          </div>
-
-          <div className="flex gap-8">
-            <div className="space-y-0.5">
-              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Entry Count</p>
-              <p className="text-sm font-black text-white">{products.length}</p>
-            </div>
-            <div className="space-y-0.5">
-              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">DB Sync Status</p>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs font-black text-white uppercase tracking-wider">Cloud Live</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-8 py-2">
         <div className="flex items-center gap-4">
@@ -1043,21 +1011,18 @@ function AdminProductAdd() {
                  <div className="space-y-6">
                     <div className="space-y-1.5">
                        <label className="text-[10px] font-black text-black uppercase tracking-widest">Short Description</label>
-                       <input 
+                       <AutoExpandingTextarea 
                           name="short_description" 
-                          type="text" 
+                          defaultValue={(editingProduct as any)?.short_description || ''}
                           placeholder="ENTER BRIEF PRODUCT TAGLINE..." 
-                          className="w-full px-4 py-3.5 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black text-xs font-bold" 
                        />
                     </div>
                     <div className="space-y-1.5">
                        <label className="text-[10px] font-black text-black uppercase tracking-widest">Long Description</label>
-                       <textarea 
+                       <AutoExpandingRichTextEditor 
                           name="long_description" 
-                          rows={6} 
                           defaultValue={editingProduct?.description || ''}
                           placeholder="ENTER COMPLETE CONVENTIONAL DESCRIPTION DETAILS..." 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-medium text-sm resize-none min-h-[160px]"
                        />
                     </div>
                  </div>

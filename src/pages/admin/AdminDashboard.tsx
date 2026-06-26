@@ -85,6 +85,7 @@ import { useCustomerStore } from '../../store/useCustomerStore';
 import { useSearchStore } from '../../store/useSearchStore';
 import { useLeadStore } from '../../store/useLeadStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { useReviewStore } from '../../store/useReviewStore';
 import { defaultNavItems } from '../../lib/adminMenus';
 import { useMenuSortStore } from '../../store/useMenuSortStore';
 import { Database, PlusCircle, FolderPlus, FilePlus, UserPlus, FileCode, Edit, Loader2 } from 'lucide-react';
@@ -113,26 +114,18 @@ import { useProductStore } from '../../store/useProductStore';
 import { useBannerStore } from '../../store/useBannerStore';
 import MainHeroCarousel from '../../components/home/MainHeroCarousel';
 
-const salesData = [
-  { name: 'Jan', revenue: 4000, orders: 240 },
-  { name: 'Feb', revenue: 3000, orders: 139 },
-  { name: 'Mar', revenue: 5000, orders: 380 },
-  { name: 'Apr', revenue: 4500, orders: 290 },
-  { name: 'May', revenue: 6000, orders: 480 },
-  { name: 'Jun', revenue: 5500, orders: 380 },
-];
-
-const RevenueChartTooltip = ({ active, payload, label }: any) => {
+const RevenueChartTooltip = ({ active, payload, label, salesData }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
-    const index = salesData.findIndex((item) => item.name === label);
+    const currentSalesData = salesData || [];
+    const index = currentSalesData.findIndex((item: any) => item.name === label);
     let growthText = 'N/A';
     let isPositive = true;
 
     if (index > 0) {
-      const prevRevenue = salesData[index - 1].revenue;
+      const prevRevenue = currentSalesData[index - 1].revenue;
       const currentRevenue = data.revenue;
-      const growth = ((currentRevenue - prevRevenue) / prevRevenue) * 100;
+      const growth = prevRevenue > 0 ? ((currentRevenue - prevRevenue) / prevRevenue) * 100 : 0;
       isPositive = growth >= 0;
       growthText = `${isPositive ? '+' : ''}${growth.toFixed(1)}%`;
     } else {
@@ -142,12 +135,12 @@ const RevenueChartTooltip = ({ active, payload, label }: any) => {
     return (
       <div className="bg-white border border-zinc-200 p-4 shadow-xl rounded-none text-left min-w-[170px] animate-fade-in select-none">
         <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest mb-2 font-mono">
-          {label} 2025
+          {label}
         </p>
         <div className="space-y-1.5 font-sans">
           <div className="flex justify-between items-center gap-6">
             <span className="text-[10px] text-zinc-500 font-black uppercase tracking-wider">Revenue</span>
-            <span className="text-xs font-black text-black">৳{(data.revenue * 10).toLocaleString()}</span>
+            <span className="text-xs font-black text-black">৳{Math.round(data.revenue || 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between items-center gap-6">
             <span className="text-[10px] text-zinc-500 font-black uppercase tracking-wider">Growth</span>
@@ -669,55 +662,13 @@ function KPICard({ label, value, trend, icon: Icon, borderClass, themeColor }: {
   );
 }
 
-const COLORS = ['#18181b', '#0ea5e9', '#a855f7', '#f43f5e'];
-const doughnutData = [
-  { name: 'Delivered', value: 480, color: '#18181b' },
-  { name: 'Processing', value: 240, color: '#0ea5e9' },
-  { name: 'Pending', value: 180, color: '#a855f7' },
-  { name: 'Cancelled', value: 120, color: '#f43f5e' },
-];
-
 function Overview() {
-  const { autoRankTrending, autoRankBestSellers } = useProductStore();
+  const { products, autoRankTrending, autoRankBestSellers } = useProductStore();
   const [rankingStatus, setRankingStatus] = useState<string | null>(null);
   const { banners: storeBanners } = useBannerStore();
-  const { user: authUser } = useAuthStore();
-  const { 
-    folders, 
-    notes, 
-    teamMembers, 
-    isLoading, 
-    subscribe,
-    addFolder,
-    addFile,
-    addNote,
-    addTeamMember,
-    updateFolder,
-    updateFile,
-    updateNote,
-    updateTeamMember,
-    deleteItem
-  } = useWorkspaceStore();
-  
-  const [activeModal, setActiveModal] = useState<'folder' | 'file' | 'note' | 'member' | 'delete' | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'folders' | 'notes' | 'teamMembers'; name: string } | null>(null);
-  const [editingItem, setEditingItem] = useState<{ id: string; type: 'folder' | 'file' | 'note' | 'member' } | null>(null);
-
-  // Form states
-  const [folderName, setFolderName] = useState('');
-  const [fileName, setFileName] = useState('');
-  const [noteContent, setNoteContent] = useState('');
-  const [memberName, setMemberName] = useState('');
-  const [memberEmail, setMemberEmail] = useState('');
-  const [memberRole, setMemberRole] = useState('Developer');
-
-  const activeUid = authUser?.id;
-
-  useEffect(() => {
-    if (!activeUid) return;
-    const unsub = subscribe(activeUid);
-    return () => unsub();
-  }, [activeUid]);
+  const { orders } = useOrderStore();
+  const { customers } = useCustomerStore();
+  const { reviews } = useReviewStore();
 
   const handleAutoRank = async (type: 'trending' | 'best') => {
     setRankingStatus(type === 'trending' ? 'Ranking Trending...' : 'Ranking Best Sellers...');
@@ -728,9 +679,210 @@ function Overview() {
     setTimeout(() => setRankingStatus(null), 3000);
   };
 
-  const activeBanners = storeBanners.filter(b => b.status === 'active' && (b.image || b.bannerType === 'designed'));
-  
+  const activeBanners = storeBanners.filter(b => b.status === 'active' && b.image && b.image.trim() !== '');
   const displayBanners = activeBanners;
+
+  // Dynamic Month Calculations (Ending at current month)
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const today = new Date();
+  const last6Months = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    last6Months.push({
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      name: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
+      shortName: monthNames[d.getMonth()],
+      revenue: 0,
+      orders: 0,
+      registrations: 0
+    });
+  }
+
+  // Populate dynamic month data
+  orders.forEach(order => {
+    const orderDate = new Date(order.date);
+    const orderYear = orderDate.getFullYear();
+    const orderMonth = orderDate.getMonth();
+    const isRevenueOrder = order.status === 'Delivered' || order.paymentStatus === 'Paid';
+    const orderTotal = Number(order.total) || 0;
+
+    const match = last6Months.find(m => m.year === orderYear && m.month === orderMonth);
+    if (match) {
+      if (isRevenueOrder) {
+        match.revenue += orderTotal;
+      }
+      match.orders += 1;
+    }
+  });
+
+  customers.forEach(cust => {
+    const regDate = typeof cust.createdAt === 'number' ? new Date(cust.createdAt) : new Date(cust.createdAt || Date.now());
+    const regYear = regDate.getFullYear();
+    const regMonth = regDate.getMonth();
+
+    const match = last6Months.find(m => m.year === regYear && m.month === regMonth);
+    if (match) {
+      match.registrations += 1;
+    }
+  });
+
+  const chartDisplayData = last6Months;
+
+  // Monthly growth helper
+  const getGrowthPercentage = (currentVal: number, prevVal: number): string => {
+    if (prevVal === 0) {
+      return currentVal > 0 ? '+100.0%' : '+0.0%';
+    }
+    const growth = ((currentVal - prevVal) / prevVal) * 100;
+    return `${growth >= 0 ? '+' : ''}${growth.toFixed(1)}%`;
+  };
+
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+
+  const prevDate = new Date(currentYear, currentMonth - 1, 1);
+  const prevYear = prevDate.getFullYear();
+  const prevMonth = prevDate.getMonth();
+
+  const isCurrentMonth = (dateVal: string | number) => {
+    const d = new Date(dateVal);
+    return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+  };
+
+  const isPreviousMonth = (dateVal: string | number) => {
+    const d = new Date(dateVal);
+    return d.getFullYear() === prevYear && d.getMonth() === prevMonth;
+  };
+
+  // Enterprise Insights (KPI Cards with Dynamic Growth)
+  // 1. Total Sales (Delivered orders total)
+  const totalSalesVal = orders
+    .filter(o => o.status === 'Delivered')
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const curSales = orders
+    .filter(o => o.status === 'Delivered' && isCurrentMonth(o.date))
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const prevSales = orders
+    .filter(o => o.status === 'Delivered' && isPreviousMonth(o.date))
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const salesGrowth = getGrowthPercentage(curSales, prevSales);
+
+  // 2. Total Orders
+  const totalOrdersVal = orders.length;
+  const curOrders = orders.filter(o => isCurrentMonth(o.date)).length;
+  const prevOrders = orders.filter(o => isPreviousMonth(o.date)).length;
+  const ordersGrowth = getGrowthPercentage(curOrders, prevOrders);
+
+  // 3. Total Customers
+  const totalCustomersVal = customers.length;
+  const curCustomers = customers.filter(c => isCurrentMonth(c.createdAt)).length;
+  const prevCustomers = customers.filter(c => isPreviousMonth(c.createdAt)).length;
+  const customersGrowth = getGrowthPercentage(curCustomers, prevCustomers);
+
+  // 4. Total Revenue (Delivered or Paid orders total)
+  const totalRevenueVal = orders
+    .filter(o => o.status === 'Delivered' || o.paymentStatus === 'Paid')
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const curRevenue = orders
+    .filter(o => (o.status === 'Delivered' || o.paymentStatus === 'Paid') && isCurrentMonth(o.date))
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const prevRevenue = orders
+    .filter(o => (o.status === 'Delivered' || o.paymentStatus === 'Paid') && isPreviousMonth(o.date))
+    .reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const revenueGrowth = getGrowthPercentage(curRevenue, prevRevenue);
+
+  // 5. Total Reviews
+  const totalReviewsVal = reviews.length;
+  const curReviews = reviews.filter(r => isCurrentMonth(r.createdAt)).length;
+  const prevReviews = reviews.filter(r => isPreviousMonth(r.createdAt)).length;
+  const reviewsGrowth = getGrowthPercentage(curReviews, prevReviews);
+
+  // Order status distribution
+  const deliveredVal = orders.filter(o => o.status === 'Delivered').length;
+  const processingVal = orders.filter(o => ['Processing', 'Confirmed', 'Packaging', 'Shipping'].includes(o.status)).length;
+  const pendingVal = orders.filter(o => ['Pending', 'Placed'].includes(o.status)).length;
+  const cancelledVal = orders.filter(o => ['Cancelled', 'Returned'].includes(o.status)).length;
+
+  const doughnutData = [
+    { name: 'Delivered', value: deliveredVal, color: deliveredVal === 0 ? '#d4d4d8' : '#18181b' },
+    { name: 'Processing', value: processingVal, color: processingVal === 0 ? '#d4d4d8' : '#0ea5e9' },
+    { name: 'Pending', value: pendingVal, color: pendingVal === 0 ? '#d4d4d8' : '#a855f7' },
+    { name: 'Cancelled', value: cancelledVal, color: cancelledVal === 0 ? '#d4d4d8' : '#f43f5e' },
+  ];
+  const COLORS = doughnutData.map(item => item.color);
+  const totalDistribution = deliveredVal + processingVal + pendingVal + cancelledVal;
+
+  // Marketplace Trends (Top Selling Products calculation)
+  const productStatsMap: { [id: string]: { id: string; name: string; category: string; image: string; revenue: number; unitsSold: number; profit: number } } = {};
+
+  orders.forEach(order => {
+    if (['Cancelled', 'Returned'].includes(order.status)) return;
+    order.items?.forEach(item => {
+      const pId = item.productId;
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.price) || 0;
+      const rev = price * qty;
+
+      const matchedProduct = products.find(p => p.id === pId);
+      const buyingPrice = matchedProduct?.buyingPrice || price * 0.7;
+      const profit = (price - buyingPrice) * qty;
+
+      if (!productStatsMap[pId]) {
+        productStatsMap[pId] = {
+          id: pId,
+          name: item.name,
+          category: matchedProduct?.category || 'General',
+          image: matchedProduct?.image || item.image || '',
+          revenue: 0,
+          unitsSold: 0,
+          profit: 0
+        };
+      }
+      productStatsMap[pId].revenue += rev;
+      productStatsMap[pId].unitsSold += qty;
+      productStatsMap[pId].profit += profit;
+    });
+  });
+
+  const calculatedTrends = Object.values(productStatsMap)
+    .sort((a, b) => b.unitsSold - a.unitsSold);
+
+  const finalTrends = [...calculatedTrends];
+  if (finalTrends.length < 5) {
+    products.forEach(p => {
+      if (finalTrends.length >= 5) return;
+      if (!productStatsMap[p.id]) {
+        finalTrends.push({
+          id: p.id,
+          name: p.name,
+          category: p.category || 'General',
+          image: p.image || '',
+          revenue: 0,
+          unitsSold: 0,
+          profit: 0
+        });
+      }
+    });
+  }
+  const displayTrends = finalTrends.slice(0, 5);
+
+  // Recent Logistics Feed
+  const displayRecentOrders = [...orders]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+
+  const currentMonthData = chartDisplayData[chartDisplayData.length - 1] || { name: 'Month', revenue: 0, orders: 0 };
+  const previousMonthData = chartDisplayData[chartDisplayData.length - 2] || { name: 'Month', revenue: 0, orders: 0 };
+  const revenueGrowthValue = currentMonthData.revenue - previousMonthData.revenue;
+  const isRevenueGrowthPositive = revenueGrowthValue >= 0;
+  const activeColor = isRevenueGrowthPositive ? '#22C55E' : '#EF4444';
+  const growthPercentage = previousMonthData.revenue > 0 
+    ? ((revenueGrowthValue / previousMonthData.revenue) * 100).toFixed(1) 
+    : (revenueGrowthValue > 0 ? '100.0' : '0.0');
+
+  const totalAccumulatedRevenue = chartDisplayData.reduce((acc, curr) => acc + curr.revenue, 0);
 
   return (
     <>
@@ -741,15 +893,15 @@ function Overview() {
         </div>
         <div className="flex gap-4">
            {rankingStatus && (
-             <span className="text-[10px] font-black text-purple-600 bg-purple-50 px-4 py-2 border border-purple-100 uppercase tracking-widest animate-pulse flex items-center">
-               {rankingStatus}
-             </span>
+              <span className="text-[10px] font-black text-purple-600 bg-purple-50 px-4 py-2 border border-purple-100 uppercase tracking-widest animate-pulse flex items-center">
+                {rankingStatus}
+              </span>
            )}
            <div className="flex bg-white border border-[#EEEEEE] rounded-none p-1 shadow-sm">
              {['Weekly', 'Monthly', 'Yearly'].map((period, i) => (
-               <button key={period} className={`px-4 py-1.5 text-sm font-semibold rounded-none transition-colors ${i === 1 ? 'bg-[#000000] text-white' : 'text-[#666666] hover:bg-gray-50'}`}>
-                 {period}
-               </button>
+                <button key={period} className={`px-4 py-1.5 text-sm font-semibold rounded-none transition-colors ${i === 1 ? 'bg-[#000000] text-white' : 'text-[#666666] hover:bg-gray-50'}`}>
+                  {period}
+                </button>
              ))}
            </div>
         </div>
@@ -766,83 +918,66 @@ function Overview() {
       <div className="space-y-6 lg:space-y-10 mb-10">
         {/* Sales Overview */}
         <div className="bg-white p-6 lg:p-8 rounded-none border border-neutral-200 shadow-sm relative overflow-hidden group">
-          {(() => {
-            const currentMonthData = salesData[salesData.length - 1];
-            const previousMonthData = salesData[salesData.length - 2];
-            const revenueGrowthValue = (currentMonthData.revenue - previousMonthData.revenue) * 10;
-            const isRevenueGrowthPositive = revenueGrowthValue >= 0;
-            const activeColor = isRevenueGrowthPositive ? '#22C55E' : '#EF4444';
-            const growthPercentage = ((revenueGrowthValue / (previousMonthData.revenue * 10)) * 100).toFixed(1);
-            const chartDisplayData = salesData.map(item => ({
-              ...item,
-              displayRevenue: item.revenue * 10
-            }));
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-6 pb-6 border-b border-zinc-100 relative z-10">
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm font-sans font-black text-[#000000] uppercase tracking-widest">Marketplace Revenue</h3>
+                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border rounded-none ${
+                  isRevenueGrowthPositive 
+                    ? 'text-green-600 bg-green-50 border-green-200' 
+                    : 'text-red-600 bg-red-50 border-red-200'
+                }`}>
+                  {isRevenueGrowthPositive ? '▲ Uptrend' : '▼ Downtrend'}
+                </span>
+              </div>
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Real-time Transactional Flow</p>
+            </div>
             
-            return (
-              <>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-6 pb-6 border-b border-zinc-100 relative z-10">
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-sm font-sans font-black text-[#000000] uppercase tracking-widest">Marketplace Revenue</h3>
-                      <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border rounded-none ${
-                        isRevenueGrowthPositive 
-                          ? 'text-green-600 bg-green-50 border-green-200' 
-                          : 'text-red-600 bg-red-50 border-red-200'
-                      }`}>
-                        {isRevenueGrowthPositive ? '▲ Uptrend' : '▼ Downtrend'}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Real-time Transactional Flow</p>
-                  </div>
-                  
-                  <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-                    <div>
-                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest block mb-0.5">Total Revenue</span>
-                      <div className="text-base font-black text-black tracking-tight">
-                        ৳{(salesData.reduce((acc, curr) => acc + curr.revenue, 0) * 10).toLocaleString()}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest block mb-0.5">June 2025</span>
-                      <div className="text-base font-black text-black tracking-tight">
-                        ৳{(currentMonthData.revenue * 10).toLocaleString()}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest block mb-0.5">Monthly Growth</span>
-                      <div className={`text-xs font-black flex items-center gap-1 ${isRevenueGrowthPositive ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
-                        <span>{isRevenueGrowthPositive ? '▲' : '▼'}</span>
-                        <span>{isRevenueGrowthPositive ? '+' : ''}{growthPercentage}%</span>
-                      </div>
-                    </div>
-                  </div>
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+              <div>
+                <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest block mb-0.5">Total Revenue</span>
+                <div className="text-base font-black text-black tracking-tight">
+                  ৳{totalAccumulatedRevenue.toLocaleString()}
                 </div>
+              </div>
+              <div>
+                <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest block mb-0.5">Active Month ({currentMonthData.name})</span>
+                <div className="text-base font-black text-black tracking-tight">
+                  ৳{currentMonthData.revenue.toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <span className="text-[8px] text-zinc-400 font-black uppercase tracking-widest block mb-0.5">Monthly Growth</span>
+                <div className={`text-xs font-black flex items-center gap-1 ${isRevenueGrowthPositive ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
+                  <span>{isRevenueGrowthPositive ? '▲' : '▼'}</span>
+                  <span>{isRevenueGrowthPositive ? '+' : ''}{growthPercentage}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-                <div className="h-[280px] sm:h-[350px] md:h-[420px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartDisplayData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorRevenueOverview" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={activeColor} stopOpacity={0.12}/>
-                          <stop offset="95%" stopColor={activeColor} stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f3f4f6" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 9, fontWeight: 700}} dy={15} />
-                      <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 9, fontWeight: 700}} tickFormatter={(value) => `৳${value.toLocaleString()}`} dx={-5} />
-                      <RechartsTooltip content={<RevenueChartTooltip />} />
-                      <Area type="monotone" dataKey="displayRevenue" stroke={activeColor} strokeWidth={3} fillOpacity={1} fill="url(#colorRevenueOverview)" animationDuration={2000} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </>
-            );
-          })()}
+          <div className="h-[280px] sm:h-[350px] md:h-[420px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartDisplayData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorRevenueOverview" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={activeColor} stopOpacity={0.12}/>
+                    <stop offset="95%" stopColor={activeColor} stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f3f4f6" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 9, fontWeight: 700}} dy={15} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 9, fontWeight: 700}} tickFormatter={(value) => `৳${value.toLocaleString()}`} dx={-5} />
+                <RechartsTooltip content={<RevenueChartTooltip salesData={chartDisplayData} />} />
+                <Area type="monotone" dataKey="revenue" stroke={activeColor} strokeWidth={3} fillOpacity={1} fill="url(#colorRevenueOverview)" animationDuration={2000} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Order Statistics Chart & Stats side by side or stacked */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
-          {/* Order Statistics */}
+          {/* Order Distribution */}
           <div className="bg-white p-6 lg:p-8 rounded-none border border-neutral-100 shadow-[0_4px_25px_rgba(0,0,0,0.02)] relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-blue-600"></div>
             <div className="mb-8">
@@ -878,7 +1013,7 @@ function Overview() {
                 {/* Center text for donut */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Total</span>
-                  <span className="text-2xl font-black text-neutral-900">1,020</span>
+                  <span className="text-2xl font-black text-neutral-900">{totalDistribution.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -902,14 +1037,14 @@ function Overview() {
             <div className="mb-10 flex justify-between items-start">
               <div>
                 <h3 className="text-lg font-sans font-black text-[#0a0a0a] uppercase tracking-tighter">Acquisition Velocity</h3>
-                <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-[0.2em]">New User Projections</p>
+                <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-[0.2em]">New Customers Registered</p>
               </div>
               <Activity className="w-5 h-5 text-cyan-400 opacity-50" />
             </div>
             
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={salesData} barSize={32}>
+                <BarChart data={chartDisplayData} barSize={32}>
                   <defs>
                     <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#0891b2" stopOpacity={1}/>
@@ -924,7 +1059,7 @@ function Overview() {
                     contentStyle={{ borderRadius: '0px', border: '1px solid #f0f0f0', boxShadow: '0 8px 25px rgba(0,0,0,0.06)' }}
                     itemStyle={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase' }}
                   />
-                  <Bar dataKey="orders" fill="url(#barGradient)" radius={[4, 4, 0, 0]} animationDuration={1500} />
+                  <Bar dataKey="registrations" fill="url(#barGradient)" radius={[4, 4, 0, 0]} animationDuration={1500} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -935,320 +1070,20 @@ function Overview() {
       {/* KPI Cards Grid */}
       <h3 className="text-lg font-sans font-black text-[#000000] mb-4 uppercase tracking-tighter">Enterprise Insights</h3>
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-8">
-         <KPICard label="Total Sales" value="BDT 854,200" trend="+18.2%" icon={DollarSign} borderClass="border-l-purple-600" themeColor="#9333ea" />
-         <KPICard label="Total Orders" value="1,254" trend="+12.4%" icon={ShoppingBag} borderClass="border-l-blue-600" themeColor="#2563eb" />
-         <KPICard label="Total Customers" value="842" trend="+8.5%" icon={Users} borderClass="border-l-cyan-600" themeColor="#0891b2" />
-         <KPICard label="Total Revenue" value="BDT 1,240K" trend="+15.3%" icon={Activity} borderClass="border-l-emerald-600" themeColor="#10b981" />
-         <KPICard label="Total Reviews" value="3,842" trend="+9.8%" icon={Star} borderClass="border-l-rose-600" themeColor="#e11d48" />
+         <KPICard label="Total Sales" value={`BDT ${totalSalesVal.toLocaleString()}`} trend={salesGrowth} icon={DollarSign} borderClass="border-l-purple-600" themeColor="#9333ea" />
+         <KPICard label="Total Orders" value={totalOrdersVal.toLocaleString()} trend={ordersGrowth} icon={ShoppingBag} borderClass="border-l-blue-600" themeColor="#2563eb" />
+         <KPICard label="Total Customers" value={totalCustomersVal.toLocaleString()} trend={customersGrowth} icon={Users} borderClass="border-l-cyan-600" themeColor="#0891b2" />
+         <KPICard label="Total Revenue" value={`BDT ${totalRevenueVal.toLocaleString()}`} trend={revenueGrowth} icon={Activity} borderClass="border-l-emerald-600" themeColor="#10b981" />
+         <KPICard label="Total Reviews" value={totalReviewsVal.toLocaleString()} trend={reviewsGrowth} icon={Star} borderClass="border-l-rose-600" themeColor="#e11d48" />
       </div>
-
-      {/* Cloud Workspace Real-time Sections */}
-      <h3 className="text-lg font-sans font-black text-[#000000] mb-4 uppercase tracking-tighter flex items-center gap-2">
-        <Database className="w-5 h-5 text-orange-500" /> Fully Synchronized Cloud Workspace
-      </h3>
-      
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-10">
-        {/* My Files Section */}
-        <div className="bg-white border border-neutral-200 rounded-none overflow-hidden flex flex-col shadow-sm">
-          <div className="p-4 bg-neutral-950 text-white flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Folder className="w-4 h-4 text-orange-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest">My Files</span>
-              <span className="bg-orange-500 text-[9px] px-1.5 py-0.5 rounded-full text-white font-bold">{folders.filter(f => f.type === 'file').length}</span>
-            </div>
-            <div className="flex gap-2">
-               <button onClick={() => setActiveModal('folder')} className="text-[8px] bg-white/10 hover:bg-white/20 px-2 py-1 uppercase font-black tracking-widest border border-white/10">New Folder</button>
-               <button onClick={() => setActiveModal('file')} className="text-[8px] bg-orange-500 hover:bg-orange-600 px-2 py-1 uppercase font-black tracking-widest text-white transition-colors">Add File</button>
-            </div>
-          </div>
-          <div className="flex-1 p-4 bg-neutral-50/30 overflow-y-auto max-h-[400px]">
-             {isLoading.folders ? (
-               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                 <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
-                 <span className="text-[9px] font-black uppercase text-neutral-400">Syncing...</span>
-               </div>
-             ) : folders.length === 0 ? (
-               <div className="text-center py-20 opacity-40">
-                 <HardDrive className="w-10 h-10 mx-auto mb-2 text-neutral-300" />
-                 <p className="text-[10px] font-black uppercase tracking-widest">No Storage Found</p>
-               </div>
-             ) : (
-               <div className="space-y-3">
-                 {folders.map(item => (
-                   <div key={item.id} className="bg-white border border-neutral-100 p-3 flex items-center justify-between hover:border-orange-200 transition-all group">
-                     <div className="flex items-center gap-3">
-                       {item.type === 'folder' ? (
-                         <div className="w-8 h-8 bg-orange-50 text-orange-500 flex items-center justify-center border border-orange-100"><Folder className="w-4 h-4 fill-current" /></div>
-                       ) : (
-                         <div className="w-8 h-8 bg-neutral-100 text-neutral-500 flex items-center justify-center border border-neutral-200"><FileCode className="w-4 h-4" /></div>
-                       )}
-                       <div>
-                         <p className="text-[11px] font-black text-neutral-900 uppercase truncate max-w-[120px]">{item.name}</p>
-                         <p className="text-[8px] font-bold text-neutral-400 uppercase tracking-tighter">{item.type} {item.size ? `• ${item.size}` : ''}</p>
-                       </div>
-                     </div>
-                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                       <button onClick={() => { setEditingItem({ id: item.id, type: item.type }); setFolderName(item.name); setFileName(item.name); setActiveModal(item.type); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-black transition-all"><Edit className="w-3 h-3" /></button>
-                       <button onClick={() => { setDeleteTarget({ id: item.id, type: 'folders', name: item.name }); setActiveModal('delete'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-red-500 transition-all"><Trash2 className="w-3 h-3" /></button>
-                     </div>
-                   </div>
-                 ))}
-               </div>
-             )}
-          </div>
-        </div>
-
-        {/* My Notes Section */}
-        <div className="bg-white border border-neutral-200 rounded-none overflow-hidden flex flex-col shadow-sm">
-          <div className="p-4 bg-neutral-950 text-white flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-purple-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest">My Notes</span>
-              <span className="bg-purple-500 text-[9px] px-1.5 py-0.5 rounded-full text-white font-bold">{notes.length}</span>
-            </div>
-            <button onClick={() => setActiveModal('note')} className="text-[8px] bg-purple-500 hover:bg-purple-600 px-2 py-1 uppercase font-black tracking-widest text-white transition-colors">New Note</button>
-          </div>
-          <div className="flex-1 p-4 bg-neutral-50/30 overflow-y-auto max-h-[400px]">
-             {isLoading.notes ? (
-               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                 <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
-                 <span className="text-[9px] font-black uppercase text-neutral-400">Syncing...</span>
-               </div>
-             ) : notes.length === 0 ? (
-               <div className="text-center py-20 opacity-40">
-                 <FileText className="w-10 h-10 mx-auto mb-2 text-neutral-300" />
-                 <p className="text-[10px] font-black uppercase tracking-widest">No Intelligence Logged</p>
-               </div>
-             ) : (
-               <div className="space-y-3">
-                 {notes.map(note => (
-                   <div key={note.id} className="bg-white border border-neutral-100 p-4 hover:border-purple-200 transition-all group relative">
-                     <h4 className="text-[12px] font-black text-neutral-900 border-b border-neutral-100 pb-2 mb-2 uppercase italic tracking-tight">{note.title}</h4>
-                     <p className="text-[10px] text-neutral-500 line-clamp-2 leading-relaxed">{note.content}</p>
-                     <div className="mt-3 flex justify-between items-center">
-                        <span className="text-[8px] font-bold text-neutral-400 uppercase">{new Date(note.createdAt).toLocaleDateString()}</span>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                          <button onClick={() => { setEditingItem({ id: note.id, type: 'note' }); setNoteContent(note.content || ''); setActiveModal('note'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-black transition-all"><Edit className="w-3 h-3" /></button>
-                          <button onClick={() => { setDeleteTarget({ id: note.id, type: 'notes', name: 'Note' }); setActiveModal('delete'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-red-500 transition-all"><Trash2 className="w-3 h-3" /></button>
-                        </div>
-                     </div>
-                   </div>
-                 ))}
-               </div>
-             )}
-          </div>
-        </div>
-
-        {/* Team Members Section */}
-        <div className="bg-white border border-neutral-200 rounded-none overflow-hidden flex flex-col shadow-sm">
-          <div className="p-4 bg-neutral-950 text-white flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-emerald-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Team Personnel</span>
-              <span className="bg-emerald-500 text-[9px] px-1.5 py-0.5 rounded-full text-white font-bold">{teamMembers.length}</span>
-            </div>
-            <button onClick={() => setActiveModal('member')} className="text-[8px] bg-emerald-500 hover:bg-emerald-600 px-2 py-1 uppercase font-black tracking-widest text-white transition-colors">Add Member</button>
-          </div>
-          <div className="flex-1 p-4 bg-neutral-50/30 overflow-y-auto max-h-[400px]">
-             {isLoading.teamMembers ? (
-               <div className="flex flex-col items-center justify-center py-20 gap-3">
-                 <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
-                 <span className="text-[9px] font-black uppercase text-neutral-400">Syncing...</span>
-               </div>
-             ) : teamMembers.length === 0 ? (
-               <div className="text-center py-20 opacity-40">
-                 <Users className="w-10 h-10 mx-auto mb-2 text-neutral-300" />
-                 <p className="text-[10px] font-black uppercase tracking-widest">No Personnel Indexed</p>
-               </div>
-             ) : (
-               <div className="space-y-2">
-                 {teamMembers.map(member => (
-                   <div key={member.id} className="bg-white border border-neutral-100 p-3 flex items-center justify-between hover:border-emerald-200 transition-all group">
-                     <div className="flex items-center gap-3">
-                       <div className="w-9 h-9 bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 font-black text-xs">
-                          {member.name.charAt(0).toUpperCase()}
-                       </div>
-                       <div>
-                         <p className="text-[11px] font-black text-neutral-900 uppercase truncate max-w-[120px]">{member.name}</p>
-                         <p className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">{member.role}</p>
-                       </div>
-                     </div>
-                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                       <button onClick={() => { setEditingItem({ id: member.id, type: 'member' }); setMemberName(member.name); setMemberEmail(member.email); setMemberRole(member.role || 'Developer'); setActiveModal('member'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-black transition-all"><Edit className="w-3 h-3" /></button>
-                       <button onClick={() => { setDeleteTarget({ id: member.id, type: 'teamMembers', name: member.name }); setActiveModal('delete'); }} className="p-1.5 hover:bg-neutral-100 text-neutral-400 hover:text-red-500 transition-all"><Trash2 className="w-3 h-3" /></button>
-                     </div>
-                   </div>
-                 ))}
-               </div>
-             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Modals for Workspace */}
-      {activeModal === 'folder' && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white border w-full max-w-sm rounded-none p-6 shadow-2xl">
-            <h3 className="text-sm font-black uppercase tracking-widest border-b pb-4 mb-6">{editingItem ? 'Edit Folder' : 'New Folder'}</h3>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!folderName.trim()) return toast.error('Name required');
-              if (!activeUid) return toast.error('Auth required');
-              try {
-                if (editingItem) await updateFolder(activeUid, editingItem.id, folderName.trim());
-                else await addFolder(activeUid, folderName.trim());
-                toast.success('Saved'); setFolderName(''); setEditingItem(null); setActiveModal(null);
-              } catch (err) { toast.error('Error saving'); }
-            }} className="space-y-6">
-              <div>
-                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Folder Identity</label>
-                <input type="text" value={folderName} onChange={e => setFolderName(e.target.value)} placeholder="e.g. Finance Reports" className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none" autoFocus />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setActiveModal(null); setEditingItem(null); setFolderName(''); }} className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-black text-white font-black uppercase text-[10px] tracking-widest">Save Folder</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {activeModal === 'file' && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white border w-full max-w-sm rounded-none p-6 shadow-2xl">
-            <h3 className="text-sm font-black uppercase tracking-widest border-b pb-4 mb-6">{editingItem ? 'Edit File' : 'Add New File'}</h3>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!fileName.trim()) return toast.error('Name required');
-              if (!activeUid) return toast.error('Auth required');
-              try {
-                if (editingItem) await updateFile(activeUid, editingItem.id, fileName.trim());
-                else await addFile(activeUid, fileName.trim());
-                toast.success('Saved'); setFileName(''); setEditingItem(null); setActiveModal(null);
-              } catch (err) { toast.error('Error saving'); }
-            }} className="space-y-5">
-              <div>
-                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">File Attachment Name</label>
-                <input type="text" value={fileName} onChange={e => setFileName(e.target.value)} placeholder="image_01.jpg" className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none" autoFocus />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => { setActiveModal(null); setEditingItem(null); setFileName(''); }} className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-orange-500 text-white font-black uppercase text-[10px] tracking-widest">Commit File</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {activeModal === 'note' && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white border w-full max-w-md rounded-none p-6 shadow-2xl">
-            <h3 className="text-sm font-black uppercase tracking-widest border-b pb-4 mb-6">{editingItem ? 'Edit Protocol' : 'New Intelligence Note'}</h3>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!noteContent.trim()) return toast.error('Content required');
-              if (!activeUid) return toast.error('Auth required');
-              try {
-                if (editingItem) await updateNote(activeUid, editingItem.id, noteContent.trim());
-                else await addNote(activeUid, noteContent.trim());
-                toast.success('Saved'); setNoteContent(''); setEditingItem(null); setActiveModal(null);
-              } catch (err) { toast.error('Error saving'); }
-            }} className="space-y-5">
-              <div>
-                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Internal Body</label>
-                <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} placeholder="Start logging data..." rows={6} className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none resize-none" />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => { setActiveModal(null); setEditingItem(null); setNoteContent(''); }} className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-purple-600 text-white font-black uppercase text-[10px] tracking-widest">Sync Note</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {activeModal === 'member' && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white border w-full max-w-sm rounded-none p-6 shadow-2xl">
-            <h3 className="text-sm font-black uppercase tracking-widest border-b pb-4 mb-6">{editingItem ? 'Modify Member' : 'Provision Personnel'}</h3>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!memberName.trim()) return toast.error('Name required');
-              if (!activeUid) return toast.error('Auth required');
-              try {
-                if (editingItem) await updateTeamMember(activeUid, editingItem.id, memberName.trim(), memberEmail.trim(), memberRole.trim());
-                else await addTeamMember(activeUid, memberName.trim(), memberEmail.trim(), memberRole.trim());
-                toast.success('Member Saved'); setMemberName(''); setMemberEmail(''); setEditingItem(null); setActiveModal(null);
-              } catch (err) { toast.error('Error saving'); }
-            }} className="space-y-4">
-              <div>
-                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Full Legal Name</label>
-                <input type="text" value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="Jane Doe" className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none" autoFocus />
-              </div>
-              <div>
-                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Corporate Email</label>
-                <input type="email" value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="jane@enterprise.com" className="w-full bg-neutral-50 border p-3 text-xs focus:ring-1 focus:ring-black outline-none" />
-              </div>
-              <div>
-                <label className="text-[9px] font-black uppercase text-neutral-400 mb-1 block">Personnel Role</label>
-                <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className="w-full bg-neutral-50 border p-3 text-xs font-black focus:ring-1 focus:ring-black outline-none appearance-none">
-                  {['Developer', 'Manager', 'Product Lead', 'Designer', 'QA Engineer', 'Security Audit'].map(r => (
-                    <option key={r} value={r}>{r.toUpperCase()}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3 pt-6">
-                <button type="button" onClick={() => { setActiveModal(null); setEditingItem(null); setMemberName(''); setMemberEmail(''); }} className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-emerald-600 text-white font-black uppercase text-[10px] tracking-widest">Register Team</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {activeModal === 'delete' && deleteTarget && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-white border w-full max-w-sm rounded-none p-8 text-center shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-red-600" />
-            <div className="w-16 h-16 bg-red-50 text-red-600 rounded-none flex items-center justify-center mx-auto mb-6">
-              <Shield className="w-8 h-8" />
-            </div>
-            <h3 className="text-lg font-black uppercase tracking-tighter text-neutral-900 mb-2">Security Override</h3>
-            <p className="text-xs text-neutral-500 mb-8 font-medium leading-relaxed">
-              Confirm deletion of <span className="font-black text-red-600">"{deleteTarget.name}"</span>.<br />
-              This document will be wiped from the encrypted Firestore node permanently.
-            </p>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => { setActiveModal(null); setDeleteTarget(null); }}
-                className="flex-1 px-4 py-3 bg-neutral-100 text-neutral-600 font-bold uppercase text-[10px] tracking-widest hover:bg-neutral-200 transition-all"
-              >
-                Abort
-              </button>
-              <button 
-                onClick={async () => {
-                  if (!activeUid) return toast.error('Auth required');
-                  try {
-                    await deleteItem(activeUid, deleteTarget.id, deleteTarget.type);
-                    toast.success('Deleted Successfully'); setActiveModal(null); setDeleteTarget(null);
-                  } catch (err) { toast.error('Error deleting'); }
-                }}
-                className="flex-1 px-4 py-3 bg-red-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg shadow-red-600/20 active:scale-95 transition-all"
-              >
-                Wipe Doc
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Tables Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 mb-6">
         {/* Top Selling Products */}
         <div className="bg-white rounded-none border border-neutral-100 overflow-hidden flex flex-col shadow-[0_2px_15px_rgba(0,0,0,0.02)]">
           <div className="p-6 border-b border-neutral-100 flex justify-between items-center shrink-0 bg-[#0a0a0a] text-white">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-               <div className="w-1 h-3 bg-purple-500 rounded-full"></div> Main Marketplace Trends
+            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-2 text-white">
+               <div className="w-1 h-3 bg-purple-500 rounded-full"></div> MAIN MARKETPLACE TRENDS
             </h3>
             <button className="text-[9px] bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 font-black transition-all uppercase tracking-widest active:scale-95">View Trends</button>
           </div>
@@ -1257,25 +1092,31 @@ function Overview() {
               <thead>
                 <tr className="bg-neutral-50/50 text-neutral-400 text-[9px] uppercase tracking-[0.2em] font-black border-b border-neutral-100">
                   <th className="p-5">Catalog Item</th>
-                  <th className="p-5">Value</th>
+                  <th className="p-5">Revenue</th>
+                  <th className="p-5">Profit</th>
                   <th className="p-5 text-right">Volume</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 text-sm">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i} className="hover:bg-neutral-50/50 transition-colors group">
+                {displayTrends.map((trend, idx) => (
+                  <tr key={trend.id || idx} className="hover:bg-neutral-50/50 transition-colors group">
                     <td className="p-5 text-[#000000] font-medium flex items-center gap-4">
                       <div className="w-11 h-11 bg-neutral-100 rounded-none border border-neutral-200 shrink-0 group-hover:border-purple-300 transition-colors relative overflow-hidden">
-                         <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 to-transparent"></div>
+                         {trend.image ? (
+                           <img src={trend.image} alt={trend.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                         ) : (
+                           <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 to-transparent flex items-center justify-center text-[10px] font-black">N/A</div>
+                         )}
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-black truncate text-[12px] uppercase tracking-wide text-neutral-900 group-hover:text-purple-600 transition-colors">Luxury Perfume {i}</span>
-                        <span className="text-[10px] text-neutral-400 font-bold tracking-widest uppercase mt-0.5">Fashion & Beauty</span>
+                        <span className="font-black truncate text-[12px] uppercase tracking-wide text-neutral-900 group-hover:text-purple-600 transition-colors">{trend.name}</span>
+                        <span className="text-[10px] text-neutral-400 font-bold tracking-widest uppercase mt-0.5">{trend.category}</span>
                       </div>
                     </td>
-                    <td className="p-5 text-neutral-900 font-black text-xs">{formatPrice(15000 - i * 1000)}</td>
+                    <td className="p-5 text-neutral-900 font-black text-xs">৳{Math.round(trend.revenue).toLocaleString()}</td>
+                    <td className="p-5 text-green-600 font-black text-xs">৳{Math.round(trend.profit).toLocaleString()}</td>
                     <td className="p-5 text-right">
-                      <span className="bg-neutral-950 text-white px-2.5 py-1 rounded-none font-black text-[9px] whitespace-nowrap uppercase tracking-widest group-hover:bg-purple-600 transition-colors shadow-sm">{120 - i * 10} Units</span>
+                      <span className="bg-neutral-950 text-white px-2.5 py-1 rounded-none font-black text-[9px] whitespace-nowrap uppercase tracking-widest group-hover:bg-purple-600 transition-colors shadow-sm">{trend.unitsSold} Units</span>
                     </td>
                   </tr>
                 ))}
@@ -1287,8 +1128,8 @@ function Overview() {
         {/* Recent Orders */}
         <div className="bg-white rounded-none border border-neutral-100 overflow-hidden flex flex-col shadow-[0_2px_15px_rgba(0,0,0,0.02)]">
           <div className="p-6 border-b border-neutral-100 flex justify-between items-center shrink-0 bg-[#0a0a0a] text-white">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-               <div className="w-1 h-3 bg-cyan-500 rounded-full"></div> Recent Logistics Feed
+            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-2 text-white">
+               <div className="w-1 h-3 bg-cyan-500 rounded-full"></div> RECENT LOGISTICS FEED
             </h3>
             <button className="text-[9px] bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 font-black transition-all uppercase tracking-widest active:scale-95">All Activity</button>
           </div>
@@ -1303,24 +1144,29 @@ function Overview() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100 text-sm text-black">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i} className="hover:bg-neutral-50/50 transition-colors group">
-                    <td className="p-5 text-neutral-900 font-black whitespace-nowrap text-xs group-hover:text-cyan-600 transition-colors">#ORD-0{i}82</td>
-                    <td className="p-5 text-neutral-500 font-bold whitespace-nowrap text-xs">Jane Smith</td>
-                    <td className="p-5 text-neutral-900 font-black whitespace-nowrap text-xs">{formatPrice(12500)}</td>
+                {displayRecentOrders.map((order, idx) => (
+                  <tr key={order.id || idx} className="hover:bg-neutral-50/50 transition-colors group">
+                    <td className="p-5 text-neutral-900 font-black whitespace-nowrap text-xs group-hover:text-cyan-600 transition-colors">{order.orderId || `#ORD-${order.id}`}</td>
+                    <td className="p-5 text-neutral-500 font-bold whitespace-nowrap text-xs">{order.customerName}</td>
+                    <td className="p-5 text-neutral-900 font-black whitespace-nowrap text-xs">৳{Math.round(order.total).toLocaleString()}</td>
                     <td className="p-5 text-right">
                       <span className={`px-2.5 py-1.5 text-[9px] font-black rounded-none border whitespace-nowrap uppercase tracking-widest shadow-sm transition-all ${
-                        i === 1 ? 'bg-purple-600 text-white border-purple-600' :
-                        i === 2 ? 'bg-blue-600 text-white border-blue-600' :
-                        i === 3 ? 'bg-amber-500 text-white border-amber-500' :
-                        i === 4 ? 'bg-rose-500 text-white border-rose-500' :
+                        order.status === 'Delivered' ? 'bg-purple-600 text-white border-purple-600' :
+                        ['Processing', 'Confirmed', 'Packaging', 'Shipping'].includes(order.status) ? 'bg-blue-600 text-white border-blue-600' :
+                        ['Pending', 'Placed'].includes(order.status) ? 'bg-amber-500 text-white border-amber-500' :
+                        ['Cancelled', 'Returned'].includes(order.status) ? 'bg-rose-500 text-white border-rose-500' :
                         'bg-emerald-500 text-white border-emerald-500'
                       }`}>
-                        {i === 1 ? 'Delivered' : i === 2 ? 'Processing' : i === 3 ? 'Pending' : i === 4 ? 'Cancelled' : 'Refunded'}
+                        {order.status}
                       </span>
                     </td>
                   </tr>
                 ))}
+                {displayRecentOrders.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-xs font-bold text-neutral-400 uppercase tracking-widest">No logistics feeds logged yet</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
