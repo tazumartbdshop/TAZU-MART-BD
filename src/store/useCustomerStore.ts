@@ -60,37 +60,7 @@ interface CustomerState {
   subscribe: () => () => void;
 }
 
-export const initialDemoCustomers: Customer[] = [
-  {
-    id: 'CUST-205',
-    name: 'Tasnim Alam',
-    phones: ['+8801314556677'],
-    emails: ['tasnim@example.com'],
-    address: {
-      country: 'Bangladesh',
-      city: 'Dhaka',
-      area: 'Dhanmondi',
-      street: 'House 12, Road 5',
-      division: 'Dhaka',
-      district: 'Dhaka',
-      upazila: 'Dhanmondi',
-      zipCode: '1205'
-    },
-    gender: 'Male',
-    socialLinks: [
-      { platform: 'Facebook', username: 'tasnim.alam' }
-    ],
-    status: 'Active',
-    customerType: 'Regular',
-    totalOrders: 1,
-    totalSpend: 1250,
-    lastLogin: Date.now(),
-    totalLogins: 5,
-    createdAt: new Date('2026-05-01').getTime(),
-    isRead: true,
-    isDemo: true
-  }
-];
+export const initialDemoCustomers: Customer[] = [];
 
 export const useCustomerStore = create<CustomerState>((set, get) => ({
   customers: initialDemoCustomers,

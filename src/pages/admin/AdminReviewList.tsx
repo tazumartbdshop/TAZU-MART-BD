@@ -17,8 +17,12 @@ type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'hidden';
 
 export default function AdminReviewList() {
   const navigate = useNavigate();
-  const { reviews, deleteReview, approveReview, rejectReview, updateReview } = useReviewStore();
+  const { reviews, deleteReview, approveReview, rejectReview, updateReview, fetchReviews, isLoading } = useReviewStore();
   const { products } = useProductStore();
+
+  React.useEffect(() => {
+    fetchReviews();
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');

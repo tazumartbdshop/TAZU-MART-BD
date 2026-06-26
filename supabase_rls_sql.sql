@@ -347,6 +347,39 @@ BEGIN
     CREATE POLICY "Banners draft read" ON public.banners_draft FOR SELECT TO public USING (true);
     DROP POLICY IF EXISTS "Banners draft write" ON public.banners_draft;
     CREATE POLICY "Banners draft write" ON public.banners_draft FOR ALL TO public USING (true) WITH CHECK (true);
+
+    -- Reviews Table
+    CREATE TABLE IF NOT EXISTS public.reviews (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      product_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      customer_name TEXT,
+      rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+      review_text TEXT NOT NULL,
+      status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'hidden')),
+      media_urls TEXT[] DEFAULT '{}',
+      verified BOOLEAN DEFAULT false,
+      is_pinned BOOLEAN DEFAULT false,
+      admin_reply TEXT,
+      rejection_reason TEXT,
+      device_ip TEXT,
+      anonymous BOOLEAN DEFAULT false,
+      phone TEXT,
+      email TEXT,
+      order_id TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Reviews read access" ON public.reviews;
+    CREATE POLICY "Reviews read access" ON public.reviews FOR SELECT TO public USING (
+      status = 'approved' OR is_admin()
+    );
+    DROP POLICY IF EXISTS "Reviews insert access" ON public.reviews;
+    CREATE POLICY "Reviews insert access" ON public.reviews FOR INSERT TO public WITH CHECK (true);
+    DROP POLICY IF EXISTS "Reviews admin access" ON public.reviews;
+    CREATE POLICY "Reviews admin access" ON public.reviews FOR ALL TO public USING (is_admin()) WITH CHECK (is_admin());
 END $$;
 
 -- 4. ENABLE REAL-TIME PUBLICATIONS

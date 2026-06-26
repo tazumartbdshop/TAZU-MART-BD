@@ -17,9 +17,13 @@ export default function ProductReviews() {
   const navigate = useNavigate();
   
   // Dynamic Stores
-  const { reviews, addReview } = useReviewStore();
+  const { reviews, addReview, fetchReviews, isLoading } = useReviewStore();
   const { products } = useProductStore();
   const { user, isAuthenticated } = useAuthStore();
+
+  React.useEffect(() => {
+    fetchReviews();
+  }, []);
   
   const product = products.find(p => String(p.id) === String(id));
 
@@ -394,7 +398,7 @@ export default function ProductReviews() {
           {filteredReviews.length === 0 ? (
             <div className="py-16 flex flex-col items-center justify-center text-center bg-zinc-50 rounded-xl border border-zinc-200/80">
                <MessageSquare className="w-12 h-12 text-zinc-300 mb-4 animate-bounce" />
-               <p className="text-zinc-500 font-bold text-sm tracking-wide">No reviews found matching the filter criteria.</p>
+               <p className="text-zinc-500 font-bold text-sm tracking-wide">No reviews yet.</p>
                <p className="text-xs text-zinc-400 mt-1">Be the first to share your purchase reviews with the community!</p>
             </div>
           ) : (

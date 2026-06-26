@@ -17,9 +17,13 @@ import { toast } from 'react-hot-toast';
 export default function AdminReviewDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { reviews, updateReview, deleteReview } = useReviewStore();
+  const { reviews, updateReview, deleteReview, fetchReviews } = useReviewStore();
   const { products } = useProductStore();
   const { customers } = useCustomerStore();
+
+  useEffect(() => {
+    fetchReviews();
+  }, []);
 
   const review = reviews.find(r => r.reviewId === id);
   const product = products.find(p => String(p.id) === String(review?.productId));
