@@ -68,6 +68,7 @@ interface BannerState {
   duplicateDraftBanner: (banner: Banner) => void;
   removeBanner: (id: string) => void;
   removeDraftBanner: (id: string) => void;
+  deleteBannerPermanently: (id: string) => Promise<void>;
   reorderBanners: (startIndex: number, endIndex: number) => void;
   reorderDraftBanners: (startIndex: number, endIndex: number) => void;
   saveDraftBanners: () => Promise<void>;
@@ -266,6 +267,47 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     if (supabase) {
         supabase.from('banners_draft').delete().eq('id', id).then(({error}) => error && console.warn(error));
         supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
+    }
+  },
+
+  deleteBannerPermanently: async (id) => {
+    const supabase = getSupabase();
+    if (!supabase) {
+      set((state) => ({
+        banners: state.banners.filter((b) => b.id !== id),
+        draftBanners: state.draftBanners.filter((b) => b.id !== id)
+      }));
+      return;
+    }
+
+    const previousBanners = get().banners;
+    const previousDraftBanners = get().draftBanners;
+
+    // Optimistic Update
+    set((state) => ({
+      banners: state.banners.filter((b) => b.id !== id),
+      draftBanners: state.draftBanners.filter((b) => b.id !== id)
+    }));
+
+    try {
+      // Delete from banners table
+      const { error: liveErr } = await supabase.from('banners').delete().eq('id', id);
+      if (liveErr) {
+        throw new Error(liveErr.message || "Failed to delete from banners table");
+      }
+
+      // Delete from banners_draft table
+      const { error: draftErr } = await supabase.from('banners_draft').delete().eq('id', id);
+      if (draftErr) {
+        throw new Error(draftErr.message || "Failed to delete from banners_draft table");
+      }
+    } catch (err) {
+      // Rollback on error
+      set({
+        banners: previousBanners,
+        draftBanners: previousDraftBanners
+      });
+      throw err;
     }
   },
 

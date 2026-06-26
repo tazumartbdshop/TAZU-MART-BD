@@ -23,12 +23,11 @@ export default function BannerListing() {
   const handleDeleteBanner = async (bannerId: string) => {
     if (confirm('Are you sure you want to delete this banner?')) {
       try {
-        useBannerStore.getState().removeBanner(bannerId);
-        useBannerStore.getState().removeDraftBanner(bannerId);
-        toast.success("✅ Banner deleted successfully!");
-      } catch (err) {
+        await useBannerStore.getState().deleteBannerPermanently(bannerId);
+        toast.success("Banner deleted successfully");
+      } catch (err: any) {
         console.error(err);
-        toast.error("❌ Failed to delete banner");
+        toast.error(`❌ Failed to delete banner: ${err?.message || 'Unknown database error'}`);
       }
     }
   };
