@@ -57,6 +57,7 @@ interface CustomerState {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearDemoData: () => void;
+  fetchCustomers: () => Promise<void>;
   subscribe: () => () => void;
 }
 
@@ -169,6 +170,15 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   clearDemoData: () => set((state) => ({
     customers: state.customers.filter(c => !c.isDemo)
   })),
+  fetchCustomers: async () => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    
+    const { data, error } = await supabase.from('customers').select('*');
+    if (!error && data) {
+      set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
+    }
+  },
   subscribe: () => {
     const supabase = getSupabase();
     if (!supabase) return () => {};

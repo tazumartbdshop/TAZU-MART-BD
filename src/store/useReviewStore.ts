@@ -186,7 +186,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
           customer_name: newRev.customerName,
           rating: newRev.rating,
           review_text: newRev.reviewText,
-          status: 'pending',
+          status: newRev.status || 'pending',
           media_urls: newRev.mediaUrls,
           verified: newRev.verified,
           phone: newRev.phone,
@@ -194,7 +194,8 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
           order_id: newRev.orderId,
           device_ip: newRev.deviceIP,
           anonymous: newRev.anonymous,
-          is_pinned: false
+          is_pinned: false,
+          created_at: newRev.createdAt || new Date().toISOString()
         }])
         .select()
         .single();
