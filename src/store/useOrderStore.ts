@@ -86,8 +86,51 @@ interface OrderState {
   subscribeTrackingStatuses: () => () => void;
 }
 
+const initialOrders: Order[] = [
+  {
+    id: 'demo-order-1',
+    orderId: 'TMB-88225544',
+    billId: 'BILL-554433',
+    productLink: 'https://luxemart.bd/order/TMB-88225544',
+    customerName: 'Tasnim Alam',
+    mobileNumber: '+8801314556677',
+    email: 'tasnim@example.com',
+    fullAddress: 'House 12, Road 5, Dhanmondi, Dhaka',
+    deliveryMode: 'Standard Delivery',
+    paymentMethod: 'bKash',
+    status: 'Delivered',
+    statusHistory: [
+      { status: 'Placed', timestamp: '2026-05-22T10:00:00Z' },
+      { status: 'Delivered', timestamp: '2026-05-25T15:00:00Z' }
+    ],
+    status_updated_at: '2026-05-25T15:00:00Z',
+    paymentStatus: 'Paid',
+    type: 'Online',
+    items: [
+      {
+        productId: 'wallet-1',
+        name: 'Premium Leather Wallet',
+        price: 1250,
+        quantity: 1,
+        variant: 'Black',
+        image: 'https://images.unsplash.com/photo-1627123424574-724758594e93?q=80&w=300&h=300&auto=format&fit=crop'
+      }
+    ],
+    subtotal: 1250,
+    discount: { type: 'fixed', value: 0, amount: 0 },
+    tax: { percent: 0, amount: 0 },
+    deliveryCharge: 60,
+    paidAmount: 1310,
+    dueAmount: 0,
+    total: 1310,
+    date: '2026-05-22T10:00:00Z',
+    isRead: true,
+    isDemo: true
+  }
+];
+
 export const useOrderStore = create<OrderState>((set, get) => ({
-  orders: [],
+  orders: initialOrders,
   trackingStatuses: [
     'Placed', 'Pending', 'Processing', 'Confirmed', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'
   ],
@@ -116,7 +159,31 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       // Fix numeric discount type mapping for database insert
       dbPayload.discount = newOrder.discount?.amount || 0;
       
-      supabase.from('orders').insert([dbPayload]).then(({error}) => error && console.warn("[Supabase Sync Error]", error));
+      supabase.from('orders').insert([dbPayload]).then(({error}) => {
+        if (error) console.warn("[Supabase Sync Error]", error);
+      });
+
+      // Update sold_count and stock for each item
+      newOrder.items.forEach(async (item) => {
+        try {
+          const { data: prod, error: prodErr } = await supabase
+            .from('products')
+            .select('sold_count, stock')
+            .eq('id', item.productId)
+            .single();
+          if (!prodErr && prod) {
+            await supabase
+              .from('products')
+              .update({
+                sold_count: Number(prod.sold_count || 0) + Number(item.quantity || 1),
+                stock: Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1))
+              })
+              .eq('id', item.productId);
+          }
+        } catch (err) {
+          console.error("Failed to update product stats in addOrder:", err);
+        }
+      });
     }
 
     set((state) => ({ orders: [newOrder, ...state.orders] }));
@@ -178,6 +245,28 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         } else {
           console.log("[Supabase Sync] Order items inserted successfully into order_items table.");
         }
+
+        // Update sold_count and stock for each item in Supabase
+        newOrder.items.forEach(async (item) => {
+          try {
+            const { data: prod, error: prodErr } = await supabase
+              .from('products')
+              .select('sold_count, stock')
+              .eq('id', item.productId)
+              .single();
+            if (!prodErr && prod) {
+              await supabase
+                .from('products')
+                .update({
+                  sold_count: Number(prod.sold_count || 0) + Number(item.quantity || 1),
+                  stock: Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1))
+                })
+                .eq('id', item.productId);
+            }
+          } catch (err) {
+            console.error("Failed to update product stats in addOrderAsync:", err);
+          }
+        });
       } catch (itemErr) {
         console.error("[Supabase Sync] Exception saving products to order_items:", itemErr);
       }

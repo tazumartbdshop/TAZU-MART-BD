@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Zap, ArrowRight, Star, ShoppingCart } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Product } from '../../store/useProductStore';
+import { useReviewStore } from '../../store/useReviewStore';
 import { formatPrice } from '../../lib/utils';
 import FlashSaleTimer from './FlashSaleTimer';
 import { useCartStore } from '../../store/useCartStore';
@@ -20,6 +21,7 @@ export default function FlashSaleSection({ products, isLoading }: FlashSaleSecti
   const { settings } = useSettingsStore();
   const navigate = useNavigate();
   const { addItem } = useCartStore();
+  const reviews = useReviewStore(state => state.reviews);
   
   if (!settings.flashSaleEnabled) return null;
   
@@ -72,6 +74,13 @@ export default function FlashSaleSection({ products, isLoading }: FlashSaleSecti
               ? Math.round(((product.price - product.discountPrice!) / product.price) * 100)
               : 0;
 
+            const approvedReviewsForProduct = reviews.filter(r => String(r.productId) === String(product.id) && r.status === 'approved');
+            const liveReviewsCount = approvedReviewsForProduct.length;
+            const liveAverageRating = liveReviewsCount > 0
+              ? Number((approvedReviewsForProduct.reduce((sum, r) => sum + r.rating, 0) / liveReviewsCount).toFixed(1))
+              : 0;
+            const showRating = liveReviewsCount > 0;
+
             return (
               <motion.div 
                 key={product.id}
@@ -103,13 +112,26 @@ export default function FlashSaleSection({ products, isLoading }: FlashSaleSecti
                 </div>
 
                 <div className="space-y-1">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-2.5 h-2.5 text-amber-500 fill-amber-500" />
-                    <span className="text-[9px] font-black text-neutral-900">{product.rating}</span>
-                  </div>
+                  {showRating ? (
+                    <div className="flex items-center gap-1 text-black font-[700] text-[9px]">
+                      <span>⭐</span>
+                      <span>{liveAverageRating.toFixed(1)}</span>
+                    </div>
+                  ) : (
+                    <div className="h-3.5" />
+                  )}
+                  
+                  {product.sku && (
+                    <div className="pt-0.5">
+                      <span className="text-[8px] bg-zinc-100 text-zinc-800 px-1 py-0.5 font-black tracking-widest uppercase border border-zinc-200">
+                        {product.sku}
+                      </span>
+                    </div>
+                  )}
+
                   <h3 className="text-[10px] font-bold text-neutral-950 line-clamp-1 group-hover:text-red-600 transition-colors uppercase tracking-tight">{product.name}</h3>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-red-600 tracking-tighter">
+                    <span className="text-xs font-[800] text-black tracking-tighter">
                       {formatPrice(product.discountPrice || product.price)}
                     </span>
                     {hasDiscount && (

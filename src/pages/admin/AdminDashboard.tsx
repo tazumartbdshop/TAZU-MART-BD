@@ -76,6 +76,9 @@ import AdminThemeSettings from './AdminThemeSettings';
 import AdminSupport from './AdminSupport';
 import AdminAIControlCenter from './AdminAIControlCenter';
 import AdminReviews from './AdminReviews';
+import AdminReviewAdd from './AdminReviewAdd';
+import AdminReviewList from './AdminReviewList';
+import AdminReviewDetail from './AdminReviewDetail';
 import { AdminCoinControl } from './AdminCoinControl';
 import AdminBarControl from './AdminBarControl';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -612,7 +615,10 @@ export default function AdminDashboard() {
               <Route path="/management/support-banner" element={<PermissionGate moduleId="dashboard"><AdminSupportBanner /></PermissionGate>} />
               <Route path="/support" element={<PermissionGate moduleId="support"><AdminSupport /></PermissionGate>} />
               <Route path="/ai-control-center" element={<PermissionGate moduleId="settings"><AdminAIControlCenter /></PermissionGate>} />
-              <Route path="/reviews" element={<PermissionGate moduleId="dashboard"><AdminReviews /></PermissionGate>} />
+              <Route path="/reviews" element={<PermissionGate moduleId="dashboard"><AdminReviewList /></PermissionGate>} />
+              <Route path="/reviews/add" element={<PermissionGate moduleId="dashboard"><AdminReviewAdd /></PermissionGate>} />
+              <Route path="/reviews/list" element={<PermissionGate moduleId="dashboard"><AdminReviewList /></PermissionGate>} />
+              <Route path="/reviews/detail/:id" element={<PermissionGate moduleId="dashboard"><AdminReviewDetail /></PermissionGate>} />
               <Route path="/search-listing" element={<PermissionGate moduleId="products"><AdminSearchListing /></PermissionGate>} />
               <Route path="/search-analytics" element={<PermissionGate moduleId="analytics"><AdminSearchListing /></PermissionGate>} />
               <Route path="/analytics" element={<PermissionGate moduleId="analytics"><AdminAnalytics /></PermissionGate>} />

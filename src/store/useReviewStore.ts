@@ -9,7 +9,7 @@ export interface ProductReview {
   reviewText: string;
   mediaUrls: string[]; // JPG, PNG, WEBP, MP4
   adminReply?: string;
-  status: 'pending' | 'approved' | 'hidden';
+  status: 'pending' | 'approved' | 'hidden' | 'rejected';
   verified: boolean;
   createdAt: string; // ISO String
   
@@ -20,6 +20,7 @@ export interface ProductReview {
   deviceIP?: string;
   anonymous?: boolean;
   isPinned?: boolean;
+  rejectionReason?: string;
 }
 
 export interface ReviewNotification {
@@ -35,9 +36,11 @@ interface ReviewState {
   notifications: ReviewNotification[];
   
   // Actions
-  addReview: (review: Omit<ProductReview, 'reviewId' | 'createdAt' | 'status'> & { status?: 'pending' | 'approved' | 'hidden' }) => void;
+  addReview: (review: Omit<ProductReview, 'reviewId' | 'createdAt' | 'status'> & { status?: 'pending' | 'approved' | 'hidden' | 'rejected' }) => void;
+  updateReview: (reviewId: string, updates: Partial<Omit<ProductReview, 'reviewId' | 'productId' | 'customerId' | 'createdAt'>>) => void;
   approveReview: (reviewId: string) => void;
   hideReview: (reviewId: string) => void;
+  rejectReview: (reviewId: string, reason?: string) => void;
   deleteReview: (reviewId: string) => void;
   pinReview: (reviewId: string) => void;
   markVerifiedPurchase: (reviewId: string, verified: boolean) => void;
@@ -129,21 +132,25 @@ export const useReviewStore = create<ReviewState>((set) => ({
       isPinned: false
     },
     {
-      reviewId: 'rev-105',
-      productId: 'w1',
-      customerId: 'cust-205',
+      reviewId: 'rev-205',
+      productId: 'wallet-1',
+      customerId: 'CUST-205',
       customerName: 'Tasnim Alam',
       rating: 5,
-      reviewText: 'Genuine leather, nicely packaged with premium box. Slim design but holds all my cards and notes effortlessly. Verified purchase, definitely recommended!',
-      mediaUrls: [],
-      status: 'approved',
+      reviewText: 'Genuine leather, nicely packaged with a premium box. Slim design, holds cards and cash comfortably. Excellent quality and highly recommended.',
+      mediaUrls: [
+        'https://images.unsplash.com/photo-1627123424574-724758594e93?q=80&w=300&h=300&auto=format&fit=crop',
+        'https://images.unsplash.com/photo-1550520920-27af501da97d?q=80&w=300&h=300&auto=format&fit=crop',
+        'https://www.w3schools.com/html/mov_bbb.mp4'
+      ],
+      status: 'pending',
       verified: true,
       createdAt: '2026-05-22T07:45:15.000Z',
-      phone: '+880 1314-556677',
-      email: 'tasnim@outlook.com',
-      orderId: 'ORD-300456',
+      phone: '+8801314556677',
+      email: 'tasnim@example.com',
+      orderId: 'TMB-88225544',
       deviceIP: '103.23.45.11',
-      anonymous: true,
+      anonymous: false,
       isPinned: false
     }
   ],
@@ -167,6 +174,14 @@ export const useReviewStore = create<ReviewState>((set) => ({
     });
   },
 
+  updateReview: (id, updates) => {
+    set((state) => ({
+      reviews: state.reviews.map((r) =>
+        r.reviewId === id ? { ...r, ...updates } : r
+      )
+    }));
+  },
+
   approveReview: (id) => {
     set((state) => ({
       reviews: state.reviews.map((r) =>
@@ -179,6 +194,14 @@ export const useReviewStore = create<ReviewState>((set) => ({
     set((state) => ({
       reviews: state.reviews.map((r) =>
         r.reviewId === id ? { ...r, status: 'hidden' } : r
+      )
+    }));
+  },
+
+  rejectReview: (id, reason) => {
+    set((state) => ({
+      reviews: state.reviews.map((r) =>
+        r.reviewId === id ? { ...r, status: 'rejected', rejectionReason: reason } : r
       )
     }));
   },

@@ -137,10 +137,13 @@ export const defaultNavItems: NavItem[] = [
     ]
   },
   { 
-    name: 'Search Listing', 
-    path: '/admin/search-listing', 
-    icon: Search, 
-    moduleId: 'products' 
+    name: 'Reviews', 
+    icon: Star,
+    moduleId: 'dashboard',
+    subItems: [
+      { name: 'Add Review', path: '/admin/reviews/add', icon: PlusCircle },
+      { name: 'Review Listing', path: '/admin/reviews/list', icon: Star }
+    ]
   },
   { 
     name: 'Search Analytics', 

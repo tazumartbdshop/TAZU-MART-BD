@@ -15,6 +15,7 @@ import { useOfferStore } from '../store/useOfferStore';
 import { getProductDiscountDetails } from '../lib/offerUtils';
 import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
 import { useWishlistStore } from '../store/useWishlistStore';
+import { useReviewStore } from '../store/useReviewStore';
 import ProductCard from '../components/ui/ProductCard';
 import ProductReviews from '../components/product/ProductReviews';
 import BannerSlider from '../components/common/BannerSlider';
@@ -246,12 +247,26 @@ export default function Product() {
   const { products } = useProductStore();
   const { offers } = useOfferStore();
   const { addViewedProduct } = useRecentlyViewedStore();
+  const { reviews } = useReviewStore();
 
   const product = useMemo(() => {
     if (!id) return null;
     const found = products.find(p => String(p.id) === String(id)) || ALL_FALLBACK_PRODUCTS.find(p => String(p.id) === String(id));
     return found || null;
   }, [products, id]);
+
+  const approvedReviewsForProduct = useMemo(() => {
+    if (!product) return [];
+    return reviews.filter(r => String(r.productId) === String(product.id) && r.status === 'approved');
+  }, [reviews, product]);
+
+  const liveReviewsCount = approvedReviewsForProduct.length;
+  const liveAverageRating = useMemo(() => {
+    if (liveReviewsCount === 0) return 0;
+    return Number((approvedReviewsForProduct.reduce((sum, r) => sum + r.rating, 0) / liveReviewsCount).toFixed(1));
+  }, [approvedReviewsForProduct, liveReviewsCount]);
+
+  const showRating = liveReviewsCount > 0;
   
   const bannerUrls = useMemo(() => {
     if (!product || !product.banner_image) return [];
@@ -531,10 +546,6 @@ export default function Product() {
   const isOutOfStock = !product || product.stock === 0 || product.stock === null || product.stock === undefined;
 
   const handleAddToCart = () => {
-    if (isOutOfStock) {
-        alert("This product is currently out of stock");
-        return;
-    }
     const variantString = Object.entries(selectedVariants).map(([k,v]) => `${k}: ${v}`).join(', ');
     const cartItemId = `${product.id}-${Object.values(selectedVariants).join('-')}`;
     const cartItemName = `${product.name}${variantString ? ` - ${variantString}` : ''}`;
@@ -559,10 +570,6 @@ export default function Product() {
   };
 
   const handleBuyNow = () => {
-    if (isOutOfStock) {
-        alert("This product is currently out of stock");
-        return;
-    }
     const variantString = Object.entries(selectedVariants).map(([k,v]) => `${k}: ${v}`).join(', ');
     const cartItemId = `${product.id}-${Object.values(selectedVariants).join('-')}`;
     const cartItemName = `${product.name}${variantString ? ` - ${variantString}` : ''}`;
@@ -612,7 +619,11 @@ export default function Product() {
   const animatedSold = useMemo(() => {
     if (!product) return '0';
     const customSeed = product.soldCount || 1200;
-    return customSeed >= 1000 ? `${(customSeed / 1000).toFixed(1)}K` : `${customSeed}`;
+    if (customSeed >= 1000) {
+      const formatted = Math.floor(customSeed / 100) / 10;
+      return `${formatted}K`;
+    }
+    return `${customSeed}`;
   }, [product]);
 
   const animatedViews = useMemo(() => {
@@ -858,18 +869,28 @@ export default function Product() {
                     <span className="text-neutral-800 font-extrabold">{product.brand}</span>
                   </>
                 )}
-                {product.sku && (
-                  <>
-                    <span>/</span>
-                    <span className="font-mono text-neutral-500">{product.sku}</span>
-                  </>
-                )}
               </div>
               
               {/* Product Title */}
               <h1 className="text-xl md:text-2xl font-black text-neutral-950 uppercase tracking-tight leading-snug">
                 {product.name}
               </h1>
+
+              {/* SKU Code - Prominent position */}
+              {(product.sku_code || product.sku) && (
+                <div className="mt-1 text-[11px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
+                  SKU: {product.sku_code || product.sku}
+                </div>
+              )}
+
+              {/* Dynamic Star Rating Block */}
+              {showRating && (
+                <div className="flex items-center gap-1.5 mt-2 select-none text-black font-[700] text-sm">
+                  <span>⭐</span>
+                  <span>{liveAverageRating.toFixed(1)}</span>
+                  <span className="text-zinc-500 font-semibold text-xs">({liveReviewsCount})</span>
+                </div>
+              )}
             </div>
 
             {/* 2. Interactive Animated Ticker Tags */}
@@ -894,7 +915,7 @@ export default function Product() {
             <div className="py-3 px-4 border border-neutral-250 bg-neutral-50 rounded-xl">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-3.5 flex-wrap">
-                  <span className="text-2xl font-black text-neutral-950 tracking-tight">
+                  <span className="text-2xl font-[800] text-neutral-950 tracking-tight">
                     {formatPrice(currentPrice)}
                   </span>
                   
@@ -1005,8 +1026,7 @@ export default function Product() {
               <button 
                 type="button"
                 onClick={handleBuyNow}
-                disabled={isOutOfStock}
-                className={`w-full h-[52px] bg-neutral-950 text-white border border-neutral-950 font-black uppercase text-[11px] tracking-widest hover:bg-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-neutral-300 border-neutral-300 text-neutral-400' : ''}`}
+                className="w-full h-[52px] bg-neutral-950 text-white border border-neutral-950 font-black uppercase text-[11px] tracking-widest hover:bg-neutral-900 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
               >
                 <ShoppingBag className="w-4 h-4 stroke-[2.5]" />
                 <span>{isOutOfStock ? 'OUT OF STOCK' : 'BUY NOW'}</span>
@@ -1174,8 +1194,7 @@ export default function Product() {
             <button 
               type="button"
               onClick={handleBuyNow}
-              disabled={isOutOfStock}
-              className={`w-full bg-gray-950 hover:bg-gray-900 text-white font-semibold h-11 px-4 rounded-lg text-sm shadow-md shadow-gray-950/10 transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none ${isOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-300 hover:bg-gray-300 text-gray-400' : ''}`}
+              className="w-full bg-gray-950 hover:bg-gray-900 text-white font-semibold h-11 px-4 rounded-lg text-sm shadow-md shadow-gray-950/10 transition-all active:scale-95 flex items-center justify-center gap-1.5 focus:outline-none"
             >
                 <ShoppingBag className="w-4 h-4" />
                 <span>{isOutOfStock ? 'OUT OF STOCK' : 'BUY NOW'}</span>

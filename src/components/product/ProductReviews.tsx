@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useReviewStore, ProductReview } from '../../store/useReviewStore';
 import { useProductStore } from '../../store/useProductStore';
+import { useAuthStore } from '../../store/useAuthStore';
 
 type FilterType = 'Latest' | 'Highest Rating' | 'Lowest Rating' | 'With Photos' | 'Verified Reviews';
 
@@ -18,6 +19,7 @@ export default function ProductReviews() {
   // Dynamic Stores
   const { reviews, addReview } = useReviewStore();
   const { products } = useProductStore();
+  const { user, isAuthenticated } = useAuthStore();
   
   const product = products.find(p => String(p.id) === String(id));
 
@@ -27,7 +29,7 @@ export default function ProductReviews() {
   const [hoveredStar, setHoveredStar] = useState(0);
   
   // Add Review Form Fields State
-  const [rating, setRating] = useState(5);
+  const [rating, setRating] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [mediaUrlInput, setMediaUrlInput] = useState('');
@@ -36,7 +38,45 @@ export default function ProductReviews() {
   const [verifiedToggle, setVerifiedToggle] = useState(true);
   const [anonymousToggle, setAnonymousToggle] = useState(false);
   
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccessPopupOpen, setIsSuccessPopupOpen] = useState(false);
+
+  // Initialize form default values when opening the modal
+  React.useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('openReview') === 'true' && isAuthenticated) {
+      setIsReviewModalOpen(true);
+      // Clean up the URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+
+    if (isReviewModalOpen) {
+      if (isAuthenticated && user) {
+        setCustomerName(user.name || '');
+      } else {
+        setCustomerName('');
+      }
+      setRating(0);
+      setReviewText('');
+      setAttachedMedia([]);
+      setVideoUrlInput('');
+      setAnonymousToggle(false);
+      setValidationError(null);
+    }
+  }, [isReviewModalOpen, isAuthenticated, user]);
+
+  const handleWriteReviewClick = () => {
+    if (!isAuthenticated) {
+      const currentPath = window.location.pathname;
+      const redirectUrl = `${currentPath}?openReview=true`;
+      navigate(`/login?redirect=${encodeURIComponent(redirectUrl)}`, { 
+        state: { message: 'Please log in to submit your review.' } 
+      });
+      return;
+    }
+    setIsReviewModalOpen(true);
+  };
 
   // Image Viewer Modal
   const [viewingImage, setViewingImage] = useState<string | null>(null);
@@ -138,20 +178,26 @@ export default function ProductReviews() {
   // Form Submission
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setValidationError(null);
 
-    if (!customerName.trim()) {
-      setValidationError("Full Name is required");
+    if (!rating || rating < 1 || rating > 5) {
+      setValidationError("Please select a star rating.");
       return;
     }
-    if (!rating || rating < 1 || rating > 5) {
-      setValidationError("Please select star rating");
+    if (!anonymousToggle && !customerName.trim()) {
+      setValidationError("Full Name is required.");
       return;
     }
     if (!reviewText.trim()) {
-      setValidationError("Review description required");
+      setValidationError("Please write your review.");
       return;
     }
+
+    setIsSubmitting(true);
+
+    // Simulated loading state (2.5 seconds)
+    await new Promise((resolve) => setTimeout(resolve, 2500));
 
     let finalVideoUrl = videoUrlInput.trim();
     if (finalVideoUrl.startsWith('data:')) {
@@ -188,32 +234,34 @@ export default function ProductReviews() {
       finalMedia.push(finalVideoUrl);
     }
 
+    const finalName = anonymousToggle ? 'Anonymous Customer' : customerName.trim();
+
     addReview({
       productId: id || 'f1',
-      customerId: 'custom-buyer',
-      customerName: customerName.trim(), // real name preserved internally
+      customerId: user?.id || 'guest',
+      customerName: finalName,
       rating,
       reviewText: reviewText.trim(),
       mediaUrls: finalMedia,
       verified: verifiedToggle,
       isPinned: false,
       anonymous: anonymousToggle,
-      status: 'approved' // Automatically auto-approved, published, and visible
+      email: user?.email,
+      phone: user?.phone,
+      status: 'pending' // Default status is now Pending
     });
 
-    setSubmitSuccess(true);
-    setTimeout(() => {
-      setIsReviewModalOpen(false);
-      setSubmitSuccess(false);
-      setValidationError(null);
-      // Reset form states
-      setRating(5);
-      setCustomerName('');
-      setReviewText('');
-      setAttachedMedia([]);
-      setVideoUrlInput('');
-      setAnonymousToggle(false);
-    }, 2000);
+    setIsSubmitting(false);
+    setIsReviewModalOpen(false); // Close review form modal
+    setIsSuccessPopupOpen(true); // Open success message popup modal
+
+    // Reset form states
+    setRating(0);
+    setCustomerName('');
+    setReviewText('');
+    setAttachedMedia([]);
+    setVideoUrlInput('');
+    setAnonymousToggle(false);
   };
 
   return (
@@ -232,7 +280,7 @@ export default function ProductReviews() {
           </div>
           
           <button 
-            onClick={() => setIsReviewModalOpen(true)}
+            onClick={handleWriteReviewClick}
             className="group flex items-center justify-center gap-2 bg-zinc-950 text-white hover:bg-zinc-800 px-8 py-4 rounded-none text-xs font-bold uppercase tracking-widest transition-all shadow-md active:translate-y-0.5"
           >
             <Edit3 className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
@@ -494,244 +542,296 @@ export default function ProductReviews() {
                   <p className="text-[10px] text-zinc-400 font-bold mt-1 uppercase">Share your honest feedback on Tazu Mart</p>
                 </div>
                 <button 
-                  onClick={() => setIsReviewModalOpen(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-zinc-100 text-zinc-800 transition-colors focus:outline-none"
+                  onClick={() => !isSubmitting && setIsReviewModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-zinc-100 text-zinc-800 transition-colors focus:outline-none disabled:opacity-50"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {submitSuccess ? (
-                <div className="p-8 text-center flex flex-col items-center justify-center space-y-4">
-                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-200 animate-pulse">
-                    <CheckCircle className="w-8 h-8" />
+              <form onSubmit={handleSubmitReview} className="p-6 overflow-y-auto space-y-5">
+                
+                {validationError && (
+                  <div className="bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-650 inline-block animate-pulse shrink-0" />
+                    <span className="flex-1">{validationError}</span>
                   </div>
-                  <h4 className="text-lg font-black text-zinc-900 uppercase">Review Submitted!</h4>
-                  <p className="text-xs text-zinc-500 font-semibold max-w-sm">
-                    Thank you! Your feedback has been queued. An administrator will review your submission soon.
-                  </p>
+                )}
+                
+                {/* Rating Selector */}
+                <div className="flex flex-col items-center justify-center py-5 bg-zinc-50 border border-zinc-200/60 rounded-lg">
+                  <span className="text-[9px] font-black text-zinc-400 bg-white px-3 py-1 border border-zinc-200 rounded-full uppercase tracking-widest mb-3">Overall Stars *</span>
+                  <div className="flex gap-1.5">
+                    {[1,2,3,4,5].map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        disabled={isSubmitting}
+                        onMouseEnter={() => !isSubmitting && setHoveredStar(s)}
+                        onMouseLeave={() => !isSubmitting && setHoveredStar(0)}
+                        onClick={() => !isSubmitting && setRating(s)}
+                        className="p-1.5 hover:scale-110 active:scale-95 transition-all text-amber-400 disabled:opacity-50"
+                      >
+                        <Star className={`w-8 h-8 ${
+                          s <= (hoveredStar || rating) 
+                            ? 'fill-amber-500 text-amber-500 drop-shadow-sm' 
+                            : 'fill-zinc-200 text-zinc-200'
+                        }`} />
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <form onSubmit={handleSubmitReview} className="p-6 overflow-y-auto space-y-5">
-                  
-                  {validationError && (
-                    <div className="bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-red-650 inline-block animate-pulse shrink-0" />
-                      <span className="flex-1">{validationError}</span>
-                    </div>
-                  )}
-                  
-                  {/* Rating Selector */}
-                  <div className="flex flex-col items-center justify-center py-5 bg-zinc-50 border border-zinc-200/60 rounded-lg">
-                    <span className="text-[9px] font-black text-zinc-400 bg-white px-3 py-1 border border-zinc-200 rounded-full uppercase tracking-widest mb-3">Overall Stars *</span>
-                    <div className="flex gap-1.5">
-                      {[1,2,3,4,5].map(s => (
-                        <button
-                          key={s}
-                          type="button"
-                          onMouseEnter={() => setHoveredStar(s)}
-                          onMouseLeave={() => setHoveredStar(0)}
-                          onClick={() => setRating(s)}
-                          className="p-1.5 hover:scale-110 active:scale-95 transition-all text-amber-400"
-                        >
-                          <Star className={`w-8 h-8 ${
-                            s <= (hoveredStar || rating) 
-                              ? 'fill-amber-500 text-amber-500 drop-shadow-sm' 
-                              : 'fill-zinc-200 text-zinc-200'
-                          }`} />
-                        </button>
-                      ))}
-                    </div>
+
+                {/* Customer Block Info */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Full Name</label>
+                  <input 
+                    type="text" 
+                    required={!anonymousToggle}
+                    disabled={anonymousToggle || isSubmitting}
+                    placeholder="Enter your name"
+                    value={anonymousToggle ? 'Anonymous Customer' : customerName}
+                    onChange={(e) => !anonymousToggle && setCustomerName(e.target.value)}
+                    className={`w-full px-4 py-3 border border-zinc-200 rounded-md text-xs font-semibold placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-950/20 text-zinc-900 ${
+                      anonymousToggle || isSubmitting ? 'bg-zinc-100 cursor-not-allowed text-zinc-500' : ''
+                    }`}
+                  />
+                </div>
+
+                {/* Review Text Area */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Review Experience</label>
+                  <textarea 
+                    required
+                    rows={4}
+                    disabled={isSubmitting}
+                    placeholder="Write your detailed observations on sizing, delivery, colors, comfort..."
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    className="w-full px-4 py-3 border border-zinc-200 rounded-md text-xs font-bold placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-950/20 text-zinc-900 disabled:bg-zinc-50 disabled:text-zinc-500"
+                  />
+                </div>
+
+                {/* IMAGE UPLOAD SECTION */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-baseline">
+                    <label className="text-[11px] font-black text-zinc-950 uppercase tracking-widest flex items-center gap-1.5">
+                      <span>🖼 REVIEWED PRODUCT IMAGE</span>
+                    </label>
+                    <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Max 5 Photos</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 font-semibold leading-none">
+                    Upload product photos related to your review
+                  </p>
+                  <span className="text-[10px] text-zinc-400 font-bold block leading-none italic text-zinc-500">
+                    “রিভিউকৃত প্রোডাক্টের ছবি আপলোড করুন”
+                  </span>
+
+                  <div className="mt-2">
+                    <label className={`flex flex-col items-center justify-center border border-dashed border-zinc-350 bg-white hover:bg-zinc-50/50 hover:border-zinc-400 transition-all rounded-xl p-6 text-center h-40 ${isSubmitting || attachedMedia.length >= 5 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input 
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        onChange={handleImageUploadChange}
+                        className="hidden"
+                        disabled={isSubmitting || attachedMedia.length >= 5}
+                      />
+                      <span className="w-9 h-9 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-800 border border-zinc-200/50 shadow-sm mb-2">
+                        <Plus className="w-4 h-4 text-zinc-950" />
+                      </span>
+                      <p className="text-xs font-black text-zinc-950 uppercase tracking-wide">Tap to upload product images</p>
+                      <p className="text-[10px] text-zinc-400 font-semibold mt-1">Supported formats: JPG, PNG, WEBP (Max 5)</p>
+                    </label>
                   </div>
 
-                  {/* Customer Block Info */}
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Full Name</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="e.g. Imtiaz Khan"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full px-4 py-3 border border-zinc-200 rounded-md text-xs font-semibold placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-950/20 text-zinc-900"
-                    />
-                  </div>
-
-                  {/* Review Text Area */}
-                  <div className="space-y-1">
-                    <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Review Experience</label>
-                    <textarea 
-                      required
-                      rows={4}
-                      placeholder="Write your detailed observations on sizing, delivery, colors, comfort..."
-                      value={reviewText}
-                      onChange={(e) => setReviewText(e.target.value)}
-                      className="w-full px-4 py-3 border border-zinc-200 rounded-md text-xs font-bold placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-950/20 text-zinc-900"
-                    />
-                  </div>
-
-                  {/* IMAGE UPLOAD SECTION */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-baseline">
-                      <label className="text-[11px] font-black text-zinc-950 uppercase tracking-widest flex items-center gap-1.5">
-                        <span>🖼 REVIEWED PRODUCT IMAGE</span>
-                      </label>
-                      <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Max 5 Photos</span>
-                    </div>
-                    <p className="text-[10px] text-zinc-500 font-semibold leading-none">
-                      Upload product photos related to your review
-                    </p>
-                    <span className="text-[10px] text-zinc-400 font-bold block leading-none italic text-zinc-500">
-                      “রিভিউকৃত প্রোডাক্টের ছবি আপলোড করুন”
-                    </span>
-
-                    <div className="mt-2">
-                      <label className="flex flex-col items-center justify-center border border-dashed border-zinc-350 bg-white hover:bg-zinc-50/50 hover:border-zinc-400 transition-all cursor-pointer rounded-xl p-6 text-center h-40">
-                        <input 
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          multiple
-                          onChange={handleImageUploadChange}
-                          className="hidden"
-                          disabled={attachedMedia.length >= 5}
-                        />
-                        <span className="w-9 h-9 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-800 border border-zinc-200/50 shadow-sm mb-2">
-                          <Plus className="w-4 h-4 text-zinc-950" />
-                        </span>
-                        <p className="text-xs font-black text-zinc-950 uppercase tracking-wide">Tap to upload product images</p>
-                        <p className="text-[10px] text-zinc-400 font-semibold mt-1">Supported formats: JPG, PNG, WEBP (Max 5)</p>
-                      </label>
-                    </div>
-
-                    {/* Image gallery layout for uploaded images */}
-                    {attachedMedia.length > 0 && (
-                      <div className="flex items-center gap-2 overflow-x-auto py-2 px-1 scrollbar-thin scrollbar-thumb-zinc-200">
-                        {attachedMedia.map((url, idx) => (
-                          <div key={idx} className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden border border-zinc-200 bg-white group shadow-sm flex items-center justify-center">
-                            <img src={url} alt="at" className="w-full h-full object-cover" />
-                            <button 
-                              type="button" 
-                              onClick={() => handleRemoveMedia(idx)}
-                              className="absolute top-1 right-1 bg-black/75 hover:bg-black text-white p-1 rounded-full transition-colors focus:outline-none"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                            <span className="absolute bottom-1 left-1.5 text-[8px] font-black uppercase bg-white/70 backdrop-blur-sm text-zinc-900 px-1 py-0.2 rounded">
-                              Img {idx + 1}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* VIDEO UPLOAD SECTION */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-baseline">
-                      <label className="text-[11px] font-black text-zinc-950 uppercase tracking-widest flex items-center gap-1.5">
-                        <span>🎥 REVIEW PRODUCT VIDEO</span>
-                      </label>
-                      <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Max 1 Video</span>
-                    </div>
-                    <p className="text-[10px] text-zinc-500 font-semibold leading-none">
-                      Upload a short review video of the product
-                    </p>
-                    <span className="text-[10px] text-zinc-400 font-bold block leading-none italic text-zinc-500">
-                      “রিভিউকৃত প্রোডাক্টের ভিডিও আপলোড করুন”
-                    </span>
-
-                    <div className="mt-2">
-                      <label className="flex flex-col items-center justify-center border border-dashed border-zinc-350 bg-white hover:bg-zinc-50/50 hover:border-zinc-400 transition-all cursor-pointer rounded-xl p-6 text-center h-40">
-                        <input 
-                          type="file"
-                          accept="video/mp4,video/quicktime,video/webm"
-                          onChange={handleVideoUploadChange}
-                          className="hidden"
-                          disabled={!!videoUrlInput}
-                        />
-                        <span className="w-9 h-9 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-800 border border-zinc-200/50 shadow-sm mb-2">
-                          <Plus className="w-4 h-4 text-zinc-950" />
-                        </span>
-                        <p className="text-xs font-black text-zinc-950 uppercase tracking-wide">Tap to upload review video</p>
-                        <p className="text-[10px] text-zinc-400 font-semibold mt-1">Supported formats: MP4, MOV, WEBM (Max 1)</p>
-                      </label>
-                    </div>
-
-                    {/* Vertical video review 9:16 preview panel */}
-                    {videoUrlInput && (
-                      <div className="flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200 rounded-xl p-4 mt-2">
-                        <div className="relative w-full max-w-[180px] aspect-[9/16] bg-zinc-950 rounded-xl overflow-hidden shadow-lg border border-zinc-800">
-                          <video 
-                            src={videoUrlInput} 
-                            controls 
-                            playsInline 
-                            className="w-full h-full object-cover" 
-                          />
+                  {/* Image gallery layout for uploaded images */}
+                  {attachedMedia.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto py-2 px-1 scrollbar-thin scrollbar-thumb-zinc-200">
+                      {attachedMedia.map((url, idx) => (
+                        <div key={idx} className="relative w-20 h-20 shrink-0 rounded-lg overflow-hidden border border-zinc-200 bg-white group shadow-sm flex items-center justify-center">
+                          <img src={url} alt="at" className="w-full h-full object-cover" />
                           <button 
                             type="button" 
-                            onClick={handleRemoveVideo}
-                            className="absolute top-2 right-2 bg-black/75 hover:bg-black text-white p-1 rounded-full z-10 transition-colors focus:outline-none"
+                            disabled={isSubmitting}
+                            onClick={() => handleRemoveMedia(idx)}
+                            className="absolute top-1 right-1 bg-black/75 hover:bg-black text-white p-1 rounded-full transition-colors focus:outline-none disabled:opacity-50"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-3 h-3" />
                           </button>
-                          
-                          {/* Absolute Center Play Button indicator to look extremely high fidelity */}
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/15">
-                            <div className="w-10 h-10 rounded-full bg-white/25 backdrop-blur-sm border border-white/50 flex items-center justify-center text-white shadow-sm">
-                              <Play className="w-4 h-4 fill-white text-white ml-0.5" />
-                            </div>
-                          </div>
+                          <span className="absolute bottom-1 left-1.5 text-[8px] font-black uppercase bg-white/70 backdrop-blur-sm text-zinc-900 px-1 py-0.2 rounded">
+                            Img {idx + 1}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                          <div className="absolute bottom-2 left-2 z-10 bg-black/60 backdrop-blur-sm text-[8px] font-black uppercase text-amber-400 px-1.5 py-0.5 rounded flex items-center gap-1">
-                            <Video className="w-2.5 h-2.5 text-amber-400" />
-                            <span>9:16 Vertical</span>
+                {/* VIDEO UPLOAD SECTION */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-baseline">
+                    <label className="text-[11px] font-black text-zinc-950 uppercase tracking-widest flex items-center gap-1.5">
+                      <span>🎥 REVIEW PRODUCT VIDEO</span>
+                    </label>
+                    <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Max 1 Video</span>
+                  </div>
+                  <p className="text-[10px] text-zinc-500 font-semibold leading-none">
+                    Upload a short review video of the product
+                  </p>
+                  <span className="text-[10px] text-zinc-400 font-bold block leading-none italic text-zinc-500">
+                    “রিভিউকৃত প্রোডাক্টের ভিডিও আপলোড করুন”
+                  </span>
+
+                  <div className="mt-2">
+                    <label className={`flex flex-col items-center justify-center border border-dashed border-zinc-350 bg-white hover:bg-zinc-50/50 hover:border-zinc-400 transition-all rounded-xl p-6 text-center h-40 ${isSubmitting || !!videoUrlInput ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                      <input 
+                        type="file"
+                        accept="video/mp4,video/quicktime,video/webm"
+                        onChange={handleVideoUploadChange}
+                        className="hidden"
+                        disabled={isSubmitting || !!videoUrlInput}
+                      />
+                      <span className="w-9 h-9 bg-zinc-100 rounded-full flex items-center justify-center text-zinc-800 border border-zinc-200/50 shadow-sm mb-2">
+                        <Plus className="w-4 h-4 text-zinc-950" />
+                      </span>
+                      <p className="text-xs font-black text-zinc-950 uppercase tracking-wide">Tap to upload review video</p>
+                      <p className="text-[10px] text-zinc-400 font-semibold mt-1">Supported formats: MP4, MOV, WEBM (Max 1)</p>
+                    </label>
+                  </div>
+
+                  {/* Vertical video review 9:16 preview panel */}
+                  {videoUrlInput && (
+                    <div className="flex flex-col items-center justify-center bg-zinc-50 border border-zinc-200 rounded-xl p-4 mt-2">
+                      <div className="relative w-full max-w-[180px] aspect-[9/16] bg-zinc-950 rounded-xl overflow-hidden shadow-lg border border-zinc-800">
+                        <video 
+                          src={videoUrlInput} 
+                          controls 
+                          playsInline 
+                          className="w-full h-full object-cover" 
+                        />
+                        <button 
+                          type="button" 
+                          disabled={isSubmitting}
+                          onClick={handleRemoveVideo}
+                          className="absolute top-2 right-2 bg-black/75 hover:bg-black text-white p-1 rounded-full z-10 transition-colors focus:outline-none disabled:opacity-50"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                        
+                        {/* Absolute Center Play Button indicator to look extremely high fidelity */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/15">
+                          <div className="w-10 h-10 rounded-full bg-white/25 backdrop-blur-sm border border-white/50 flex items-center justify-center text-white shadow-sm">
+                            <Play className="w-4 h-4 fill-white text-white ml-0.5" />
                           </div>
                         </div>
+
+                        <div className="absolute bottom-2 left-2 z-10 bg-black/60 backdrop-blur-sm text-[8px] font-black uppercase text-amber-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                          <Video className="w-2.5 h-2.5 text-amber-400" />
+                          <span>9:16 Vertical</span>
+                        </div>
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Toggles */}
+                <div className="flex items-center justify-between gap-4 pt-2">
+                  <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={verifiedToggle}
+                      disabled={isSubmitting}
+                      onChange={(e) => setVerifiedToggle(e.target.checked)}
+                      className="w-4 h-4 accent-zinc-900 disabled:opacity-50"
+                    />
+                    <span>Verified Purchase</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={anonymousToggle}
+                      disabled={isSubmitting}
+                      onChange={(e) => setAnonymousToggle(e.target.checked)}
+                      className="w-4 h-4 accent-zinc-900 disabled:opacity-50"
+                    />
+                    <span>Anonymously post</span>
+                  </label>
+                </div>
+
+                <div className="pt-4 border-t border-zinc-100 flex justify-end gap-3">
+                  <button 
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => setIsReviewModalOpen(false)}
+                    className="px-5 py-3 border border-zinc-200 rounded text-xs font-bold uppercase tracking-wider hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-6 py-3 bg-zinc-950 text-white rounded text-xs font-black uppercase tracking-wider hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2 min-w-[120px] disabled:opacity-75 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <span>Post Review</span>
                     )}
-                  </div>
+                  </button>
+                </div>
 
-                  {/* Toggles */}
-                  <div className="flex items-center justify-between gap-4 pt-2">
-                    <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={verifiedToggle}
-                        onChange={(e) => setVerifiedToggle(e.target.checked)}
-                        className="w-4 h-4 accent-zinc-900"
-                      />
-                      <span>Verified Purchase</span>
-                    </label>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
-                    <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={anonymousToggle}
-                        onChange={(e) => setAnonymousToggle(e.target.checked)}
-                        className="w-4 h-4 accent-zinc-900"
-                      />
-                      <span>Anonymously post</span>
-                    </label>
-                  </div>
+      {/* Success Popup Modal Overlay */}
+      <AnimatePresence>
+        {isSuccessPopupOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-none shadow-2xl p-8 border border-zinc-200 text-center flex flex-col items-center justify-center space-y-6"
+            >
+              <motion.div 
+                initial={{ scale: 0, rotate: -45 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-200 shadow-sm"
+              >
+                <svg className="w-8 h-8 stroke-current" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </motion.div>
 
-                  <div className="pt-4 border-t border-zinc-100 flex justify-end gap-3">
-                    <button 
-                      type="button"
-                      onClick={() => setIsReviewModalOpen(false)}
-                      className="px-5 py-3 border border-zinc-200 rounded text-xs font-bold uppercase tracking-wider hover:bg-zinc-50"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      type="submit"
-                      className="px-6 py-3 bg-zinc-950 text-white rounded text-xs font-black uppercase tracking-wider hover:bg-zinc-800"
-                    >
-                      Post Review
-                    </button>
-                  </div>
+              <div className="space-y-2">
+                <h4 className="text-base font-black text-zinc-950 uppercase tracking-tight">
+                  Your review has been submitted successfully!
+                </h4>
+                <p className="text-xs text-zinc-500 font-bold leading-relaxed">
+                  Thank you for sharing your feedback. <br />
+                  Your review will appear in the Customer Ratings section after approval.
+                </p>
+              </div>
 
-                </form>
-              )}
+              <button
+                onClick={() => setIsSuccessPopupOpen(false)}
+                className="w-full py-3.5 bg-zinc-950 text-white hover:bg-zinc-800 rounded-none text-xs font-black uppercase tracking-widest transition-colors focus:outline-none shadow-md"
+              >
+                OK
+              </button>
             </motion.div>
           </div>
         )}

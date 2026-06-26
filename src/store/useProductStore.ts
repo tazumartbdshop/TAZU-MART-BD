@@ -7,6 +7,7 @@ export interface Product {
   id: string;
   name: string;
   sku: string;
+  sku_code?: string; // New field for consistency
   category: string;
   price: number;
   discountPrice?: number;
@@ -29,6 +30,7 @@ export interface Product {
   warranty?: string;
   unitName?: string;
   soldCount?: number;
+  productCode?: string;
   seoPoints?: string[];
   variants?: { title: string; option: string; price: string }[];
   shippingZones?: { zone: string; charge: string }[];
@@ -262,7 +264,8 @@ const mapDbToProduct = (row: any): Product => {
     ...camelRow,
     id: camelRow.id || '',
     name: camelRow.name || '',
-    sku: camelRow.sku || '',
+    sku: camelRow.sku || camelRow.skuCode || '',
+    sku_code: camelRow.skuCode || camelRow.sku || '',
     category: camelRow.category || '',
     price: Number(camelRow.price || 0),
     discountPrice: camelRow.discountPrice,
@@ -285,6 +288,7 @@ const mapDbToProduct = (row: any): Product => {
     warranty: camelRow.warranty || '',
     unitName: camelRow.unitName,
     soldCount: Number(camelRow.soldCount || 0),
+    productCode: camelRow.productCode || '',
     seoPoints: parsedSeoPoints,
     variants: parsedVariants,
     shippingZones: parsedShippingZones,

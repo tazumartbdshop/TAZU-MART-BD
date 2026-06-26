@@ -25,7 +25,11 @@ export default function Login() {
   const location = useLocation();
   const { login, isAuthenticated, user } = useAuthStore();
 
-  const from = location.state?.from?.pathname || '/account/dashboard';
+  const searchParams = new URLSearchParams(location.search);
+  const redirectPath = searchParams.get('redirect');
+  const message = location.state?.message;
+
+  const from = redirectPath || location.state?.from?.pathname || '/account/dashboard';
   const adminFrom = location.state?.from?.pathname || '/admin';
 
   useEffect(() => {
@@ -210,6 +214,13 @@ export default function Login() {
           <h2 className="text-lg font-bold text-neutral-900 leading-tight">Welcome Back</h2>
           <p className="text-xs text-neutral-500 mt-1">Sign in to continue shopping securely.</p>
         </div>
+
+        {message && (
+          <div className="mb-5 p-3.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-medium border border-amber-100 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+            <div>{message}</div>
+          </div>
+        )}
 
         {error && (
           <div className="mb-5 p-3.5 rounded-xl bg-red-50 text-red-700 text-xs font-medium border border-red-100 flex items-start gap-2.5">

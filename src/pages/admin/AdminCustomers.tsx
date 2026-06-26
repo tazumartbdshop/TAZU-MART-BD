@@ -127,7 +127,7 @@ function AdminCustomerList() {
   return (
     <div className="text-[#111111] space-y-8 max-w-7xl mx-auto p-4 md:p-6 font-sans">
       {/* 1. Statistics Cards - 8 Total */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="flex overflow-x-auto no-scrollbar gap-4 pb-2 snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0">
         {[
           { label: 'Total Customers', value: stats.total, icon: Search, color: 'bg-white text-zinc-900 border-zinc-200' },
           { label: 'Active Accounts', value: stats.active, icon: Check, color: 'bg-white text-emerald-600 border-emerald-200' },
@@ -138,7 +138,13 @@ function AdminCustomerList() {
           { label: 'Premium Members', value: stats.premium, icon: Sparkles, color: 'bg-white text-amber-600 border-amber-200' },
           { label: 'Returning Customers', value: stats.returning, icon: RotateCw, color: 'bg-white text-cyan-600 border-cyan-200' },
         ].map((item, idx) => (
-          <div key={idx} className={cn("p-5 border rounded-xl shadow-sm flex flex-col justify-between h-32 transition-all hover:shadow-md", item.color)}>
+          <div 
+            key={idx} 
+            className={cn(
+              "flex-none w-[240px] md:w-[280px] snap-start p-5 border rounded-xl shadow-sm flex flex-col justify-between h-32 transition-all hover:shadow-md", 
+              item.color
+            )}
+          >
              <div className="flex justify-between items-start">
                <span className="text-[11px] font-black uppercase tracking-widest leading-none opacity-70">{item.label}</span>
                {typeof item.icon === 'function' ? <item.icon className="w-5 h-5 opacity-40 shrink-0" /> : <div className="scale-75 opacity-70"><item.icon /></div>}
@@ -167,7 +173,7 @@ function AdminCustomerList() {
                 key={filter.id}
                 onClick={() => setActiveFilter(filter.id)}
                 className={cn(
-                  "flex-none h-[42px] px-5 text-[10px] font-black uppercase tracking-widest rounded-xl border transition-all whitespace-nowrap active:scale-95",
+                  "flex-none h-[42px] px-5 text-[10px] font-black uppercase tracking-widest rounded-lg border transition-all whitespace-nowrap active:scale-95",
                   activeFilter === filter.id 
                     ? "bg-black text-white border-black shadow-md" 
                     : "bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400"
@@ -180,7 +186,7 @@ function AdminCustomerList() {
         </div>
 
         {/* Search Bar & Actions */}
-        <div className="bg-white border border-zinc-200 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row gap-4">
+        <div className="bg-white border border-zinc-200 rounded-lg p-4 shadow-sm flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-300" />
             <input 
@@ -188,7 +194,7 @@ function AdminCustomerList() {
               placeholder="Search by Name, Email, Phone or Customer ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-12 pl-12 pr-6 bg-zinc-50 border-none rounded-xl text-sm font-medium focus:ring-2 focus:ring-black transition-all placeholder:text-zinc-400"
+              className="w-full h-12 pl-12 pr-6 bg-zinc-50 border-none rounded-lg text-sm font-medium focus:ring-2 focus:ring-black transition-all placeholder:text-zinc-400"
             />
           </div>
           
@@ -200,14 +206,14 @@ function AdminCustomerList() {
                     clearDemoCustomers();
                   }
                 }}
-                className="h-12 px-4 bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-xl border border-rose-100 hover:bg-rose-600 hover:text-white transition-all flex items-center gap-2"
+                className="h-12 px-4 bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-rose-100 hover:bg-rose-600 hover:text-white transition-all flex items-center gap-2"
               >
                 <Trash2 className="w-4 h-4" /> Purge Demo
               </button>
             )}
             <Link 
               to="/admin/customers/add"
-              className="h-12 px-6 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-800 transition-all shadow-sm"
+              className="h-12 px-6 bg-black text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-800 transition-all shadow-sm"
             >
               <Plus className="w-4 h-4 text-purple-400" /> Enroll
             </Link>
@@ -222,8 +228,8 @@ function AdminCustomerList() {
         </div>
 
         {customers.length === 0 ? (
-          <div className="bg-white border-2 border-dashed border-zinc-200 rounded-2xl p-20 flex flex-col items-center justify-center text-center">
-             <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center mb-4">
+          <div className="bg-white border-2 border-dashed border-zinc-200 rounded-lg p-20 flex flex-col items-center justify-center text-center">
+             <div className="w-16 h-16 bg-zinc-50 rounded-lg flex items-center justify-center mb-4">
                 <Search className="w-8 h-8 text-zinc-300" />
              </div>
              <p className="text-sm font-black text-zinc-900 uppercase tracking-widest">No Customers Available</p>
@@ -269,13 +275,13 @@ function AdminCustomerList() {
                   key={customer.id}
                   onClick={() => setSelectedCustomerId(customer.id)}
                   className={cn(
-                    "bg-white rounded-xl border transition-all duration-300 flex flex-col group cursor-pointer overflow-hidden",
+                    "bg-white rounded-lg border transition-all duration-300 flex flex-col group cursor-pointer overflow-hidden",
                     isMatch ? "border-black shadow-lg ring-1 ring-black/5 z-10" : "border-zinc-100 shadow-sm hover:shadow-md"
                   )}
                 >
                   {/* Simplified Card Layout */}
                   <div className="p-4 flex gap-4 items-center">
-                    <div className="w-14 h-14 shrink-0 rounded-xl bg-zinc-50 overflow-hidden relative border border-zinc-100 shadow-inner">
+                    <div className="w-14 h-14 shrink-0 rounded-lg bg-zinc-50 overflow-hidden relative border border-zinc-100 shadow-inner">
                       {customer.profileImage ? (
                         <img 
                           src={customer.profileImage} 
@@ -332,13 +338,13 @@ function AdminCustomerList() {
         {selectedCustomer && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
             <div 
-              className="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl animate-scale-in"
+              className="bg-white w-full max-w-2xl rounded-lg overflow-hidden shadow-2xl animate-scale-in"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header */}
               <div className="bg-zinc-900 px-6 py-4 flex justify-between items-center text-white">
                 <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+                   <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center">
                       <Sparkles className="w-5 h-5 text-purple-400" />
                    </div>
                    <div>
@@ -359,7 +365,7 @@ function AdminCustomerList() {
                 <div className="flex flex-col md:flex-row gap-6">
                    {/* Left Side: Identity */}
                    <div className="w-full md:w-48 shrink-0 flex flex-col items-center text-center space-y-4">
-                      <div className="w-32 h-32 rounded-3xl border-4 border-zinc-50 shadow-xl overflow-hidden">
+                      <div className="w-32 h-32 rounded-lg border-4 border-zinc-50 shadow-xl overflow-hidden">
                         {selectedCustomer.profileImage ? (
                           <img src={selectedCustomer.profileImage} className="w-full h-full object-cover" />
                         ) : (
@@ -386,7 +392,7 @@ function AdminCustomerList() {
                       <div className="grid grid-cols-2 gap-2 w-full">
                         <button 
                           onClick={() => navigate(`/admin/customers/edit/${selectedCustomer.id}`)}
-                          className="flex-1 h-10 bg-black text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-zinc-800 flex items-center justify-center gap-2"
+                          className="flex-1 h-10 bg-black text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-zinc-800 flex items-center justify-center gap-2"
                         >
                           <Edit className="w-3 h-3" /> Edit
                         </button>
@@ -396,7 +402,7 @@ function AdminCustomerList() {
                             setActiveSession(sId);
                             navigate('/admin/support');
                           }}
-                          className="flex-1 h-10 bg-zinc-100 text-zinc-900 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-zinc-200 flex items-center justify-center gap-2 underline underline-offset-2"
+                          className="flex-1 h-10 bg-zinc-100 text-zinc-900 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-zinc-200 flex items-center justify-center gap-2 underline underline-offset-2"
                         >
                           <MessageSquare className="w-3 h-3" /> Chat
                         </button>
@@ -406,11 +412,11 @@ function AdminCustomerList() {
                    {/* Right Side: Details Grid */}
                    <div className="flex-1 space-y-6">
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+                        <div className="p-4 bg-zinc-50 rounded-lg border border-zinc-100">
                            <span className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Total Orders</span>
                            <span className="text-xl font-black text-zinc-900 leading-none">{selectedCustomer.totalOrders || 0}</span>
                         </div>
-                        <div className="p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100">
+                        <div className="p-4 bg-emerald-50/30 rounded-lg border border-emerald-100">
                            <span className="block text-[9px] font-black text-emerald-600/60 uppercase tracking-widest mb-1">Total Spent</span>
                            <span className="text-xl font-black text-emerald-600 leading-none">৳{(selectedCustomer.totalSpend || 0).toLocaleString()}</span>
                         </div>
@@ -449,7 +455,7 @@ function AdminCustomerList() {
                             <label className="block text-zinc-400 font-bold uppercase mb-0.5">Email Address</label>
                             <span className="font-black text-zinc-900">{selectedCustomer.emails.join(', ') || 'N/A'}</span>
                          </div>
-                         <div className="col-span-2 space-y-1.5 bg-zinc-50 p-4 rounded-2xl border border-zinc-100">
+                         <div className="col-span-2 space-y-1.5 bg-zinc-50 p-4 rounded-lg border border-zinc-100">
                              <label className="block text-zinc-400 font-black uppercase text-[9px] mb-1 tracking-widest opacity-70">Operational Address Breakdown</label>
                              <div className="space-y-1">
                                 <p className="text-[11px] font-black text-zinc-900 uppercase tracking-tight flex items-center gap-2">
@@ -470,7 +476,7 @@ function AdminCustomerList() {
                              </div>
                           </div>
                          {selectedCustomer.note && (
-                           <div className="col-span-2 bg-amber-50 p-4 rounded-xl border border-amber-100">
+                           <div className="col-span-2 bg-amber-50 p-4 rounded-lg border border-amber-100">
                               <label className="block text-amber-700 font-black uppercase text-[9px] mb-1">Administrative Notes</label>
                               <p className="text-amber-800 leading-relaxed font-bold italic">"{selectedCustomer.note}"</p>
                            </div>
@@ -484,13 +490,13 @@ function AdminCustomerList() {
               <div className="p-6 bg-zinc-50 border-t border-zinc-100 flex justify-end gap-3">
                 <button 
                   onClick={() => handleDeleteCustomer(selectedCustomer.id)}
-                  className="px-6 h-12 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all border border-rose-100 shadow-sm"
+                  className="px-6 h-12 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all border border-rose-100 shadow-sm"
                 >
                   Terminate Account
                 </button>
                 <button 
                   onClick={() => setSelectedCustomerId(null)}
-                  className="px-8 h-12 bg-white text-zinc-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-100 transition-all border border-zinc-200 shadow-sm"
+                  className="px-8 h-12 bg-white text-zinc-900 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-zinc-100 transition-all border border-zinc-200 shadow-sm"
                 >
                   Close Profile
                 </button>
@@ -820,7 +826,7 @@ function AdminCustomerAdd() {
   };
 
   return (
-    <div className="bg-white rounded-none border border-black overflow-hidden font-mono text-[#111111]">
+    <div className="bg-white rounded-lg border border-black overflow-hidden font-mono text-[#111111]">
       <div className="p-6 border-b border-black flex justify-between items-center bg-black text-white">
         <div>
           <h3 className="text-sm font-black uppercase tracking-wider">
@@ -866,14 +872,14 @@ function AdminCustomerAdd() {
                     handleEditExistingPhoto();
                   }
                 }}
-                className="relative flex flex-col items-center justify-center w-24 h-24 border border-[#111111] bg-neutral-50 hover:bg-neutral-100 transition-all cursor-pointer overflow-hidden group shrink-0 rounded-none"
+                className="relative flex flex-col items-center justify-center w-24 h-24 border border-[#111111] bg-neutral-50 hover:bg-neutral-100 transition-all cursor-pointer overflow-hidden group shrink-0 rounded-lg"
               >
                 {formData.profileImage ? (
                   <div className="relative w-full h-full group/preview">
                     <img 
                       src={formData.profileImage} 
                       alt="Profile Preview" 
-                      className="w-full h-full object-cover rounded-none" 
+                      className="w-full h-full object-cover rounded-lg" 
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/preview:opacity-105 flex items-center justify-center transition-all">
                       <span className="px-2 py-1 bg-white text-black font-black text-[8px] uppercase tracking-wider border border-black max-w-[80%] text-center">
@@ -1234,7 +1240,7 @@ function AdminCustomerAdd() {
             ) : (
               <div className="space-y-3">
                 {specialDays.map((day, dIdx) => (
-                  <div key={day.id} className="p-3.5 border-2 border-black bg-neutral-50 relative space-y-3">
+                  <div key={day.id} className="p-3.5 border-2 border-black bg-neutral-50 relative space-y-3 rounded-lg">
                     <div className="flex justify-between items-center pb-2 border-b border-[#111111]/10">
                       <span className="text-[9.5px] font-black text-purple-700 uppercase tracking-wide">
                         Occasion Segment #{dIdx + 1} (Required to save)
@@ -1294,13 +1300,13 @@ function AdminCustomerAdd() {
             <button 
               type="button" 
               onClick={() => navigate('/admin/customers')} 
-              className="h-11 px-6 border border-zinc-450 hover:bg-zinc-50 text-[10px] font-bold uppercase tracking-wider text-center flex items-center justify-center transition-colors"
+              className="h-11 px-6 border border-zinc-450 hover:bg-zinc-50 text-[10px] font-bold uppercase tracking-wider text-center flex items-center justify-center transition-colors rounded-lg"
             >
               Cancel Profile Changes
             </button>
             <button 
               type="submit"
-              className="h-11 px-8 bg-zinc-950 text-white hover:bg-zinc-850 text-[10s] font-black uppercase tracking-widest border border-black flex items-center justify-center transition-colors"
+              className="h-11 px-8 bg-zinc-950 text-white hover:bg-zinc-850 text-[10s] font-black uppercase tracking-widest border border-black flex items-center justify-center transition-colors rounded-lg"
             >
               Sync Client to Database
             </button>
@@ -1312,7 +1318,7 @@ function AdminCustomerAdd() {
       {/* Profile Photo Crop Canvas Portal Modal code block */}
       {uploadedRawImage && (
         <div className="fixed inset-0 bg-neutral-950/90 backdrop-blur-md z-[100] flex items-center justify-center p-4 select-none animate-fade-in duration-200">
-          <div className="bg-white border-2 border-black max-w-[360px] w-full p-6 space-y-4 rounded-none shadow-2xl relative text-left">
+          <div className="bg-white border-2 border-black max-w-[360px] w-full p-6 space-y-4 rounded-lg shadow-2xl relative text-left">
             
             {/* Header */}
             <div className="border-b border-black pb-3">
@@ -1335,7 +1341,7 @@ function AdminCustomerAdd() {
             </div>
 
             {/* Visual Viewport with cropped preview guidelines */}
-            <div className="relative w-56 h-56 mx-auto border-2 border-black bg-neutral-900 overflow-hidden cursor-move shadow-inner rounded-none">
+            <div className="relative w-56 h-56 mx-auto border-2 border-black bg-neutral-900 overflow-hidden cursor-move shadow-inner rounded-lg">
               <div 
                 onMouseDown={handleDragStart}
                 onMouseMove={handleDragMove}

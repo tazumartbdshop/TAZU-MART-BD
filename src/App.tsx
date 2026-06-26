@@ -32,6 +32,7 @@ import Product from './pages/Product';
 import Orders from './pages/Orders';
 import CategoryPage from './pages/CategoryPage';
 import Settings from './pages/Settings';
+import MyReviews from './pages/MyReviews';
 
 import ReviewDetails from './pages/ReviewDetails';
 import Support from './pages/Support';
@@ -273,7 +274,7 @@ export default function App() {
             <Route path="account/dashboard" element={<Account />} />
             <Route path="games" element={<Games />} />
             <Route path="help-center" element={<Settings />} />
-            <Route path="my-reviews" element={<div className="container mx-auto py-24 text-center text-primary-900"><h1 className="text-4xl font-bold mb-4">My Reviews</h1><p className="text-gray-500 font-sans">Track and manage your reviews.</p></div>} />
+            <Route path="my-reviews" element={<MyReviews />} />
             <Route path="payment-methods" element={<Settings />} />
             <Route path="settings" element={<Settings />} />
           </Route>
