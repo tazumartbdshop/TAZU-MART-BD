@@ -301,22 +301,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Products loading or empty state */}
-      {productsLoading ? (
-        <div className="flex flex-wrap items-center justify-center gap-6 mx-auto py-12">
-          {[1, 2, 3, 4].map(n => (
-            <div key={n} className="w-48 h-64 bg-neutral-100 animate-pulse rounded-xl" />
-          ))}
-        </div>
-      ) : activeProducts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center text-center py-16 px-4 bg-white rounded-2xl border border-neutral-100 max-w-md mx-auto my-12 shadow-sm">
-          <div className="w-12 h-12 rounded-full bg-neutral-50 flex items-center justify-center text-neutral-400 mb-3 border border-neutral-100">
-            <Sparkles className="w-6 h-6" />
-          </div>
-          <h3 className="text-sm md:text-base font-black uppercase tracking-wider text-neutral-900 font-display">No Products Available</h3>
-          <p className="text-[10px] md:text-xs text-neutral-400 font-bold uppercase tracking-wider mt-1.5">Our inventory is currently being updated. Please check back later!</p>
-        </div>
-      ) : null}
+      {/* No skeleton loaders or blank product card placeholder structure shown */}
 
       {/* 4. DYNAMIC SPECIAL SECTIONS */}
       {/* 1) Flash Sale Section */}

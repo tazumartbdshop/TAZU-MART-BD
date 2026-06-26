@@ -171,12 +171,96 @@ CREATE TABLE IF NOT EXISTS public.settings (
 
 CREATE TABLE IF NOT EXISTS public.banners (
   id TEXT PRIMARY KEY,
-  title TEXT,
   image TEXT,
-  link TEXT,
-  display_order INT DEFAULT 0,
-  is_active BOOLEAN DEFAULT true,
-  created_at BIGINT
+  original_image TEXT,
+  name TEXT,
+  description TEXT,
+  button_enabled BOOLEAN DEFAULT false,
+  button_text TEXT,
+  button_link TEXT,
+  is_custom_button_text BOOLEAN DEFAULT false,
+  connected_product_id TEXT,
+  locations TEXT[] DEFAULT '{}',
+  banner_size TEXT,
+  cta_destination TEXT,
+  destination_type TEXT,
+  cta_text TEXT,
+  cta_link TEXT,
+  status TEXT DEFAULT 'draft',
+  "order" INT DEFAULT 0,
+  banner_type TEXT,
+  offer_text TEXT,
+  discount_text TEXT,
+  background_color TEXT,
+  background_gradient TEXT,
+  is_gradient BOOLEAN DEFAULT false,
+  text_color TEXT,
+  button_color TEXT,
+  button_text_color TEXT,
+  border_color TEXT,
+  font_family TEXT,
+  font_size TEXT,
+  font_weight TEXT,
+  italic BOOLEAN DEFAULT false,
+  alignment TEXT,
+  logo_image TEXT,
+  product_image TEXT,
+  sticker_type TEXT,
+  sticker_text TEXT,
+  countdown_enabled BOOLEAN DEFAULT false,
+  countdown_date TEXT,
+  connected_category_id TEXT,
+  connected_offer_id TEXT,
+  created_date TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.banners_draft (
+  id TEXT PRIMARY KEY,
+  image TEXT,
+  original_image TEXT,
+  name TEXT,
+  description TEXT,
+  button_enabled BOOLEAN DEFAULT false,
+  button_text TEXT,
+  button_link TEXT,
+  is_custom_button_text BOOLEAN DEFAULT false,
+  connected_product_id TEXT,
+  locations TEXT[] DEFAULT '{}',
+  banner_size TEXT,
+  cta_destination TEXT,
+  destination_type TEXT,
+  cta_text TEXT,
+  cta_link TEXT,
+  status TEXT DEFAULT 'draft',
+  "order" INT DEFAULT 0,
+  banner_type TEXT,
+  offer_text TEXT,
+  discount_text TEXT,
+  background_color TEXT,
+  background_gradient TEXT,
+  is_gradient BOOLEAN DEFAULT false,
+  text_color TEXT,
+  button_color TEXT,
+  button_text_color TEXT,
+  border_color TEXT,
+  font_family TEXT,
+  font_size TEXT,
+  font_weight TEXT,
+  italic BOOLEAN DEFAULT false,
+  alignment TEXT,
+  logo_image TEXT,
+  product_image TEXT,
+  sticker_type TEXT,
+  sticker_text TEXT,
+  countdown_enabled BOOLEAN DEFAULT false,
+  countdown_date TEXT,
+  connected_category_id TEXT,
+  connected_offer_id TEXT,
+  created_date TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 2. UTILITY FUNCTION (ADMIN CHECK)
@@ -256,13 +340,20 @@ BEGIN
     CREATE POLICY "Banners read" ON public.banners FOR SELECT TO public USING (true);
     DROP POLICY IF EXISTS "Banners write" ON public.banners;
     CREATE POLICY "Banners write" ON public.banners FOR ALL TO public USING (true) WITH CHECK (true);
+
+    -- Banners Draft Policies
+    ALTER TABLE public.banners_draft ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Banners draft read" ON public.banners_draft;
+    CREATE POLICY "Banners draft read" ON public.banners_draft FOR SELECT TO public USING (true);
+    DROP POLICY IF EXISTS "Banners draft write" ON public.banners_draft;
+    CREATE POLICY "Banners draft write" ON public.banners_draft FOR ALL TO public USING (true) WITH CHECK (true);
 END $$;
 
 -- 4. ENABLE REAL-TIME PUBLICATIONS
 -- ---------------------------------------------------------------------
 DO $$
 BEGIN
-  -- Check and add categories to realtime publication
+  -- Check and add categories, products, banners, and banners_draft to realtime publication
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
     IF NOT EXISTS (
       SELECT 1 FROM pg_publication_tables 
@@ -271,12 +362,25 @@ BEGIN
       ALTER PUBLICATION supabase_realtime ADD TABLE public.categories;
     END IF;
 
-    -- Check and add products to realtime publication
     IF NOT EXISTS (
       SELECT 1 FROM pg_publication_tables 
       WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'products'
     ) THEN
       ALTER PUBLICATION supabase_realtime ADD TABLE public.products;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'banners'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.banners;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'banners_draft'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.banners_draft;
     END IF;
   END IF;
 END $$;

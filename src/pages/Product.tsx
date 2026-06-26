@@ -243,7 +243,7 @@ export default function Product() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addItem, clearCart } = useCartStore();
-  const { products, isLoading } = useProductStore();
+  const { products } = useProductStore();
   const { offers } = useOfferStore();
   const { addViewedProduct } = useRecentlyViewedStore();
 
@@ -620,17 +620,6 @@ export default function Product() {
     const customSeed = product.soldCount ? product.soldCount * 4 : 5800;
     return customSeed >= 1000 ? `${(customSeed / 1000).toFixed(1)}K` : `${customSeed}`;
   }, [product]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen pt-24 pb-16 flex justify-center items-center">
-        <div className="flex flex-col items-center gap-4 text-neutral-400">
-           <div className="w-12 h-12 border-4 border-black/10 border-t-black rounded-full animate-spin"></div>
-           <p className="text-xs font-bold uppercase tracking-widest">Loading Product...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (!product) {
     return (

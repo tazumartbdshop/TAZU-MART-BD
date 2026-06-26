@@ -9,7 +9,7 @@ import { ChevronRight, ShoppingBag } from 'lucide-react';
 export default function CategoryPage() {
   const { id } = useParams();
   const { categories, isLoaded } = useCategoryStore();
-  const { products, isLoading } = useProductStore();
+  const { products } = useProductStore();
 
   let category = categories.find(c => 
     String(c.id).toLowerCase() === String(id).toLowerCase() || 
@@ -46,7 +46,7 @@ export default function CategoryPage() {
     }
   }
   
-  if (!isLoaded || isLoading) {
+  if (!isLoaded) {
     return (
       <div className="min-h-screen pt-24 pb-16 flex justify-center items-center">
         <div className="flex flex-col items-center gap-4 text-neutral-400">

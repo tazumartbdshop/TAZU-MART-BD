@@ -42,6 +42,164 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   }
 }
 
+const SCHEMA_SQL = `-- COPY AND RUN THIS IN YOUR SUPABASE SQL EDITOR:
+
+-- 1. Create public.banners table
+CREATE TABLE IF NOT EXISTS public.banners (
+  id TEXT PRIMARY KEY,
+  image TEXT,
+  original_image TEXT,
+  name TEXT,
+  description TEXT,
+  button_enabled BOOLEAN DEFAULT false,
+  button_text TEXT,
+  button_link TEXT,
+  is_custom_button_text BOOLEAN DEFAULT false,
+  connected_product_id TEXT,
+  locations TEXT[] DEFAULT '{}',
+  banner_size TEXT,
+  cta_destination TEXT,
+  destination_type TEXT,
+  cta_text TEXT,
+  cta_link TEXT,
+  status TEXT DEFAULT 'draft',
+  "order" INT DEFAULT 0,
+  banner_type TEXT,
+  offer_text TEXT,
+  discount_text TEXT,
+  background_color TEXT,
+  background_gradient TEXT,
+  is_gradient BOOLEAN DEFAULT false,
+  text_color TEXT,
+  button_color TEXT,
+  button_text_color TEXT,
+  border_color TEXT,
+  font_family TEXT,
+  font_size TEXT,
+  font_weight TEXT,
+  italic BOOLEAN DEFAULT false,
+  alignment TEXT,
+  logo_image TEXT,
+  product_image TEXT,
+  sticker_type TEXT,
+  sticker_text TEXT,
+  countdown_enabled BOOLEAN DEFAULT false,
+  countdown_date TEXT,
+  connected_category_id TEXT,
+  connected_offer_id TEXT,
+  created_date TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. Create public.banners_draft table
+CREATE TABLE IF NOT EXISTS public.banners_draft (
+  id TEXT PRIMARY KEY,
+  image TEXT,
+  original_image TEXT,
+  name TEXT,
+  description TEXT,
+  button_enabled BOOLEAN DEFAULT false,
+  button_text TEXT,
+  button_link TEXT,
+  is_custom_button_text BOOLEAN DEFAULT false,
+  connected_product_id TEXT,
+  locations TEXT[] DEFAULT '{}',
+  banner_size TEXT,
+  cta_destination TEXT,
+  destination_type TEXT,
+  cta_text TEXT,
+  cta_link TEXT,
+  status TEXT DEFAULT 'draft',
+  "order" INT DEFAULT 0,
+  banner_type TEXT,
+  offer_text TEXT,
+  discount_text TEXT,
+  background_color TEXT,
+  background_gradient TEXT,
+  is_gradient BOOLEAN DEFAULT false,
+  text_color TEXT,
+  button_color TEXT,
+  button_text_color TEXT,
+  border_color TEXT,
+  font_family TEXT,
+  font_size TEXT,
+  font_weight TEXT,
+  italic BOOLEAN DEFAULT false,
+  alignment TEXT,
+  logo_image TEXT,
+  product_image TEXT,
+  sticker_type TEXT,
+  sticker_text TEXT,
+  countdown_enabled BOOLEAN DEFAULT false,
+  countdown_date TEXT,
+  connected_category_id TEXT,
+  connected_offer_id TEXT,
+  created_date TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. Add missing columns to existing banners table if needed
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS image TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS original_image TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS name TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS button_enabled BOOLEAN DEFAULT false;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS button_text TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS button_link TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS is_custom_button_text BOOLEAN DEFAULT false;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS connected_product_id TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS locations TEXT[] DEFAULT '{}';
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS banner_size TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS cta_destination TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS destination_type TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS cta_text TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS cta_link TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'draft';
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS "order" INT DEFAULT 0;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS banner_type TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS offer_text TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS discount_text TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS background_color TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS background_gradient TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS is_gradient BOOLEAN DEFAULT false;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS text_color TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS button_color TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS button_text_color TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS border_color TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS font_family TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS font_size TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS font_weight TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS italic BOOLEAN DEFAULT false;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS alignment TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS logo_image TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS product_image TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS sticker_type TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS sticker_text TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS countdown_enabled BOOLEAN DEFAULT false;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS countdown_date TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS connected_category_id TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS connected_offer_id TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS created_date TEXT;
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+ALTER TABLE public.banners ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+-- 4. Enable Row Level Security (RLS)
+ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.banners_draft ENABLE ROW LEVEL SECURITY;
+
+-- 5. Create non-blocking global policies
+DROP POLICY IF EXISTS "Banners read" ON public.banners;
+CREATE POLICY "Banners read" ON public.banners FOR SELECT TO public USING (true);
+DROP POLICY IF EXISTS "Banners write" ON public.banners;
+CREATE POLICY "Banners write" ON public.banners FOR ALL TO public USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Banners draft read" ON public.banners_draft;
+CREATE POLICY "Banners draft read" ON public.banners_draft FOR SELECT TO public USING (true);
+DROP POLICY IF EXISTS "Banners draft write" ON public.banners_draft;
+CREATE POLICY "Banners draft write" ON public.banners_draft FOR ALL TO public USING (true) WITH CHECK (true);`;
+
 interface LocalPreview {
   id: string;
   file: File;
@@ -67,6 +225,74 @@ export default function AdminBanners() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [localPreviews, setLocalPreviews] = useState<LocalPreview[]>([]);
+
+  // Database Schema Readiness Check State
+  const [schemaStatus, setSchemaStatus] = useState<{
+    checked: boolean;
+    ready: boolean;
+    error?: string;
+  }>({ checked: false, ready: true });
+
+  const verifyDbSchema = async () => {
+    const supabase = await import('../../lib/supabase').then(m => m.getSupabase());
+    if (!supabase) {
+      setSchemaStatus({ checked: true, ready: false, error: "Database not initialized" });
+      return;
+    }
+
+    try {
+      // Validate both tables and all critical banner system columns
+      const requiredColumns = [
+        'id', 'image', 'name', 'description', 'button_text', 'button_link', 'status', 'order'
+      ];
+      
+      const { error: bannersErr } = await supabase
+        .from('banners')
+        .select(requiredColumns.join(','))
+        .limit(0);
+
+      if (bannersErr) {
+        setSchemaStatus({ 
+          checked: true, 
+          ready: false, 
+          error: `Table 'banners' is missing required columns: ${bannersErr.message}` 
+        });
+        return;
+      }
+
+      const { error: draftErr } = await supabase
+        .from('banners_draft')
+        .select(requiredColumns.join(','))
+        .limit(0);
+
+      if (draftErr) {
+        setSchemaStatus({ 
+          checked: true, 
+          ready: false, 
+          error: `Table 'banners_draft' is missing or not configured: ${draftErr.message}` 
+        });
+        return;
+      }
+
+      // Schema is fully prepared and complete
+      setSchemaStatus({ checked: true, ready: true });
+    } catch (err: any) {
+      setSchemaStatus({ 
+        checked: true, 
+        ready: false, 
+        error: err.message || "Failed to communicate with Database" 
+      });
+    }
+  };
+
+  useEffect(() => {
+    verifyDbSchema();
+  }, []);
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(SCHEMA_SQL);
+    toast.success("📋 SQL migration copied to clipboard!");
+  };
 
   // Hidden file input ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -269,8 +495,15 @@ export default function AdminBanners() {
         const { objectToSnake } = await import('../../lib/supabaseUtils');
         const dbPayloads = objectToSnake(newBanners);
 
-        await supabase.from('banners').upsert(dbPayloads);
-        await supabase.from('banners_draft').upsert(dbPayloads);
+        const { error: bannersErr } = await supabase.from('banners').upsert(dbPayloads);
+        if (bannersErr) {
+          throw new Error(`Database error on 'banners' table: ${bannersErr.message}`);
+        }
+
+        const { error: draftErr } = await supabase.from('banners_draft').upsert(dbPayloads);
+        if (draftErr) {
+          throw new Error(`Database error on 'banners_draft' table: ${draftErr.message}`);
+        }
 
         // Instantly update the local Zustand store state to keep Homepage, Banner Listing, and Banner Management in perfect real-time sync
         const existingBanners = useBannerStore.getState().banners;
@@ -285,7 +518,7 @@ export default function AdminBanners() {
         localPreviews.forEach(p => URL.revokeObjectURL(p.previewUrl));
         setLocalPreviews([]);
         
-        toast.success(`🎉 Banners saved successfully!`);
+        toast.success(`🎉 Banner saved successfully.`);
         
         setName('');
         setButtonText('Shop Now');
@@ -295,9 +528,9 @@ export default function AdminBanners() {
         // Redirect user to Banner Listing as part of a smooth administrative workflow
         navigate('/admin/banner/list');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error('❌ Failed to bulk save banners');
+      toast.error(`❌ Failed to save banner: ${err.message || 'Unknown database error'}`);
     }
 
     setIsSubmitting(false);
@@ -357,6 +590,65 @@ export default function AdminBanners() {
           &larr; Back to Banners
         </button>
       </div>
+
+      {/* Database Schema Status Warning & Action Card */}
+      {schemaStatus.checked && !schemaStatus.ready && (
+        <div className="bg-red-50/70 border-2 border-red-200 p-6 md:p-8 space-y-4 animate-fade-in">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+              <Database className="w-4 h-4 text-red-600 animate-pulse" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black uppercase text-red-800 tracking-wider">
+                Database Schema is Incomplete or Not Prepared
+              </h3>
+              <p className="text-xs text-red-700 font-medium mt-1 leading-relaxed font-sans">
+                The required tables and columns for managing and saving banners are missing in your Supabase project. 
+                Until the Database Schema is fully prepared, the Banner saving process cannot be shown as complete or executed.
+              </p>
+              {schemaStatus.error && (
+                <div className="mt-2 text-[10px] bg-red-100 border border-red-200 text-red-800 font-mono p-2 select-all rounded break-all">
+                  Details: {schemaStatus.error}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-2 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-red-800">
+                👉 SQL Schema Setup Script
+              </span>
+              <button
+                type="button"
+                onClick={handleCopySql}
+                className="px-3 py-1.5 bg-red-100 text-red-800 border border-red-200 hover:bg-red-200 text-[10px] font-black uppercase tracking-widest rounded-none cursor-pointer transition-all active:scale-[0.98]"
+              >
+                Copy SQL Script
+              </button>
+            </div>
+            <div className="relative bg-zinc-900 border border-zinc-800 p-4 max-h-60 overflow-y-auto rounded-none">
+              <pre className="text-[10px] text-zinc-300 font-mono overflow-x-auto whitespace-pre leading-relaxed select-all">
+                {SCHEMA_SQL}
+              </pre>
+            </div>
+            <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">
+              💡 Copy the SQL above, navigate to your <a href="https://supabase.com" target="_blank" rel="noreferrer" className="underline hover:text-red-900 font-black">Supabase Dashboard SQL Editor</a>, run it, and click "Check Schema Status Again" below.
+            </p>
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={verifyDbSchema}
+              className="px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all active:scale-[0.98] flex items-center gap-2"
+            >
+              <Database className="w-3.5 h-3.5" />
+              Check Schema Status Again
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Form Sections (Each Field inside its own separate card container) */}
       <div className="space-y-6">
@@ -544,7 +836,7 @@ export default function AdminBanners() {
           </div>
           <button 
             type="button"
-            disabled={isSubmitting || isProcessing || localPreviews.length === 0}
+            disabled={isSubmitting || isProcessing || localPreviews.length === 0 || !schemaStatus.ready}
             onClick={handlePublishBanners}
             className="px-6 py-3 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-widest transition-all rounded-none duration-150 cursor-pointer disabled:bg-zinc-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 w-full sm:w-auto"
           >
@@ -552,6 +844,10 @@ export default function AdminBanners() {
               <>
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Publishing...
+              </>
+            ) : !schemaStatus.ready ? (
+              <>
+                ⚠️ Schema Incomplete
               </>
             ) : (
               <>

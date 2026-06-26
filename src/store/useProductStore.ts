@@ -300,9 +300,33 @@ const mapDbToProduct = (row: any): Product => {
   };
 };
 
+// Initial state helper to read from localStorage synchronous cache
+const getCachedProducts = (): Product[] => {
+  try {
+    const cached = localStorage.getItem('supabase_cached_products');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to parse cached products from localStorage:", e);
+  }
+  return [];
+};
+
+const saveCachedProducts = (products: Product[]) => {
+  try {
+    localStorage.setItem('supabase_cached_products', JSON.stringify(products));
+  } catch (e) {
+    console.warn("Failed to save products to localStorage cache:", e);
+  }
+};
+
 export const useProductStore = create<ProductState>((set, get) => ({
-  products: [],
-  isLoading: true,
+  products: getCachedProducts(),
+  isLoading: false,
   autoRankTrending: () => {
     const products = get().products;
     const sorted = [...products].sort((a, b) => (b.reviews || 0) * (b.rating || 0) - (a.reviews || 0) * (a.rating || 0));
@@ -324,6 +348,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
   clearDemoData: () => {
     const nonDemo = get().products.filter(p => !p.isDemo);
     set({ products: nonDemo });
+    saveCachedProducts(nonDemo);
   },
   
   addProduct: async (payload) => {
@@ -339,7 +364,9 @@ export const useProductStore = create<ProductState>((set, get) => ({
     
     // Optimistic Update
     const currentProducts = get().products;
-    set({ products: [...currentProducts, newProduct] });
+    const nextProducts = [...currentProducts, newProduct];
+    set({ products: nextProducts });
+    saveCachedProducts(nextProducts);
     
     if (supabase) {
       const dbPayload = objectToSnake(newProduct);
@@ -347,6 +374,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
       if (error) {
         // Rollback on error
         set({ products: currentProducts });
+        saveCachedProducts(currentProducts);
         console.error("%c[Supabase Product Sync] INSERT ERROR:", "color: #ef4444; font-weight: bold;", {
           code: error.code,
           message: error.message,
@@ -389,6 +417,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     // Optimistic Update
     const updatedProducts = currentProducts.map(p => p.id === id ? { ...p, ...finalPayload } : p);
     set({ products: updatedProducts });
+    saveCachedProducts(updatedProducts);
     
     if (supabase) {
       const dbPayload = objectToSnake(finalPayload);
@@ -396,6 +425,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
       if (error) {
         // Rollback on error
         set({ products: currentProducts });
+        saveCachedProducts(currentProducts);
         console.error("Supabase update error:", error);
         throw new Error(error.message || "Failed to update product in database");
       }
@@ -432,12 +462,14 @@ export const useProductStore = create<ProductState>((set, get) => ({
     // Optimistic Update
     const newProducts = currentProducts.filter(p => p.id !== id);
     set({ products: newProducts });
+    saveCachedProducts(newProducts);
     
     if (supabase) {
       const { error } = await supabase.from('products').delete().eq('id', id);
       if (error) {
         // Rollback on error
         set({ products: currentProducts });
+        saveCachedProducts(currentProducts);
         console.error("Supabase delete error:", error);
         throw new Error(error.message || "Failed to delete product from database");
       }
@@ -445,23 +477,21 @@ export const useProductStore = create<ProductState>((set, get) => ({
   },
   
   subscribe: () => {
-    set({ isLoading: true });
+    // Start non-blocking directly from cache
+    set({ isLoading: false });
     const supabase = getSupabase();
     
     if (!supabase) {
-        set({ isLoading: false });
         return () => {}; // No-op if not configured
     }
     
     const { url } = (window as any).getSupabaseCredentials?.() || {};
     console.log(`[Supabase Product Sync] Querying 'products' from: ${url || 'Injected Key'}`);
     
+    // Direct, fast asynchronous fetch from the live database
     supabase.from('products').select('*').then(({ data, error, status, statusText }) => {
         if (!error && data) {
             console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products. (HTTP ${status})`, "color: #10b981; font-weight: bold;");
-            if (data.length === 0) {
-              console.warn("[Supabase Products Sync] Table is empty or RLS is blocking access for 'anon' role. Verify that SELECT permission is granted to public/anon.");
-            }
             try {
               const mapped = data.map((row, index) => {
                 try {
@@ -471,10 +501,11 @@ export const useProductStore = create<ProductState>((set, get) => ({
                   throw err;
                 }
               });
+              
               set({ products: mapped, isLoading: false });
+              saveCachedProducts(mapped);
             } catch (mapErr) {
               console.error("[Supabase Product Sync] Critical mapping error:", mapErr);
-              set({ isLoading: false });
             }
         } else if (error) {
             console.error("%c[Supabase Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
@@ -485,23 +516,20 @@ export const useProductStore = create<ProductState>((set, get) => ({
               httpStatus: status,
               httpStatusText: statusText
             });
-            set({ isLoading: false });
-        } else {
-            console.log("[Supabase Product Sync] No data and no error returned (Unexpected).");
-            set({ isLoading: false });
         }
     }, (pErr) => {
         console.error("[Supabase Product Sync] CONNECTION ERROR:", pErr);
-        set({ isLoading: false });
     });
-
+ 
     const channel = supabase
       .channel('public:products:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
-        // Simple reload strategy on any change
+        // Real-time synchronization
         supabase.from('products').select('*').then(({ data, error }) => {
             if (!error && data) {
-                set({ products: data.map(mapDbToProduct) });
+                const mapped = data.map(mapDbToProduct);
+                set({ products: mapped });
+                saveCachedProducts(mapped);
             }
         });
       })
