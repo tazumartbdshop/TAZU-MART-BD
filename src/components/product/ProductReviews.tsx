@@ -191,6 +191,7 @@ export default function ProductReviews() {
     e.preventDefault();
     if (isSubmitting) return;
     setValidationError(null);
+    setDetailedError(null);
 
     if (!rating || rating < 1 || rating > 5) {
       setValidationError("Please select a star rating.");
@@ -206,9 +207,6 @@ export default function ProductReviews() {
     }
 
     setIsSubmitting(true);
-
-    // Simulated loading state (2.5 seconds)
-    await new Promise((resolve) => setTimeout(resolve, 2500));
 
     let finalVideoUrl = videoUrlInput.trim();
     if (finalVideoUrl.startsWith('data:')) {
@@ -277,9 +275,16 @@ export default function ProductReviews() {
     } catch (err: any) {
       setIsSubmitting(false);
       if (err.title) {
-        setDetailedError(err);
+        setDetailedError({
+          ...err,
+          title: `❌ Review could not be saved`
+        });
       } else {
-        setValidationError("An unexpected error occurred. Please try again.");
+        setDetailedError({
+          title: `❌ Review could not be saved`,
+          reason: err.message || "An unexpected database error occurred.",
+          solution: "Please check your network connection and try again."
+        });
       }
     }
   };
@@ -837,12 +842,15 @@ export default function ProductReviews() {
               </motion.div>
 
               <div className="space-y-2">
-                <h4 className="text-base font-black text-zinc-950 uppercase tracking-tight">
-                  Your review has been submitted successfully!
+                <h4 className="text-base font-black text-emerald-600 uppercase tracking-tight">
+                  ✅ Review submitted successfully.
                 </h4>
-                <p className="text-xs text-zinc-500 font-bold leading-relaxed">
+                <p className="text-sm font-black text-zinc-950 uppercase tracking-tight">
+                  Waiting for admin approval.
+                </p>
+                <p className="text-xs text-zinc-500 font-bold leading-relaxed pt-2">
                   Thank you for sharing your feedback. <br />
-                  Your review will appear in the Customer Ratings section after approval.
+                  Your review will appear in the Customer Ratings section after verification.
                 </p>
               </div>
 

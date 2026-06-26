@@ -39,7 +39,7 @@ interface ReviewState {
   isLoading: boolean;
   
   // Actions
-  fetchReviews: () => Promise<void>;
+  fetchReviews: (silent?: boolean) => Promise<void>;
   addReview: (review: Omit<ProductReview, 'reviewId' | 'createdAt' | 'status'> & { status?: 'pending' | 'approved' | 'hidden' | 'rejected' }) => Promise<void>;
   updateReview: (reviewId: string, updates: Partial<Omit<ProductReview, 'reviewId' | 'productId' | 'customerId' | 'createdAt'>>) => Promise<void>;
   approveReview: (reviewId: string) => Promise<void>;
@@ -58,8 +58,8 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   notifications: [],
   isLoading: false,
 
-  fetchReviews: async () => {
-    set({ isLoading: true });
+  fetchReviews: async (silent = false) => {
+    if (!silent) set({ isLoading: true });
     try {
       const { data, error } = await supabase
         .from('reviews')
@@ -92,7 +92,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       set({ reviews: formattedReviews, isLoading: false });
     } catch (error: any) {
       console.error('Error fetching reviews:', error);
-      toast.error('Failed to load reviews');
+      if (!silent) toast.error('Failed to load reviews');
       set({ isLoading: false });
     }
   },
@@ -100,7 +100,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   addReview: async (newRev) => {
     try {
       // 1. Basic Auth Check
-      if (!newRev.customerId) {
+      if (!newRev.customerId || newRev.customerId === 'guest') {
         throw { 
           title: 'Authentication Required',
           reason: 'Customer is not logged in.',
@@ -207,8 +207,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         };
       }
       
-      await get().fetchReviews();
-      toast.success('Review submitted successfully. Waiting for admin approval.');
+      await get().fetchReviews(true); // Silent fetch
     } catch (error: any) {
       console.error('Detailed Review Error:', error);
       // Re-throw structured error for UI handling
