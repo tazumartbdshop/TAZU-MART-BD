@@ -99,7 +99,86 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
 
   addReview: async (newRev) => {
     try {
-      const { data, error } = await supabase
+      // 1. Basic Auth Check
+      if (!newRev.customerId) {
+        throw { 
+          title: 'Authentication Required',
+          reason: 'Customer is not logged in.',
+          solution: 'Please log in to your account and try again.'
+        };
+      }
+
+      // 2. Data Validation
+      if (!newRev.rating) {
+        throw { 
+          title: 'Rating Required',
+          reason: 'No star rating selected.',
+          solution: 'Please select a rating between 1 and 5 stars.'
+        };
+      }
+
+      if (!newRev.reviewText || newRev.reviewText.trim().length === 0) {
+        throw { 
+          title: 'Review Text Empty',
+          reason: 'The review text field is empty.',
+          solution: 'Please write your feedback about the product.'
+        };
+      }
+
+      // 3. Database Schema Integrity Checks
+      // Check if table exists and columns are correct
+      const { error: schemaError } = await supabase
+        .from('reviews')
+        .select('id, product_id, user_id, rating, review_text, status, created_at, updated_at')
+        .limit(1);
+
+      if (schemaError) {
+        if (schemaError.code === 'PGRST116' || schemaError.message?.includes('does not exist')) {
+          throw {
+            title: 'Database Table Missing',
+            reason: 'The "reviews" table was not found in the database.',
+            table: 'reviews',
+            solution: 'Create the "reviews" table in your Supabase SQL editor using the provided schema.'
+          };
+        }
+        
+        if (schemaError.message?.includes('column')) {
+          const missingCol = schemaError.message.match(/column "(.*?)"/)?.[1] || 'unknown';
+          throw {
+            title: 'Missing Database Column',
+            reason: `A required column is missing from the database.`,
+            table: 'reviews',
+            missingColumn: missingCol,
+            solution: `Add the "${missingCol}" column to the "reviews" table.`
+          };
+        }
+
+        throw {
+          title: 'Database Error',
+          reason: schemaError.message,
+          solution: 'Please check your database permissions and RLS policies.'
+        };
+      }
+
+      // 4. Duplicate Review Check
+      const { data: existingReview, error: duplicateError } = await supabase
+        .from('reviews')
+        .select('id')
+        .eq('product_id', newRev.productId)
+        .eq('user_id', newRev.customerId)
+        .limit(1)
+        .single();
+
+      if (existingReview) {
+        throw {
+          title: 'Duplicate Review',
+          reason: 'You have already submitted a review for this product.',
+          solution: 'You can only review each product once. To change your feedback, please contact support.'
+        };
+      }
+
+      // 5. Final Insertion
+      const { data, error: insertError } = await supabase
         .from('reviews')
         .insert([{
           product_id: newRev.productId,
@@ -107,7 +186,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
           customer_name: newRev.customerName,
           rating: newRev.rating,
           review_text: newRev.reviewText,
-          status: 'pending', // Default is pending
+          status: 'pending',
           media_urls: newRev.mediaUrls,
           verified: newRev.verified,
           phone: newRev.phone,
@@ -120,13 +199,20 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (insertError) {
+        throw {
+          title: 'Submission Failed',
+          reason: insertError.message,
+          solution: 'The database rejected the entry. Check foreign key constraints and permissions.'
+        };
+      }
       
       await get().fetchReviews();
-      toast.success('Review submitted for moderation');
+      toast.success('Review submitted successfully. Waiting for admin approval.');
     } catch (error: any) {
-      console.error('Error adding review:', error);
-      toast.error('Failed to submit review');
+      console.error('Detailed Review Error:', error);
+      // Re-throw structured error for UI handling
+      throw error;
     }
   },
 
