@@ -231,7 +231,7 @@ export default function AdminBanners() {
 
     try {
       const currentBannersLength = useBannerStore.getState().banners.length;
-      const newBanners = [];
+      const newBanners: Banner[] = [];
 
       for (const item of localPreviews) {
         try {
@@ -239,20 +239,20 @@ export default function AdminBanners() {
           const targetId = `ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
           const currentOrder = currentBannersLength + successCount;
 
-          const bannerData = {
+          const bannerData: Banner = {
             id: targetId,
             image: downloadUrl,
-            name: name || item.file.name.split('.')[0],
-            buttonText,
-            buttonLink,
-            buttonEnabled: !!buttonText && !!buttonLink,
-            connectedProductId,
+            name: name.trim() || item.file.name.split('.')[0],
+            buttonText: buttonText.trim(),
+            buttonLink: buttonLink.trim(),
+            buttonEnabled: !!buttonText.trim() && !!buttonLink.trim(),
+            connectedProductId: connectedProductId || undefined,
             isCustomButtonText: true,
             locations: ['homepage-hero'],
             bannerSize: 'hero',
-            status: 'active' as const,
+            status: 'active',
             order: currentOrder,
-            bannerType: 'uploaded' as const,
+            bannerType: 'uploaded',
             createdDate: new Date().toISOString()
           };
 
@@ -265,8 +265,22 @@ export default function AdminBanners() {
       }
 
       if (successCount > 0) {
-        await supabase.from('banners').upsert(newBanners);
-        await supabase.from('banners_draft').upsert(newBanners);
+        // Convert to snake_case for Supabase database compatibility
+        const { objectToSnake } = await import('../../lib/supabaseUtils');
+        const dbPayloads = objectToSnake(newBanners);
+
+        await supabase.from('banners').upsert(dbPayloads);
+        await supabase.from('banners_draft').upsert(dbPayloads);
+
+        // Instantly update the local Zustand store state to keep Homepage, Banner Listing, and Banner Management in perfect real-time sync
+        const existingBanners = useBannerStore.getState().banners;
+        const existingDraftBanners = useBannerStore.getState().draftBanners;
+
+        const updatedBanners = [...existingBanners.filter(b => !newBanners.some(n => n.id === b.id)), ...newBanners];
+        const updatedDraftBanners = [...existingDraftBanners.filter(b => !newBanners.some(n => n.id === b.id)), ...newBanners];
+
+        useBannerStore.getState().setBanners(updatedBanners);
+        useBannerStore.getState().setDraftBanners(updatedDraftBanners);
         
         localPreviews.forEach(p => URL.revokeObjectURL(p.previewUrl));
         setLocalPreviews([]);
@@ -277,6 +291,9 @@ export default function AdminBanners() {
         setButtonText('Shop Now');
         setButtonLink('');
         setConnectedProductId('');
+
+        // Redirect user to Banner Listing as part of a smooth administrative workflow
+        navigate('/admin/banner/list');
       }
     } catch (err) {
       console.error(err);
@@ -548,7 +565,7 @@ export default function AdminBanners() {
       </div>
 
       {/* Main Sequence Panel */}
-      {banners.length >= 2 && (
+      {banners.length >= 1 && (
         <section className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 shadow-sm space-y-4">
           <div className="border-b border-zinc-100 pb-3">
             <h2 className="text-sm font-black uppercase tracking-wider text-neutral-900">
