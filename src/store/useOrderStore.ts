@@ -349,6 +349,17 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const dbPayload = objectToSnake(newOrder);
       // Convert nested discount object to simple numeric amount for the database column
       dbPayload.discount = newOrder.discount?.amount || 0;
+      
+      // Fix items mismatch: frontend has array, DB expects numeric (likely item count)
+      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items.length : 0;
+      
+      // Fix type mismatch: frontend has string ('Online'/'Offline'), DB expects numeric
+      dbPayload.type = newOrder.type === 'Online' ? 1 : 2;
+      
+      // Ensure mobile_number is numeric/string format that postgres numeric can parse
+      if (dbPayload.mobile_number) {
+        dbPayload.mobile_number = Number(dbPayload.mobile_number);
+      }
 
       console.log("[Supabase Sync] Attempting insertion into orders table:", dbPayload);
       const { data, error } = await supabase.from('orders').insert([dbPayload]).select();
@@ -429,6 +440,23 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         last_edit_time: merged.last_edit_time,
         edited_by_admin: merged.edited_by_admin
       });
+      
+      if (dbPayload.discount && typeof dbPayload.discount === 'object') {
+        dbPayload.discount = dbPayload.discount.amount || 0;
+      }
+      
+      if ('items' in dbPayload) {
+        dbPayload.items = Array.isArray(dbPayload.items) ? dbPayload.items.length : 0;
+      }
+      
+      if ('type' in dbPayload) {
+        dbPayload.type = dbPayload.type === 'Online' ? 1 : 2;
+      }
+      
+      if (dbPayload.mobile_number) {
+        dbPayload.mobile_number = Number(dbPayload.mobile_number);
+      }
+      
       supabase.from('orders').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
     }
 
@@ -526,7 +554,16 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     const loadOrders = async () => {
         const { data, error } = await supabase.from('orders').select('*').order('date', { ascending: false });
         if (!error && data) {
-            set({ orders: (data as any[]).map(row => objectToCamel(row)) as Order[] });
+            set({ orders: (data as any[]).map(row => {
+               const parsed = objectToCamel(row);
+               if (Array.isArray(parsed.customerName)) {
+                 parsed.customerName = parsed.customerName[0] || '';
+               }
+               if (typeof parsed.mobileNumber === 'number') {
+                 parsed.mobileNumber = '0' + parsed.mobileNumber.toString();
+               }
+               return parsed;
+            }) as Order[] });
         } else {
             if (error && error.code !== '42P01') {
                 console.error('Error fetching orders:', error);
