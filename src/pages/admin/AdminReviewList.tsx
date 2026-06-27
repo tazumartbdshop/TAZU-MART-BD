@@ -241,7 +241,16 @@ export default function AdminReviewList() {
       </div>
 
       {/* Review Cards List */}
-      <div className="space-y-4">
+      <div className="space-y-4 relative min-h-[400px]">
+        {isLoading && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-lg">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-4 border-zinc-200 border-t-zinc-950 rounded-full animate-spin" />
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Syncing Reviews...</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between px-2">
           <button 
             onClick={handleSelectAll}

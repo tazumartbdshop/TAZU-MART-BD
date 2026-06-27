@@ -30,6 +30,8 @@ import { useAuthStore } from './store/useAuthStore';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Product from './pages/Product';
 import Orders from './pages/Orders';
+import OrderDetails from './pages/OrderDetails';
+import ToReview from './pages/ToReview';
 import CategoryPage from './pages/CategoryPage';
 import Settings from './pages/Settings';
 import MyReviews from './pages/MyReviews';
@@ -265,6 +267,8 @@ export default function App() {
           <Route path="checkout/success/:orderId" element={<OrderSuccess />} />
           <Route path="checkout/invoice/:orderId" element={<OrderInvoice />} />
           <Route path="orders" element={<Orders />} />
+          <Route path="orders/:id" element={<OrderDetails />} />
+          <Route path="orders/to-review" element={<ToReview />} />
 
           <Route path="admin/link-pages" element={<AdminContentPages />} />
           {/* Dynamic Link Pages */}

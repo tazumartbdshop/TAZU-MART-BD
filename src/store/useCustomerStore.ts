@@ -50,9 +50,9 @@ export interface Customer {
 
 interface CustomerState {
   customers: Customer[];
-  addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'isRead'> & { id?: string }) => void;
+  addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'isRead'> & { id?: string }) => Promise<void>;
   syncCustomerFromAuth: (user: any) => void;
-  updateCustomer: (id: string, updates: Partial<Customer>) => void;
+  updateCustomer: (id: string, updates: Partial<Customer>) => Promise<void>;
   deleteCustomer: (id: string) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
@@ -65,24 +65,36 @@ export const initialDemoCustomers: Customer[] = [];
 
 export const useCustomerStore = create<CustomerState>((set, get) => ({
   customers: initialDemoCustomers,
-  addCustomer: (customerPayload) => {
-    const id = customerPayload.id || Math.random().toString(36).substring(2, 9);
-    const newCustomer = {
-      ...customerPayload,
-      id,
-      createdAt: Date.now(),
-      isRead: false,
-    };
-    
-    const supabase = getSupabase();
-    if (supabase) {
-      const dbPayload = objectToSnake(newCustomer);
-      supabase.from('customers').insert([dbPayload]).then(({error}) => error && console.warn(error));
-    }
+  addCustomer: async (customerPayload) => {
+    const password = customerPayload.password || '123456';
+    const email = customerPayload.emails[0];
+    const phone = customerPayload.phones[0];
+
+    try {
+      const response = await fetch('/api/admin/create-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: customerPayload.name,
+          email,
+          password,
+          phone,
+          customerData: objectToSnake(customerPayload)
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create customer');
+      }
+
+      // Success - State is updated by subscription usually, but we can do it manually for immediate feedback
+      await get().fetchCustomers();
       
-    set((state) => ({
-      customers: [...state.customers, newCustomer]
-    }));
+    } catch (error: any) {
+      console.error("[Store Add Customer] Error:", error);
+      throw error;
+    }
   },
   syncCustomerFromAuth: (user) => {
     if (!user || user.role !== 'customer') return;
@@ -127,16 +139,27 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       });
     }
   },
-  updateCustomer: (id, updates) => {
-    const supabase = getSupabase();
-    if (supabase) {
-      const dbPayload = objectToSnake(updates);
-      supabase.from('customers').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+  updateCustomer: async (id, updates) => {
+    try {
+      const response = await fetch('/api/admin/update-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          updates: objectToSnake(updates)
+        })
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to update customer');
+      }
+
+      await get().fetchCustomers();
+    } catch (error: any) {
+      console.error("[Store Update Customer] Error:", error);
+      throw error;
     }
-      
-    set((state) => ({
-      customers: state.customers.map(c => c.id === id ? { ...c, ...updates } : c)
-    }));
   },
   deleteCustomer: (id) => {
     const supabase = getSupabase();

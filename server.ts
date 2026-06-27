@@ -86,19 +86,23 @@ async function startServer() {
   const SUPABASE_CONFIG_FILE = path.join(process.cwd(), 'supabase_config.json');
   let savedSupabaseUrl = "";
   let savedSupabaseKey = "";
+  let savedSupabaseServiceKey = "";
   try {
     const fileData = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
     const parsed = JSON.parse(fileData);
     savedSupabaseUrl = parsed.supabaseUrl || "";
     savedSupabaseKey = parsed.supabaseKey || "";
+    savedSupabaseServiceKey = parsed.supabaseServiceKey || "";
   } catch (e) {
     // ignore missing or corrupted file
   }
 
   let supabaseAdmin: any = null;
+  let supabaseServiceRole: any = null;
   try {
     let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedSupabaseUrl;
     let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseKey;
+    let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || savedSupabaseServiceKey;
     
     if (!supabaseUrl || !supabaseKey) {
       console.log("[Server Boot] Supabase credentials empty in env/file. Attempting Firestore fallback...");
@@ -106,14 +110,27 @@ async function startServer() {
       if (firestoreConfig) {
         supabaseUrl = firestoreConfig.supabaseUrl;
         supabaseKey = firestoreConfig.supabaseKey;
+        // Also check for service key in firestore if possible
         console.log(`[Server Boot] Successfully restored Supabase credentials from Firestore settings: ${supabaseUrl}`);
       }
     }
 
     if (supabaseUrl && supabaseKey) {
        supabaseAdmin = createClient(supabaseUrl, supabaseKey);
-       console.log("Supabase Backend initialized successfully");
-    } else {
+       console.log("Supabase Backend (Anon) initialized successfully");
+    }
+
+    if (supabaseUrl && supabaseServiceKey) {
+       supabaseServiceRole = createClient(supabaseUrl, supabaseServiceKey, {
+         auth: {
+           autoRefreshToken: false,
+           persistSession: false
+         }
+       });
+       console.log("Supabase Backend (Service Role) initialized successfully");
+    }
+
+    if (!supabaseAdmin && !supabaseServiceRole) {
        console.warn("Missing Supabase credentials in server.ts");
     }
   } catch (err) {
@@ -125,37 +142,45 @@ async function startServer() {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     let fileUrl = "";
     let fileKey = "";
+    let fileServiceKey = "";
     try {
       const data = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
       const parsed = JSON.parse(data);
       fileUrl = parsed.supabaseUrl || "";
       fileKey = parsed.supabaseKey || "";
+      fileServiceKey = parsed.supabaseServiceKey || "";
     } catch (e) {}
 
     let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
     let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
+    let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || fileServiceKey || "";
     
-    if (!supabaseUrl || !supabaseKey) {
-      const firestoreConfig = await getSupabaseCredentialsFromFirestore();
-      if (firestoreConfig) {
-        supabaseUrl = firestoreConfig.supabaseUrl;
-        supabaseKey = firestoreConfig.supabaseKey;
-        console.log(`[Server API] Found Supabase configuration in Firestore fallback: ${supabaseUrl}`);
-      }
-    }
-
-    res.json({ supabaseUrl, supabaseKey });
+    res.json({ supabaseUrl, supabaseKey, supabaseServiceKey });
   });
 
   app.post("/api/supabase-config", async (req, res) => {
     try {
-      const { supabaseUrl, supabaseKey } = req.body;
+      const { supabaseUrl, supabaseKey, supabaseServiceKey } = req.body;
       if (!supabaseUrl || !supabaseKey) {
         return res.status(400).json({ error: "supabaseUrl and supabaseKey are required" });
       }
 
-      await fs.writeFile(SUPABASE_CONFIG_FILE, JSON.stringify({ supabaseUrl, supabaseKey }, null, 2));
+      await fs.writeFile(SUPABASE_CONFIG_FILE, JSON.stringify({ 
+        supabaseUrl, 
+        supabaseKey, 
+        supabaseServiceKey: supabaseServiceKey || "" 
+      }, null, 2));
+      
       supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+      if (supabaseServiceKey) {
+        supabaseServiceRole = createClient(supabaseUrl, supabaseServiceKey, {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        });
+      }
+      
       console.log(`Supabase Backend configured & re-initialized via API successfully targeting: ${supabaseUrl}`);
 
       // Replicate configured credentials to Firestore settings so all containers/devices sync instantly
@@ -164,6 +189,7 @@ async function startServer() {
         await db.collection('settings').doc('supabase_credential').set({
           supabaseUrl,
           supabaseKey,
+          supabaseServiceKey: supabaseServiceKey || "",
           updatedAt: Date.now()
         }, { merge: true });
         console.log(`[Server API] Replicated credentials to Firestore settings successfully.`);
@@ -698,6 +724,119 @@ Please ask me your query or select a quick question template below!`;
     } catch (routeErr: any) {
       console.error("AI chat router error:", routeErr);
       res.status(500).json({ error: "Internal AI processing failed" });
+    }
+  });
+
+  // Admin Customer Management Endpoint
+  app.post("/api/admin/create-customer", async (req, res) => {
+    try {
+      if (!supabaseServiceRole) {
+        return res.status(500).json({ 
+          error: "Supabase Service Role key is not configured. Admin actions are disabled." 
+        });
+      }
+
+      const { name, email, password, phone, role = 'customer', ...otherData } = req.body;
+
+      if (!email || !password || !name) {
+        return res.status(400).json({ error: "Name, email and password are required" });
+      }
+
+      // 1. Create User in Supabase Auth
+      const { data: authUser, error: authError } = await supabaseServiceRole.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name, role }
+      });
+
+      if (authError) {
+        console.error("[Admin Create Customer] Auth Error:", authError);
+        return res.status(400).json({ error: "Customer could not be created. Please try again." });
+      }
+
+      const userId = authUser.user.id;
+
+      // 2. Insert into public.users table
+      const userProfile = {
+        id: userId,
+        uid: userId,
+        name,
+        email,
+        phone: phone || '',
+        role,
+        status: 'Active',
+        created_at: new Date().toISOString(),
+        ...otherData.profileData
+      };
+
+      const { error: userError } = await supabaseServiceRole.from('users').upsert([userProfile]);
+      if (userError) {
+        console.error("[Admin Create Customer] Users Table Error:", userError);
+        // We don't necessarily abort if only one table fails, but it's bad.
+      }
+
+      // 3. Insert into public.customers table
+      const customerRecord = {
+        id: userId,
+        name,
+        emails: [email],
+        phones: phone ? [phone] : [],
+        password: password, // For admin reference if needed, though usually hashed in Auth
+        status: 'Active',
+        customer_type: 'New',
+        created_at: Date.now(),
+        ...otherData.customerData
+      };
+
+      const { error: customerError } = await supabaseServiceRole.from('customers').upsert([customerRecord]);
+      if (customerError) {
+        console.error("[Admin Create Customer] Customers Table Error:", customerError);
+      }
+
+      if (userError && customerError) {
+        return res.status(500).json({ error: "Customer could not be created. Please try again." });
+      }
+
+      res.json({ 
+        status: "success", 
+        message: "Customer created successfully",
+        user: authUser.user
+      });
+
+    } catch (err: any) {
+      console.error("[Admin Create Customer] Fatal Error:", err);
+      res.status(500).json({ error: "Customer could not be created. Please try again." });
+    }
+  });
+
+  app.post("/api/admin/update-customer", async (req, res) => {
+    try {
+      if (!supabaseServiceRole) {
+        return res.status(500).json({ error: "Supabase Service Role key missing." });
+      }
+
+      const { id, updates } = req.body;
+      if (!id) return res.status(400).json({ error: "Customer ID is required" });
+
+      // If password is being updated
+      if (updates.password) {
+        const { error: authError } = await supabaseServiceRole.auth.admin.updateUserById(id, {
+          password: updates.password
+        });
+        if (authError) {
+          console.error("[Admin Update Customer] Auth Error:", authError);
+        }
+      }
+
+      // Update DB tables
+      const { error: userError } = await supabaseServiceRole.from('users').update(updates).eq('id', id);
+      const { error: customerError } = await supabaseServiceRole.from('customers').update(updates).eq('id', id);
+
+      res.json({ status: "success" });
+    } catch (err: any) {
+      console.error("[Admin Update Customer] Fatal Error:", err);
+      res.status(500).json({ error: "Customer update failed" });
     }
   });
 

@@ -689,7 +689,9 @@ function AdminCustomerAdd() {
   const addEmail = () => setFormData({ ...formData, emails: [...formData.emails, ''] });
   const removeEmail = (index: number) => setFormData({ ...formData, emails: formData.emails.filter((_, i) => i !== index) });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
@@ -718,16 +720,20 @@ function AdminCustomerAdd() {
       if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Passwords entries do not match.';
       }
+    } else if (!id) {
+       newErrors.password = 'Password is required for new accounts.';
     }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      // scroll to top to see error notice
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    const saveCustomer = async () => {
+    setIsSubmitting(true);
+    const toastId = (await import('react-hot-toast')).default.loading(id ? 'Updating customer...' : 'Creating customer...');
+
+    try {
       // Prepare Occasion strings separated by '|' separators
       const occasionJoined = specialDays.length > 0 
         ? specialDays.map(d => d.name.trim()).join(' | ') 
@@ -737,12 +743,21 @@ function AdminCustomerAdd() {
         ? specialDays.map(d => {
             const parts = d.date.split('-');
             if (parts.length === 3 && parts[0].length === 4) {
-              // YYYY-MM-DD -> DD-MM-YYYY format
               return `${parts[2]}-${parts[1]}-${parts[0]}`;
             }
             return d.date;
           }).join(' | ')
         : '';
+
+      let profileImageUrl = formData.profileImage;
+
+      // If profile image is a data URL (newly cropped), upload it
+      if (formData.profileImage && formData.profileImage.startsWith('data:')) {
+        const { uploadImage } = await import('../../lib/imageUtils');
+        const res = await fetch(formData.profileImage);
+        const blob = await res.blob();
+        profileImageUrl = await uploadImage(blob, 'customers', `avatar-${Date.now()}.jpg`);
+      }
 
       const { confirmPassword, ...payload } = formData;
       if (id && !payload.password) {
@@ -751,77 +766,26 @@ function AdminCustomerAdd() {
 
       const finalPayload = {
         ...payload,
+        profileImage: profileImageUrl,
         occasionName: occasionJoined,
         specialDate: datesJoined
       };
 
       if (id) {
         await updateCustomer(id, finalPayload as any);
+        (await import('react-hot-toast')).default.success('Customer updated successfully', { id: toastId });
       } else {
         await addCustomer(finalPayload as any);
+        (await import('react-hot-toast')).default.success('Customer created successfully', { id: toastId });
       }
 
       navigate('/admin/customers');
-    };
-
-    // If profile image is a data URL (newly cropped), upload it
-    if (formData.profileImage && formData.profileImage.startsWith('data:')) {
-      const uploadAndSave = async () => {
-        try {
-          const { uploadImage } = await import('../../lib/imageUtils');
-          const res = await fetch(formData.profileImage);
-          const blob = await res.blob();
-          const downloadUrl = await uploadImage(blob, 'customers', `avatar-${Date.now()}.jpg`);
-          
-          setFormData(prev => {
-            const next = { ...prev, profileImage: downloadUrl };
-            // We use the local version of finalPayload construction within saveCustomer
-            // but we need to ensure the payload includes the NEW downloadUrl.
-            // Simplified: update state then call save logic with the NEW value.
-            return next;
-          });
-          
-          // Re-derive payload with the new URL for immediate save
-          const occasionJoined = specialDays.length > 0 
-            ? specialDays.map(d => d.name.trim()).join(' | ') 
-            : '';
-          
-          const datesJoined = specialDays.length > 0
-            ? specialDays.map(d => {
-                const parts = d.date.split('-');
-                if (parts.length === 3 && parts[0].length === 4) {
-                  return `${parts[2]}-${parts[1]}-${parts[0]}`;
-                }
-                return d.date;
-              }).join(' | ')
-            : '';
-
-          const { confirmPassword, ...payload } = formData;
-          if (id && !payload.password) {
-            delete (payload as any).password;
-          }
-
-          const finalPayload = {
-            ...payload,
-            profileImage: downloadUrl,
-            occasionName: occasionJoined,
-            specialDate: datesJoined
-          };
-
-          if (id) {
-            await updateCustomer(id, finalPayload as any);
-          } else {
-            await addCustomer(finalPayload as any);
-          }
-          navigate('/admin/customers');
-        } catch (err) {
-          console.error(err);
-          setErrors({ submit: 'Failed to upload image. Please try again.' });
-        }
-      };
-      uploadAndSave();
-    } else {
-      saveCustomer();
+    } catch (err: any) {
+      console.error("[Customer Enrollment Error]:", err);
+      (await import('react-hot-toast')).default.error('Customer could not be created. Please try again.', { id: toastId });
+      setErrors({ submit: 'Customer could not be created. Please try again. Internal error logged.' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1306,9 +1270,17 @@ function AdminCustomerAdd() {
             </button>
             <button 
               type="submit"
-              className="h-11 px-8 bg-zinc-950 text-white hover:bg-zinc-850 text-[10s] font-black uppercase tracking-widest border border-black flex items-center justify-center transition-colors rounded-lg"
+              disabled={isSubmitting}
+              className={`h-11 px-8 bg-zinc-950 text-white hover:bg-zinc-850 text-[10s] font-black uppercase tracking-widest border border-black flex items-center justify-center transition-colors rounded-lg ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              Sync Client to Database
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Syncing...
+                </>
+              ) : (
+                'Sync Client to Database'
+              )}
             </button>
           </div>
 

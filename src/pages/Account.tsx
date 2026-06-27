@@ -31,6 +31,34 @@ const getStatusIcon = (statusName: string) => {
   return Users;
 };
 
+const darazStatusItems = [
+  {
+    label: 'To Pay',
+    backendStatuses: ['placed'],
+    icon: Wallet,
+  },
+  {
+    label: 'To Ship',
+    backendStatuses: ['pending'],
+    icon: Package,
+  },
+  {
+    label: 'To Receive',
+    backendStatuses: ['processing'],
+    icon: Truck,
+  },
+  {
+    label: 'To Review',
+    backendStatuses: ['confirmed'],
+    icon: MessageSquare,
+  },
+  {
+    label: 'Returns & Cancellations',
+    backendStatuses: ['cancelled', 'returned'],
+    icon: RefreshCcw,
+  },
+];
+
 export default function Account() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
@@ -83,6 +111,10 @@ export default function Account() {
   // Map state filter based on active badge selection
   const filteredOrders = useMemo(() => {
     if (!activeFilter) return userOrders;
+    const item = darazStatusItems.find(i => i.label === activeFilter);
+    if (item) {
+      return userOrders.filter(o => item.backendStatuses.includes(o.status.toLowerCase()));
+    }
     return userOrders.filter(o => o.status.toLowerCase() === activeFilter.toLowerCase());
   }, [userOrders, activeFilter]);
 
@@ -231,16 +263,22 @@ export default function Account() {
 
           {/* Dynamic Status Cards with Horizontal Scroll and Active Highlight */}
           <div className="flex gap-3 overflow-x-auto pb-4 pt-3 px-4 scroll-smooth no-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            {trackingStatuses.map((status, i) => {
-              const count = userOrders.filter(o => o.status.toLowerCase() === status.toLowerCase()).length;
-              const isTrackingActive = activeTrackingOrder && activeTrackingOrder.status.toLowerCase() === status.toLowerCase();
-              const isFilteredActive = activeFilter && activeFilter.toLowerCase() === status.toLowerCase();
-              const IconComp = getStatusIcon(status);
+            {darazStatusItems.map((item, i) => {
+              const count = userOrders.filter(o => item.backendStatuses.includes(o.status.toLowerCase())).length;
+              const isTrackingActive = activeTrackingOrder && item.backendStatuses.includes(activeTrackingOrder.status.toLowerCase());
+              const isFilteredActive = activeFilter === item.label;
+              const IconComp = item.icon;
 
               return (
                 <button
                   key={i}
-                  onClick={() => setActiveFilter(prev => prev === status ? null : status)}
+                  onClick={() => {
+                    if (item.label === 'To Review') {
+                      navigate('/orders/to-review');
+                    } else {
+                      setActiveFilter(prev => prev === item.label ? null : item.label);
+                    }
+                  }}
                   className={cn(
                     "flex flex-col items-center justify-center gap-2 px-4 py-3 border rounded-xl cursor-pointer transition-all shrink-0 min-w-[95px] relative",
                     isTrackingActive 
@@ -266,16 +304,14 @@ export default function Account() {
                     "w-5 h-5 transition-colors",
                     isTrackingActive 
                       ? "text-white" 
-                      : isFilteredActive
-                        ? "text-slate-900" 
-                        : "text-gray-400"
+                      : "text-black"
                   )} />
 
                   <span className={cn(
                     "text-[9px] uppercase tracking-wider font-extrabold text-center block max-w-[85px] truncate",
-                    isTrackingActive ? "text-white" : "text-inherit"
+                    isTrackingActive ? "text-white" : "text-black"
                   )}>
-                    {status}
+                    {item.label}
                   </span>
                   
                   {isTrackingActive && (

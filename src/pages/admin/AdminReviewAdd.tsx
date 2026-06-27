@@ -174,22 +174,13 @@ export default function AdminReviewAdd() {
         createdAt: new Date(createdAt).toISOString()
       } as any);
 
-      toast.success('Review added successfully');
+      toast.success('Review Published Successfully!');
       navigate('/admin/reviews/list');
     } catch (err: any) {
-      console.error(err);
-      if (err.title) {
-        setDetailedError({
-          ...err,
-          title: `❌ Review could not be saved`
-        });
-      } else {
-        setDetailedError({
-          title: `❌ Review could not be saved`,
-          reason: err.message || "An unexpected database error occurred.",
-          solution: "Please check your network connection and try again."
-        });
-      }
+      console.error("[Review Publish Flow Error]:", err);
+      // Show generic error to user, log technical details internally
+      toast.error('Review could not be published. Please try again.');
+      setDetailedError(null);
     } finally {
       setIsSubmitting(false);
     }

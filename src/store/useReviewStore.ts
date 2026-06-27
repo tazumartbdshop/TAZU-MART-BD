@@ -40,7 +40,7 @@ interface ReviewState {
   
   // Actions
   fetchReviews: (silent?: boolean) => Promise<void>;
-  addReview: (review: Omit<ProductReview, 'reviewId' | 'createdAt' | 'status'> & { status?: 'pending' | 'approved' | 'hidden' | 'rejected' }) => Promise<void>;
+  addReview: (review: Omit<ProductReview, 'reviewId' | 'createdAt' | 'status'> & { status?: 'pending' | 'approved' | 'hidden' | 'rejected', createdAt?: string }) => Promise<void>;
   updateReview: (reviewId: string, updates: Partial<Omit<ProductReview, 'reviewId' | 'productId' | 'customerId' | 'createdAt'>>) => Promise<void>;
   approveReview: (reviewId: string) => Promise<void>;
   hideReview: (reviewId: string) => Promise<void>;

@@ -19,10 +19,11 @@ export default function AdminReviewDetail() {
   const navigate = useNavigate();
   const { reviews, updateReview, deleteReview, fetchReviews } = useReviewStore();
   const { products } = useProductStore();
-  const { customers } = useCustomerStore();
+  const { customers, fetchCustomers } = useCustomerStore();
 
   useEffect(() => {
     fetchReviews();
+    fetchCustomers();
   }, []);
 
   const review = reviews.find(r => r.reviewId === id);
