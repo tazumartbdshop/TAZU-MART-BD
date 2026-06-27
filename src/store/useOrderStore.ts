@@ -294,6 +294,19 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const dbPayload = objectToSnake(newOrder);
       // Fix numeric discount type mapping for database insert
       dbPayload.discount = newOrder.discount?.amount || 0;
+
+      // Fix items mismatch: frontend has array, DB expects numeric
+      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items.length : 0;
+      
+      // Fix orderId mismatch: frontend has string, DB expects text[] (array of strings)
+      if (newOrder.orderId) {
+        dbPayload.order_id = [newOrder.orderId];
+      }
+      
+      // Fix customerName mismatch: DB expects text[] array
+      if (newOrder.customerName) {
+        dbPayload.customer_name = [newOrder.customerName];
+      }
       
       supabase.from('orders').insert([dbPayload]).then(({error}) => {
         if (error) console.warn("[Supabase Sync Error]", error);
@@ -352,6 +365,16 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       
       // Fix items mismatch: frontend has array, DB expects numeric (likely item count)
       dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items.length : 0;
+      
+      // Fix orderId mismatch: frontend has string, DB expects text[] (array of strings)
+      if (newOrder.orderId) {
+        dbPayload.order_id = [newOrder.orderId];
+      }
+      
+      // Fix customerName mismatch: DB expects text[] array
+      if (newOrder.customerName) {
+        dbPayload.customer_name = [newOrder.customerName];
+      }
       
       // Fix type mismatch: frontend has string ('Online'/'Offline'), DB expects numeric
       dbPayload.type = newOrder.type === 'Online' ? 1 : 2;
@@ -447,6 +470,14 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       
       if ('items' in dbPayload) {
         dbPayload.items = Array.isArray(dbPayload.items) ? dbPayload.items.length : 0;
+      }
+
+      if ('order_id' in dbPayload && typeof dbPayload.order_id === 'string') {
+        dbPayload.order_id = [dbPayload.order_id];
+      }
+      
+      if ('customer_name' in dbPayload && typeof dbPayload.customer_name === 'string') {
+        dbPayload.customer_name = [dbPayload.customer_name];
       }
       
       if ('type' in dbPayload) {
@@ -553,6 +584,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
     const loadOrders = async () => {
         const { data, error } = await supabase.from('orders').select('*').order('date', { ascending: false });
+        
+        // Also fetch order items to attach them
+        const { data: itemsData } = await supabase.from('order_items').select('*');
+
         if (!error && data) {
             set({ orders: (data as any[]).map(row => {
                const parsed = objectToCamel(row);
@@ -562,6 +597,36 @@ export const useOrderStore = create<OrderState>((set, get) => ({
                if (typeof parsed.mobileNumber === 'number') {
                  parsed.mobileNumber = '0' + parsed.mobileNumber.toString();
                }
+               
+               // Parse statusHistory back to array
+               if (typeof parsed.statusHistory === 'string') {
+                 try {
+                   parsed.statusHistory = JSON.parse(parsed.statusHistory);
+                 } catch(e) {
+                   parsed.statusHistory = [];
+                 }
+               }
+
+               // Attach actual items from order_items table
+               if (itemsData) {
+                 const orderItems = itemsData.filter(item => item.order_id === parsed.orderId);
+                 if (orderItems.length > 0) {
+                   parsed.items = orderItems.map(item => ({
+                     productId: item.product_id,
+                     name: item.product_name,
+                     price: item.product_price,
+                     quantity: item.quantity,
+                     image: item.product_image,
+                     variant: 'Default'
+                   }));
+                 }
+               }
+               
+               if (typeof parsed.items === 'number' || !parsed.items) {
+                 // Fallback if no items found in order_items
+                 parsed.items = [];
+               }
+
                return parsed;
             }) as Order[] });
         } else {

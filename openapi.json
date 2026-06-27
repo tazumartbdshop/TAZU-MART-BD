@@ -1,0 +1,5367 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "",
+    "title": "standard public schema",
+    "version": "14.5"
+  },
+  "host": "gaqyfjztpxvzijouiwwh.supabase.co:443",
+  "basePath": "/",
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json",
+    "application/vnd.pgrst.object+json;nulls=stripped",
+    "application/vnd.pgrst.object+json",
+    "text/csv"
+  ],
+  "produces": [
+    "application/json",
+    "application/vnd.pgrst.object+json;nulls=stripped",
+    "application/vnd.pgrst.object+json",
+    "text/csv"
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "produces": [
+          "application/openapi+json",
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "summary": "OpenAPI description (this document)",
+        "tags": [
+          "Introspection"
+        ]
+      }
+    },
+    "/banners": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.banners.banner_size"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.banner_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_enabled"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.connected_product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.created_date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.is_custom_button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.locations"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.original_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.cta_destination"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.destination_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.cta_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.cta_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.offer_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.discount_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.background_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.background_gradient"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.is_gradient"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.text_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_text_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.border_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.font_family"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.font_size"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.font_weight"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.italic"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.alignment"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.logo_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.product_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.sticker_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.sticker_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.countdown_enabled"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.countdown_date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.connected_category_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.connected_offer_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.updated_at"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/banners"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "banners"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.banners"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "banners"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.banners.banner_size"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.banner_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_enabled"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.connected_product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.created_date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.is_custom_button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.locations"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.original_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.cta_destination"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.destination_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.cta_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.cta_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.offer_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.discount_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.background_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.background_gradient"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.is_gradient"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.text_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_text_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.border_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.font_family"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.font_size"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.font_weight"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.italic"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.alignment"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.logo_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.product_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.sticker_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.sticker_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.countdown_enabled"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.countdown_date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.connected_category_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.connected_offer_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.updated_at"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "banners"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.banners.banner_size"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.banner_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_enabled"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.connected_product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.created_date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.is_custom_button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.locations"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.original_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.cta_destination"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.destination_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.cta_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.cta_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.offer_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.discount_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.background_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.background_gradient"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.is_gradient"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.text_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.button_text_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.border_color"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.font_family"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.font_size"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.font_weight"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.italic"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.alignment"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.logo_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.product_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.sticker_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.sticker_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.countdown_enabled"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.countdown_date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.connected_category_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.connected_offer_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners.updated_at"
+          },
+          {
+            "$ref": "#/parameters/body.banners"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "banners"
+        ]
+      }
+    },
+    "/orders": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.orders.mobile_number"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.invoice_no"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.devision"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.district"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.upazila"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.save_address"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.notes"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.payment_status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.subtotal"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.discount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.reword_coins"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.delivery_charge"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.tax"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.total_amount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.items"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.order_status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.bill_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.city_area"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.delivery_mode"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.due_amount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.is_read"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.paid_amount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.payment_method"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.product_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.promo_code_used"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status_history"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status_updated_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.total"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.order_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.full_address"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.landmark"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.customer_name"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/orders"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "orders"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.orders"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "orders"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.orders.mobile_number"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.invoice_no"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.devision"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.district"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.upazila"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.save_address"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.notes"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.payment_status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.subtotal"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.discount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.reword_coins"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.delivery_charge"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.tax"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.total_amount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.items"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.order_status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.bill_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.city_area"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.delivery_mode"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.due_amount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.is_read"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.paid_amount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.payment_method"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.product_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.promo_code_used"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status_history"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status_updated_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.total"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.order_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.full_address"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.landmark"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.customer_name"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "orders"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.orders.mobile_number"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.invoice_no"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.devision"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.district"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.upazila"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.save_address"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.notes"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.payment_status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.subtotal"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.discount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.reword_coins"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.delivery_charge"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.tax"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.total_amount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.items"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.order_status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.bill_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.city_area"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.delivery_mode"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.due_amount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.is_read"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.paid_amount"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.payment_method"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.product_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.promo_code_used"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status_history"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status_updated_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.total"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.order_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.full_address"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.landmark"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.customer_name"
+          },
+          {
+            "$ref": "#/parameters/body.orders"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/properties": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.properties.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.user_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.title"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.address"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.category"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.image_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.created_at"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/properties"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "properties"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.properties"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "properties"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.properties.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.user_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.title"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.address"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.category"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.image_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.created_at"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "properties"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.properties.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.user_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.title"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.address"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.category"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.image_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.properties.created_at"
+          },
+          {
+            "$ref": "#/parameters/body.properties"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "properties"
+        ]
+      }
+    },
+    "/banners_draft": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.banner_size"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.banner_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.button_enabled"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.button_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.connected_product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.created_date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.is_custom_button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.locations"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.id"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/banners_draft"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "banners_draft"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.banners_draft"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "banners_draft"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.banner_size"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.banner_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.button_enabled"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.button_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.connected_product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.created_date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.is_custom_button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.locations"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.id"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "banners_draft"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.banner_size"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.banner_type"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.button_enabled"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.button_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.connected_product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.created_date"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.is_custom_button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.locations"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.banners_draft.id"
+          },
+          {
+            "$ref": "#/parameters/body.banners_draft"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "banners_draft"
+        ]
+      }
+    },
+    "/settings": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.settings.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.settings.value"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/settings"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.settings"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "settings"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.settings.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.settings.value"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.settings.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.settings.value"
+          },
+          {
+            "$ref": "#/parameters/body.settings"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/products": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.products.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.sku"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.discount_price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.stock"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.category"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.thumbnail"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.keywords"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.display_order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.banner_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.brand"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.buying_price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.featured_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.image_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.images"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_best_selling"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_flash_sale"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_new"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_offer"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_regular"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_trending"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.media_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.rating"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.reviews"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.reward_coins"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.seo_points"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.shipping_zones"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.sold_count"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.unit_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.variants"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.video_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.warranty"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/products"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "products"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.products"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "products"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.products.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.sku"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.discount_price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.stock"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.category"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.thumbnail"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.keywords"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.display_order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.banner_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.brand"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.buying_price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.featured_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.image_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.images"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_best_selling"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_flash_sale"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_new"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_offer"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_regular"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_trending"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.media_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.rating"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.reviews"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.reward_coins"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.seo_points"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.shipping_zones"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.sold_count"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.unit_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.variants"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.video_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.warranty"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "products"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.products.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.sku"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.discount_price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.stock"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.category"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.thumbnail"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.keywords"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.display_order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.banner_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.brand"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.buying_price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.featured_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.image_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.images"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_best_selling"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_flash_sale"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_new"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_offer"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_regular"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.is_trending"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.media_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.rating"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.reviews"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.reward_coins"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.seo_points"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.shipping_zones"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.sold_count"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.unit_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.variants"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.video_url"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.products.warranty"
+          },
+          {
+            "$ref": "#/parameters/body.products"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/inquiries": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.website_domain"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.phone"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.message"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.updated_at"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/inquiries"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "inquiries"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.inquiries"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "inquiries"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.website_domain"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.phone"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.message"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.updated_at"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "inquiries"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.website_domain"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.phone"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.message"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.inquiries.updated_at"
+          },
+          {
+            "$ref": "#/parameters/body.inquiries"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "inquiries"
+        ]
+      }
+    },
+    "/order_items": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.quantity"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.subtotal"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.order_id"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/order_items"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "order_items"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.order_items"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "order_items"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.quantity"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.subtotal"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.order_id"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "order_items"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.product_price"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.quantity"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.subtotal"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.order_items.order_id"
+          },
+          {
+            "$ref": "#/parameters/body.order_items"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "order_items"
+        ]
+      }
+    },
+    "/liked_properties": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.user_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.property_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.created_at"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/liked_properties"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "liked_properties"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.liked_properties"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "liked_properties"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.user_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.property_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.created_at"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "liked_properties"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.user_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.property_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.liked_properties.created_at"
+          },
+          {
+            "$ref": "#/parameters/body.liked_properties"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "liked_properties"
+        ]
+      }
+    },
+    "/categories": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.categories.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.bannerName"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.slug"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.bannerImage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.bannerImages"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.iconImage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.wideBannerImage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.buttonText"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.buttonLink"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.featuredProducts"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.displayOrder"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.showOnHomepage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.createdAt"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.metaTitle"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.metaDescription"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.keywords"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.isDemo"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.sliderSettings"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.banner_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.banner_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.banner_images"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.icon_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.wide_banner_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.button_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.featured_products"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.display_order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.show_on_homepage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.meta_title"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.meta_description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.is_demo"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.slider_settings"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/categories"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "categories"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.categories"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "categories"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.categories.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.bannerName"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.slug"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.bannerImage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.bannerImages"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.iconImage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.wideBannerImage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.buttonText"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.buttonLink"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.featuredProducts"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.displayOrder"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.showOnHomepage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.createdAt"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.metaTitle"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.metaDescription"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.keywords"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.isDemo"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.sliderSettings"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.banner_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.banner_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.banner_images"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.icon_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.wide_banner_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.button_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.featured_products"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.display_order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.show_on_homepage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.meta_title"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.meta_description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.is_demo"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.slider_settings"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "categories"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.categories.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.bannerName"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.slug"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.bannerImage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.bannerImages"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.iconImage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.wideBannerImage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.buttonText"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.buttonLink"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.featuredProducts"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.displayOrder"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.status"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.showOnHomepage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.createdAt"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.metaTitle"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.metaDescription"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.keywords"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.isDemo"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.sliderSettings"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.banner_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.banner_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.banner_images"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.icon_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.wide_banner_image"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.button_text"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.button_link"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.featured_products"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.display_order"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.show_on_homepage"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.created_at"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.meta_title"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.meta_description"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.is_demo"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.categories.slider_settings"
+          },
+          {
+            "$ref": "#/parameters/body.categories"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "categories"
+        ]
+      }
+    },
+    "/reviews": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.reviews.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.reviews.product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.reviews.user_id"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/reviews"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "reviews"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.reviews"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "reviews"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.reviews.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.reviews.product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.reviews.user_id"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "reviews"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.reviews.id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.reviews.product_id"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.reviews.user_id"
+          },
+          {
+            "$ref": "#/parameters/body.reviews"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
+    "/rpc/rls_auto_enable": {
+      "post": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "args",
+            "required": true,
+            "schema": {
+              "type": "object"
+            }
+          },
+          {
+            "$ref": "#/parameters/preferParams"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/vnd.pgrst.object+json;nulls=stripped",
+          "application/vnd.pgrst.object+json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "(rpc) rls_auto_enable"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "banners": {
+      "properties": {
+        "banner_size": {
+          "format": "text",
+          "type": "string"
+        },
+        "banner_type": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_enabled": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_link": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_text": {
+          "format": "text",
+          "type": "string"
+        },
+        "connected_product_id": {
+          "format": "text",
+          "type": "string"
+        },
+        "created_date": {
+          "format": "text",
+          "type": "string"
+        },
+        "image": {
+          "format": "text",
+          "type": "string"
+        },
+        "is_custom_button_text": {
+          "format": "text",
+          "type": "string"
+        },
+        "locations": {
+          "format": "text",
+          "type": "string"
+        },
+        "name": {
+          "format": "text",
+          "type": "string"
+        },
+        "order": {
+          "format": "text",
+          "type": "string"
+        },
+        "status": {
+          "format": "text",
+          "type": "string"
+        },
+        "id": {
+          "format": "text",
+          "type": "string"
+        },
+        "original_image": {
+          "format": "text",
+          "type": "string"
+        },
+        "description": {
+          "format": "text",
+          "type": "string"
+        },
+        "cta_destination": {
+          "format": "text",
+          "type": "string"
+        },
+        "destination_type": {
+          "format": "text",
+          "type": "string"
+        },
+        "cta_text": {
+          "format": "text",
+          "type": "string"
+        },
+        "cta_link": {
+          "format": "text",
+          "type": "string"
+        },
+        "offer_text": {
+          "format": "text",
+          "type": "string"
+        },
+        "discount_text": {
+          "format": "text",
+          "type": "string"
+        },
+        "background_color": {
+          "format": "text",
+          "type": "string"
+        },
+        "background_gradient": {
+          "format": "text",
+          "type": "string"
+        },
+        "is_gradient": {
+          "default": false,
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "text_color": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_color": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_text_color": {
+          "format": "text",
+          "type": "string"
+        },
+        "border_color": {
+          "format": "text",
+          "type": "string"
+        },
+        "font_family": {
+          "format": "text",
+          "type": "string"
+        },
+        "font_size": {
+          "format": "text",
+          "type": "string"
+        },
+        "font_weight": {
+          "format": "text",
+          "type": "string"
+        },
+        "italic": {
+          "default": false,
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "alignment": {
+          "format": "text",
+          "type": "string"
+        },
+        "logo_image": {
+          "format": "text",
+          "type": "string"
+        },
+        "product_image": {
+          "format": "text",
+          "type": "string"
+        },
+        "sticker_type": {
+          "format": "text",
+          "type": "string"
+        },
+        "sticker_text": {
+          "format": "text",
+          "type": "string"
+        },
+        "countdown_enabled": {
+          "default": false,
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "countdown_date": {
+          "format": "text",
+          "type": "string"
+        },
+        "connected_category_id": {
+          "format": "text",
+          "type": "string"
+        },
+        "connected_offer_id": {
+          "format": "text",
+          "type": "string"
+        },
+        "created_at": {
+          "default": "now()",
+          "format": "timestamp with time zone",
+          "type": "string"
+        },
+        "updated_at": {
+          "default": "now()",
+          "format": "timestamp with time zone",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "orders": {
+      "required": [
+        "mobile_number"
+      ],
+      "properties": {
+        "mobile_number": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "invoice_no": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "devision": {
+          "format": "text",
+          "type": "string"
+        },
+        "district": {
+          "format": "text",
+          "type": "string"
+        },
+        "upazila": {
+          "format": "text",
+          "type": "string"
+        },
+        "save_address": {
+          "format": "text",
+          "type": "string"
+        },
+        "notes": {
+          "format": "text",
+          "type": "string"
+        },
+        "payment_status": {
+          "format": "text",
+          "type": "string"
+        },
+        "subtotal": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "discount": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "reword_coins": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "delivery_charge": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "tax": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "total_amount": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "items": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "order_status": {
+          "format": "text",
+          "type": "string"
+        },
+        "created_at": {
+          "default": "now()",
+          "format": "timestamp without time zone",
+          "type": "string"
+        },
+        "bill_id": {
+          "format": "text",
+          "type": "string"
+        },
+        "city_area": {
+          "format": "text",
+          "type": "string"
+        },
+        "date": {
+          "default": "now()",
+          "format": "timestamp without time zone",
+          "type": "string"
+        },
+        "delivery_mode": {
+          "format": "text",
+          "type": "string"
+        },
+        "due_amount": {
+          "format": "numeric[]",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "is_read": {
+          "format": "text",
+          "type": "string"
+        },
+        "id": {
+          "format": "text",
+          "type": "string"
+        },
+        "paid_amount": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "payment_method": {
+          "format": "text",
+          "type": "string"
+        },
+        "product_link": {
+          "format": "text",
+          "type": "string"
+        },
+        "promo_code_used": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "status": {
+          "format": "text",
+          "type": "string"
+        },
+        "status_history": {
+          "format": "text",
+          "type": "string"
+        },
+        "status_updated_at": {
+          "default": "now()",
+          "format": "timestamp without time zone",
+          "type": "string"
+        },
+        "total": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "type": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "order_id": {
+          "format": "text[]",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "full_address": {
+          "format": "text",
+          "type": "string"
+        },
+        "landmark": {
+          "format": "text",
+          "type": "string"
+        },
+        "customer_name": {
+          "format": "text",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "properties": {
+      "required": [
+        "id",
+        "title",
+        "description",
+        "price",
+        "address",
+        "category"
+      ],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "text",
+          "type": "string"
+        },
+        "user_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "title": {
+          "format": "text",
+          "type": "string"
+        },
+        "description": {
+          "format": "text",
+          "type": "string"
+        },
+        "price": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "address": {
+          "format": "text",
+          "type": "string"
+        },
+        "category": {
+          "format": "text",
+          "type": "string"
+        },
+        "image_url": {
+          "format": "text",
+          "type": "string"
+        },
+        "status": {
+          "default": "active",
+          "format": "text",
+          "type": "string"
+        },
+        "created_at": {
+          "default": "now()",
+          "format": "timestamp with time zone",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "banners_draft": {
+      "properties": {
+        "banner_size": {
+          "format": "text",
+          "type": "string"
+        },
+        "banner_type": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_enabled": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_link": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_text": {
+          "format": "text",
+          "type": "string"
+        },
+        "connected_product_id": {
+          "format": "text",
+          "type": "string"
+        },
+        "created_date": {
+          "format": "text",
+          "type": "string"
+        },
+        "image": {
+          "format": "text",
+          "type": "string"
+        },
+        "is_custom_button_text": {
+          "format": "text",
+          "type": "string"
+        },
+        "locations": {
+          "format": "text",
+          "type": "string"
+        },
+        "name": {
+          "format": "text",
+          "type": "string"
+        },
+        "order": {
+          "format": "text",
+          "type": "string"
+        },
+        "status": {
+          "format": "text",
+          "type": "string"
+        },
+        "id": {
+          "format": "text",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "settings": {
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "text",
+          "type": "string"
+        },
+        "value": {
+          "format": "jsonb"
+        }
+      },
+      "type": "object"
+    },
+    "products": {
+      "required": [
+        "id",
+        "name",
+        "sku",
+        "price"
+      ],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "text",
+          "type": "string"
+        },
+        "name": {
+          "format": "text",
+          "type": "string"
+        },
+        "sku": {
+          "format": "text",
+          "type": "string"
+        },
+        "price": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "discount_price": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "stock": {
+          "default": 0,
+          "format": "integer",
+          "type": "integer"
+        },
+        "category": {
+          "format": "text",
+          "type": "string"
+        },
+        "description": {
+          "format": "text",
+          "type": "string"
+        },
+        "image": {
+          "default": "'{}'::text[]",
+          "format": "text",
+          "type": "string"
+        },
+        "thumbnail": {
+          "format": "text",
+          "type": "string"
+        },
+        "status": {
+          "default": "Active",
+          "format": "text",
+          "type": "string"
+        },
+        "keywords": {
+          "default": "'{}'::text[]",
+          "format": "text",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "text",
+          "type": "string"
+        },
+        "display_order": {
+          "default": 1,
+          "format": "integer",
+          "type": "integer"
+        },
+        "banner_image": {
+          "format": "text",
+          "type": "string"
+        },
+        "brand": {
+          "format": "text",
+          "type": "string"
+        },
+        "buying_price": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "featured_image": {
+          "format": "text",
+          "type": "string"
+        },
+        "image_url": {
+          "format": "text",
+          "type": "string"
+        },
+        "images": {
+          "format": "text",
+          "type": "string"
+        },
+        "is_best_selling": {
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "is_flash_sale": {
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "is_new": {
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "is_offer": {
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "is_regular": {
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "is_trending": {
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "media_url": {
+          "format": "text",
+          "type": "string"
+        },
+        "rating": {
+          "format": "text",
+          "type": "string"
+        },
+        "reviews": {
+          "format": "text",
+          "type": "string"
+        },
+        "reward_coins": {
+          "format": "text",
+          "type": "string"
+        },
+        "seo_points": {
+          "format": "text",
+          "type": "string"
+        },
+        "shipping_zones": {
+          "format": "text",
+          "type": "string"
+        },
+        "sold_count": {
+          "format": "text",
+          "type": "string"
+        },
+        "unit_name": {
+          "format": "text",
+          "type": "string"
+        },
+        "variants": {
+          "format": "text",
+          "type": "string"
+        },
+        "video_url": {
+          "format": "text",
+          "type": "string"
+        },
+        "warranty": {
+          "format": "text",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "inquiries": {
+      "required": [
+        "id",
+        "name",
+        "phone",
+        "message",
+        "status",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "id": {
+          "default": "gen_random_uuid()",
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "uuid",
+          "type": "string"
+        },
+        "website_domain": {
+          "format": "text",
+          "type": "string"
+        },
+        "name": {
+          "format": "text",
+          "type": "string"
+        },
+        "phone": {
+          "format": "text",
+          "type": "string"
+        },
+        "message": {
+          "format": "text",
+          "type": "string"
+        },
+        "status": {
+          "default": "new",
+          "format": "text",
+          "type": "string"
+        },
+        "created_at": {
+          "default": "now()",
+          "format": "timestamp with time zone",
+          "type": "string"
+        },
+        "updated_at": {
+          "default": "now()",
+          "format": "timestamp with time zone",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "order_items": {
+      "properties": {
+        "product_id": {
+          "format": "text",
+          "type": "string"
+        },
+        "product_name": {
+          "format": "text",
+          "type": "string"
+        },
+        "product_image": {
+          "format": "text",
+          "type": "string"
+        },
+        "product_price": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "quantity": {
+          "format": "integer",
+          "type": "integer"
+        },
+        "subtotal": {
+          "format": "numeric",
+          "type": "number"
+        },
+        "created_at": {
+          "default": "now()",
+          "format": "timestamp with time zone",
+          "type": "string"
+        },
+        "id": {
+          "format": "text",
+          "type": "string"
+        },
+        "order_id": {
+          "format": "text",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "liked_properties": {
+      "required": [
+        "id",
+        "property_id"
+      ],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "bigint",
+          "type": "integer"
+        },
+        "user_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "property_id": {
+          "format": "text",
+          "type": "string"
+        },
+        "created_at": {
+          "default": "now()",
+          "format": "timestamp with time zone",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "categories": {
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "text",
+          "type": "string"
+        },
+        "name": {
+          "format": "text",
+          "type": "string"
+        },
+        "bannerName": {
+          "format": "text",
+          "type": "string"
+        },
+        "slug": {
+          "format": "text",
+          "type": "string"
+        },
+        "bannerImage": {
+          "format": "text",
+          "type": "string"
+        },
+        "bannerImages": {
+          "format": "jsonb"
+        },
+        "iconImage": {
+          "format": "text",
+          "type": "string"
+        },
+        "wideBannerImage": {
+          "format": "text",
+          "type": "string"
+        },
+        "buttonText": {
+          "format": "text",
+          "type": "string"
+        },
+        "buttonLink": {
+          "format": "text",
+          "type": "string"
+        },
+        "featuredProducts": {
+          "format": "text",
+          "type": "string"
+        },
+        "description": {
+          "format": "text",
+          "type": "string"
+        },
+        "displayOrder": {
+          "default": 0,
+          "format": "integer",
+          "type": "integer"
+        },
+        "status": {
+          "default": "Active",
+          "format": "text",
+          "type": "string"
+        },
+        "showOnHomepage": {
+          "default": true,
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "createdAt": {
+          "format": "text",
+          "type": "string"
+        },
+        "metaTitle": {
+          "format": "text",
+          "type": "string"
+        },
+        "metaDescription": {
+          "format": "text",
+          "type": "string"
+        },
+        "keywords": {
+          "format": "text",
+          "type": "string"
+        },
+        "isDemo": {
+          "default": false,
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "sliderSettings": {
+          "format": "jsonb"
+        },
+        "banner_name": {
+          "format": "text",
+          "type": "string"
+        },
+        "banner_image": {
+          "format": "text",
+          "type": "string"
+        },
+        "banner_images": {
+          "format": "text[]",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "icon_image": {
+          "format": "text",
+          "type": "string"
+        },
+        "wide_banner_image": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_text": {
+          "format": "text",
+          "type": "string"
+        },
+        "button_link": {
+          "format": "text",
+          "type": "string"
+        },
+        "featured_products": {
+          "format": "text",
+          "type": "string"
+        },
+        "display_order": {
+          "default": 1,
+          "format": "integer",
+          "type": "integer"
+        },
+        "show_on_homepage": {
+          "default": true,
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "created_at": {
+          "format": "text",
+          "type": "string"
+        },
+        "meta_title": {
+          "format": "text",
+          "type": "string"
+        },
+        "meta_description": {
+          "format": "text",
+          "type": "string"
+        },
+        "is_demo": {
+          "default": false,
+          "format": "boolean",
+          "type": "boolean"
+        },
+        "slider_settings": {
+          "format": "jsonb"
+        }
+      },
+      "type": "object"
+    },
+    "reviews": {
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "default": "gen_random_uuid()",
+          "description": "Note:\nThis is a Primary Key.<pk/>",
+          "format": "uuid",
+          "type": "string"
+        },
+        "product_id": {
+          "format": "uuid[]",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "user_id": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "parameters": {
+    "preferParams": {
+      "name": "Prefer",
+      "description": "Preference",
+      "required": false,
+      "in": "header",
+      "type": "string"
+    },
+    "preferReturn": {
+      "name": "Prefer",
+      "description": "Preference",
+      "required": false,
+      "enum": [
+        "return=representation",
+        "return=minimal",
+        "return=none"
+      ],
+      "in": "header",
+      "type": "string"
+    },
+    "preferCount": {
+      "name": "Prefer",
+      "description": "Preference",
+      "required": false,
+      "enum": [
+        "count=none"
+      ],
+      "in": "header",
+      "type": "string"
+    },
+    "preferPost": {
+      "name": "Prefer",
+      "description": "Preference",
+      "required": false,
+      "enum": [
+        "return=representation",
+        "return=minimal",
+        "return=none",
+        "resolution=ignore-duplicates",
+        "resolution=merge-duplicates"
+      ],
+      "in": "header",
+      "type": "string"
+    },
+    "select": {
+      "name": "select",
+      "description": "Filtering Columns",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "on_conflict": {
+      "name": "on_conflict",
+      "description": "On Conflict",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "order": {
+      "name": "order",
+      "description": "Ordering",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "range": {
+      "name": "Range",
+      "description": "Limiting and Pagination",
+      "required": false,
+      "in": "header",
+      "type": "string"
+    },
+    "rangeUnit": {
+      "name": "Range-Unit",
+      "description": "Limiting and Pagination",
+      "required": false,
+      "default": "items",
+      "in": "header",
+      "type": "string"
+    },
+    "offset": {
+      "name": "offset",
+      "description": "Limiting and Pagination",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "limit": {
+      "name": "limit",
+      "description": "Limiting and Pagination",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.banners": {
+      "name": "banners",
+      "description": "banners",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/banners"
+      }
+    },
+    "rowFilter.banners.banner_size": {
+      "name": "banner_size",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.banner_type": {
+      "name": "banner_type",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.button_enabled": {
+      "name": "button_enabled",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.button_link": {
+      "name": "button_link",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.button_text": {
+      "name": "button_text",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.connected_product_id": {
+      "name": "connected_product_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.created_date": {
+      "name": "created_date",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.image": {
+      "name": "image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.is_custom_button_text": {
+      "name": "is_custom_button_text",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.locations": {
+      "name": "locations",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.name": {
+      "name": "name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.order": {
+      "name": "order",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.status": {
+      "name": "status",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.original_image": {
+      "name": "original_image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.description": {
+      "name": "description",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.cta_destination": {
+      "name": "cta_destination",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.destination_type": {
+      "name": "destination_type",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.cta_text": {
+      "name": "cta_text",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.cta_link": {
+      "name": "cta_link",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.offer_text": {
+      "name": "offer_text",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.discount_text": {
+      "name": "discount_text",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.background_color": {
+      "name": "background_color",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.background_gradient": {
+      "name": "background_gradient",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.is_gradient": {
+      "name": "is_gradient",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.text_color": {
+      "name": "text_color",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.button_color": {
+      "name": "button_color",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.button_text_color": {
+      "name": "button_text_color",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.border_color": {
+      "name": "border_color",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.font_family": {
+      "name": "font_family",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.font_size": {
+      "name": "font_size",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.font_weight": {
+      "name": "font_weight",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.italic": {
+      "name": "italic",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.alignment": {
+      "name": "alignment",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.logo_image": {
+      "name": "logo_image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.product_image": {
+      "name": "product_image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.sticker_type": {
+      "name": "sticker_type",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.sticker_text": {
+      "name": "sticker_text",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.countdown_enabled": {
+      "name": "countdown_enabled",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.countdown_date": {
+      "name": "countdown_date",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.connected_category_id": {
+      "name": "connected_category_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.connected_offer_id": {
+      "name": "connected_offer_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.created_at": {
+      "name": "created_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners.updated_at": {
+      "name": "updated_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.orders": {
+      "name": "orders",
+      "description": "orders",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/orders"
+      }
+    },
+    "rowFilter.orders.mobile_number": {
+      "name": "mobile_number",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.invoice_no": {
+      "name": "invoice_no",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.devision": {
+      "name": "devision",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.district": {
+      "name": "district",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.upazila": {
+      "name": "upazila",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.save_address": {
+      "name": "save_address",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.notes": {
+      "name": "notes",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.payment_status": {
+      "name": "payment_status",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.subtotal": {
+      "name": "subtotal",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.discount": {
+      "name": "discount",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.reword_coins": {
+      "name": "reword_coins",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.delivery_charge": {
+      "name": "delivery_charge",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.tax": {
+      "name": "tax",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.total_amount": {
+      "name": "total_amount",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.items": {
+      "name": "items",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.order_status": {
+      "name": "order_status",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.created_at": {
+      "name": "created_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.bill_id": {
+      "name": "bill_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.city_area": {
+      "name": "city_area",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.date": {
+      "name": "date",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.delivery_mode": {
+      "name": "delivery_mode",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.due_amount": {
+      "name": "due_amount",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.is_read": {
+      "name": "is_read",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.paid_amount": {
+      "name": "paid_amount",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.payment_method": {
+      "name": "payment_method",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.product_link": {
+      "name": "product_link",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.promo_code_used": {
+      "name": "promo_code_used",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.status": {
+      "name": "status",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.status_history": {
+      "name": "status_history",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.status_updated_at": {
+      "name": "status_updated_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.total": {
+      "name": "total",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.type": {
+      "name": "type",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.order_id": {
+      "name": "order_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.full_address": {
+      "name": "full_address",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.landmark": {
+      "name": "landmark",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.customer_name": {
+      "name": "customer_name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.properties": {
+      "name": "properties",
+      "description": "properties",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/properties"
+      }
+    },
+    "rowFilter.properties.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.properties.user_id": {
+      "name": "user_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.properties.title": {
+      "name": "title",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.properties.description": {
+      "name": "description",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.properties.price": {
+      "name": "price",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.properties.address": {
+      "name": "address",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.properties.category": {
+      "name": "category",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.properties.image_url": {
+      "name": "image_url",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.properties.status": {
+      "name": "status",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.properties.created_at": {
+      "name": "created_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.banners_draft": {
+      "name": "banners_draft",
+      "description": "banners_draft",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/banners_draft"
+      }
+    },
+    "rowFilter.banners_draft.banner_size": {
+      "name": "banner_size",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.banner_type": {
+      "name": "banner_type",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.button_enabled": {
+      "name": "button_enabled",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.button_link": {
+      "name": "button_link",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.button_text": {
+      "name": "button_text",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.connected_product_id": {
+      "name": "connected_product_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.created_date": {
+      "name": "created_date",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.image": {
+      "name": "image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.is_custom_button_text": {
+      "name": "is_custom_button_text",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.locations": {
+      "name": "locations",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.name": {
+      "name": "name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.order": {
+      "name": "order",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.status": {
+      "name": "status",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.banners_draft.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.settings": {
+      "name": "settings",
+      "description": "settings",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/settings"
+      }
+    },
+    "rowFilter.settings.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.settings.value": {
+      "name": "value",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.products": {
+      "name": "products",
+      "description": "products",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/products"
+      }
+    },
+    "rowFilter.products.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.name": {
+      "name": "name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.sku": {
+      "name": "sku",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.price": {
+      "name": "price",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.discount_price": {
+      "name": "discount_price",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.stock": {
+      "name": "stock",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.category": {
+      "name": "category",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.description": {
+      "name": "description",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.image": {
+      "name": "image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.thumbnail": {
+      "name": "thumbnail",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.status": {
+      "name": "status",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.keywords": {
+      "name": "keywords",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.created_at": {
+      "name": "created_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.display_order": {
+      "name": "display_order",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.banner_image": {
+      "name": "banner_image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.brand": {
+      "name": "brand",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.buying_price": {
+      "name": "buying_price",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.featured_image": {
+      "name": "featured_image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.image_url": {
+      "name": "image_url",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.images": {
+      "name": "images",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.is_best_selling": {
+      "name": "is_best_selling",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.is_flash_sale": {
+      "name": "is_flash_sale",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.is_new": {
+      "name": "is_new",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.is_offer": {
+      "name": "is_offer",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.is_regular": {
+      "name": "is_regular",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.is_trending": {
+      "name": "is_trending",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.media_url": {
+      "name": "media_url",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.rating": {
+      "name": "rating",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.reviews": {
+      "name": "reviews",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.reward_coins": {
+      "name": "reward_coins",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.seo_points": {
+      "name": "seo_points",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.shipping_zones": {
+      "name": "shipping_zones",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.sold_count": {
+      "name": "sold_count",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.unit_name": {
+      "name": "unit_name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.variants": {
+      "name": "variants",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.video_url": {
+      "name": "video_url",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.products.warranty": {
+      "name": "warranty",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.inquiries": {
+      "name": "inquiries",
+      "description": "inquiries",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/inquiries"
+      }
+    },
+    "rowFilter.inquiries.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.inquiries.website_domain": {
+      "name": "website_domain",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.inquiries.name": {
+      "name": "name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.inquiries.phone": {
+      "name": "phone",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.inquiries.message": {
+      "name": "message",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.inquiries.status": {
+      "name": "status",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.inquiries.created_at": {
+      "name": "created_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.inquiries.updated_at": {
+      "name": "updated_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.order_items": {
+      "name": "order_items",
+      "description": "order_items",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/order_items"
+      }
+    },
+    "rowFilter.order_items.product_id": {
+      "name": "product_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.order_items.product_name": {
+      "name": "product_name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.order_items.product_image": {
+      "name": "product_image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.order_items.product_price": {
+      "name": "product_price",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.order_items.quantity": {
+      "name": "quantity",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.order_items.subtotal": {
+      "name": "subtotal",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.order_items.created_at": {
+      "name": "created_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.order_items.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.order_items.order_id": {
+      "name": "order_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.liked_properties": {
+      "name": "liked_properties",
+      "description": "liked_properties",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/liked_properties"
+      }
+    },
+    "rowFilter.liked_properties.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.liked_properties.user_id": {
+      "name": "user_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.liked_properties.property_id": {
+      "name": "property_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.liked_properties.created_at": {
+      "name": "created_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.categories": {
+      "name": "categories",
+      "description": "categories",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/categories"
+      }
+    },
+    "rowFilter.categories.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.name": {
+      "name": "name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.bannerName": {
+      "name": "bannerName",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.slug": {
+      "name": "slug",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.bannerImage": {
+      "name": "bannerImage",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.bannerImages": {
+      "name": "bannerImages",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.iconImage": {
+      "name": "iconImage",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.wideBannerImage": {
+      "name": "wideBannerImage",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.buttonText": {
+      "name": "buttonText",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.buttonLink": {
+      "name": "buttonLink",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.featuredProducts": {
+      "name": "featuredProducts",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.description": {
+      "name": "description",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.displayOrder": {
+      "name": "displayOrder",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.status": {
+      "name": "status",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.showOnHomepage": {
+      "name": "showOnHomepage",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.createdAt": {
+      "name": "createdAt",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.metaTitle": {
+      "name": "metaTitle",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.metaDescription": {
+      "name": "metaDescription",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.keywords": {
+      "name": "keywords",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.isDemo": {
+      "name": "isDemo",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.sliderSettings": {
+      "name": "sliderSettings",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.banner_name": {
+      "name": "banner_name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.banner_image": {
+      "name": "banner_image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.banner_images": {
+      "name": "banner_images",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.icon_image": {
+      "name": "icon_image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.wide_banner_image": {
+      "name": "wide_banner_image",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.button_text": {
+      "name": "button_text",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.button_link": {
+      "name": "button_link",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.featured_products": {
+      "name": "featured_products",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.display_order": {
+      "name": "display_order",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.show_on_homepage": {
+      "name": "show_on_homepage",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.created_at": {
+      "name": "created_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.meta_title": {
+      "name": "meta_title",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.meta_description": {
+      "name": "meta_description",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.is_demo": {
+      "name": "is_demo",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.categories.slider_settings": {
+      "name": "slider_settings",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.reviews": {
+      "name": "reviews",
+      "description": "reviews",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/reviews"
+      }
+    },
+    "rowFilter.reviews.id": {
+      "name": "id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.reviews.product_id": {
+      "name": "product_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.reviews.user_id": {
+      "name": "user_id",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    }
+  },
+  "externalDocs": {
+    "description": "PostgREST Documentation",
+    "url": "https://postgrest.org/en/v14/references/api.html"
+  }
+}
