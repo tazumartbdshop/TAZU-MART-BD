@@ -82,8 +82,6 @@ export default function AdminSettings() {
     try {
       updateDraftSettings(formState);
       await useSettingsStore.getState().publishSettings();
-      // Premium 800ms state response delay
-      await new Promise(resolve => setTimeout(resolve, 800));
       setShowToast(true);
       setTimeout(() => {
         setShowToast(false);

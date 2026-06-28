@@ -7,13 +7,15 @@ import {
   HelpCircle,
   Clock,
   ShieldCheck,
-  Building
+  Building,
+  Loader2
 } from 'lucide-react';
 import { useSettingsStore, AppSettings } from '../../store/useSettingsStore';
 
 export default function AdminStoreIdentity() {
   const { settings, updateSettings, updateDraftSettings } = useSettingsStore();
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form states loaded from store
   const [storeName, setStoreName] = useState(settings.storeName || '');
@@ -45,8 +47,9 @@ export default function AdminStoreIdentity() {
     }, 4000);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     const updates = {
       storeName,
       storeSlug,
@@ -58,11 +61,17 @@ export default function AdminStoreIdentity() {
       businessType
     };
 
-    // Keep settings and draft settings updated in parallel
-    updateSettings(updates);
-    updateDraftSettings(updates);
-
-    triggerFeedback('🏢 Store identity parameters updated successfully!');
+    try {
+      // Keep settings and draft settings updated in parallel
+      await updateSettings(updates);
+      updateDraftSettings(updates);
+      triggerFeedback('🏢 Store identity parameters updated successfully!');
+    } catch (err) {
+      console.error(err);
+      triggerFeedback('❌ Failed to update store identity parameters');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -238,10 +247,20 @@ export default function AdminStoreIdentity() {
             <div className="pt-4 border-t border-neutral-100 flex justify-end">
               <button
                 type="submit"
-                className="bg-neutral-900 hover:bg-black text-white h-11 px-8 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2"
+                disabled={isSaving}
+                className="bg-neutral-900 hover:bg-black text-white h-11 px-8 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2 disabled:bg-neutral-500 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4 text-emerald-400" />
-                <span>Save Store Identity</span>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 text-emerald-400" />
+                    <span>Save Store Identity</span>
+                  </>
+                )}
               </button>
             </div>
 

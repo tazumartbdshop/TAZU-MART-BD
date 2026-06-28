@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function AdminCourierCharges() {
-  const { divisionCharges, updateDivisionCharge } = useDeliveryStore();
+  const { divisionCharges, updateAllDivisionCharges } = useDeliveryStore();
   const [localCharges, setLocalCharges] = useState<{ [key: string]: number }>(
     Object.fromEntries(divisionCharges.map(d => [d.id, d.charge]))
   );
@@ -19,17 +19,17 @@ export default function AdminCourierCharges() {
     }
   };
 
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     setIsSaving(true);
-    // Simulate API delay
-    setTimeout(() => {
-      Object.entries(localCharges).forEach(([id, charge]) => {
-        updateDivisionCharge(id, charge as number);
-      });
+    try {
+      await updateAllDivisionCharges(localCharges);
       setIsSaving(false);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    }, 800);
+    } catch (err) {
+      console.error(err);
+      setIsSaving(false);
+    }
   };
 
   return (

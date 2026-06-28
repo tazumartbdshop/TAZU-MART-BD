@@ -27,6 +27,7 @@ interface DeliveryStore {
   subscribe: () => () => void;
   updateCourierApi: (id: string, updates: Partial<CourierAPI>) => void;
   updateDivisionCharge: (id: string, charge: number) => void;
+  updateAllDivisionCharges: (charges: { [key: string]: number }) => Promise<void>;
   getActiveCourier: () => CourierAPI | undefined;
   getChargeByDivision: (divisionName: string) => number;
 }
@@ -113,6 +114,23 @@ export const useDeliveryStore = create<DeliveryStore>((set, get) => ({
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').update({ divisionCharges: nextDivisionCharges }).eq('id', 'delivery').then(({error}) => error && console.warn(error));
+    }
+  },
+
+  updateAllDivisionCharges: async (charges) => {
+    const nextDivisionCharges = get().divisionCharges.map((div) => {
+      const charge = charges[div.id];
+      return charge !== undefined ? { ...div, charge } : div;
+    });
+
+    set({ divisionCharges: nextDivisionCharges });
+    const supabase = getSupabase();
+    if (supabase) {
+      const { error } = await supabase.from('settings').update({ divisionCharges: nextDivisionCharges }).eq('id', 'delivery');
+      if (error) {
+        console.error("Error updating division charges:", error);
+        throw error;
+      }
     }
   },
 

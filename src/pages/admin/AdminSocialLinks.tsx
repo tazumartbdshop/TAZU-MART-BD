@@ -15,7 +15,8 @@ import {
   Info,
   ExternalLink,
   Globe,
-  Settings
+  Settings,
+  Loader2
 } from 'lucide-react';
 import { useSettingsStore, AppSettings } from '../../store/useSettingsStore';
 
@@ -32,6 +33,7 @@ interface SocialChannelItem {
 export default function AdminSocialLinks() {
   const { settings, updateSettings, updateDraftSettings } = useSettingsStore();
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Define local form fields linked directly with AppSettings
   const [facebookUrl, setFacebookUrl] = useState(settings.facebookUrl || '');
@@ -106,8 +108,9 @@ export default function AdminSocialLinks() {
     }, 4000);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
 
     const updates: Partial<AppSettings> = {
       facebookUrl,
@@ -133,10 +136,16 @@ export default function AdminSocialLinks() {
       linkedinEnabled
     };
 
-    updateSettings(updates);
-    updateDraftSettings(updates);
-
-    triggerFeedback('🔗 Social media connectivity parameters updated!');
+    try {
+      await updateSettings(updates);
+      updateDraftSettings(updates);
+      triggerFeedback('🔗 Social media connectivity parameters updated!');
+    } catch (err) {
+      console.error(err);
+      triggerFeedback('❌ Failed to update social media connectivity parameters');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const channels = [
@@ -395,10 +404,20 @@ export default function AdminSocialLinks() {
             <div className="pt-4 border-t border-neutral-150 flex justify-end">
               <button
                 type="submit"
-                className="bg-neutral-900 hover:bg-black text-white h-11 px-8 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2"
+                disabled={isSaving}
+                className="bg-neutral-900 hover:bg-black text-white h-11 px-8 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2 disabled:bg-neutral-500 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4 text-emerald-400" />
-                <span>Save Social Links</span>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 text-emerald-400" />
+                    <span>Save Social Links</span>
+                  </>
+                )}
               </button>
             </div>
 

@@ -56,20 +56,25 @@ export default function AdminThemeSettings() {
     draftTheme: theme, 
     updateDraftTheme: updateTheme, 
     updateDraftButton: updateButton,
-    resetDraftTheme: resetTheme
+    resetDraftTheme: resetTheme,
+    publishTheme
   } = useThemeStore();
   const [activeTab, setActiveTab] = useState('colors');
   const [previewMode, setPreviewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      await publishTheme();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    }, 1000);
+    } catch (err) {
+      console.error("Failed to publish theme settings:", err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const tabs = [

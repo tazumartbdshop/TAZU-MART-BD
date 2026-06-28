@@ -7,13 +7,15 @@ import {
   Globe,
   Settings,
   HelpCircle,
-  Map
+  Map,
+  Loader2
 } from 'lucide-react';
 import { useSettingsStore, AppSettings } from '../../store/useSettingsStore';
 
 export default function AdminBusinessAddress() {
   const { settings, updateSettings, updateDraftSettings } = useSettingsStore();
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Form states loaded from store
   const [businessName, setBusinessName] = useState(settings.businessName || '');
@@ -55,8 +57,9 @@ export default function AdminBusinessAddress() {
     }, 4000);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     const updates = {
       businessName,
       contactPerson,
@@ -73,10 +76,16 @@ export default function AdminBusinessAddress() {
       googleMapLink
     };
 
-    updateSettings(updates);
-    updateDraftSettings(updates);
-
-    triggerFeedback('📍 Business location details saved successfully!');
+    try {
+      await updateSettings(updates);
+      updateDraftSettings(updates);
+      triggerFeedback('📍 Business location details saved successfully!');
+    } catch (err) {
+      console.error(err);
+      triggerFeedback('❌ Failed to save business location details');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -292,10 +301,20 @@ export default function AdminBusinessAddress() {
             <div className="pt-4 border-t border-neutral-100 flex justify-end">
               <button
                 type="submit"
-                className="bg-neutral-900 hover:bg-black text-white h-11 px-8 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2"
+                disabled={isSaving}
+                className="bg-neutral-900 hover:bg-black text-white h-11 px-8 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2 disabled:bg-neutral-500 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4 text-emerald-400" />
-                <span>Save Location Details</span>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 text-emerald-400" />
+                    <span>Save Location Details</span>
+                  </>
+                )}
               </button>
             </div>
 
