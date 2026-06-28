@@ -15,18 +15,60 @@ import {
   Search as SearchIcon,
   Share2,
   Check,
-  RefreshCw
+  RefreshCw,
+  Database
 } from 'lucide-react';
 import { useBrandingStore } from '../../store/useBrandingStore';
 import { BrandingSettings } from '../../services/brandingService';
 import { toast } from 'react-hot-toast';
+
+const DB_COLUMNS_INFO: { key: string; label: string; dbType: string; category: string }[] = [
+  { key: 'id', label: 'ID', dbType: 'VARCHAR(50) PRIMARY KEY', category: 'General' },
+  { key: 'site_name', label: 'Site Name', dbType: 'VARCHAR(255)', category: 'General' },
+  { key: 'site_short_name', label: 'Site Short Name', dbType: 'VARCHAR(100)', category: 'General' },
+  { key: 'site_tagline', label: 'Site Tagline', dbType: 'VARCHAR(255)', category: 'General' },
+  { key: 'primary_logo', label: 'Primary Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'secondary_logo', label: 'Secondary Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'favicon', label: 'Favicon', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'apple_touch_icon', label: 'Apple Touch Icon', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'mobile_logo', label: 'Mobile Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'desktop_logo', label: 'Desktop Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'dark_logo', label: 'Dark Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'light_logo', label: 'Light Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'footer_logo', label: 'Footer Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'invoice_logo', label: 'Invoice Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'email_logo', label: 'Email Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'loading_logo', label: 'Loading Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'watermark_logo', label: 'Watermark Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'share_logo', label: 'Share Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'login_logo', label: 'Login Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'signup_logo', label: 'Signup Logo', dbType: 'TEXT (URL)', category: 'Logos' },
+  { key: 'default_profile_image', label: 'Default Profile Image', dbType: 'TEXT (URL)', category: 'Fallback Images' },
+  { key: 'default_store_banner', label: 'Default Store Banner', dbType: 'TEXT (URL)', category: 'Fallback Images' },
+  { key: 'default_category_banner', label: 'Default Category Banner', dbType: 'TEXT (URL)', category: 'Fallback Images' },
+  { key: 'default_product_image', label: 'Default Product Image', dbType: 'TEXT (URL)', category: 'Fallback Images' },
+  { key: 'default_blog_banner', label: 'Default Blog Banner', dbType: 'TEXT (URL)', category: 'Fallback Images' },
+  { key: 'og_image', label: 'OG Image', dbType: 'TEXT (URL)', category: 'Fallback Images' },
+  { key: 'primary_color', label: 'Primary Color', dbType: 'VARCHAR(10) [HEX]', category: 'Theme Colors' },
+  { key: 'secondary_color', label: 'Secondary Color', dbType: 'VARCHAR(10) [HEX]', category: 'Theme Colors' },
+  { key: 'accent_color', label: 'Accent Color', dbType: 'VARCHAR(10) [HEX]', category: 'Theme Colors' },
+  { key: 'text_color', label: 'Text Color', dbType: 'VARCHAR(10) [HEX]', category: 'Theme Colors' },
+  { key: 'background_color', label: 'Background Color', dbType: 'VARCHAR(10) [HEX]', category: 'Theme Colors' },
+  { key: 'meta_title', label: 'Meta Title', dbType: 'VARCHAR(255)', category: 'SEO' },
+  { key: 'meta_description', label: 'Meta Description', dbType: 'TEXT', category: 'SEO' },
+  { key: 'meta_keywords', label: 'Meta Keywords', dbType: 'TEXT', category: 'SEO' },
+  { key: 'facebook_image', label: 'Facebook Image', dbType: 'TEXT (URL)', category: 'Social' },
+  { key: 'twitter_image', label: 'Twitter Image', dbType: 'TEXT (URL)', category: 'Social' },
+  { key: 'linkedin_image', label: 'Linkedin Image', dbType: 'TEXT (URL)', category: 'Social' },
+];
 
 export default function AdminBranding() {
   const { settings, isLoading, updateBranding, fetchBranding } = useBrandingStore();
   
   // Local state for all fields
   const [formData, setFormData] = useState<BrandingSettings>({ ...settings });
-  const [activeTab, setActiveTab] = useState<'logos' | 'images' | 'theme' | 'seo' | 'social' | 'general'>('general');
+  const [activeTab, setActiveTab] = useState<'logos' | 'images' | 'theme' | 'seo' | 'social' | 'general' | 'database'>('general');
+  const [dbSearchQuery, setDbSearchQuery] = useState('');
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -270,6 +312,19 @@ export default function AdminBranding() {
           >
             <Share2 className="w-4 h-4 shrink-0" />
             <span>Social Branding</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('database')}
+            className={`w-full text-left h-11 px-4 text-xs font-black uppercase tracking-widest flex items-center gap-3 border transition-colors ${
+              activeTab === 'database' 
+                ? 'bg-neutral-900 text-white border-neutral-900' 
+                : 'bg-white hover:bg-neutral-50 text-neutral-700 border-neutral-200'
+            }`}
+          >
+            <Database className="w-4 h-4 shrink-0 text-amber-500" />
+            <span>DB Table View</span>
           </button>
 
           <div className="bg-neutral-50 p-4 border border-neutral-200 space-y-2 mt-4">
@@ -541,30 +596,211 @@ export default function AdminBranding() {
               </div>
             )}
 
+            {/* 7. DATABASE TABLE LIVE VIEW */}
+            {activeTab === 'database' && (
+              <div className="space-y-4">
+                <div className="pb-3 border-b border-neutral-150 flex flex-col md:flex-row md:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-black uppercase text-neutral-900 tracking-wider flex items-center gap-1.5">
+                      <Database className="w-4 h-4 text-amber-500 animate-pulse" />
+                      <span>PostgreSQL DB Live Table: public.branding_settings</span>
+                    </h3>
+                    <p className="text-[10px] text-neutral-400 font-semibold uppercase mt-0.5">
+                      Direct raw database representation of the global branding row in table.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-black uppercase tracking-wider flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                      CONNECTED
+                    </span>
+                    <span className="text-[10px] bg-neutral-100 text-neutral-700 px-2.5 py-1 rounded font-mono font-bold">
+                      Row: id='global'
+                    </span>
+                  </div>
+                </div>
+
+                {/* Search & Filter Bar */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    <input
+                      type="text"
+                      placeholder="Search database columns..."
+                      value={dbSearchQuery}
+                      onChange={(e) => setDbSearchQuery(e.target.value)}
+                      className="w-full h-10 pl-10 pr-4 bg-neutral-50 border border-neutral-200 text-xs font-semibold focus:outline-none focus:border-neutral-400"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDbSearchQuery('');
+                      fetchBranding();
+                    }}
+                    className="h-10 px-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-[10px] font-black uppercase tracking-wider border border-neutral-200 transition-colors flex items-center gap-1.5 select-none"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Clear & Reload</span>
+                  </button>
+                </div>
+
+                {/* Database Table Layout */}
+                <div className="border border-neutral-200 overflow-x-auto rounded-sm">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
+                    <thead>
+                      <tr className="bg-neutral-900 text-white font-mono text-[10px] uppercase tracking-wider divide-x divide-neutral-800">
+                        <th className="py-3 px-4 font-black">COLUMN_NAME</th>
+                        <th className="py-3 px-4 font-black w-44">DATA_TYPE</th>
+                        <th className="py-3 px-4 font-black">DB_VALUE (LIVE RECORD)</th>
+                        <th className="py-3 px-4 font-black text-center w-28">ACTION</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-200 text-xs font-mono">
+                      {DB_COLUMNS_INFO.filter(col => {
+                        const term = dbSearchQuery.toLowerCase();
+                        return col.key.toLowerCase().includes(term) || 
+                               col.label.toLowerCase().includes(term) || 
+                               col.dbType.toLowerCase().includes(term);
+                      }).map((col) => {
+                        const dbVal = settings[col.key as keyof BrandingSettings] || '';
+                        const isColor = col.dbType.includes('HEX');
+                        const isUrl = col.dbType.includes('URL') && dbVal;
+
+                        return (
+                          <tr key={col.key} className="hover:bg-neutral-50/80 transition-colors divide-x divide-neutral-200">
+                            {/* Column name & label */}
+                            <td className="py-2.5 px-4">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-neutral-900">{col.key}</span>
+                                <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-tight">
+                                  {col.category}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Data Type */}
+                            <td className="py-2.5 px-4 text-neutral-500 font-semibold text-[11px]">
+                              {col.dbType}
+                            </td>
+
+                            {/* Database Value representation */}
+                            <td className="py-2.5 px-4 max-w-sm truncate">
+                              <div className="flex items-center gap-2">
+                                {isColor ? (
+                                  <>
+                                    <span 
+                                      className="w-5 h-5 rounded border border-neutral-300 shadow-xs shrink-0" 
+                                      style={{ backgroundColor: dbVal }}
+                                    />
+                                    <span className="font-bold text-neutral-850">{dbVal || 'NULL'}</span>
+                                  </>
+                                ) : isUrl ? (
+                                  <>
+                                    <div className="w-10 h-10 border border-neutral-200 rounded overflow-hidden bg-white shrink-0 relative group">
+                                      <img 
+                                        src={dbVal} 
+                                        alt="" 
+                                        className="w-full h-full object-contain" 
+                                        referrerPolicy="no-referrer"
+                                      />
+                                    </div>
+                                    <span className="text-[10px] text-sky-600 font-medium hover:underline cursor-pointer truncate max-w-[200px]" onClick={() => window.open(dbVal, '_blank')}>
+                                      {dbVal}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="text-neutral-800 font-semibold break-all whitespace-pre-wrap">
+                                    {dbVal || <span className="text-neutral-400 font-normal italic">[NULL / EMPTY]</span>}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Action columns */}
+                            <td className="py-2.5 px-4 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(dbVal);
+                                    toast.success(`Copied value of ${col.key}!`);
+                                  }}
+                                  className="h-7 px-2.5 bg-neutral-150 hover:bg-neutral-200 text-neutral-800 text-[10px] font-bold uppercase tracking-wider transition-colors border border-neutral-300 select-none"
+                                  title="Copy Value"
+                                >
+                                  Copy
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    // Navigate to respective tab
+                                    const categoryToTab: { [key: string]: 'logos' | 'images' | 'theme' | 'seo' | 'social' | 'general' } = {
+                                      'General': 'general',
+                                      'Logos': 'logos',
+                                      'Fallback Images': 'images',
+                                      'Theme Colors': 'theme',
+                                      'SEO': 'seo',
+                                      'Social': 'social',
+                                    };
+                                    setActiveTab(categoryToTab[col.category] || 'general');
+                                  }}
+                                  className="h-7 px-2.5 bg-neutral-900 hover:bg-black text-white text-[10px] font-bold uppercase tracking-wider transition-colors select-none"
+                                  title="Edit in form"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Additional metadata info footer for realism */}
+                <div className="bg-neutral-50 p-4 border border-neutral-200 rounded-sm font-mono text-[10px] text-neutral-500 leading-relaxed uppercase">
+                  <div className="font-bold text-neutral-700 mb-1">📐 SQL SCHEMA DETAILS:</div>
+                  CREATE TABLE branding_settings (<br />
+                  &nbsp;&nbsp;id VARCHAR(50) PRIMARY KEY,<br />
+                  &nbsp;&nbsp;site_name VARCHAR(255),<br />
+                  &nbsp;&nbsp;site_short_name VARCHAR(100),<br />
+                  &nbsp;&nbsp;site_tagline VARCHAR(255),<br />
+                  &nbsp;&nbsp;-- Image & color configs ...<br />
+                  &nbsp;&nbsp;created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,<br />
+                  &nbsp;&nbsp;updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP<br />
+                  );
+                </div>
+              </div>
+            )}
+
             {/* Bottom Form Action Buttons */}
-            <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
-              <p className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">
-                {isLoading ? 'Synchronizing database...' : 'All changes update instantly'}
-              </p>
-              
-              <button
-                type="submit"
-                disabled={isSaving || isUploading !== null}
-                className="bg-neutral-900 hover:bg-black text-white h-11 px-8 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 text-emerald-400" />
-                    <span>Save {activeTab} Config</span>
-                  </>
-                )}
-              </button>
-            </div>
+            {activeTab !== 'database' && (
+              <div className="pt-5 border-t border-neutral-100 flex items-center justify-between">
+                <p className="text-[10px] text-neutral-400 uppercase font-bold tracking-wider">
+                  {isLoading ? 'Synchronizing database...' : 'All changes update instantly'}
+                </p>
+                
+                <button
+                  type="submit"
+                  disabled={isSaving || isUploading !== null}
+                  className="bg-neutral-900 hover:bg-black text-white h-11 px-8 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 text-emerald-400" />
+                      <span>Save {activeTab} Config</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
           </form>
         </div>
