@@ -580,9 +580,6 @@
             "$ref": "#/parameters/rowFilter.orders.total_amount"
           },
           {
-            "$ref": "#/parameters/rowFilter.orders.items"
-          },
-          {
             "$ref": "#/parameters/rowFilter.orders.order_status"
           },
           {
@@ -625,9 +622,6 @@
             "$ref": "#/parameters/rowFilter.orders.status"
           },
           {
-            "$ref": "#/parameters/rowFilter.orders.status_history"
-          },
-          {
             "$ref": "#/parameters/rowFilter.orders.status_updated_at"
           },
           {
@@ -647,6 +641,12 @@
           },
           {
             "$ref": "#/parameters/rowFilter.orders.customer_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status_history"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.items"
           },
           {
             "$ref": "#/parameters/select"
@@ -754,9 +754,6 @@
             "$ref": "#/parameters/rowFilter.orders.total_amount"
           },
           {
-            "$ref": "#/parameters/rowFilter.orders.items"
-          },
-          {
             "$ref": "#/parameters/rowFilter.orders.order_status"
           },
           {
@@ -799,9 +796,6 @@
             "$ref": "#/parameters/rowFilter.orders.status"
           },
           {
-            "$ref": "#/parameters/rowFilter.orders.status_history"
-          },
-          {
             "$ref": "#/parameters/rowFilter.orders.status_updated_at"
           },
           {
@@ -821,6 +815,12 @@
           },
           {
             "$ref": "#/parameters/rowFilter.orders.customer_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status_history"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.items"
           },
           {
             "$ref": "#/parameters/preferReturn"
@@ -880,9 +880,6 @@
             "$ref": "#/parameters/rowFilter.orders.total_amount"
           },
           {
-            "$ref": "#/parameters/rowFilter.orders.items"
-          },
-          {
             "$ref": "#/parameters/rowFilter.orders.order_status"
           },
           {
@@ -925,9 +922,6 @@
             "$ref": "#/parameters/rowFilter.orders.status"
           },
           {
-            "$ref": "#/parameters/rowFilter.orders.status_history"
-          },
-          {
             "$ref": "#/parameters/rowFilter.orders.status_updated_at"
           },
           {
@@ -947,6 +941,12 @@
           },
           {
             "$ref": "#/parameters/rowFilter.orders.customer_name"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.status_history"
+          },
+          {
+            "$ref": "#/parameters/rowFilter.orders.items"
           },
           {
             "$ref": "#/parameters/body.orders"
@@ -2094,6 +2094,113 @@
         ]
       }
     },
+    "/customer": {
+      "get": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.customer.id"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/order"
+          },
+          {
+            "$ref": "#/parameters/range"
+          },
+          {
+            "$ref": "#/parameters/rangeUnit"
+          },
+          {
+            "$ref": "#/parameters/offset"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/preferCount"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "items": {
+                "$ref": "#/definitions/customer"
+              },
+              "type": "array"
+            }
+          },
+          "206": {
+            "description": "Partial Content"
+          }
+        },
+        "tags": [
+          "customer"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/body.customer"
+          },
+          {
+            "$ref": "#/parameters/select"
+          },
+          {
+            "$ref": "#/parameters/preferPost"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "tags": [
+          "customer"
+        ]
+      },
+      "delete": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.customer.id"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "customer"
+        ]
+      },
+      "patch": {
+        "parameters": [
+          {
+            "$ref": "#/parameters/rowFilter.customer.id"
+          },
+          {
+            "$ref": "#/parameters/body.customer"
+          },
+          {
+            "$ref": "#/parameters/preferReturn"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "customer"
+        ]
+      }
+    },
     "/order_items": {
       "get": {
         "parameters": [
@@ -3233,10 +3340,6 @@
           "format": "numeric",
           "type": "number"
         },
-        "items": {
-          "format": "numeric",
-          "type": "number"
-        },
         "order_status": {
           "format": "text",
           "type": "string"
@@ -3298,10 +3401,6 @@
           "format": "text",
           "type": "string"
         },
-        "status_history": {
-          "format": "text",
-          "type": "string"
-        },
         "status_updated_at": {
           "default": "now()",
           "format": "timestamp without time zone",
@@ -3331,8 +3430,20 @@
           "type": "string"
         },
         "customer_name": {
-          "format": "text",
-          "type": "string"
+          "format": "text[]",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "status_history": {
+          "format": "json[]",
+          "items": {},
+          "type": "array"
+        },
+        "items": {
+          "format": "numeric",
+          "type": "number"
         }
       },
       "type": "object"
@@ -3681,6 +3792,18 @@
         "updated_at": {
           "default": "now()",
           "format": "timestamp with time zone",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "customer": {
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "format": "text",
           "type": "string"
         }
       },
@@ -4402,12 +4525,6 @@
       "in": "query",
       "type": "string"
     },
-    "rowFilter.orders.items": {
-      "name": "items",
-      "required": false,
-      "in": "query",
-      "type": "string"
-    },
     "rowFilter.orders.order_status": {
       "name": "order_status",
       "required": false,
@@ -4492,12 +4609,6 @@
       "in": "query",
       "type": "string"
     },
-    "rowFilter.orders.status_history": {
-      "name": "status_history",
-      "required": false,
-      "in": "query",
-      "type": "string"
-    },
     "rowFilter.orders.status_updated_at": {
       "name": "status_updated_at",
       "required": false,
@@ -4536,6 +4647,18 @@
     },
     "rowFilter.orders.customer_name": {
       "name": "customer_name",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.status_history": {
+      "name": "status_history",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "rowFilter.orders.items": {
+      "name": "items",
       "required": false,
       "in": "query",
       "type": "string"
@@ -5007,6 +5130,21 @@
     },
     "rowFilter.inquiries.updated_at": {
       "name": "updated_at",
+      "required": false,
+      "in": "query",
+      "type": "string"
+    },
+    "body.customer": {
+      "name": "customer",
+      "description": "customer",
+      "required": false,
+      "in": "body",
+      "schema": {
+        "$ref": "#/definitions/customer"
+      }
+    },
+    "rowFilter.customer.id": {
+      "name": "id",
       "required": false,
       "in": "query",
       "type": "string"

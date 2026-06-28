@@ -78,10 +78,33 @@ interface BannerState {
   subscribe: () => () => void;
 }
 
+const getCachedBanners = (): Banner[] => {
+  try {
+    const cached = localStorage.getItem('supabase_cached_banners');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to parse cached banners from localStorage:", e);
+  }
+  return [];
+};
+
+const saveCachedBanners = (banners: Banner[]) => {
+  try {
+    localStorage.setItem('supabase_cached_banners', JSON.stringify(banners));
+  } catch (e) {
+    console.warn("Failed to save banners to localStorage cache:", e);
+  }
+};
+
 export const useBannerStore = create<BannerState>((set, get) => ({
-  banners: [],
+  banners: getCachedBanners(),
   draftBanners: [],
-  isLoaded: false,
+  isLoaded: getCachedBanners().length > 0,
   hasUnsavedChanges: false,
   sliderConfig: {
     autoSlide: true,
@@ -96,7 +119,11 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     }
 
     supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-        if (!error && data) set({ banners: (data as any[]).map(row => objectToCamel(row)) as Banner[], isLoaded: true });
+        if (!error && data) {
+          const mapped = (data as any[]).map(row => objectToCamel(row)) as Banner[];
+          set({ banners: mapped, isLoaded: true });
+          saveCachedBanners(mapped);
+        }
     });
 
     supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
@@ -110,7 +137,11 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       .channel('public:banners:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, (payload) => {
           supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-            if (!error && data) set({ banners: (data as any[]).map(row => objectToCamel(row)) as Banner[], isLoaded: true });
+            if (!error && data) {
+              const mapped = (data as any[]).map(row => objectToCamel(row)) as Banner[];
+              set({ banners: mapped, isLoaded: true });
+              saveCachedBanners(mapped);
+            }
           });
       })
       .subscribe();
@@ -130,7 +161,10 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     };
   },
 
-  setBanners: (banners) => set({ banners, isLoaded: true }),
+  setBanners: (banners) => {
+    set({ banners, isLoaded: true });
+    saveCachedBanners(banners);
+  },
   setDraftBanners: (draftBanners) => set({ draftBanners }),
   setHasUnsavedChanges: (hasUnsavedChanges) => set({ hasUnsavedChanges }),
   
@@ -141,9 +175,9 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   updateSliderConfigLocal: (autoSlide, duration) => set({ sliderConfig: { autoSlide, duration } }),
 
   updateBanner: (id, updates) => {
-    set((state) => ({
-      banners: state.banners.map((b) => b.id === id ? { ...b, ...updates } : b)
-    }));
+    const nextBanners = get().banners.map((b) => b.id === id ? { ...b, ...updates } : b);
+    set({ banners: nextBanners });
+    saveCachedBanners(nextBanners);
     const supabase = getSupabase();
     if (supabase) {
       const dbPayload = objectToSnake(updates);
@@ -187,9 +221,9 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       stickerType: 'none',
       countdownEnabled: false,
     };
-    set((state) => ({
-      banners: [...state.banners, newBanner]
-    }));
+    const nextBanners = [...get().banners, newBanner];
+    set({ banners: nextBanners });
+    saveCachedBanners(nextBanners);
     const supabase = getSupabase();
     if (supabase) {
       const dbPayload = objectToSnake(newBanner);
@@ -252,9 +286,9 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   },
 
   removeBanner: (id) => {
-    set((state) => ({
-      banners: state.banners.filter((b) => b.id !== id)
-    }));
+    const nextBanners = get().banners.filter((b) => b.id !== id);
+    set({ banners: nextBanners });
+    saveCachedBanners(nextBanners);
     const supabase = getSupabase();
     if (supabase) supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
   },
@@ -284,10 +318,12 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     const previousDraftBanners = get().draftBanners;
 
     // Optimistic Update
-    set((state) => ({
-      banners: state.banners.filter((b) => b.id !== id),
-      draftBanners: state.draftBanners.filter((b) => b.id !== id)
-    }));
+    const nextBanners = get().banners.filter((b) => b.id !== id);
+    set({
+      banners: nextBanners,
+      draftBanners: get().draftBanners.filter((b) => b.id !== id)
+    });
+    saveCachedBanners(nextBanners);
 
     try {
       // Delete from banners table
@@ -317,6 +353,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     result.splice(endIndex, 0, removed);
     const reordered = result.map((b, idx) => ({ ...b, order: idx }));
     set({ banners: reordered });
+    saveCachedBanners(reordered);
 
     const supabase = getSupabase();
     if (supabase) {
@@ -356,6 +393,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
         draftBanners, 
         hasUnsavedChanges: false 
       });
+      saveCachedBanners(draftBanners);
       console.log("Both Draft and Live Banners collections persisted successfully.");
     } catch (error) {
       console.error("Error saving banners:", error);
@@ -384,6 +422,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
 
       console.log("Banners published successfully.");
       set({ banners: updatedDraftBanners, draftBanners: updatedDraftBanners, hasUnsavedChanges: false });
+      saveCachedBanners(updatedDraftBanners);
     } catch (error) {
       console.error("Error publishing banners:", error);
       throw error;

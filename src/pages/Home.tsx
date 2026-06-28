@@ -46,14 +46,34 @@ const CUSTOMER_TESTIMONIALS = [
   }
 ];
 
+// Helper to optimize banner image URLs to WebP with responsive fit and width
+function getOptimizedImageUrl(url: string, width = 1200): string {
+  if (!url) return "";
+  if (url.includes("images.unsplash.com")) {
+    try {
+      const urlObj = new URL(url);
+      urlObj.searchParams.set("fm", "webp");
+      urlObj.searchParams.set("w", width.toString());
+      urlObj.searchParams.set("q", "80");
+      urlObj.searchParams.set("auto", "format");
+      urlObj.searchParams.set("fit", "crop");
+      return urlObj.toString();
+    } catch (e) {
+      return url;
+    }
+  }
+  return url;
+}
+
 export default function Home() {
   const { categories, isLoaded: categoriesLoaded } = useCategoryStore();
   const { products, isLoading: productsLoading } = useProductStore();
-  const { banners: storeBanners } = useBannerStore();
+  const { banners: storeBanners, isLoaded: isBannerStoreLoaded } = useBannerStore();
   const { settings } = useSettingsStore();
 
   const [activeSlide, setActiveSlide] = useState(0);
   const [activeReview, setActiveReview] = useState(0);
+  const [isBannerImageLoaded, setIsBannerImageLoaded] = useState(false);
 
   // Dynamic active database categories mapped inside the exact home format
   const activeDbCategories = (categories || [])
@@ -77,6 +97,29 @@ export default function Home() {
 
   // If DB banners are set, use them, otherwise empty array as we do not use demo banners
   const sliderBanners = uploadedBanners;
+
+  // Preload first slide banner image immediately (with highest priority and webp optimization)
+  const firstBannerImage = sliderBanners[0]?.image;
+
+  useEffect(() => {
+    if (!firstBannerImage) {
+      if (isBannerStoreLoaded && sliderBanners.length === 0) {
+        setIsBannerImageLoaded(true);
+      }
+      return;
+    }
+
+    const img = new Image();
+    img.src = getOptimizedImageUrl(firstBannerImage);
+    img.onload = () => {
+      setIsBannerImageLoaded(true);
+    };
+    img.onerror = () => {
+      setIsBannerImageLoaded(true);
+    };
+  }, [firstBannerImage, isBannerStoreLoaded, sliderBanners.length]);
+
+  const isBannerReady = (sliderBanners.length === 0 && isBannerStoreLoaded) || (sliderBanners.length > 0 && isBannerImageLoaded);
 
   // Auto-play for 16:9 banner slider
   useEffect(() => {
@@ -163,112 +206,146 @@ export default function Home() {
     <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-hidden font-sans">
       
       {/* 1. MAIN SLIDER BANNER (16:9, Dynamic Overlays and Optional Button Actions) */}
-      {sliderBanners.length > 0 && (
-        <section className="relative w-full aspect-[16/9] bg-neutral-950 overflow-hidden select-none">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeSlide}
-              initial={{ opacity: 0, scale: 1.01 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.6, ease: 'easeInOut' }}
-              className="absolute inset-0 w-full h-full"
-            >
-              {/* Main Banner Image */}
-              <img 
-                src={sliderBanners[activeSlide].image} 
-                alt={sliderBanners[activeSlide].name || "Luxury Banner Graphic"} 
-                className="w-full h-full object-cover object-center pointer-events-none select-none"
-                referrerPolicy="no-referrer"
-              />
+      <section className="relative w-full aspect-[16/9] bg-neutral-950 overflow-hidden select-none">
+        {!isBannerReady ? (
+          /* Reserved layout height space with beautiful dark aesthetic to prevent CLS */
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-center p-4">
+            <div className="space-y-3 animate-pulse">
+              <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] text-neutral-500">TAZU MART BD</span>
+              <h2 className="text-sm sm:text-lg md:text-xl font-bold text-neutral-400 uppercase tracking-widest font-display">PREMIUM LIFETIME COLLECTION</h2>
+            </div>
+          </div>
+        ) : sliderBanners.length > 0 ? (
+          <>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeSlide}
+                initial={{ opacity: 0, scale: 1.01 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.6, ease: 'easeInOut' }}
+                className="absolute inset-0 w-full h-full"
+              >
+                {/* Main Banner Image */}
+                <img 
+                  src={getOptimizedImageUrl(sliderBanners[activeSlide].image)} 
+                  alt={sliderBanners[activeSlide].name || "Luxury Banner Graphic"} 
+                  className="w-full h-full object-cover object-center pointer-events-none select-none"
+                  referrerPolicy="no-referrer"
+                  fetchPriority={activeSlide === 0 ? "high" : "low"}
+                  loading={activeSlide === 0 ? "eager" : "lazy"}
+                />
 
-              {/* Text and CTA Button Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 flex flex-col justify-end pb-8 sm:pb-12 md:pb-16 px-4 md:px-12 z-10 select-text">
-                <div className="max-w-2xl space-y-2 sm:space-y-4">
-                  {sliderBanners[activeSlide].name && (
-                    <motion.h2 
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.15, duration: 0.4 }}
-                      className="text-lg sm:text-2xl md:text-4xl lg:text-5xl font-black text-white uppercase tracking-wider drop-shadow-md font-sans"
-                    >
-                      {sliderBanners[activeSlide].name}
-                    </motion.h2>
-                  )}
-                  
-                  {sliderBanners[activeSlide].description && (
-                    <motion.p 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.25, duration: 0.4 }}
-                      className="text-white/90 text-[10px] sm:text-xs md:text-sm font-semibold uppercase tracking-widest max-w-xl drop-shadow-sm"
-                    >
-                      {sliderBanners[activeSlide].description}
-                    </motion.p>
-                  )}
-
-                  {sliderBanners[activeSlide].buttonText && sliderBanners[activeSlide].buttonLink && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.35, duration: 0.4 }}
-                      className="pt-1.5 sm:pt-3"
-                    >
-                      <Link 
-                        to={sliderBanners[activeSlide].buttonLink}
-                        className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-black hover:bg-neutral-900 border border-white/20 hover:border-white/40 text-white text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-150 active:scale-95 shadow-lg"
+                {/* Text and CTA Button Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 flex flex-col justify-end pb-8 sm:pb-12 md:pb-16 px-4 md:px-12 z-10 select-text">
+                  <div className="max-w-2xl space-y-2 sm:space-y-4">
+                    {sliderBanners[activeSlide].name && (
+                      <motion.h2 
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15, duration: 0.4 }}
+                        className="text-lg sm:text-2xl md:text-4xl lg:text-5xl font-black text-white uppercase tracking-wider drop-shadow-md font-sans"
                       >
-                        {sliderBanners[activeSlide].buttonText}
-                        <span className="text-[10px] sm:text-xs font-light">&rarr;</span>
-                      </Link>
-                    </motion.div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </AnimatePresence>
+                        {sliderBanners[activeSlide].name}
+                      </motion.h2>
+                    )}
+                    
+                    {sliderBanners[activeSlide].description && (
+                      <motion.p 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.25, duration: 0.4 }}
+                        className="text-white/90 text-[10px] sm:text-xs md:text-sm font-semibold uppercase tracking-widest max-w-xl drop-shadow-sm"
+                      >
+                        {sliderBanners[activeSlide].description}
+                      </motion.p>
+                    )}
 
-          {/* Previous and Next Navigation Arrows */}
-          {sliderBanners.length > 1 && (
-            <>
-              <button 
-                onClick={() => setActiveSlide((prev) => (prev - 1 + sliderBanners.length) % sliderBanners.length)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => setActiveSlide((prev) => (prev + 1) % sliderBanners.length)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              
-              {/* Custom Dot Bullets */}
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-25">
-                {sliderBanners.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveSlide(idx)}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeSlide ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-      )}
+                    {sliderBanners[activeSlide].buttonText && sliderBanners[activeSlide].buttonLink && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.35, duration: 0.4 }}
+                        className="pt-1.5 sm:pt-3"
+                      >
+                        <Link 
+                          to={sliderBanners[activeSlide].buttonLink}
+                          className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-black hover:bg-neutral-900 border border-white/20 hover:border-white/40 text-white text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-150 active:scale-95 shadow-lg"
+                        >
+                          {sliderBanners[activeSlide].buttonText}
+                          <span className="text-[10px] sm:text-xs font-light">&rarr;</span>
+                        </Link>
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Previous and Next Navigation Arrows */}
+            {sliderBanners.length > 1 && (
+              <>
+                <button 
+                  onClick={() => setActiveSlide((prev) => (prev - 1 + sliderBanners.length) % sliderBanners.length)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => setActiveSlide((prev) => (prev + 1) % sliderBanners.length)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                
+                {/* Custom Dot Bullets */}
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-25">
+                  {sliderBanners.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveSlide(idx)}
+                      className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeSlide ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        ) : null}
+      </section>
+
+      {isBannerReady && (
+        <>
 
       {/* 2. CATEGORY SECTION (Circular shape, completely database-driven) */}
       <section className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
         <div className="container mx-auto px-4">
-          {!categoriesLoaded ? (
-            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl justify-items-center">
-              {[1, 2, 3, 4].map((n) => (
-                <div key={n} className="flex flex-col items-center animate-pulse text-center">
-                  <div className="w-[16vw] h-[16vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full bg-neutral-100 border border-neutral-100 flex items-center justify-center" />
-                  <div className="h-2.5 w-12 bg-neutral-100 rounded mt-2.5" />
-                </div>
+          {!categoriesLoaded && homeCategories.length === 0 ? (
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl">
+              {[
+                { name: "WATCHES", image: "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop", link: "/search?q=watch" },
+                { name: "WALLETS", image: "https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=200&h=200&auto=format&fit=crop", link: "/search?q=wallet" },
+                { name: "GIFT SET", image: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=200&h=200&auto=format&fit=crop", link: "/search?q=gift" },
+                { name: "PREMIUM", image: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=200&h=200&auto=format&fit=crop", link: "/search?q=premium" }
+              ].map((cat, i) => (
+                <Link 
+                  key={i} 
+                  to={cat.link}
+                  className="flex flex-col items-center group select-none text-center"
+                >
+                  <div className="relative w-[16vw] h-[16vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full overflow-hidden border border-neutral-100 bg-neutral-50 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-black/25 group-hover:shadow-md">
+                    <img 
+                      src={getOptimizedImageUrl(cat.image, 200)} 
+                      alt={cat.name} 
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
+                    />
+                  </div>
+                  <span className="text-[10px] sm:text-xs font-black uppercase text-neutral-800 tracking-wider mt-2.5 transition-colors group-hover:text-black leading-tight">
+                    {cat.name}
+                  </span>
+                </Link>
               ))}
             </div>
           ) : homeCategories.length > 0 ? (
@@ -281,10 +358,11 @@ export default function Home() {
                 >
                   <div className="relative w-[16vw] h-[16vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full overflow-hidden border border-neutral-100 bg-neutral-50 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-black/25 group-hover:shadow-md">
                     <img 
-                      src={cat.image} 
+                      src={getOptimizedImageUrl(cat.image, 200)} 
                       alt={cat.name} 
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       referrerPolicy="no-referrer"
+                      loading="lazy"
                     />
                   </div>
                   <span className="text-[10px] sm:text-xs font-black uppercase text-neutral-800 tracking-wider mt-2.5 transition-colors group-hover:text-black leading-tight">
@@ -517,6 +595,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+        </>
+      )}
 
     </div>
   );

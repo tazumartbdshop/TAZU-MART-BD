@@ -147,9 +147,33 @@ async function executeWithSelfHealing(
   return { data: null, error: new Error("Too many self-healing retrieval attempts"), status: 400, statusText: "Bad Request" };
 }
 
+// Initial state helper to read from localStorage synchronous cache
+const getCachedCategories = (): Category[] => {
+  try {
+    const cached = localStorage.getItem('supabase_cached_categories');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to parse cached categories from localStorage:", e);
+  }
+  return [];
+};
+
+const saveCachedCategories = (categories: Category[]) => {
+  try {
+    localStorage.setItem('supabase_cached_categories', JSON.stringify(categories));
+  } catch (e) {
+    console.warn("Failed to save categories to localStorage cache:", e);
+  }
+};
+
 export const useCategoryStore = create<CategoryState>((set, get) => ({
-  categories: [],
-  isLoaded: false,
+  categories: getCachedCategories(),
+  isLoaded: getCachedCategories().length > 0,
   
   addCategory: async (payload) => {
     const supabase = getSupabase();
@@ -172,6 +196,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const currentCats = get().categories;
     const nextCats = [...currentCats, newCategory];
     set({ categories: nextCats, isLoaded: true });
+    saveCachedCategories(nextCats);
     
     if (supabase) {
       try {
@@ -241,6 +266,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     // Optimistic Update
     const updatedCats = currentCats.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
     set({ categories: updatedCats as Category[], isLoaded: true });
+    saveCachedCategories(updatedCats as Category[]);
     
     if (supabase) {
       try {
@@ -311,6 +337,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     // Optimistic Update
     const newCats = currentCats.filter(c => c.id !== id);
     set({ categories: newCats, isLoaded: true });
+    saveCachedCategories(newCats);
     
     if (supabase) {
       try {
@@ -336,6 +363,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   
   clearDemoData: () => {
     set({ categories: [] });
+    saveCachedCategories([]);
   },
   
   subscribe: () => {
@@ -406,6 +434,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
                   }
                 }).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
                 set({ categories: mappedData, isLoaded: true });
+                saveCachedCategories(mappedData);
               } catch (err) {
                 console.error("[Supabase Categories] Critical processing error:", err);
                 set({ isLoaded: true });

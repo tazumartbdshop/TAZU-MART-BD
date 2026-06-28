@@ -304,6 +304,21 @@ BEGIN
     CREATE POLICY "Allow profile read" ON public.users FOR SELECT TO public USING (true);
     DROP POLICY IF EXISTS "Allow profile insert" ON public.users;
     CREATE POLICY "Allow profile insert" ON public.users FOR INSERT TO public WITH CHECK (true);
+    DROP POLICY IF EXISTS "Allow profile update" ON public.users;
+    CREATE POLICY "Allow profile update" ON public.users FOR UPDATE TO public USING (true) WITH CHECK (true);
+    DROP POLICY IF EXISTS "Allow profile delete" ON public.users;
+    CREATE POLICY "Allow profile delete" ON public.users FOR DELETE TO public USING (true);
+
+    -- Customers Policies
+    ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Customers read access" ON public.customers;
+    CREATE POLICY "Customers read access" ON public.customers FOR SELECT TO public USING (true);
+    DROP POLICY IF EXISTS "Customers insert access" ON public.customers;
+    CREATE POLICY "Customers insert access" ON public.customers FOR INSERT TO public WITH CHECK (true);
+    DROP POLICY IF EXISTS "Customers update access" ON public.customers;
+    CREATE POLICY "Customers update access" ON public.customers FOR UPDATE TO public USING (true) WITH CHECK (true);
+    DROP POLICY IF EXISTS "Customers delete access" ON public.customers;
+    CREATE POLICY "Customers delete access" ON public.customers FOR DELETE TO public USING (true);
     
     -- Categories Policies
     ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;

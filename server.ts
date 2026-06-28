@@ -752,7 +752,7 @@ Please ask me your query or select a quick question template below!`;
 
       if (authError) {
         console.error("[Admin Create Customer] Auth Error:", authError);
-        return res.status(400).json({ error: "Customer could not be created. Please try again." });
+        return res.status(400).json({ error: authError.message || "Auth Error: Customer could not be created." });
       }
 
       const userId = authUser.user.id;
@@ -773,7 +773,6 @@ Please ask me your query or select a quick question template below!`;
       const { error: userError } = await supabaseServiceRole.from('users').upsert([userProfile]);
       if (userError) {
         console.error("[Admin Create Customer] Users Table Error:", userError);
-        // We don't necessarily abort if only one table fails, but it's bad.
       }
 
       // 3. Insert into public.customers table
@@ -794,8 +793,9 @@ Please ask me your query or select a quick question template below!`;
         console.error("[Admin Create Customer] Customers Table Error:", customerError);
       }
 
-      if (userError && customerError) {
-        return res.status(500).json({ error: "Customer could not be created. Please try again." });
+      if (userError || customerError) {
+        const errorMsg = (userError?.message || '') + " | " + (customerError?.message || '');
+        return res.status(500).json({ error: errorMsg || "Database insert failed" });
       }
 
       res.json({ 
@@ -806,7 +806,7 @@ Please ask me your query or select a quick question template below!`;
 
     } catch (err: any) {
       console.error("[Admin Create Customer] Fatal Error:", err);
-      res.status(500).json({ error: "Customer could not be created. Please try again." });
+      res.status(500).json({ error: err.message || err.toString() || "Fatal Error: Customer could not be created." });
     }
   });
 

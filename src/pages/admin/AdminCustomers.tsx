@@ -782,8 +782,9 @@ function AdminCustomerAdd() {
       navigate('/admin/customers');
     } catch (err: any) {
       console.error("[Customer Enrollment Error]:", err);
-      (await import('react-hot-toast')).default.error('Customer could not be created. Please try again.', { id: toastId });
-      setErrors({ submit: 'Customer could not be created. Please try again. Internal error logged.' });
+      const errorMessage = err.message || err.toString() || 'Customer could not be created.';
+      (await import('react-hot-toast')).default.error(errorMessage, { id: toastId });
+      setErrors({ submit: errorMessage });
     } finally {
       setIsSubmitting(false);
     }
