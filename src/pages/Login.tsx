@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useBrandingStore } from '../store/useBrandingStore';
 import { useWebsitesStore } from '../store/useWebsitesStore';
 import { useModeratorStore } from '../store/useModeratorStore';
 import { useLoginHistoryStore } from '../store/useLoginHistoryStore';
@@ -13,6 +14,7 @@ import { pixelService } from '../utils/pixelService';
 
 export default function Login() {
   const { settings } = useSettingsStore();
+  const { settings: branding } = useBrandingStore();
   const ADMIN_EMAIL = (settings.adminEmail && settings.adminEmail !== "admin@tazumart.com" ? settings.adminEmail : "admin.tazumartbd@gmail.com").toLowerCase().trim();
   const ADMIN_PASSWORD = settings.adminPassword && settings.adminPassword !== "12345678" ? settings.adminPassword : "8963885522";
 
@@ -208,8 +210,21 @@ export default function Login() {
       >
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm select-none">T</div>
-            <span className="text-base font-black tracking-tight text-neutral-950 uppercase">{settings.storeName || 'Tazu Mart'}</span>
+            <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm select-none overflow-hidden">
+              {branding.login_logo || branding.primary_logo || branding.desktop_logo ? (
+                <img 
+                  src={branding.login_logo || branding.primary_logo || branding.desktop_logo} 
+                  alt={branding.site_short_name || 'Logo'} 
+                  className="w-full h-full object-contain" 
+                  referrerPolicy="no-referrer" 
+                />
+              ) : (
+                (branding.site_name || 'T')[0]
+              )}
+            </div>
+            <span className="text-base font-black tracking-tight text-neutral-950 uppercase">
+              {branding.site_name || settings.storeName || 'Tazu Mart'}
+            </span>
           </Link>
           <h2 className="text-lg font-bold text-neutral-900 leading-tight">Welcome Back</h2>
           <p className="text-xs text-neutral-500 mt-1">Sign in to continue shopping securely.</p>

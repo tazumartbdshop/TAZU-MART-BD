@@ -56,6 +56,7 @@ import AdminContentPages from './pages/admin/AdminContentPages';
 import DynamicLinkPage from './pages/DynamicLinkPage';
 import { useSiteManagementStore } from './store/useSiteManagementStore';
 import { useWebsitesStore } from './store/useWebsitesStore';
+import { useBrandingStore } from './store/useBrandingStore';
 import { fetchSupabaseConfigFromServer } from './lib/supabase';
 import { RuntimeDiagnostics } from './components/common/RuntimeDiagnostics';
 
@@ -79,10 +80,12 @@ export default function App() {
   useEffect(() => {
     if (!isConfigLoaded) return;
 
-    // Initial fetch for site management data
+    // Initial fetch for site management and branding data
     fetchSettings();
+    useBrandingStore.getState().fetchBranding();
 
     // Subscribe to stores
+    const unsubBranding = useBrandingStore.getState().subscribeRealtime();
     const unsubCategories = useCategoryStore.getState().subscribe();
     const unsubProducts = useProductStore.getState().subscribe();
     const unsubSearches = useSearchStore.getState().subscribe();
@@ -100,6 +103,7 @@ export default function App() {
     const unsubDelivery = useDeliveryStore.getState().subscribe();
     
     return () => {
+      unsubBranding();
       unsubCategories();
       unsubProducts();
       unsubSearches();

@@ -5,6 +5,7 @@ import { Mail, Lock, Smartphone, User, Eye, EyeOff, Loader2, CheckCircle2, Alert
 import { getSupabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
+import { useBrandingStore } from '../store/useBrandingStore';
 import { pixelService } from '../utils/pixelService';
 import { cn } from '../lib/utils';
 
@@ -30,6 +31,7 @@ const SPECIAL_DAY_OPTIONS = [
 ];
 
 export default function Register() {
+  const { settings: branding } = useBrandingStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -360,7 +362,7 @@ export default function Register() {
         <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-[440px] bg-white p-8 rounded-[24px] border border-neutral-150 space-y-4 shadow-sm">
           <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto" />
           <h2 className="text-lg font-bold">Account Created</h2>
-          <p className="text-xs text-neutral-500">Welcome to Tazu Mart BD. Logging you in...</p>
+          <p className="text-xs text-neutral-500">Welcome to {branding.site_name || 'Tazu Mart BD'}. Logging you in...</p>
           <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-900" />
         </motion.div>
       </div>
@@ -376,8 +378,21 @@ export default function Register() {
       >
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm">T</div>
-            <span className="text-base font-black tracking-tight uppercase">Tazu Mart</span>
+            <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm overflow-hidden">
+              {branding.signup_logo || branding.primary_logo || branding.desktop_logo ? (
+                <img 
+                  src={branding.signup_logo || branding.primary_logo || branding.desktop_logo} 
+                  alt={branding.site_short_name || 'Logo'} 
+                  className="w-full h-full object-contain" 
+                  referrerPolicy="no-referrer" 
+                />
+              ) : (
+                (branding.site_name || 'T')[0]
+              )}
+            </div>
+            <span className="text-base font-black tracking-tight uppercase">
+              {branding.site_name || 'Tazu Mart'}
+            </span>
           </Link>
           <h2 className="text-xl font-black tracking-tight uppercase">Create Account</h2>
           <p className="text-xs text-neutral-500 mt-1">Join us to start secure shopping with premium service.</p>

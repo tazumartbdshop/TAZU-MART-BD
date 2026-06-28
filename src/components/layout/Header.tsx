@@ -12,6 +12,7 @@ import { useCategoryStore } from '../../store/useCategoryStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSiteManagementStore } from '../../store/useSiteManagementStore';
+import { useBrandingStore } from '../../store/useBrandingStore';
 import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import LogoutModal from '../ui/LogoutModal';
@@ -33,6 +34,7 @@ export function Header() {
   const { categories } = useCategoryStore();
   const { user, isAuthenticated, logout } = useAuthStore();
   const { settings } = useSettingsStore();
+  const { settings: branding } = useBrandingStore();
 
   const { data: siteData, fetchSettings } = useSiteManagementStore();
 
@@ -101,7 +103,7 @@ export function Header() {
         {/* 1️⃣ Thin premium headline text */}
         <div className="w-full bg-navbar-bg text-navbar-text border-b border-theme-border pt-[calc(10px+env(safe-area-inset-top,0px))] pb-2.5 text-center select-none font-sans">
           <p className="text-[10px] font-bold tracking-[0.25em] uppercase opacity-80">
-            TAZU MART BD PREMIUM STORE
+            {branding.site_name || 'TAZU MART BD'} {branding.site_tagline ? `— ${branding.site_tagline}` : 'PREMIUM STORE'}
           </p>
         </div>
 
@@ -118,14 +120,20 @@ export function Header() {
 
             <Link to="/" className="flex items-center gap-1.5 shrink-0">
               <div className="w-7.5 h-7.5 md:w-8.5 md:h-8.5 bg-theme-secondary rounded flex items-center justify-center text-theme-bg font-sans font-black text-base md:text-lg overflow-hidden shrink-0">
-                 {settings.storeLogo && !logoError ? (
-                   <img src={settings.storeLogo || undefined} onError={() => setLogoError(true)} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                 {branding.primary_logo || branding.desktop_logo || settings.storeLogo ? (
+                   <img 
+                     src={branding.primary_logo || branding.desktop_logo || settings.storeLogo} 
+                     onError={() => setLogoError(true)} 
+                     alt={branding.site_short_name || "Logo"} 
+                     className="w-full h-full object-contain" 
+                     referrerPolicy="no-referrer" 
+                   />
                  ) : (
-                   'T'
+                   (branding.site_name || 'T')[0]
                  )}
               </div>
               <span className="font-display font-black text-[13px] xs:text-sm md:text-lg text-navbar-text tracking-tighter uppercase whitespace-nowrap">
-                TAZU MART <span className="font-black">BD</span>
+                {branding.site_name || 'TAZU MART BD'}
               </span>
             </Link>
           </div>
@@ -197,19 +205,21 @@ export function Header() {
               <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
                 <Link to="/" className="flex items-center gap-1.5" onClick={() => setIsMobileMenuOpen(false)}>
                   <div className="w-9 h-9 bg-neutral-950 rounded flex items-center justify-center text-white font-black text-xl overflow-hidden">
-                    {settings.storeLogo && !logoError ? (
+                    {branding.mobile_logo || branding.primary_logo || settings.storeLogo ? (
                       <img 
-                        src={settings.storeLogo} 
-                        alt="Logo" 
+                        src={branding.mobile_logo || branding.primary_logo || settings.storeLogo} 
+                        alt={branding.site_short_name || "Logo"} 
                         className="w-full h-full object-contain transition-all duration-300" 
                         referrerPolicy="no-referrer" 
                         onError={() => setLogoError(true)}
                       />
                     ) : (
-                      'T'
+                      (branding.site_name || 'T')[0]
                     )}
                   </div>
-                  <span className="font-display font-black text-xl text-neutral-950 tracking-tighter uppercase">TAZU MART <span className="font-black">BD</span></span>
+                  <span className="font-display font-black text-xl text-neutral-950 tracking-tighter uppercase">
+                    {branding.site_name || 'TAZU MART BD'}
+                  </span>
                 </Link>
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
                   <X className="w-6 h-6" />

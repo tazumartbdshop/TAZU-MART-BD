@@ -18,10 +18,12 @@ import {
 } from 'lucide-react';
 import { getFlutterConfig, FlutterConfig } from '../../services/flutterService';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { useBrandingStore } from '../../store/useBrandingStore';
 
 export function Footer() {
   const [config, setConfig] = useState<FlutterConfig | null>(null);
   const { settings } = useSettingsStore();
+  const { settings: branding } = useBrandingStore();
 
   useEffect(() => {
     async function load() {
@@ -90,21 +92,21 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <Link to="/" className="flex items-center gap-2">
-              {brand.logoUrl ? (
-                <img src={brand.logoUrl} alt={brand.name} className="h-8 object-contain" />
+              {branding.footer_logo || branding.primary_logo || brand.logoUrl ? (
+                <img src={branding.footer_logo || branding.primary_logo || brand.logoUrl} alt={branding.site_name || brand.name} className="h-8 object-contain" referrerPolicy="no-referrer" />
               ) : (
                 <>
                   <div className="w-8 h-8 rounded flex items-center justify-center font-sans font-bold text-xl text-white" style={{ backgroundColor: brand.brandColor }}>
-                    {brand.name.charAt(0)}
+                    {(branding.site_name || brand.name).charAt(0)}
                   </div>
                   <span className="font-sans font-bold text-xl tracking-wide" style={{ color: brand.brandColor }}>
-                    {brand.name}
+                    {branding.site_name || brand.name}
                   </span>
                 </>
               )}
             </Link>
             <p className="text-sm leading-relaxed max-w-xs" style={{ color: mutedColor }}>
-              {description.short}
+              {branding.meta_description || description.short}
             </p>
             <div className="flex flex-wrap gap-4 pt-2">
               {(() => {

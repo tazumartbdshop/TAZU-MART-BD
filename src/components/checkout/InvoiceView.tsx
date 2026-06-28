@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import html2pdf from "html2pdf.js";
 import { useSettingsStore } from "../../store/useSettingsStore";
+import { useBrandingStore } from "../../store/useBrandingStore";
 
 interface InvoiceViewProps {
   order: any;
@@ -10,6 +11,7 @@ interface InvoiceViewProps {
 export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
   const invoiceRef = useRef(null);
   const { settings } = useSettingsStore();
+  const { settings: branding } = useBrandingStore();
 
   const subtotal = order.items.reduce(
     (acc: number, p: any) => acc + p.quantity * p.price,
@@ -102,12 +104,14 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
           {/* Header */}
           <div className="border-b pb-6 mb-6" style={{ borderColor: '#d1d5db' }}>
             <div className="flex items-center gap-3 mb-2">
-              {settings.invoiceLogo ? (
-                <img src={settings.invoiceLogo || null} alt="Logo" className="w-10 h-10 object-contain" />
+              {branding.invoice_logo || branding.primary_logo || settings.invoiceLogo ? (
+                <img src={branding.invoice_logo || branding.primary_logo || settings.invoiceLogo} alt="Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
               ) : (
-                <div className="w-10 h-10 bg-black rounded flex items-center justify-center text-white font-black text-lg">TM</div>
+                <div className="w-10 h-10 bg-black rounded flex items-center justify-center text-white font-black text-lg">
+                  {(branding.site_name || settings.storeName || 'T')[0]}
+                </div>
               )}
-              <h1 className="text-xl font-black uppercase">{settings.storeName || 'TAZU MART BD'}</h1>
+              <h1 className="text-xl font-black uppercase">{branding.site_name || settings.storeName || 'TAZU MART BD'}</h1>
             </div>
             <div className="text-[14px]">
                 <p>{settings.storeEmail}</p>

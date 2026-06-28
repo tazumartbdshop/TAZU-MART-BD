@@ -169,6 +169,60 @@ CREATE TABLE IF NOT EXISTS public.settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS public.branding_settings (
+  id TEXT PRIMARY KEY DEFAULT 'global',
+  site_name TEXT,
+  site_short_name TEXT,
+  site_tagline TEXT,
+  
+  -- Logos
+  primary_logo TEXT,
+  secondary_logo TEXT,
+  favicon TEXT,
+  apple_touch_icon TEXT,
+  mobile_logo TEXT,
+  desktop_logo TEXT,
+  dark_logo TEXT,
+  light_logo TEXT,
+  footer_logo TEXT,
+  invoice_logo TEXT,
+  email_logo TEXT,
+  loading_logo TEXT,
+  watermark_logo TEXT,
+  share_logo TEXT,
+  login_logo TEXT,
+  signup_logo TEXT,
+  
+  -- Branding Images
+  default_profile_image TEXT,
+  default_store_banner TEXT,
+  default_category_banner TEXT,
+  default_product_image TEXT,
+  default_blog_banner TEXT,
+  og_image TEXT,
+  
+  -- Theme Branding
+  primary_color TEXT,
+  secondary_color TEXT,
+  accent_color TEXT,
+  text_color TEXT,
+  background_color TEXT,
+  
+  -- SEO Branding
+  meta_title TEXT,
+  meta_description TEXT,
+  meta_keywords TEXT,
+  
+  -- Social Branding
+  facebook_image TEXT,
+  twitter_image TEXT,
+  linkedin_image TEXT,
+  
+  -- System
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.banners (
   id TEXT PRIMARY KEY,
   image TEXT,
