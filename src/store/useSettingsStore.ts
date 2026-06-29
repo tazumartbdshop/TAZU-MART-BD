@@ -532,12 +532,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       id: 'global',
       store_name: newSettings.storeName,
       store_slug: newSettings.storeSlug,
-      store_description: newSettings.storeDescription || newSettings.storeTagline,
+      store_description: newSettings.storeDescription,
+      store_tagline: newSettings.storeTagline,
       support_email: newSettings.supportEmail || newSettings.storeEmail,
       contact_number: newSettings.contactNumber,
       website_url: newSettings.websiteUrl,
       timezone: newSettings.timezone,
       industry: newSettings.businessType,
+      business_type: newSettings.businessType,
+      country: newSettings.country,
       primary_logo: newSettings.storeLogo,
       updated_at: new Date().toISOString()
     });
@@ -545,13 +548,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const { error: identityError } = await supabase.from('store_identity').upsert([identityPayload]);
     if (identityError) {
       console.error("Supabase store_identity update fail:", identityError);
-      throw new Error(`[Database Table: store_identity] Save failed: ${identityError.message}. Make sure the table exists and Row Level Security (RLS) is configured correctly.`);
+      throw new Error(`[Database Table: store_identity] Save failed: ${identityError.message}. Please execute the schema script to add columns: store_tagline, country, business_type.`);
     }
 
     // 2. Double-check persistence by querying back the master record immediately
     const { data: verifyData, error: verifyError } = await supabase
       .from('store_identity')
-      .select('store_name, store_slug')
+      .select('store_name, store_slug, store_tagline, country, business_type')
       .eq('id', 'global')
       .single();
 
@@ -622,12 +625,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         id: 'global',
         store_name: draft.storeName,
         store_slug: draft.storeSlug,
-        store_description: draft.storeDescription || draft.storeTagline,
+        store_description: draft.storeDescription,
+        store_tagline: draft.storeTagline,
         support_email: draft.supportEmail || draft.storeEmail,
         contact_number: draft.contactNumber,
         website_url: draft.websiteUrl,
         timezone: draft.timezone,
         industry: draft.businessType,
+        business_type: draft.businessType,
+        country: draft.country,
         primary_logo: draft.storeLogo,
         updated_at: new Date().toISOString()
       });
@@ -724,11 +730,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             storeName: idData.storeName || mergedSettings.storeName,
             storeSlug: idData.storeSlug || mergedSettings.storeSlug,
             storeDescription: idData.storeDescription || mergedSettings.storeDescription,
+            storeTagline: idData.storeTagline || mergedSettings.storeTagline,
+            country: idData.country || mergedSettings.country,
             supportEmail: idData.supportEmail || idData.storeEmail || mergedSettings.supportEmail,
             contactNumber: idData.contactNumber || mergedSettings.contactNumber,
             websiteUrl: idData.websiteUrl || mergedSettings.websiteUrl,
             timezone: idData.timezone || mergedSettings.timezone,
-            businessType: idData.industry || idData.businessType || mergedSettings.businessType,
+            businessType: idData.businessType || idData.industry || mergedSettings.businessType,
             storeLogo: idData.primaryLogo || idData.storeLogo || mergedSettings.storeLogo
           };
       }

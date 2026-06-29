@@ -19,6 +19,44 @@ import { useSettingsStore, AppSettings } from '../../store/useSettingsStore';
 import { toast } from 'react-hot-toast';
 import { uploadImage } from '../../lib/imageUtils';
 
+const COUNTRIES = [
+  "Bangladesh",
+  "India",
+  "Pakistan",
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "Australia",
+  "Saudi Arabia",
+  "UAE",
+  "Malaysia",
+  "Singapore"
+];
+
+const BUSINESS_TYPES = [
+  "Retail E-commerce",
+  "Wholesale",
+  "Electronics",
+  "Fashion",
+  "Luxury Watches",
+  "Jewelry",
+  "Cosmetics",
+  "Grocery",
+  "Pharmacy",
+  "Furniture",
+  "Restaurant",
+  "Food Delivery",
+  "Digital Products",
+  "Services",
+  "Manufacturing",
+  "Education",
+  "Healthcare",
+  "Real Estate",
+  "Travel",
+  "Automotive",
+  "Others"
+];
+
 export default function AdminStoreIdentity() {
   const { settings, updateSettings, updateDraftSettings } = useSettingsStore();
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
@@ -34,8 +72,15 @@ export default function AdminStoreIdentity() {
   const [websiteUrl, setWebsiteUrl] = useState(settings.websiteUrl || '');
   const [timezone, setTimezone] = useState(settings.timezone || '');
   const [businessType, setBusinessType] = useState(settings.businessType || '');
+  const [country, setCountry] = useState(settings.country || '');
   const [storeLogo, setStoreLogo] = useState(settings.storeLogo || '');
   const [isUploading, setIsUploading] = useState(false);
+
+  // Searchable dropdown states
+  const [isCountryOpen, setIsCountryOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
+  const [isBusinessTypeOpen, setIsBusinessTypeOpen] = useState(false);
+  const [businessTypeSearch, setBusinessTypeSearch] = useState('');
 
   useEffect(() => {
     if (settings) {
@@ -48,6 +93,7 @@ export default function AdminStoreIdentity() {
       setWebsiteUrl(settings.websiteUrl || '');
       setTimezone(settings.timezone || '');
       setBusinessType(settings.businessType || '');
+      setCountry(settings.country || '');
       setStoreLogo(settings.storeLogo || '');
     }
   }, [settings]);
@@ -71,7 +117,8 @@ export default function AdminStoreIdentity() {
       contactNumber,
       websiteUrl,
       timezone,
-      businessType
+      businessType,
+      country
     };
 
     try {
@@ -362,7 +409,7 @@ export default function AdminStoreIdentity() {
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
+              <div className="space-y-1 sm:col-span-2">
                 <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">Operation Timezone</label>
                 <select 
                   value={timezone} 
@@ -376,18 +423,118 @@ export default function AdminStoreIdentity() {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">Industry / Business Classification</label>
-                <select 
-                  value={businessType} 
-                  onChange={(e) => setBusinessType(e.target.value)} 
-                  className="w-full h-11 border border-neutral-200 px-3 text-xs font-bold focus:outline-none focus:border-neutral-900 rounded-none bg-white text-neutral-900"
-                >
-                  <option value="">Select Industry...</option>
-                  <option value="Retail E-commerce">Retail E-commerce</option>
-                  <option value="Wholesale B2B">Wholesale B2B</option>
-                  <option value="Services">Services & digital distribution</option>
-                </select>
+              {/* Country Searchable Dropdown */}
+              <div className="space-y-1 relative">
+                <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">Country</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsCountryOpen(!isCountryOpen)}
+                    className="w-full h-11 border border-neutral-200 px-3 text-xs font-bold text-left bg-white text-neutral-900 flex items-center justify-between focus:outline-none focus:border-neutral-900"
+                  >
+                    <span>{country || "Select Country..."}</span>
+                    <span className="text-neutral-400 text-[10px]">▼</span>
+                  </button>
+                  
+                  {isCountryOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsCountryOpen(false)} />
+                      <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-neutral-200 shadow-xl max-h-60 overflow-y-auto">
+                        <div className="p-2 border-b border-neutral-100 sticky top-0 bg-white z-10">
+                          <input
+                            type="text"
+                            value={countrySearch}
+                            onChange={(e) => setCountrySearch(e.target.value)}
+                            placeholder="Search country..."
+                            className="w-full h-8 px-2.5 text-xs border border-neutral-200 focus:outline-none focus:border-neutral-900 bg-white font-bold"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="py-1">
+                          {COUNTRIES.filter(c => c.toLowerCase().includes(countrySearch.toLowerCase())).length > 0 ? (
+                            COUNTRIES.filter(c => c.toLowerCase().includes(countrySearch.toLowerCase())).map((c) => (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => {
+                                  setCountry(c);
+                                  setIsCountryOpen(false);
+                                  setCountrySearch('');
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors hover:bg-neutral-50 ${
+                                  country === c ? 'bg-neutral-900 text-white hover:bg-neutral-900' : 'text-neutral-950'
+                                }`}
+                              >
+                                {c}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-xs text-neutral-400 font-bold uppercase tracking-wider text-center">
+                              No country found
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Business Type Searchable Dropdown */}
+              <div className="space-y-1 relative">
+                <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">Business Type</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsBusinessTypeOpen(!isBusinessTypeOpen)}
+                    className="w-full h-11 border border-neutral-200 px-3 text-xs font-bold text-left bg-white text-neutral-900 flex items-center justify-between focus:outline-none focus:border-neutral-900"
+                  >
+                    <span>{businessType || "Select Business Type..."}</span>
+                    <span className="text-neutral-400 text-[10px]">▼</span>
+                  </button>
+                  
+                  {isBusinessTypeOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsBusinessTypeOpen(false)} />
+                      <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-neutral-200 shadow-xl max-h-60 overflow-y-auto">
+                        <div className="p-2 border-b border-neutral-100 sticky top-0 bg-white z-10">
+                          <input
+                            type="text"
+                            value={businessTypeSearch}
+                            onChange={(e) => setBusinessTypeSearch(e.target.value)}
+                            placeholder="Search business type..."
+                            className="w-full h-8 px-2.5 text-xs border border-neutral-200 focus:outline-none focus:border-neutral-900 bg-white font-bold"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="py-1">
+                          {BUSINESS_TYPES.filter(b => b.toLowerCase().includes(businessTypeSearch.toLowerCase())).length > 0 ? (
+                            BUSINESS_TYPES.filter(b => b.toLowerCase().includes(businessTypeSearch.toLowerCase())).map((b) => (
+                              <button
+                                key={b}
+                                type="button"
+                                onClick={() => {
+                                  setBusinessType(b);
+                                  setIsBusinessTypeOpen(false);
+                                  setBusinessTypeSearch('');
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors hover:bg-neutral-50 ${
+                                  businessType === b ? 'bg-neutral-900 text-white hover:bg-neutral-900' : 'text-neutral-950'
+                                }`}
+                              >
+                                {b}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-xs text-neutral-400 font-bold uppercase tracking-wider text-center">
+                              No match found
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 

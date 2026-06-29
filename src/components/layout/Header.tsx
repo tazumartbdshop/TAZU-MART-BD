@@ -101,11 +101,23 @@ export function Header() {
         isScrolled ? 'shadow-sm' : ''
       )}>
         {/* 1️⃣ Thin premium headline text */}
-        <div className="w-full bg-navbar-bg text-navbar-text border-b border-theme-border pt-[calc(10px+env(safe-area-inset-top,0px))] pb-2.5 text-center select-none font-sans">
-          <p className="text-[10px] font-bold tracking-[0.25em] uppercase opacity-80">
-            {branding.site_name || 'TAZU MART BD'} {branding.site_tagline ? `— ${branding.site_tagline}` : 'PREMIUM STORE'}
-          </p>
-        </div>
+        {settings.storeTagline && settings.storeTagline.trim() !== '' && (
+          <div className="w-full bg-navbar-bg text-navbar-text border-b border-theme-border pt-[calc(10px+env(safe-area-inset-top,0px))] pb-2.5 overflow-hidden select-none font-sans relative">
+            <div className="container mx-auto px-4 flex justify-center items-center">
+              {settings.storeTagline.length > 35 ? (
+                <div className="w-full overflow-hidden whitespace-nowrap relative">
+                  <span className="animate-marquee inline-block text-[10px] font-bold tracking-[0.25em] uppercase opacity-80">
+                    {settings.storeTagline}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-[10px] font-bold tracking-[0.25em] uppercase opacity-80 text-center">
+                  {settings.storeTagline}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 2️⃣ Logo/Header row */}
         <div className="container mx-auto px-4 h-14 md:h-16 flex items-center justify-between">
@@ -132,9 +144,11 @@ export function Header() {
                    (branding.site_name || 'T')[0]
                  )}
               </div>
-              <span className="font-display font-black text-[13px] xs:text-sm md:text-lg text-navbar-text tracking-tighter uppercase whitespace-nowrap">
-                {branding.site_name || 'TAZU MART BD'}
-              </span>
+              {settings.storeName && settings.storeName.trim() !== '' && (
+                <span className="font-display font-black text-[13px] xs:text-sm md:text-lg text-navbar-text tracking-tighter uppercase whitespace-nowrap">
+                  {settings.storeName}
+                </span>
+              )}
             </Link>
           </div>
 
@@ -214,12 +228,14 @@ export function Header() {
                         onError={() => setLogoError(true)}
                       />
                     ) : (
-                      (branding.site_name || 'T')[0]
+                      (settings.storeName || 'T')[0]
                     )}
                   </div>
-                  <span className="font-display font-black text-xl text-neutral-950 tracking-tighter uppercase">
-                    {branding.site_name || 'TAZU MART BD'}
-                  </span>
+                  {settings.storeName && settings.storeName.trim() !== '' && (
+                    <span className="font-display font-black text-xl text-neutral-950 tracking-tighter uppercase">
+                      {settings.storeName}
+                    </span>
+                  )}
                 </Link>
                 <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
                   <X className="w-6 h-6" />
