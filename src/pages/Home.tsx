@@ -199,6 +199,12 @@ export default function Home() {
     );
   };
 
+  const isLoading = !categoriesLoaded || productsLoading || !isBannerStoreLoaded || !isBannerReady;
+
+  if (isLoading) {
+    return <HomeSkeleton />;
+  }
+
   const whatsappNumber = (settings.whatsappNumber || "8801314541738").replace(/[^0-9]/g, '');
   const hotlineNumber = settings.hotlineNumber || settings.contactNumber || settings.phone || "+8801314541738";
 
@@ -206,149 +212,123 @@ export default function Home() {
     <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-hidden font-sans">
       
       {/* 1. MAIN SLIDER BANNER (16:9, Dynamic Overlays and Optional Button Actions) */}
-      <section className="relative w-full aspect-[16/9] bg-neutral-950 overflow-hidden select-none">
-        {!isBannerReady ? (
-          /* Reserved layout height space with beautiful dark aesthetic to prevent CLS */
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-neutral-950 via-neutral-900 to-neutral-950 text-center p-4">
-            <div className="space-y-3 animate-pulse">
-              <span className="text-[10px] sm:text-xs font-black uppercase tracking-[0.25em] text-neutral-500">TAZU MART BD</span>
-              <h2 className="text-sm sm:text-lg md:text-xl font-bold text-neutral-400 uppercase tracking-widest font-display">PREMIUM LIFETIME COLLECTION</h2>
-            </div>
-          </div>
-        ) : sliderBanners.length > 0 ? (
-          <>
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeSlide}
-                initial={{ opacity: 0, scale: 1.01 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.6, ease: 'easeInOut' }}
-                className="absolute inset-0 w-full h-full"
+      {sliderBanners.length > 0 && (
+        <section className="relative w-full aspect-[16/9] bg-neutral-950 overflow-hidden select-none">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeSlide}
+              initial={{ opacity: 0, scale: 1.01 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6, ease: 'easeInOut' }}
+              className="absolute inset-0 w-full h-full"
+            >
+              {/* Main Banner Image */}
+              <img 
+                src={getOptimizedImageUrl(sliderBanners[activeSlide].image)} 
+                alt={sliderBanners[activeSlide].name || "Luxury Banner Graphic"} 
+                className="w-full h-full object-cover object-center pointer-events-none select-none"
+                referrerPolicy="no-referrer"
+                fetchPriority={activeSlide === 0 ? "high" : "low"}
+                loading={activeSlide === 0 ? "eager" : "lazy"}
+              />
+
+              {/* Text and CTA Button Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 flex flex-col justify-end pb-8 sm:pb-12 md:pb-16 px-4 md:px-12 z-10 select-text">
+                <div className="max-w-2xl space-y-1.5 sm:space-y-3">
+                  {/* 1. Title (name) */}
+                  {sliderBanners[activeSlide].name && (
+                    <motion.h2 
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15, duration: 0.4 }}
+                      className="text-lg sm:text-2xl md:text-4xl lg:text-5xl font-black text-white uppercase tracking-wider drop-shadow-md font-sans"
+                    >
+                      {sliderBanners[activeSlide].name}
+                    </motion.h2>
+                  )}
+
+                  {/* 2. Subtitle (offerText) */}
+                  {sliderBanners[activeSlide].offerText && (
+                    <motion.h3
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2, duration: 0.4 }}
+                      className="text-amber-400 text-[10px] sm:text-sm md:text-base font-black uppercase tracking-[0.2em] drop-shadow-sm"
+                    >
+                      {sliderBanners[activeSlide].offerText}
+                    </motion.h3>
+                  )}
+                  
+                  {/* 3. Description */}
+                  {sliderBanners[activeSlide].description && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.25, duration: 0.4 }}
+                      className="text-white/90 text-[10px] sm:text-xs md:text-sm font-semibold uppercase tracking-widest max-w-xl drop-shadow-sm"
+                    >
+                      {sliderBanners[activeSlide].description}
+                    </motion.p>
+                  )}
+
+                  {/* 4. CTA Button */}
+                  {sliderBanners[activeSlide].buttonText && sliderBanners[activeSlide].buttonLink && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.35, duration: 0.4 }}
+                      className="pt-2 sm:pt-4"
+                    >
+                      <Link 
+                        to={sliderBanners[activeSlide].buttonLink}
+                        className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-black hover:bg-neutral-900 border border-white/20 hover:border-white/40 text-white text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-150 active:scale-95 shadow-lg"
+                      >
+                        {sliderBanners[activeSlide].buttonText}
+                        <span className="text-[10px] sm:text-xs font-light">&rarr;</span>
+                      </Link>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+
+          {/* Previous and Next Navigation Arrows */}
+          {sliderBanners.length > 1 && (
+            <>
+              <button 
+                onClick={() => setActiveSlide((prev) => (prev - 1 + sliderBanners.length) % sliderBanners.length)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
               >
-                {/* Main Banner Image */}
-                <img 
-                  src={getOptimizedImageUrl(sliderBanners[activeSlide].image)} 
-                  alt={sliderBanners[activeSlide].name || "Luxury Banner Graphic"} 
-                  className="w-full h-full object-cover object-center pointer-events-none select-none"
-                  referrerPolicy="no-referrer"
-                  fetchPriority={activeSlide === 0 ? "high" : "low"}
-                  loading={activeSlide === 0 ? "eager" : "lazy"}
-                />
-
-                {/* Text and CTA Button Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 flex flex-col justify-end pb-8 sm:pb-12 md:pb-16 px-4 md:px-12 z-10 select-text">
-                  <div className="max-w-2xl space-y-2 sm:space-y-4">
-                    {sliderBanners[activeSlide].name && (
-                      <motion.h2 
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15, duration: 0.4 }}
-                        className="text-lg sm:text-2xl md:text-4xl lg:text-5xl font-black text-white uppercase tracking-wider drop-shadow-md font-sans"
-                      >
-                        {sliderBanners[activeSlide].name}
-                      </motion.h2>
-                    )}
-                    
-                    {sliderBanners[activeSlide].description && (
-                      <motion.p 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.25, duration: 0.4 }}
-                        className="text-white/90 text-[10px] sm:text-xs md:text-sm font-semibold uppercase tracking-widest max-w-xl drop-shadow-sm"
-                      >
-                        {sliderBanners[activeSlide].description}
-                      </motion.p>
-                    )}
-
-                    {sliderBanners[activeSlide].buttonText && sliderBanners[activeSlide].buttonLink && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.35, duration: 0.4 }}
-                        className="pt-1.5 sm:pt-3"
-                      >
-                        <Link 
-                          to={sliderBanners[activeSlide].buttonLink}
-                          className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-black hover:bg-neutral-900 border border-white/20 hover:border-white/40 text-white text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-150 active:scale-95 shadow-lg"
-                        >
-                          {sliderBanners[activeSlide].buttonText}
-                          <span className="text-[10px] sm:text-xs font-light">&rarr;</span>
-                        </Link>
-                      </motion.div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-
-            {/* Previous and Next Navigation Arrows */}
-            {sliderBanners.length > 1 && (
-              <>
-                <button 
-                  onClick={() => setActiveSlide((prev) => (prev - 1 + sliderBanners.length) % sliderBanners.length)}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => setActiveSlide((prev) => (prev + 1) % sliderBanners.length)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-                
-                {/* Custom Dot Bullets */}
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-25">
-                  {sliderBanners.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveSlide(idx)}
-                      className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeSlide ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        ) : null}
-      </section>
-
-      {isBannerReady && (
-        <>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => setActiveSlide((prev) => (prev + 1) % sliderBanners.length)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              
+              {/* Custom Dot Bullets */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-25">
+                {sliderBanners.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveSlide(idx)}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeSlide ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {/* 2. CATEGORY SECTION (Circular shape, completely database-driven) */}
-      <section className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
-        <div className="container mx-auto px-4">
-          {!categoriesLoaded && homeCategories.length === 0 ? (
-            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl">
-              {[
-                { name: "WATCHES", image: "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop", link: "/search?q=watch" },
-                { name: "WALLETS", image: "https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=200&h=200&auto=format&fit=crop", link: "/search?q=wallet" },
-                { name: "GIFT SET", image: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=200&h=200&auto=format&fit=crop", link: "/search?q=gift" },
-                { name: "PREMIUM", image: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=200&h=200&auto=format&fit=crop", link: "/search?q=premium" }
-              ].map((cat, i) => (
-                <Link 
-                  key={i} 
-                  to={cat.link}
-                  className="flex flex-col items-center group select-none text-center"
-                >
-                  <div className="relative w-[16vw] h-[16vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full overflow-hidden border border-neutral-100 bg-neutral-50 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-black/25 group-hover:shadow-md">
-                    <img 
-                      src={getOptimizedImageUrl(cat.image, 200)} 
-                      alt={cat.name} 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                    />
-                  </div>
-                  <span className="text-[10px] sm:text-xs font-black uppercase text-neutral-800 tracking-wider mt-2.5 transition-colors group-hover:text-black leading-tight">
-                    {cat.name}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          ) : homeCategories.length > 0 ? (
+      {homeCategories.length > 0 && (
+        <section className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
+          <div className="container mx-auto px-4">
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl">
               {homeCategories.map((cat, i) => (
                 <Link 
@@ -371,13 +351,9 @@ export default function Home() {
                 </Link>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-6">
-              <p className="text-xs font-black uppercase tracking-widest text-neutral-400">No Categories Available</p>
-            </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       {/* No skeleton loaders or blank product card placeholder structure shown */}
 
@@ -595,9 +571,56 @@ export default function Home() {
           </div>
         </div>
       </section>
-        </>
-      )}
 
+    </div>
+  );
+}
+
+function HomeSkeleton() {
+  return (
+    <div className="bg-neutral-50/50 min-h-screen pb-12 overflow-x-hidden font-sans animate-pulse">
+      {/* Banner Skeleton (16:9 aspect ratio) */}
+      <div className="w-full aspect-[16/9] bg-neutral-200" />
+
+      {/* Category List Skeleton */}
+      <div className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="flex flex-col items-center">
+                <div className="w-[16vw] h-[16vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full bg-neutral-200" />
+                <div className="h-3 w-12 bg-neutral-200 mt-2.5 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Products Skeletons - repeated for 2-3 sections */}
+      {[...Array(2)].map((_, sectionIdx) => (
+        <section key={sectionIdx} className="py-6 container mx-auto px-4 border-b border-neutral-100 animate-pulse">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-neutral-200 animate-pulse" />
+              <div className="h-5 w-32 bg-neutral-200 rounded" />
+            </div>
+            <div className="h-4 w-16 bg-neutral-200 rounded" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white border border-neutral-150 p-2.5 rounded-lg flex flex-col gap-3 h-full">
+                <div className="w-full aspect-square bg-neutral-200 rounded-lg" />
+                <div className="h-4 w-3/4 bg-neutral-200 rounded" />
+                <div className="h-3 w-1/2 bg-neutral-200 rounded" />
+                <div className="mt-auto pt-2 flex items-center justify-between">
+                  <div className="h-4 w-1/3 bg-neutral-200 rounded" />
+                  <div className="h-7 w-12 bg-neutral-200 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

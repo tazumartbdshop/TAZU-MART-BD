@@ -287,7 +287,6 @@ export default function Register() {
         phone: fullPhoneNumber,
         role: 'customer',
         status: 'Active',
-        password: formData.password, // Storing for phone-login fallback
         createdAt: new Date().toISOString(),
         gender: formData.gender,
         address: formData.address.trim(),
@@ -295,6 +294,8 @@ export default function Register() {
         profile_image: profileImage || null,
         occasionName: occasionJson,
         occasion_name: occasionJson,
+        loginProvider: 'Email',
+        registrationDate: new Date().toISOString(),
         division: '',
         district: '',
         upazila: '',
@@ -304,34 +305,7 @@ export default function Register() {
 
       if (dbError) console.warn("Profile table insert failed:", dbError.message);
 
-      // 3. Update Stores
-      addCustomer({
-        id: authData.user.id,
-        name: formData.fullName,
-        phones: [fullPhoneNumber],
-        emails: formData.email ? [formData.email.toLowerCase().trim()] : [],
-        address: {
-          country: 'Bangladesh',
-          city: '',
-          area: '',
-          street: formData.address.trim(),
-          division: '',
-          district: '',
-          upazila: '',
-          zipCode: '',
-        },
-        profileImage: profileImage || undefined,
-        gender: formData.gender,
-        status: 'Active',
-        customerType: 'New',
-        totalOrders: 0,
-        totalSpend: 0,
-        lastLogin: Date.now(),
-        totalLogins: 1,
-        socialLinks: [],
-        occasionName: occasionJson,
-      });
-
+      // 3. Update Stores - Removed addCustomer call (Redundant with syncCustomerFromAuth)
       login({
         id: authData.user.id,
         name: formData.fullName,

@@ -423,6 +423,10 @@ export default function AdminDashboard() {
                         } else {
                           toggleSubmenu(item.name);
                         }
+                        if (item.path) {
+                          navigate(item.path);
+                          if (window.innerWidth < 768) setSidebarOpen(false);
+                        }
                       }}
                       className={`flex items-center group px-6 py-4 rounded-none transition-all w-full border-l-[3px] 
                         ${active && !isExpanded ? 'bg-white/10 text-white font-bold border-purple-500' : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent'}
@@ -642,9 +646,9 @@ export default function AdminDashboard() {
   );
 }
 
-function KPICard({ label, value, trend, icon: Icon, borderClass, themeColor }: { label: string, value: string, trend: string, icon: any, borderClass: string, themeColor: string }) {
-  return (
-    <div className={`bg-white p-4 lg:p-5 rounded-none border-l-[4px] ${borderClass} border border-[#EEEEEE] shadow-[0_2px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:-translate-y-1 transition-all duration-300 min-h-[140px] flex flex-col justify-between group relative overflow-hidden`}>
+function KPICard({ label, value, trend, icon: Icon, borderClass, themeColor, to }: { label: string, value: string, trend: string, icon: any, borderClass: string, themeColor: string, to?: string }) {
+  const cardContent = (
+    <>
       {/* Subtle Background Tint */}
       <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-[0.03] transition-transform duration-500 group-hover:scale-150`} style={{ backgroundColor: themeColor }}></div>
       
@@ -664,6 +668,20 @@ function KPICard({ label, value, trend, icon: Icon, borderClass, themeColor }: {
           {value}
         </div>
       </div>
+    </>
+  );
+
+  if (to) {
+    return (
+      <Link to={to} className={`bg-white p-4 lg:p-5 rounded-none border-l-[4px] ${borderClass} border border-[#EEEEEE] shadow-[0_2px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:-translate-y-1 transition-all duration-300 min-h-[140px] flex flex-col justify-between group relative overflow-hidden cursor-pointer`}>
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={`bg-white p-4 lg:p-5 rounded-none border-l-[4px] ${borderClass} border border-[#EEEEEE] shadow-[0_2px_15px_rgba(0,0,0,0.02)] hover:shadow-[0_10px_30px_rgba(0,0,0,0.04)] hover:-translate-y-1 transition-all duration-300 min-h-[140px] flex flex-col justify-between group relative overflow-hidden`}>
+      {cardContent}
     </div>
   );
 }
@@ -1076,11 +1094,11 @@ function Overview() {
       {/* KPI Cards Grid */}
       <h3 className="text-lg font-sans font-black text-[#000000] mb-4 uppercase tracking-tighter">Enterprise Insights</h3>
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-8">
-         <KPICard label="Total Sales" value={`BDT ${totalSalesVal.toLocaleString()}`} trend={salesGrowth} icon={DollarSign} borderClass="border-l-purple-600" themeColor="#9333ea" />
-         <KPICard label="Total Orders" value={totalOrdersVal.toLocaleString()} trend={ordersGrowth} icon={ShoppingBag} borderClass="border-l-blue-600" themeColor="#2563eb" />
-         <KPICard label="Total Customers" value={totalCustomersVal.toLocaleString()} trend={customersGrowth} icon={Users} borderClass="border-l-cyan-600" themeColor="#0891b2" />
-         <KPICard label="Total Revenue" value={`BDT ${totalRevenueVal.toLocaleString()}`} trend={revenueGrowth} icon={Activity} borderClass="border-l-emerald-600" themeColor="#10b981" />
-         <KPICard label="Total Reviews" value={totalReviewsVal.toLocaleString()} trend={reviewsGrowth} icon={Star} borderClass="border-l-rose-600" themeColor="#e11d48" />
+         <KPICard label="Total Sales" value={`BDT ${totalSalesVal.toLocaleString()}`} trend={salesGrowth} icon={DollarSign} borderClass="border-l-purple-600" themeColor="#9333ea" to="/admin/orders" />
+         <KPICard label="Total Orders" value={totalOrdersVal.toLocaleString()} trend={ordersGrowth} icon={ShoppingBag} borderClass="border-l-blue-600" themeColor="#2563eb" to="/admin/orders" />
+         <KPICard label="Total Customers" value={totalCustomersVal.toLocaleString()} trend={customersGrowth} icon={Users} borderClass="border-l-cyan-600" themeColor="#0891b2" to="/admin/customers" />
+         <KPICard label="Total Revenue" value={`BDT ${totalRevenueVal.toLocaleString()}`} trend={revenueGrowth} icon={Activity} borderClass="border-l-emerald-600" themeColor="#10b981" to="/admin/orders" />
+         <KPICard label="Total Reviews" value={totalReviewsVal.toLocaleString()} trend={reviewsGrowth} icon={Star} borderClass="border-l-rose-600" themeColor="#e11d48" to="/admin/reviews" />
       </div>
 
       {/* Tables Row */}

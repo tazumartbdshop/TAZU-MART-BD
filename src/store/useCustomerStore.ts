@@ -44,6 +44,8 @@ export interface Customer {
   deviceType?: string;
   paymentMethods?: PaymentMethod[];
   createdAt: number;
+  loginProvider?: 'Email' | 'Google' | 'Facebook';
+  lastLoginAt?: string;
   isRead?: boolean;
   isDemo?: boolean;
 }
@@ -58,6 +60,7 @@ interface CustomerState {
   markAllAsRead: () => void;
   clearDemoData: () => void;
   fetchCustomers: () => Promise<void>;
+  checkAndCreateCustomerRecord: (user: any) => Promise<void>;
   subscribe: () => () => void;
 }
 
@@ -96,47 +99,73 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       throw error;
     }
   },
-  syncCustomerFromAuth: (user) => {
+  syncCustomerFromAuth: async (user) => {
     if (!user || user.role !== 'customer') return;
+    
+    // Refresh customers first to have latest state
+    await get().fetchCustomers();
+    
     const customers = get().customers;
-    const existing = customers.find(c => c.emails.includes(user.email) || (user.phone && c.phones.includes(user.phone)));
+    const existing = customers.find(c => 
+      c.id === user.id || 
+      c.emails.includes(user.email) || 
+      (user.phone && c.phones.includes(user.phone))
+    );
     
     if (existing) {
       get().updateCustomer(existing.id, { 
         lastLogin: Date.now(),
+        lastLoginAt: new Date().toISOString(),
         totalLogins: (existing.totalLogins || 0) + 1,
-        lastIP: '192.168.' + Math.floor(Math.random() * 255) + '.' + Math.floor(Math.random() * 255),
-        deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop'
-      });
-    } else {
-      get().addCustomer({
-        name: user.name,
-        phones: user.phone ? [user.phone] : [],
-        emails: [user.email],
-        address: {
-          country: user.country || 'Bangladesh',
-          city: user.city || user.district || '',
-          area: user.area || user.upazila || '',
-          street: user.address || user.street || '',
-          division: user.division,
-          district: user.district,
-          upazila: user.upazila,
-          zipCode: user.zipCode
-        },
-        profileImage: user.profileImage,
-        gender: user.gender,
-        occasionName: user.occasionName, // Capture special day
-        specialDate: user.specialDate,
-        socialLinks: [],
-        status: 'Active',
-        customerType: 'New',
-        totalOrders: 0,
-        totalSpend: 0,
-        lastLogin: Date.now(),
-        totalLogins: 1,
         lastIP: 'User Sync',
         deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop'
       });
+    } else {
+      // If not in customer table, create the record (Auth user already exists here)
+      await get().checkAndCreateCustomerRecord(user);
+    }
+  },
+  checkAndCreateCustomerRecord: async (user) => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const customerRecord = {
+      id: user.id,
+      name: user.name || 'New Customer',
+      emails: [user.email],
+      phones: user.phone ? [user.phone] : [],
+      address: {
+        country: user.country || 'Bangladesh',
+        city: user.city || user.district || '',
+        area: user.area || user.upazila || '',
+        street: user.address || user.street || '',
+        division: user.division || '',
+        district: user.district || '',
+        upazila: user.upazila || '',
+        zipCode: user.zipCode || ''
+      },
+      profileImage: user.profileImage,
+      gender: user.gender,
+      occasionName: user.occasionName,
+      specialDate: user.specialDate,
+      status: 'Active',
+      customerType: 'New',
+      loginProvider: user.app_metadata?.provider === 'google' ? 'Google' : 
+                     user.app_metadata?.provider === 'facebook' ? 'Facebook' : 'Email',
+      totalOrders: 0,
+      totalSpend: 0,
+      lastLogin: Date.now(),
+      lastLoginAt: new Date().toISOString(),
+      totalLogins: 1,
+      createdAt: Date.now(),
+      socialLinks: []
+    };
+
+    const { error } = await supabase.from('customers').upsert([objectToSnake(customerRecord)]);
+    if (error) {
+      console.error("[checkAndCreateCustomerRecord] Error:", error);
+    } else {
+      await get().fetchCustomers();
     }
   },
   updateCustomer: async (id, updates) => {
@@ -161,13 +190,26 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       throw error;
     }
   },
-  deleteCustomer: (id) => {
-    const supabase = getSupabase();
-    if (supabase) supabase.from('customers').delete().eq('id', id).then(({error}) => error && console.warn(error));
-      
-    set((state) => ({
-      customers: state.customers.filter(c => c.id !== id)
-    }));
+  deleteCustomer: async (id) => {
+    try {
+      const response = await fetch('/api/admin/delete-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to delete customer');
+      }
+
+      set((state) => ({
+        customers: state.customers.filter(c => c.id !== id)
+      }));
+    } catch (error: any) {
+      console.error("[Store Delete Customer] Error:", error);
+      throw error;
+    }
   },
   markAsRead: (id) => {
     const supabase = getSupabase();

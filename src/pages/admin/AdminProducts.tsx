@@ -247,7 +247,7 @@ function AdminProductAdd() {
 
   // States
   const [seoPoints, setSeoPoints] = useState<string[]>(['']);
-  const [variants, setVariants] = useState<{ title: string; option: string; price: string }[]>([]);
+  const [variants, setVariants] = useState<{ name: string; price: number | '' }[]>([{ name: '', price: '' }]);
   const [shippingZones, setShippingZones] = useState<{ zone: string; charge: string }[]>([
     { zone: 'Inside Dhaka', charge: '80' },
     { zone: 'Outside Dhaka', charge: '150' }
@@ -270,10 +270,24 @@ function AdminProductAdd() {
   const [manualKeywords, setManualKeywords] = useState<string[]>([]);
   const [newKeywordInput, setNewKeywordInput] = useState('');
 
+  const getRegularOldPriceDefaultValue = () => {
+    if (!editingProduct) return '';
+    if (editingProduct.discountPrice) {
+      return `${editingProduct.discountPrice} / ${editingProduct.price}`;
+    }
+    return `${editingProduct.price || ''}`;
+  };
+
   useEffect(() => {
     if (isEditing && editingProduct) {
       setSeoPoints(editingProduct.seoPoints || ['']);
-      setVariants(editingProduct.variants || []);
+      const mappedVariants = editingProduct.variants?.length 
+        ? editingProduct.variants.map((v: any) => ({
+            name: v.name || v.option || '',
+            price: v.price || ''
+          }))
+        : [{ name: '', price: '' }];
+      setVariants(mappedVariants);
       setShippingZones(editingProduct.shippingZones || [
         { zone: 'Inside Dhaka', charge: '80' },
         { zone: 'Outside Dhaka', charge: '150' }
@@ -478,11 +492,17 @@ function AdminProductAdd() {
   };
 
   const addVariant = () => {
-    setVariants([...variants, { title: '', option: '', price: '' }]);
+    setVariants([...variants, { name: '', price: '' }]);
   };
 
   const removeVariant = (index: number) => {
     setVariants(variants.filter((_, i) => i !== index));
+  };
+
+  const updateVariant = (index: number, field: 'name' | 'price', value: string | number) => {
+    const newVariants = [...variants];
+    newVariants[index] = { ...newVariants[index], [field]: value };
+    setVariants(newVariants);
   };
 
   const addShippingZone = () => {
@@ -504,15 +524,25 @@ function AdminProductAdd() {
     const formData = new FormData(e.currentTarget);
     
     // Convert logic
-    const regPrice = Number(formData.get('regular_price'));
-    const oldPrice = Number(formData.get('old_price'));
+    const regOldPriceVal = (formData.get('regular_old_price') as string) || '';
+    let regPrice = 0;
+    let oldPrice = 0;
+    if (regOldPriceVal.includes('/')) {
+      const parts = regOldPriceVal.split('/');
+      regPrice = Number(parts[0].trim()) || 0;
+      oldPrice = Number(parts[1].trim()) || 0;
+    } else {
+      regPrice = Number(regOldPriceVal.trim()) || 0;
+    }
     const sellingPrice = Number(formData.get('selling_price'));
 
     let finalPrice = sellingPrice;
     let finalDiscountPrice: number | undefined = undefined;
 
-    if (oldPrice > 0 && sellingPrice > 0) {
-      finalPrice = oldPrice;
+    const parsedOldPrice = oldPrice > 0 ? oldPrice : regPrice;
+
+    if (parsedOldPrice > 0 && sellingPrice > 0 && parsedOldPrice !== sellingPrice) {
+      finalPrice = parsedOldPrice;
       finalDiscountPrice = sellingPrice;
     } else if (regPrice > 0 && sellingPrice > 0 && regPrice !== sellingPrice) {
       finalPrice = regPrice;
@@ -585,7 +615,7 @@ function AdminProductAdd() {
           warranty: formData.get('warranty') as string,
           unitName: formData.get('unit_name') as string,
           seoPoints,
-          variants,
+          variants: variants.filter(v => (v.name || '').trim() !== ''),
           shippingZones,
           is_flash_sale: isFlashSale,
           is_trending: isTrending,
@@ -871,16 +901,7 @@ function AdminProductAdd() {
                           className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold font-mono text-sm" 
                        />
                     </div>
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-black uppercase tracking-widest">Brand Name</label>
-                       <input 
-                          name="brand" 
-                          type="text" 
-                          defaultValue={editingProduct?.brand || ''}
-                          placeholder="e.g. Tazu Classic" 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                       />
-                    </div>
+
                     <div className="space-y-1.5">
                        <label className="text-[10px] font-black text-black uppercase tracking-widest">Product Tags</label>
                        <input 
@@ -893,98 +914,101 @@ function AdminProductAdd() {
                  </div>
               </div>
 
-              {/* 10. PRICING SECTION */}
-              <div className="space-y-4 pt-8 border-t border-zinc-200">
-                 <h4 className="block text-xs font-black text-black uppercase tracking-widest border-l-4 border-black pl-3">PRICING</h4>
-                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-black uppercase tracking-widest">Regular Price</label>
-                       <input 
-                          name="regular_price" 
-                          type="number" 
-                          defaultValue={editingProduct?.price || ''}
-                          placeholder="Regular Price" 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                       />
-                    </div>
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-black uppercase tracking-widest">Old Price</label>
-                       <input 
-                          name="old_price" 
-                          type="number" 
-                          defaultValue={editingProduct?.discountPrice ? editingProduct.price : ''}
-                          placeholder="Old Price" 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                       />
-                    </div>
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-black uppercase tracking-widest">Selling Price *</label>
-                       <input 
-                          name="selling_price" 
-                          required 
-                          type="number" 
-                          defaultValue={editingProduct?.discountPrice || editingProduct?.price || ''}
-                          placeholder="Selling Price" 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                       />
-                    </div>
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-black uppercase tracking-widest">Stock Quantity *</label>
-                       <input 
-                          name="stock_quantity" 
-                          required 
-                          type="number" 
-                          defaultValue={editingProduct?.stock || ''}
-                          placeholder="Stock Quantity" 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                       />
-                    </div>
-                    <div className="space-y-1.5 col-span-2 md:col-span-1 border-black">
-                       <label className="text-[10px] font-black text-black uppercase tracking-widest">Sold Count</label>
-                       <input 
-                          name="sold_count" 
-                          type="number" 
-                          defaultValue={editingProduct?.soldCount || ''}
-                          placeholder="Sold Count" 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                       />
-                    </div>
-                 </div>
-                 
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-black uppercase tracking-widest">Buying Price *</label>
-                       <input 
-                          name="buying_price" 
-                          type="number" 
-                          defaultValue={editingProduct?.buyingPrice || ''}
-                          placeholder="Buying Price" 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                       />
-                       <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">* ADMIN USE ONLY</p>
-                    </div>
-                    <div className="space-y-1.5">
-                       <label className="text-[10px] font-black text-black uppercase tracking-widest">Warranty</label>
-                       <input 
-                          name="warranty" 
-                          type="text" 
-                          defaultValue={editingProduct?.warranty || ''}
-                          placeholder="e.g. 1 Year Brand Warranty" 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                       />
-                    </div>
-                    <div className="space-y-1.5 col-span-1">
-                       <label className="text-[10px] font-black text-black uppercase tracking-widest">Unit Name</label>
-                       <input 
-                          name="unit_name" 
-                          type="text" 
-                          defaultValue={editingProduct?.unitName || ''}
-                          placeholder="e.g. piece, pack, box" 
-                          className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
-                       />
-                    </div>
-                 </div>
-              </div>
+               {/* 10. PRICING SECTION */}
+               <div className="space-y-4 pt-8 border-t border-zinc-200">
+                  <h4 className="block text-xs font-black text-black uppercase tracking-widest border-l-4 border-black pl-3">PRICING</h4>
+                  <div className="grid grid-cols-2 gap-4 md:gap-6">
+                     {/* Row 1 */}
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-black uppercase tracking-widest">REGULAR / OLD PRICE</label>
+                        <input 
+                           name="regular_old_price" 
+                           type="text" 
+                           defaultValue={getRegularOldPriceDefaultValue()}
+                           placeholder="999 / 1299" 
+                           className="w-full h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
+                        />
+                     </div>
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-black uppercase tracking-widest">SELLING PRICE *</label>
+                        <input 
+                           name="selling_price" 
+                           required 
+                           type="number" 
+                           defaultValue={editingProduct?.discountPrice || editingProduct?.price || ''}
+                           placeholder="Selling Price" 
+                           className="w-full h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
+                        />
+                     </div>
+
+                     {/* Row 2 */}
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-black uppercase tracking-widest">BUYING PRICE *</label>
+                        <input 
+                           name="buying_price" 
+                           type="number" 
+                           defaultValue={editingProduct?.buyingPrice || ''}
+                           placeholder="Buying Price" 
+                           className="w-full h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
+                        />
+                     </div>
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-black uppercase tracking-widest">UNIT NAME</label>
+                        <input 
+                           name="unit_name" 
+                           type="text" 
+                           defaultValue={editingProduct?.unitName || ''}
+                           placeholder="e.g. piece, pack, box" 
+                           className="w-full h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
+                        />
+                     </div>
+
+                     {/* Row 3 */}
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-black uppercase tracking-widest">STOCK QUANTITY *</label>
+                        <input 
+                           name="stock_quantity" 
+                           required 
+                           type="number" 
+                           defaultValue={editingProduct?.stock || ''}
+                           placeholder="Stock Quantity" 
+                           className="w-full h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
+                        />
+                     </div>
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-black uppercase tracking-widest">SOLD COUNT</label>
+                        <input 
+                           name="sold_count" 
+                           type="number" 
+                           defaultValue={editingProduct?.soldCount || ''}
+                           placeholder="Sold Count" 
+                           className="w-full h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
+                        />
+                     </div>
+
+                     {/* Row 4 */}
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-black uppercase tracking-widest">WARRANTY</label>
+                        <input 
+                           name="warranty" 
+                           type="text" 
+                           defaultValue={editingProduct?.warranty || ''}
+                           placeholder="e.g. 1 Year Brand Warranty" 
+                           className="w-full h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
+                        />
+                     </div>
+                     <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-black uppercase tracking-widest">BRAND NAME</label>
+                        <input 
+                           name="brand" 
+                           type="text" 
+                           defaultValue={editingProduct?.brand || ''}
+                           placeholder="e.g. Tazu Classic" 
+                           className="w-full h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm" 
+                        />
+                     </div>
+                  </div>
+               </div>
 
               {/* 12. CATEGORY SYSTEM */}
               <div className="space-y-4 pt-8 border-t border-zinc-200">
@@ -1028,6 +1052,46 @@ function AdminProductAdd() {
                  </div>
               </div>
 
+              {/* VARIANTS SECTION */}
+              <div className="space-y-4 pt-8 border-t border-zinc-200">
+                 <div className="flex justify-between items-center">
+                    <h4 className="block text-xs font-black text-black uppercase tracking-widest border-l-4 border-black pl-3">VARIANTS</h4>
+                    <button 
+                       type="button" 
+                       onClick={addVariant}
+                       className="px-4 py-2 bg-black text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-zinc-800 transition-colors"
+                    >
+                       <Plus className="w-3.5 h-3.5" /> Add Variant
+                    </button>
+                 </div>
+                 <div className="space-y-3">
+                    {variants.map((variant, index) => (
+                       <div key={index} className="flex gap-4 items-center">
+                          <input 
+                             placeholder="Variant Name (e.g. XL, Red, 128GB)" 
+                             value={variant.name}
+                             onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                             className="flex-1 h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm"
+                          />
+                          <input 
+                             type="number" 
+                             placeholder="Variant Price" 
+                             value={variant.price}
+                             onChange={(e) => updateVariant(index, 'price', e.target.value)}
+                             className="w-48 h-12 px-4 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-bold text-sm"
+                          />
+                          <button 
+                             type="button"
+                             onClick={() => removeVariant(index)}
+                             className="p-3 border border-zinc-200 text-gray-400 hover:text-red-500 hover:border-red-500 transition-colors"
+                          >
+                             <Trash2 className="w-5 h-5" />
+                          </button>
+                       </div>
+                    ))}
+                 </div>
+              </div>
+
               {/* Advanced collapsibles to fully align with schema features */}
               <div className="pt-8 border-t border-zinc-200 space-y-6">
                  <h5 className="block text-[10px] font-black text-zinc-400 uppercase tracking-widest">ADDITIONAL CONFIGURATIONS</h5>
@@ -1065,7 +1129,7 @@ function AdminProductAdd() {
                        </div>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t border-zinc-200">
                        <div className="flex justify-between items-center">
                           <label className="text-[10px] font-black text-black uppercase tracking-[0.1em]">Shipping Charge Zones</label>
                           <button 

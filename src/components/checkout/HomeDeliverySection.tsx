@@ -93,7 +93,7 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
           </label>
           <select 
             id="checkout-division"
-            value={formData.division}
+            value={formData.division || ''}
             onChange={(e) => {
               handleInputChange('division', e.target.value);
               handleInputChange('district', '');
@@ -115,7 +115,7 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
           </label>
           <select 
             id="checkout-district"
-            value={formData.district}
+            value={formData.district || ''}
             onChange={(e) => {
               handleInputChange('district', e.target.value);
               handleInputChange('upazila', '');
@@ -138,7 +138,7 @@ export const HomeDeliverySection: React.FC<HomeDeliverySectionProps> = ({
         </label>
         <select 
           id="checkout-upazila"
-          value={formData.upazila}
+          value={formData.upazila || ''}
           onChange={(e) => handleInputChange('upazila', e.target.value)}
           disabled={!formData.district}
           className="w-full bg-white border-2 border-neutral-200 px-4 h-[54px] rounded-[20px] focus:outline-none focus:border-neutral-400 text-xs font-bold transition-all duration-300 cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.03)] disabled:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"

@@ -32,7 +32,7 @@ export interface Product {
   soldCount?: number;
   productCode?: string;
   seoPoints?: string[];
-  variants?: { title: string; option: string; price: string }[];
+  variants?: { name: string; price: number }[];
   shippingZones?: { zone: string; charge: string }[];
   is_flash_sale?: boolean;
   is_trending?: boolean;

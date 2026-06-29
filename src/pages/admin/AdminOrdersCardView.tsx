@@ -150,7 +150,7 @@ export default function AdminOrdersCardView() {
 
   const getProductImage = (item: any) => {
     if (item?.image) return item.image;
-    const prd = products.find(p => p.id === item?.productId || p.name.toLowerCase() === item?.name?.toLowerCase());
+    const prd = products.find(p => p.id === item?.productId || (p.name || '').toLowerCase() === (item?.name || '').toLowerCase());
     if (prd?.image) return prd.image;
     
     const n = (item?.name || '').toLowerCase();
@@ -168,9 +168,9 @@ export default function AdminOrdersCardView() {
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = 
-      order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.mobileNumber.includes(searchQuery);
+      (order.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (order.orderId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (order.mobileNumber || '').includes(searchQuery);
     
     const matchesType = viewType === 'All' || order.type === viewType;
     

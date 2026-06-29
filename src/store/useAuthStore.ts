@@ -62,9 +62,28 @@ export const useAuthStore = create<AuthState>()(
         }
         set({ user: null, isAuthenticated: false });
       },
-      updateUser: (updatedUser) => set((state) => ({
-        user: state.user ? { ...state.user, ...updatedUser } : null
-      })),
+      updateUser: (updatedUser) => {
+        set((state) => {
+          const newUser = state.user ? { ...state.user, ...updatedUser } : null;
+          
+          // Sync to database if user is a customer
+          if (newUser && newUser.role === 'customer') {
+             const supabase = getSupabase();
+             if (supabase) {
+               // Update users table
+               supabase.from('users').update(updatedUser).eq('id', newUser.id)
+                 .then(({error}) => error && console.warn("Users sync error:", error));
+               
+               // Update customers table (needs some field mapping usually, but let's try direct for now)
+               // Note: useCustomerStore.updateCustomer handles API call which is safer for sync
+               useCustomerStore.getState().updateCustomer(newUser.id, updatedUser as any)
+                 .catch(err => console.warn("Customers sync error:", err));
+             }
+          }
+          
+          return { user: newUser };
+        });
+      },
     }),
     {
       name: 'luxemart-auth',

@@ -781,7 +781,7 @@ Please ask me your query or select a quick question template below!`;
         name,
         emails: [email],
         phones: phone ? [phone] : [],
-        password: password, // For admin reference if needed, though usually hashed in Auth
+        // Removed plain text password storage
         status: 'Active',
         customer_type: 'New',
         created_at: Date.now(),
@@ -827,16 +827,56 @@ Please ask me your query or select a quick question template below!`;
         if (authError) {
           console.error("[Admin Update Customer] Auth Error:", authError);
         }
+        delete updates.password; // Remove password from database update payload
       }
 
       // Update DB tables
       const { error: userError } = await supabaseServiceRole.from('users').update(updates).eq('id', id);
       const { error: customerError } = await supabaseServiceRole.from('customers').update(updates).eq('id', id);
 
+      // If email is updated, sync to Auth
+      if (updates.email || (updates.emails && updates.emails[0])) {
+        const newEmail = updates.email || updates.emails[0];
+        const { error: authEmailError } = await supabaseServiceRole.auth.admin.updateUserById(id, {
+          email: newEmail,
+          email_confirm: true
+        });
+        if (authEmailError) {
+          console.error("[Admin Update Customer] Auth Email Error:", authEmailError);
+        }
+      }
+
       res.json({ status: "success" });
     } catch (err: any) {
       console.error("[Admin Update Customer] Fatal Error:", err);
       res.status(500).json({ error: "Customer update failed" });
+    }
+  });
+
+  app.post("/api/admin/delete-customer", async (req, res) => {
+    try {
+      if (!supabaseServiceRole) {
+        return res.status(500).json({ error: "Supabase Service Role key missing." });
+      }
+
+      const { id } = req.body;
+      if (!id) return res.status(400).json({ error: "Customer ID is required" });
+
+      // 1. Delete from Supabase Auth
+      const { error: authError } = await supabaseServiceRole.auth.admin.deleteUser(id);
+      if (authError) {
+        console.error("[Admin Delete Customer] Auth Error:", authError);
+        // We continue even if auth delete fails (maybe user doesn't exist in auth)
+      }
+
+      // 2. Delete from DB tables
+      await supabaseServiceRole.from('users').delete().eq('id', id);
+      await supabaseServiceRole.from('customers').delete().eq('id', id);
+
+      res.json({ status: "success" });
+    } catch (err: any) {
+      console.error("[Admin Delete Customer] Fatal Error:", err);
+      res.status(500).json({ error: "Customer deletion failed" });
     }
   });
 

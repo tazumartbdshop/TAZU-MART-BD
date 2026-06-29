@@ -310,6 +310,19 @@ function AdminCustomerList() {
                        <p className="text-[10px] font-bold text-zinc-400 truncate">
                          {customer.emails[0] || 'No Email'}
                        </p>
+                       <div className="flex items-center gap-2 mt-1">
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border",
+                            customer.loginProvider === 'Google' ? "bg-red-50 text-red-600 border-red-100" :
+                            customer.loginProvider === 'Facebook' ? "bg-blue-50 text-blue-600 border-blue-100" :
+                            "bg-zinc-50 text-zinc-600 border-zinc-100"
+                          )}>
+                            {customer.loginProvider || 'Email'}
+                          </span>
+                          <span className="text-[9px] font-bold text-zinc-400">
+                             Reg: {new Date(customer.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
 
                        <div className="pt-1 flex items-center gap-2">
                           {genderBadge(customer.gender)}
@@ -437,7 +450,11 @@ function AdminCustomerList() {
                          </div>
                          <div>
                             <label className="block text-zinc-400 font-bold uppercase mb-0.5">Last Login</label>
-                            <span className="font-black text-zinc-900">{selectedCustomer.lastLogin ? new Date(selectedCustomer.lastLogin).toLocaleString() : 'Never'}</span>
+                            <span className="font-black text-zinc-900">{selectedCustomer.lastLoginAt ? new Date(selectedCustomer.lastLoginAt).toLocaleString() : selectedCustomer.lastLogin ? new Date(selectedCustomer.lastLogin).toLocaleString() : 'Never'}</span>
+                         </div>
+                         <div>
+                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Login Provider</label>
+                            <span className="font-black text-zinc-900 uppercase">{selectedCustomer.loginProvider || 'Email'}</span>
                          </div>
                          <div>
                             <label className="block text-zinc-400 font-bold uppercase mb-0.5">Loyalty Score</label>

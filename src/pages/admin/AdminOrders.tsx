@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Search, Plus } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { useOrderStore } from '../../store/useOrderStore';
 import AdminOrdersCardView from './AdminOrdersCardView';
@@ -11,13 +12,22 @@ import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/l
 
 function AdminOrderList() {
   const { orders, updateOrderStatus, markAsRead } = useOrderStore();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewType, setViewType] = useState('All'); // 'All' | 'Online' | 'Offline'
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any>(null);
 
-  const filteredOrders = orders.filter(
-    order => activeTab === 'All' || order.status === activeTab
-  );
+  const filteredOrders = orders.filter(order => {
+    const matchesTab = activeTab === 'All' || order.status === activeTab;
+    const matchesSearch = 
+      (order.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (order.orderId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (order.mobileNumber || '').includes(searchQuery);
+    const matchesType = viewType === 'All' || order.type === viewType;
+    return matchesTab && matchesSearch && matchesType;
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -44,14 +54,63 @@ function AdminOrderList() {
 
   return (
     <div className="bg-white rounded-none border border-[#EEEEEE] shadow-[0_4px_20px_rgb(0,0,0,0.03)] overflow-hidden flex flex-col min-h-[70vh]">
-      <div className="p-6 border-b border-[#EEEEEE] shrink-0">
-        <h3 className="text-xl font-serif font-bold text-[#000000] mb-4">Complete Order Database</h3>
+      <div className="p-6 border-b border-[#EEEEEE] shrink-0 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h3 className="text-xl font-serif font-bold text-[#000000]">Complete Order Database</h3>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Channel/ViewType Toggle */}
+            <div className="flex items-center bg-gray-100 p-1 rounded-none border border-gray-200">
+              <button 
+                onClick={() => setViewType('All')}
+                className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'All' ? 'bg-white text-black shadow-sm font-bold' : 'text-gray-400'}`}
+              >
+                All
+              </button>
+              <button 
+                onClick={() => setViewType('Online')}
+                className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'Online' ? 'bg-white text-black shadow-sm font-bold' : 'text-gray-400'}`}
+              >
+                Online
+              </button>
+              <button 
+                onClick={() => setViewType('Offline')}
+                className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest transition-all ${viewType === 'Offline' ? 'bg-white text-black shadow-sm font-bold' : 'text-gray-400'}`}
+              >
+                In Shop
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative group min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-black transition-colors" />
+              <input 
+                type="text" 
+                placeholder="Search Customer / Order ID..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-4 py-2 bg-[#f8f8f8] border border-[#EEEEEE] rounded-none text-xs font-bold w-full focus:outline-none focus:border-black transition-all"
+              />
+            </div>
+
+            {/* Add Order Button */}
+            <button 
+              onClick={() => navigate('/admin/orders/add')}
+              className="bg-black text-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] hover:bg-gray-800 transition-all active:scale-95 flex items-center gap-1.5 shadow-md"
+            >
+              <Plus className="w-4 h-4" />
+              Add Order
+            </button>
+          </div>
+        </div>
+
+        {/* Status Filter Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
           {['All', 'Placed', 'Pending', 'Confirmed', 'Processing', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'].map((status) => (
             <button 
               key={status} 
               onClick={() => setActiveTab(status)}
-              className={`px-4 py-1.5 rounded-none text-sm font-medium whitespace-nowrap transition-colors ${activeTab === status ? 'bg-[#000000] text-white' : 'bg-gray-50 text-[#666666] hover:bg-gray-100'}`}
+              className={`px-4 py-1.5 rounded-none text-sm font-medium whitespace-nowrap transition-colors ${activeTab === status ? 'bg-[#000000] text-white font-bold' : 'bg-gray-50 text-[#666666] hover:bg-gray-100'}`}
             >
               {status}
             </button>
@@ -71,7 +130,7 @@ function AdminOrderList() {
 
           return (
             <div 
-              key={order.id} 
+              key={`${order.id || index}-${index}`} 
               className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden"
             >
               {/* Compact View */}
@@ -106,9 +165,9 @@ function AdminOrderList() {
                   </p>
                   <div onClick={(e) => e.stopPropagation()}>
                     <select 
-                      value={order.status}
+                      value={order.status || ''}
                       onChange={(e) => updateOrderStatus(order.id, e.target.value as any)}
-                      className={`px-3 py-1 text-xs font-bold rounded-full border outline-none cursor-pointer ${getStatusColor(order.status)}`}
+                      className={`px-3 py-1 text-xs font-bold rounded-full border outline-none cursor-pointer ${getStatusColor(order.status || '')}`}
                     >
                       {['Placed', 'Pending', 'Confirmed', 'Processing', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'].map(s => (
                         <option key={s} value={s}>{s}</option>
@@ -301,7 +360,7 @@ function AdminOrderList() {
 export default function AdminOrders() {
   return (
     <Routes>
-      <Route path="/" element={<AdminOrdersCardView />} />
+      <Route path="/" element={<AdminOrderList />} />
       <Route path="/complete" element={<AdminOrderList />} />
       <Route path="/add" element={<PremiumOrderAdd />} />
       <Route path="/edit/:id" element={<PremiumOrderAdd />} />

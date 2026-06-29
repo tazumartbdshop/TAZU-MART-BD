@@ -442,21 +442,27 @@ export default function Product() {
 
   const groupedVariants = useMemo<Record<string, { option: string, price: string }[]>>(() => {
     const groups: Record<string, { option: string, price: string }[]> = {};
-    if (product && product.variants && Array.isArray(product.variants)) {
-      product.variants.forEach(v => {
-        if (!v || !v.title) return;
+    
+    const processVariant = (v: any) => {
+      if (!v) return;
+      if (v.name) {
+        // New structure: { name: string, price: string }
+        if (!groups['Variant']) groups['Variant'] = [];
+        groups['Variant'].push({ option: v.name, price: v.price });
+      } else if (v.title) {
+        // Legacy structure: { title: string, option: string, price: string }
         if (!groups[v.title]) groups[v.title] = [];
         groups[v.title].push({ option: v.option, price: v.price });
-      });
+      }
+    };
+
+    if (product && product.variants && Array.isArray(product.variants)) {
+      product.variants.forEach(processVariant);
     } else if (product && product.variants && typeof product.variants === 'string') {
       try {
         const parsed = JSON.parse(product.variants);
         if (Array.isArray(parsed)) {
-          parsed.forEach((v: any) => {
-            if (!v || !v.title) return;
-            if (!groups[v.title]) groups[v.title] = [];
-            groups[v.title].push({ option: v.option, price: v.price });
-          });
+          parsed.forEach(processVariant);
         }
       } catch {}
     }
@@ -492,10 +498,13 @@ export default function Product() {
     }
   }, [product, addViewedProduct]);
 
-  // Variant custom pricing multipliers
-  const extraPrice = useMemo(() => {
-    let total = 0;
-    if (!product) return 0;
+  // Variant custom pricing
+  const { extraPrice, variantBasePrice, variantOriginalPrice } = useMemo(() => {
+    let totalExtra = 0;
+    let overrideBase: number | null = null;
+    let overrideOriginal: number | null = null;
+
+    if (!product) return { extraPrice: 0, variantBasePrice: null, variantOriginalPrice: null };
     
     let variantsList = product.variants;
     if (variantsList && typeof variantsList === 'string') {
@@ -507,22 +516,35 @@ export default function Product() {
     
     for (const [title, option] of Object.entries(selectedVariants)) {
       if (variantsList && Array.isArray(variantsList)) {
-        const variant = variantsList.find(v => v && v.title === title && v.option === option);
-        if (variant && variant.price) {
-          total += parseFloat(variant.price) || 0;
+        let variant;
+        if (title === 'Variant') {
+          // New structure
+          variant = variantsList.find(v => v && v.name === option);
+          if (variant && variant.price !== undefined && variant.price !== '') {
+             overrideBase = parseFloat(variant.price);
+             // Assume original price stays the same or we use the new base.
+             // If there's a discount setup, maybe override base and let it calculate, but for simplicity:
+             overrideOriginal = parseFloat(variant.price);
+          }
+        } else {
+          // Legacy structure
+          variant = variantsList.find(v => v && v.title === title && v.option === option);
+          if (variant && variant.price) {
+            totalExtra += parseFloat(variant.price) || 0;
+          }
         }
       }
     }
-    return total;
+    return { extraPrice: totalExtra, variantBasePrice: overrideBase, variantOriginalPrice: overrideOriginal };
   }, [selectedVariants, product]);
 
   const discountDetails = useMemo(() => {
     return getProductDiscountDetails(product, offers);
   }, [product, offers]);
 
-  const basePrice = discountDetails.discountPrice;
+  const basePrice = variantBasePrice !== null ? variantBasePrice : discountDetails.discountPrice;
   const currentPrice = basePrice + extraPrice;
-  const originalTotal = (product?.price || 0) + extraPrice;
+  const originalTotal = (variantOriginalPrice !== null ? variantOriginalPrice : (product?.price || 0)) + extraPrice;
 
   const discountPercent = originalTotal > currentPrice 
     ? Math.round(((originalTotal - currentPrice) / originalTotal) * 100) 
@@ -964,9 +986,9 @@ export default function Product() {
                       </div>
                       
                       <div className="flex flex-wrap gap-2">
-                        {options.map(opt => (
+                        {options.map((opt, idx) => (
                           <button 
-                            key={opt.option}
+                            key={`${opt.option}-${idx}`}
                             onClick={() => setSelectedVariants(prev => ({...prev, [title]: opt.option}))}
                             className={`min-w-[70px] px-3.5 py-2 text-xs font-black uppercase tracking-widest transition-all rounded-none ${
                               selectedVariants[title] === opt.option 

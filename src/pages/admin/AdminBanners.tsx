@@ -60,6 +60,8 @@ export default function AdminBanners() {
 
   // Form Fields State
   const [name, setName] = useState('');
+  const [offerText, setOfferText] = useState('');
+  const [description, setDescription] = useState('');
   const [buttonText, setButtonText] = useState('Shop Now');
   const [buttonLink, setButtonLink] = useState('');
   const [connectedProductId, setConnectedProductId] = useState('');
@@ -91,6 +93,8 @@ export default function AdminBanners() {
   useEffect(() => {
     // Clear form when in "Add Mode"
     setName('');
+    setOfferText('');
+    setDescription('');
     setButtonText('Shop Now');
     setButtonLink('');
     setConnectedProductId('');
@@ -258,7 +262,9 @@ export default function AdminBanners() {
           const bannerData: Banner = {
             id: targetId,
             image: downloadUrl,
-            name: name.trim() || item.file.name.split('.')[0],
+            name: name.trim(),
+            offerText: offerText.trim(),
+            description: description.trim(),
             buttonText: buttonText.trim(),
             buttonLink: buttonLink.trim(),
             buttonEnabled: !!buttonText.trim() && !!buttonLink.trim(),
@@ -313,6 +319,8 @@ export default function AdminBanners() {
         toast.success(`🎉 Banner saved successfully.`);
         
         setName('');
+        setOfferText('');
+        setDescription('');
         setButtonText('Shop Now');
         setButtonLink('');
         setConnectedProductId('');
@@ -494,11 +502,52 @@ export default function AdminBanners() {
           />
         </div>
 
-        {/* 3. Banner Button Text Card */}
+        {/* 3. Banner Subtitle Card */}
         <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-4 shadow-sm">
           <div className="border-b border-zinc-100 pb-3">
             <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
-              3. Banner Button Text <span className="text-zinc-400 font-bold">(Optional)</span>
+              3. Banner Subtitle <span className="text-zinc-400 font-bold">(Optional)</span>
+            </h4>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+              Secondary text or promotional catchphrase (e.g. LIMITED TIME OFFER)
+            </p>
+          </div>
+          
+          <input 
+            type="text"
+            id="banner-subtitle-input"
+            value={offerText}
+            onChange={(e) => setOfferText(e.target.value)}
+            placeholder="e.g. SPECIAL RAMADAN COLLECTION"
+            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
+          />
+        </div>
+
+        {/* 4. Banner Description Card */}
+        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-4 shadow-sm">
+          <div className="border-b border-zinc-100 pb-3">
+            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
+              4. Banner Description <span className="text-zinc-400 font-bold">(Optional)</span>
+            </h4>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+              Small descriptive text providing additional details
+            </p>
+          </div>
+          
+          <textarea 
+            id="banner-description-input"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. Explore our newest arrivals for the season with premium quality material."
+            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-bold text-xs uppercase text-black min-h-[80px] resize-none"
+          />
+        </div>
+
+        {/* 5. Banner Button Text Card */}
+        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-4 shadow-sm">
+          <div className="border-b border-zinc-100 pb-3">
+            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
+              5. Banner Button Text <span className="text-zinc-400 font-bold">(Optional)</span>
             </h4>
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
               Call to action text inside the action button
@@ -515,11 +564,11 @@ export default function AdminBanners() {
           />
         </div>
 
-        {/* 4. Banner Navigation Link Card */}
+        {/* 6. Banner Navigation Link Card */}
         <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-6 shadow-sm">
           <div className="border-b border-zinc-100 pb-3">
             <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
-              4. Banner Navigation Link <span className="text-zinc-400 font-bold">(Optional)</span>
+              6. Banner Navigation Link <span className="text-zinc-400 font-bold">(Optional)</span>
             </h4>
             <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
               Select a pre-existing product or specify a custom routing path
@@ -557,7 +606,7 @@ export default function AdminBanners() {
           </div>
         </div>
 
-        {/* 5. Save Banner Action Card */}
+        {/* 7. Save Banner Action Card */}
         <div className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
           <div>
             <h4 className="text-[10px] font-black uppercase text-black tracking-widest">Ready to Publish?</h4>
