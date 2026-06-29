@@ -45,7 +45,7 @@ async function getFirestoreDatabaseInstance() {
 }
 
 // Helper to load Supabase credentials persistently from Firestore when filesystem/env values are missing
-async function getSupabaseCredentialsFromFirestore(): Promise<{ supabaseUrl: string; supabaseKey: string } | null> {
+async function getSupabaseCredentialsFromFirestore(): Promise<{ supabaseUrl: string; supabaseKey: string; supabaseServiceKey?: string } | null> {
   try {
     const db = await getFirestoreDatabaseInstance();
     const docRef = db.collection('settings').doc('supabase_credential');
@@ -56,7 +56,8 @@ async function getSupabaseCredentialsFromFirestore(): Promise<{ supabaseUrl: str
       if (data && data.supabaseUrl && data.supabaseKey) {
         return {
           supabaseUrl: data.supabaseUrl,
-          supabaseKey: data.supabaseKey
+          supabaseKey: data.supabaseKey,
+          supabaseServiceKey: data.supabaseServiceKey
         };
       }
     }
@@ -104,13 +105,13 @@ async function startServer() {
     let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseKey;
     let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || savedSupabaseServiceKey;
     
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
       console.log("[Server Boot] Supabase credentials empty in env/file. Attempting Firestore fallback...");
       const firestoreConfig = await getSupabaseCredentialsFromFirestore();
       if (firestoreConfig) {
-        supabaseUrl = firestoreConfig.supabaseUrl;
-        supabaseKey = firestoreConfig.supabaseKey;
-        // Also check for service key in firestore if possible
+        supabaseUrl = supabaseUrl || firestoreConfig.supabaseUrl;
+        supabaseKey = supabaseKey || firestoreConfig.supabaseKey;
+        supabaseServiceKey = supabaseServiceKey || firestoreConfig.supabaseServiceKey;
         console.log(`[Server Boot] Successfully restored Supabase credentials from Firestore settings: ${supabaseUrl}`);
       }
     }
@@ -155,6 +156,15 @@ async function startServer() {
       let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
       let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
       let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || fileServiceKey || "";
+
+      if (!supabaseUrl || !supabaseKey) {
+        const firestoreConfig = await getSupabaseCredentialsFromFirestore();
+        if (firestoreConfig) {
+          supabaseUrl = supabaseUrl || firestoreConfig.supabaseUrl || "";
+          supabaseKey = supabaseKey || firestoreConfig.supabaseKey || "";
+          supabaseServiceKey = supabaseServiceKey || firestoreConfig.supabaseServiceKey || "";
+        }
+      }
       
       res.json({ supabaseUrl, supabaseKey, supabaseServiceKey });
     } catch (err) {
@@ -832,13 +842,14 @@ Please ask me your query or select a quick question template below!`;
         ...otherData.profileData
       };
 
-      try {
-        await supabaseServiceRole.from('users').upsert([userProfile]);
-      } catch (userErr) {
-        console.warn("[Admin Create Customer] Users Table Upsert failed (non-critical):", userErr);
+      // 2. Insert into public.users table
+      const { error: userError } = await supabaseServiceRole.from('users').upsert([userProfile]);
+      if (userError) {
+        console.error("[Admin Create Customer] Users Table Error:", userError);
+        throw new Error(`Database save failed: Table 'users' returned error - ${userError.message}`);
       }
 
-      // 3. Try Inserting into public.customers table (optional/fallback)
+      // 3. Insert into public.customers table
       const customerRecord = {
         id: userId,
         name,
@@ -850,10 +861,10 @@ Please ask me your query or select a quick question template below!`;
         ...otherData.customerData
       };
 
-      try {
-        await supabaseServiceRole.from('customers').upsert([customerRecord]);
-      } catch (customerErr) {
-        console.warn("[Admin Create Customer] Customers Table Upsert failed (non-critical):", customerErr);
+      const { error: customerError } = await supabaseServiceRole.from('customers').upsert([customerRecord]);
+      if (customerError) {
+        console.error("[Admin Create Customer] Customers Table Error:", customerError);
+        throw new Error(`Database save failed: Table 'customers' returned error - ${customerError.message}`);
       }
 
       res.json({ 
@@ -906,20 +917,20 @@ Please ask me your query or select a quick question template below!`;
       if (updates.phone && !userUpdates.phone) userUpdates.phone = updates.phone;
       if (updates.phones && updates.phones[0] && !userUpdates.phone) userUpdates.phone = updates.phones[0];
 
-      try {
-        if (Object.keys(userUpdates).length > 0) {
-          await supabaseServiceRole.from('users').update(userUpdates).eq('id', id);
+      if (Object.keys(userUpdates).length > 0) {
+        const { error: userError } = await supabaseServiceRole.from('users').update(userUpdates).eq('id', id);
+        if (userError) {
+          console.error("[Admin Update Customer] Users table update failed:", userError);
+          throw new Error(`Database update failed: Table 'users' returned error - ${userError.message}`);
         }
-      } catch (e) {
-        console.warn("[Admin Update Customer] users table update failed (non-critical):", e);
       }
 
-      try {
-        if (Object.keys(customerUpdates).length > 0) {
-          await supabaseServiceRole.from('customers').update(customerUpdates).eq('id', id);
+      if (Object.keys(customerUpdates).length > 0) {
+        const { error: customerError } = await supabaseServiceRole.from('customers').update(customerUpdates).eq('id', id);
+        if (customerError) {
+          console.error("[Admin Update Customer] Customers table update failed:", customerError);
+          throw new Error(`Database update failed: Table 'customers' returned error - ${customerError.message}`);
         }
-      } catch (e) {
-        console.warn("[Admin Update Customer] customers table update failed (non-critical):", e);
       }
 
       // Sync metadata to Supabase Auth user_metadata
@@ -979,17 +990,17 @@ Please ask me your query or select a quick question template below!`;
         // We continue even if auth delete fails (maybe user doesn't exist in auth)
       }
 
-      // 2. Delete from DB tables (with try-catch so it doesn't fail if tables do not exist)
-      try {
-        await supabaseServiceRole.from('users').delete().eq('id', id);
-      } catch (e) {
-        console.warn("[Admin Delete Customer] users table delete failed (non-critical):", e);
+      // 2. Delete from DB tables (Strict verification)
+      const { error: userError } = await supabaseServiceRole.from('users').delete().eq('id', id);
+      if (userError) {
+        console.error("[Admin Delete Customer] Users table delete failed:", userError);
+        throw new Error(`Database deletion failed: Table 'users' returned error - ${userError.message}`);
       }
 
-      try {
-        await supabaseServiceRole.from('customers').delete().eq('id', id);
-      } catch (e) {
-        console.warn("[Admin Delete Customer] customers table delete failed (non-critical):", e);
+      const { error: customerError } = await supabaseServiceRole.from('customers').delete().eq('id', id);
+      if (customerError) {
+        console.error("[Admin Delete Customer] Customers table delete failed:", customerError);
+        throw new Error(`Database deletion failed: Table 'customers' returned error - ${customerError.message}`);
       }
 
       res.json({ status: "success" });

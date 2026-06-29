@@ -1,17 +1,23 @@
 import dotenv from 'dotenv';
+import { Firestore } from '@google-cloud/firestore';
 
 dotenv.config();
 
 async function run() {
   try {
-    const res = await fetch('http://localhost:3000/api/admin/customers');
-    const data: any = await res.json();
-    console.log("=== API CUSTOMERS ===");
-    console.log("Status:", res.status);
-    console.log("Customers count:", data.customers?.length);
-    console.log(JSON.stringify(data, null, 2));
+    const db = new Firestore({
+      projectId: process.env.GOOGLE_CLOUD_PROJECT,
+    });
+    const docRef = db.collection('settings').doc('supabase_credential');
+    const docSnap = await docRef.get();
+    
+    if (docSnap.exists) {
+      console.log("Firestore Data:", docSnap.data());
+    } else {
+      console.log("Document does not exist");
+    }
   } catch (err: any) {
-    console.error("Failed to query API endpoint:", err.message);
+    console.error("Error:", err.message);
   }
 }
 

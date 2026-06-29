@@ -305,7 +305,10 @@ export default function Register() {
         postalCode: '',
       }]);
 
-      if (dbError) console.warn("Profile table insert failed:", dbError.message);
+      if (dbError) {
+        console.error("Profile table insert failed:", dbError);
+        throw new Error(`Database registration failed: Table 'users' returned error - ${dbError.message}`);
+      }
 
       // 3. Save to 'customers' table
       const { error: customerError } = await supabase.from('customers').insert([{
@@ -328,7 +331,10 @@ export default function Register() {
         created_at: new Date().toISOString()
       }]);
 
-      if (customerError) console.warn("Customer table insert failed:", customerError.message);
+      if (customerError) {
+        console.error("Customer table insert failed:", customerError);
+        throw new Error(`Database registration failed: Table 'customers' returned error - ${customerError.message}`);
+      }
 
       // 4. Update Stores
       login({
