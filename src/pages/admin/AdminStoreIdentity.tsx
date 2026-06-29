@@ -77,12 +77,19 @@ export default function AdminStoreIdentity() {
     try {
       // Keep settings and draft settings updated in parallel
       const updatesWithLogo = { ...updates, storeLogo };
-      await updateSettings(updatesWithLogo);
+      
+      await toast.promise(
+        updateSettings(updatesWithLogo),
+        {
+          loading: 'Saving store identity...',
+          success: '🏢 Store identity parameters updated successfully!',
+          error: '❌ Failed to update store identity parameters'
+        }
+      );
+      
       updateDraftSettings(updatesWithLogo);
-      triggerFeedback('🏢 Store identity parameters updated successfully!');
     } catch (err) {
       console.error(err);
-      triggerFeedback('❌ Failed to update store identity parameters');
     } finally {
       setIsSaving(false);
     }

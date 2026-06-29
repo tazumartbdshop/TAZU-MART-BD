@@ -419,7 +419,7 @@ interface SettingsState {
   settings: AppSettings;
   draftSettings: AppSettings;
   isLoaded: boolean;
-  updateSettings: (updates: Partial<AppSettings>) => void;
+  updateSettings: (updates: Partial<AppSettings>) => Promise<void>;
   updateDraftSettings: (updates: Partial<AppSettings>) => void;
   publishSettings: () => Promise<void>;
   resetDraftSettings: () => void;
@@ -519,17 +519,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     return null;
   },
   updateSettings: async (updates) => {
-    const newSettings = { ...get().settings, ...updates };
-    set({ settings: newSettings });
-    
+    const { settings } = get();
+    const newSettings = { ...settings, ...updates };
+    set({ settings: newSettings, draftSettings: newSettings });
+
     const supabase = getSupabase();
     if (supabase) {
-        const dbPayload = objectToSnake({ id: 'global', ...newSettings });
-        // Assume document structure with id 'global'
-        const { error } = await supabase.from('settings').upsert([dbPayload]);
-        if (error && error.code !== '42P01') console.error("Supabase settings update fail", error);
+        // 1. Update main settings table (as JSON in 'value' column to avoid schema issues)
+        const dbPayload = { 
+            id: 'global', 
+            value: JSON.stringify(objectToSnake(newSettings)),
+            updated_at: new Date().toISOString()
+        };
+        const { error: settingsError } = await supabase.from('settings').upsert([dbPayload]);
+        if (settingsError && settingsError.code !== '42P01') console.error("Supabase settings update fail", settingsError);
         
-        // Sync to store_identity table
+        // 2. Sync to store_identity table (Master Source of Truth)
         const identityPayload = objectToSnake({
           id: 'global',
           store_name: newSettings.storeName,
@@ -543,41 +548,36 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           primary_logo: newSettings.storeLogo,
           updated_at: new Date().toISOString()
         });
-        await supabase.from('store_identity').upsert([identityPayload]);
+        const { error: identityError } = await supabase.from('store_identity').upsert([identityPayload]);
+        if (identityError) console.error("Supabase store_identity update fail", identityError);
         
-        // Also save to specialized site_settings table if storeLogo is updated
+        // 3. Propagate to branding if logo changed
         if (updates.storeLogo) {
           await saveLogoToSiteSettings(updates.storeLogo);
           
-          // Propagate to branding_settings table
-          const supabase = getSupabase();
-          if (supabase) {
-            const logoUrl = updates.storeLogo;
-            const brandingUpdates = {
-              primary_logo: logoUrl,
-              secondary_logo: logoUrl,
-              favicon: logoUrl,
-              apple_touch_icon: logoUrl,
-              mobile_logo: logoUrl,
-              desktop_logo: logoUrl,
-              dark_logo: logoUrl,
-              light_logo: logoUrl,
-              footer_logo: logoUrl,
-              invoice_logo: logoUrl,
-              email_logo: logoUrl,
-              loading_logo: logoUrl,
-              watermark_logo: logoUrl,
-              share_logo: logoUrl,
-              login_logo: logoUrl,
-              signup_logo: logoUrl,
-              updated_at: new Date().toISOString()
-            };
-            
-            await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
-            
-            // Also update the branding store state if it's already loaded to avoid delay
-            useBrandingStore.getState().fetchBranding();
-          }
+          const logoUrl = updates.storeLogo;
+          const brandingUpdates = {
+            primary_logo: logoUrl,
+            secondary_logo: logoUrl,
+            favicon: logoUrl,
+            apple_touch_icon: logoUrl,
+            mobile_logo: logoUrl,
+            desktop_logo: logoUrl,
+            dark_logo: logoUrl,
+            light_logo: logoUrl,
+            footer_logo: logoUrl,
+            invoice_logo: logoUrl,
+            email_logo: logoUrl,
+            loading_logo: logoUrl,
+            watermark_logo: logoUrl,
+            share_logo: logoUrl,
+            login_logo: logoUrl,
+            signup_logo: logoUrl,
+            updated_at: new Date().toISOString()
+          };
+          
+          await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
+          useBrandingStore.getState().fetchBranding();
         }
     }
   },
@@ -590,11 +590,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
       const supabase = getSupabase();
       if (supabase) {
-          const dbPayload = objectToSnake({ id: 'global', ...draft });
-          const { error } = await supabase.from('settings').upsert([dbPayload]);
-          if (error && error.code !== '42P01') throw error;
+          // 1. Update settings table
+          const dbPayload = { 
+            id: 'global', 
+            value: JSON.stringify(objectToSnake(draft)),
+            updated_at: new Date().toISOString()
+          };
+          const { error: settingsError } = await supabase.from('settings').upsert([dbPayload]);
+          if (settingsError && settingsError.code !== '42P01') throw settingsError;
           
-          // Sync to store_identity table on publish
+          // 2. Sync to store_identity table
           const identityPayload = objectToSnake({
             id: 'global',
             store_name: draft.storeName,
@@ -608,13 +613,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             primary_logo: draft.storeLogo,
             updated_at: new Date().toISOString()
           });
-          await supabase.from('store_identity').upsert([identityPayload]);
+          const { error: identityError } = await supabase.from('store_identity').upsert([identityPayload]);
+          if (identityError) throw identityError;
 
-          // Also save to specialized site_settings table if storeLogo exists in draft
+          // 3. Branding propagation
           if (draft.storeLogo) {
             await saveLogoToSiteSettings(draft.storeLogo);
-            
-            // Propagate to branding_settings table on publish
             const logoUrl = draft.storeLogo;
             const brandingUpdates = {
               primary_logo: logoUrl,
@@ -635,7 +639,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
               signup_logo: logoUrl,
               updated_at: new Date().toISOString()
             };
-            
             await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
             useBrandingStore.getState().fetchBranding();
           }
@@ -659,17 +662,30 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     
     // Load setting collections
     const loadData = async () => {
+      const supabase = getSupabase();
+      if (!supabase) return;
+
       // 1. Load from main settings
       const { data: settingsData, error: settingsError } = await supabase.from('settings').select('*').eq('id', 'global').limit(1);
       
-      // 2. Load from store_identity (priority for identity fields)
+      // 2. Load from store_identity (Priority Source of Truth for identity fields)
       const { data: identityData, error: identityError } = await supabase.from('store_identity').select('*').eq('id', 'global').limit(1);
 
       let mergedSettings = { ...defaultSettings };
 
       if (!settingsError && settingsData && settingsData.length > 0) {
-          const camelData = objectToCamel(settingsData[0]);
-          mergedSettings = { ...mergedSettings, ...camelData };
+          const row = settingsData[0];
+          // Support both flat columns and JSON wrapper
+          if (row.value) {
+            try {
+              const parsedValue = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
+              mergedSettings = { ...mergedSettings, ...objectToCamel(parsedValue) };
+            } catch (e) {
+              mergedSettings = { ...mergedSettings, ...objectToCamel(row) };
+            }
+          } else {
+            mergedSettings = { ...mergedSettings, ...objectToCamel(row) };
+          }
       }
 
       if (!identityError && identityData && identityData.length > 0) {
@@ -679,16 +695,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
             storeName: idData.storeName || mergedSettings.storeName,
             storeSlug: idData.storeSlug || mergedSettings.storeSlug,
             storeDescription: idData.storeDescription || mergedSettings.storeDescription,
-            supportEmail: idData.supportEmail || mergedSettings.supportEmail,
+            supportEmail: idData.supportEmail || idData.storeEmail || mergedSettings.supportEmail,
             contactNumber: idData.contactNumber || mergedSettings.contactNumber,
             websiteUrl: idData.websiteUrl || mergedSettings.websiteUrl,
             timezone: idData.timezone || mergedSettings.timezone,
-            businessType: idData.industry || mergedSettings.businessType,
-            storeLogo: idData.primaryLogo || mergedSettings.storeLogo
+            businessType: idData.industry || idData.businessType || mergedSettings.businessType,
+            storeLogo: idData.primaryLogo || idData.storeLogo || mergedSettings.storeLogo
           };
       }
 
-      // If no data exists at all, we don't seed with defaults anymore as per user request (empty fields preferred)
       set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
       get().fetchLatestLogo();
     };
