@@ -27,12 +27,13 @@ export default function AdminStoreIdentity() {
   // Form states loaded from store
   const [storeName, setStoreName] = useState(settings.storeName || '');
   const [storeSlug, setStoreSlug] = useState(settings.storeSlug || '');
+  const [storeDescription, setStoreDescription] = useState(settings.storeDescription || '');
   const [storeTagline, setStoreTagline] = useState(settings.storeTagline || '');
   const [storeEmail, setStoreEmail] = useState(settings.storeEmail || '');
   const [contactNumber, setContactNumber] = useState(settings.contactNumber || '');
   const [websiteUrl, setWebsiteUrl] = useState(settings.websiteUrl || '');
-  const [timezone, setTimezone] = useState(settings.timezone || 'Asia/Dhaka (GMT+6)');
-  const [businessType, setBusinessType] = useState(settings.businessType || 'Retail E-commerce');
+  const [timezone, setTimezone] = useState(settings.timezone || '');
+  const [businessType, setBusinessType] = useState(settings.businessType || '');
   const [storeLogo, setStoreLogo] = useState(settings.storeLogo || '');
   const [isUploading, setIsUploading] = useState(false);
 
@@ -40,12 +41,13 @@ export default function AdminStoreIdentity() {
     if (settings) {
       setStoreName(settings.storeName || '');
       setStoreSlug(settings.storeSlug || '');
+      setStoreDescription(settings.storeDescription || '');
       setStoreTagline(settings.storeTagline || '');
       setStoreEmail(settings.storeEmail || '');
       setContactNumber(settings.contactNumber || '');
       setWebsiteUrl(settings.websiteUrl || '');
-      setTimezone(settings.timezone || 'Asia/Dhaka (GMT+6)');
-      setBusinessType(settings.businessType || 'Retail E-commerce');
+      setTimezone(settings.timezone || '');
+      setBusinessType(settings.businessType || '');
       setStoreLogo(settings.storeLogo || '');
     }
   }, [settings]);
@@ -63,6 +65,7 @@ export default function AdminStoreIdentity() {
     const updates = {
       storeName,
       storeSlug,
+      storeDescription,
       storeTagline,
       storeEmail,
       contactNumber,
@@ -283,13 +286,23 @@ export default function AdminStoreIdentity() {
               </div>
 
               <div className="space-y-1 sm:col-span-2">
-                <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">Store Description / Operating Tagline</label>
+                <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">Store Tagline (Small Hook)</label>
                 <input 
                   type="text" 
                   value={storeTagline} 
                   onChange={(e) => setStoreTagline(e.target.value)} 
                   className="w-full h-11 border border-neutral-200 px-3 text-xs focus:outline-none focus:border-neutral-900 rounded-none bg-white text-neutral-900 font-bold" 
-                  placeholder="e.g. Premium quality gadgets, attire and daily essentials."
+                  placeholder="e.g. Quality products for your daily life."
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">Detailed Store Description</label>
+                <textarea 
+                  value={storeDescription} 
+                  onChange={(e) => setStoreDescription(e.target.value)} 
+                  className="w-full min-h-[100px] border border-neutral-200 p-3 text-xs focus:outline-none focus:border-neutral-900 rounded-none bg-white text-neutral-900 font-bold resize-none" 
+                  placeholder="e.g. Tazu Mart BD is a premier e-commerce destination in Bangladesh focusing on electronics and lifestyle products."
                 />
               </div>
             </div>
@@ -349,6 +362,7 @@ export default function AdminStoreIdentity() {
                   onChange={(e) => setTimezone(e.target.value)} 
                   className="w-full h-11 border border-neutral-200 px-3 text-xs font-bold focus:outline-none focus:border-neutral-900 rounded-none bg-white text-neutral-900"
                 >
+                  <option value="">Select Timezone...</option>
                   <option value="Asia/Dhaka (GMT+6)">Asia/Dhaka (GMT+6)</option>
                   <option value="Asia/Kolkata (GMT+5:30)">Asia/Kolkata (GMT+5:30)</option>
                   <option value="UTC (GMT+0)">UTC (GMT+0)</option>
@@ -362,6 +376,7 @@ export default function AdminStoreIdentity() {
                   onChange={(e) => setBusinessType(e.target.value)} 
                   className="w-full h-11 border border-neutral-200 px-3 text-xs font-bold focus:outline-none focus:border-neutral-900 rounded-none bg-white text-neutral-900"
                 >
+                  <option value="">Select Industry...</option>
                   <option value="Retail E-commerce">Retail E-commerce</option>
                   <option value="Wholesale B2B">Wholesale B2B</option>
                   <option value="Services">Services & digital distribution</option>

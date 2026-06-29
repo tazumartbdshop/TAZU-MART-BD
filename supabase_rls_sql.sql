@@ -169,6 +169,21 @@ CREATE TABLE IF NOT EXISTS public.settings (
   value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS public.store_identity (
+  id TEXT PRIMARY KEY DEFAULT 'global',
+  store_name TEXT,
+  store_slug TEXT,
+  store_description TEXT,
+  support_email TEXT,
+  contact_number TEXT,
+  website_url TEXT,
+  timezone TEXT,
+  industry TEXT,
+  primary_logo TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.branding_settings (
   id TEXT PRIMARY KEY DEFAULT 'global',
   site_name TEXT,
@@ -403,6 +418,11 @@ BEGIN
     DROP POLICY IF EXISTS "Settings access" ON public.settings;
     CREATE POLICY "Settings access" ON public.settings FOR ALL TO public USING (true) WITH CHECK (true);
 
+    -- Store Identity Policies
+    ALTER TABLE public.store_identity ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Store Identity access" ON public.store_identity;
+    CREATE POLICY "Store Identity access" ON public.store_identity FOR ALL TO public USING (true) WITH CHECK (true);
+
     -- Banners Policies
     ALTER TABLE public.banners ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Banners read" ON public.banners;
@@ -483,6 +503,13 @@ BEGIN
       WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'banners_draft'
     ) THEN
       ALTER PUBLICATION supabase_realtime ADD TABLE public.banners_draft;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'store_identity'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.store_identity;
     END IF;
   END IF;
 END $$;

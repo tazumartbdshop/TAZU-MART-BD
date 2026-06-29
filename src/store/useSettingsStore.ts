@@ -13,6 +13,7 @@ export interface AppSettings {
   storeSlug: string;
   businessType: string;
   storeTagline: string;
+  storeDescription?: string;
 
   // 2. Branding
   primaryColor: string;
@@ -225,14 +226,15 @@ export interface AppSettings {
 }
 
 const defaultSettings: AppSettings = {
-  storeName: 'TAZU MART BD',
-  storeEmail: 'admin@tazumartbd.com',
-  contactNumber: '+880 1711223344',
-  timezone: 'Asia/Dhaka (GMT+6)',
-  websiteUrl: 'https://tazumart.bd',
-  storeSlug: 'tazumart',
-  businessType: 'Retail E-commerce',
-  storeTagline: 'Quality Products at Best Prices',
+  storeName: '',
+  storeEmail: '',
+  contactNumber: '',
+  timezone: '',
+  websiteUrl: '',
+  storeSlug: '',
+  businessType: '',
+  storeTagline: '',
+  storeDescription: '',
 
   primaryColor: '#000000',
   secondaryColor: '#666666',
@@ -527,6 +529,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         const { error } = await supabase.from('settings').upsert([dbPayload]);
         if (error && error.code !== '42P01') console.error("Supabase settings update fail", error);
         
+        // Sync to store_identity table
+        const identityPayload = objectToSnake({
+          id: 'global',
+          store_name: newSettings.storeName,
+          store_slug: newSettings.storeSlug,
+          store_description: newSettings.storeDescription || newSettings.storeTagline,
+          support_email: newSettings.supportEmail || newSettings.storeEmail,
+          contact_number: newSettings.contactNumber,
+          website_url: newSettings.websiteUrl,
+          timezone: newSettings.timezone,
+          industry: newSettings.businessType,
+          primary_logo: newSettings.storeLogo,
+          updated_at: new Date().toISOString()
+        });
+        await supabase.from('store_identity').upsert([identityPayload]);
+        
         // Also save to specialized site_settings table if storeLogo is updated
         if (updates.storeLogo) {
           await saveLogoToSiteSettings(updates.storeLogo);
@@ -576,6 +594,22 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           const { error } = await supabase.from('settings').upsert([dbPayload]);
           if (error && error.code !== '42P01') throw error;
           
+          // Sync to store_identity table on publish
+          const identityPayload = objectToSnake({
+            id: 'global',
+            store_name: draft.storeName,
+            store_slug: draft.storeSlug,
+            store_description: draft.storeDescription || draft.storeTagline,
+            support_email: draft.supportEmail || draft.storeEmail,
+            contact_number: draft.contactNumber,
+            website_url: draft.websiteUrl,
+            timezone: draft.timezone,
+            industry: draft.businessType,
+            primary_logo: draft.storeLogo,
+            updated_at: new Date().toISOString()
+          });
+          await supabase.from('store_identity').upsert([identityPayload]);
+
           // Also save to specialized site_settings table if storeLogo exists in draft
           if (draft.storeLogo) {
             await saveLogoToSiteSettings(draft.storeLogo);
@@ -624,36 +658,58 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     }
     
     // Load setting collections
-    supabase.from('settings').select('*').eq('id', 'global').limit(1).then(({ data, error }) => {
-        if (!error && data && data.length > 0) {
-            const camelData = objectToCamel(data[0]);
-            const mergedSettings = { ...defaultSettings, ...camelData };
-            set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
-        } else {
-            // Initial seed if not exist
-            const dbPayload = objectToSnake({ id: 'global', ...defaultSettings });
-            supabase.from('settings').upsert([dbPayload]).then(({error}) => error && console.warn(error));
-            set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
-        }
-        
-        // Always load latest logo from site_settings immediately on page initialization
-        get().fetchLatestLogo();
-    });
+    const loadData = async () => {
+      // 1. Load from main settings
+      const { data: settingsData, error: settingsError } = await supabase.from('settings').select('*').eq('id', 'global').limit(1);
+      
+      // 2. Load from store_identity (priority for identity fields)
+      const { data: identityData, error: identityError } = await supabase.from('store_identity').select('*').eq('id', 'global').limit(1);
+
+      let mergedSettings = { ...defaultSettings };
+
+      if (!settingsError && settingsData && settingsData.length > 0) {
+          const camelData = objectToCamel(settingsData[0]);
+          mergedSettings = { ...mergedSettings, ...camelData };
+      }
+
+      if (!identityError && identityData && identityData.length > 0) {
+          const idData = objectToCamel(identityData[0]);
+          mergedSettings = {
+            ...mergedSettings,
+            storeName: idData.storeName || mergedSettings.storeName,
+            storeSlug: idData.storeSlug || mergedSettings.storeSlug,
+            storeDescription: idData.storeDescription || mergedSettings.storeDescription,
+            supportEmail: idData.supportEmail || mergedSettings.supportEmail,
+            contactNumber: idData.contactNumber || mergedSettings.contactNumber,
+            websiteUrl: idData.websiteUrl || mergedSettings.websiteUrl,
+            timezone: idData.timezone || mergedSettings.timezone,
+            businessType: idData.industry || mergedSettings.businessType,
+            storeLogo: idData.primaryLogo || mergedSettings.storeLogo
+          };
+      }
+
+      // If no data exists at all, we don't seed with defaults anymore as per user request (empty fields preferred)
+      set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
+      get().fetchLatestLogo();
+    };
+
+    loadData();
 
     const channel = supabase
       .channel('public:settings:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
-        supabase.from('settings').select('*').eq('id', 'global').limit(1).then(({ data, error }) => {
-            if (!error && data && data.length > 0) {
-                const camelData = objectToCamel(data[0]);
-                const mergedSettings = { ...defaultSettings, ...camelData };
-                set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
-                get().fetchLatestLogo();
-            }
-        });
+        loadData();
       })
       .subscribe();
 
+    // Setup listener on store_identity
+    const channelIdentity = supabase
+      .channel('public:store_identity:' + Math.random().toString(36).substring(2, 9))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_identity' }, (payload) => {
+        loadData();
+      })
+      .subscribe();
+      
     // Setup listener on specialized site_settings table as well
     const channelLogo = supabase
       .channel('public:site_settings:' + Math.random().toString(36).substring(2, 9))
@@ -666,6 +722,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     return () => {
         supabase.removeChannel(channel);
         supabase.removeChannel(channelLogo);
+        supabase.removeChannel(channelIdentity);
     }
   }
 }));
