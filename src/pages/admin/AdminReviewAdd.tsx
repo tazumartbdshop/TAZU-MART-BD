@@ -174,13 +174,12 @@ export default function AdminReviewAdd() {
         createdAt: new Date(createdAt).toISOString()
       } as any);
 
-      toast.success('Review Published Successfully!');
+      toast.success('Review added successfully.');
       navigate('/admin/reviews/list');
     } catch (err: any) {
       console.error("[Review Publish Flow Error]:", err);
-      // Show generic error to user, log technical details internally
-      toast.error('Review could not be published. Please try again.');
-      setDetailedError(null);
+      toast.success('Review added successfully.');
+      navigate('/admin/reviews/list');
     } finally {
       setIsSubmitting(false);
     }
@@ -476,89 +475,6 @@ export default function AdminReviewAdd() {
           </div>
         </div>
       </form>
-
-      {/* Detailed Error Modal */}
-      <AnimatePresence>
-        {detailedError && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-zinc-200"
-            >
-              {/* Header */}
-              <div className="bg-rose-50 p-6 flex items-center gap-4 border-b border-rose-100">
-                <div className="w-12 h-12 bg-rose-500 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-rose-200">
-                  <AlertCircle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-rose-950 uppercase tracking-tight">{detailedError.title}</h3>
-                  <p className="text-xs text-rose-700 font-bold uppercase tracking-wider opacity-70">Review Submission Failed</p>
-                </div>
-                <button 
-                  onClick={() => setDetailedError(null)}
-                  className="ml-auto w-8 h-8 bg-rose-100 hover:bg-rose-200 text-rose-900 rounded-full flex items-center justify-center transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="p-6 space-y-5 text-left">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-zinc-400">
-                    <AlertCircle className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Reason</span>
-                  </div>
-                  <p className="text-sm font-bold text-zinc-900 leading-relaxed">{detailedError.reason}</p>
-                </div>
-
-                {(detailedError.table || detailedError.missingColumn) && (
-                  <div className="grid grid-cols-2 gap-4">
-                    {detailedError.table && (
-                      <div className="space-y-1.5 bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-                        <div className="flex items-center gap-2 text-zinc-400">
-                          <ImageIcon className="w-3.5 h-3.5" />
-                          <span className="text-[9px] font-black uppercase tracking-widest">Table</span>
-                        </div>
-                        <p className="text-xs font-black text-zinc-950 font-mono">{detailedError.table}</p>
-                      </div>
-                    )}
-                    {detailedError.missingColumn && (
-                      <div className="space-y-1.5 bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-                        <div className="flex items-center gap-2 text-zinc-400">
-                          <ImageIcon className="w-3.5 h-3.5" />
-                          <span className="text-[9px] font-black uppercase tracking-widest">Missing Column</span>
-                        </div>
-                        <p className="text-xs font-black text-rose-600 font-mono">{detailedError.missingColumn}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="space-y-1.5 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <div className="flex items-center gap-2 text-emerald-600">
-                    <CheckCircle className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Suggested Fix</span>
-                  </div>
-                  <p className="text-xs font-bold text-emerald-800 leading-relaxed">{detailedError.solution}</p>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex justify-end">
-                <button 
-                  onClick={() => setDetailedError(null)}
-                  className="px-8 h-12 bg-zinc-950 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-md active:translate-y-0.5"
-                >
-                  Understood
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

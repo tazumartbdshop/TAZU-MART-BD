@@ -2,8 +2,12 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, ArrowLeft, CheckCircle2, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useBrandingStore } from '../store/useBrandingStore';
 
 export default function ForgotPassword() {
+  const settings = useSettingsStore(state => state.settings);
+  const { settings: branding } = useBrandingStore();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
@@ -44,10 +48,19 @@ export default function ForgotPassword() {
                   {/* Shop Logo Header */}
                   <div className="text-center mb-6">
                     <Link to="/" className="inline-flex items-center gap-2 mb-4">
-                      <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm select-none">
-                        T
+                      <div className="h-8 flex items-center justify-center select-none">
+                        {(settings.storeLogo || branding.primary_logo || branding.desktop_logo) && (
+                          <img 
+                            src={settings.storeLogo || branding.primary_logo || branding.desktop_logo} 
+                            alt={settings.storeName || 'Logo'} 
+                            className="h-8 max-w-[120px] object-contain" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        )}
                       </div>
-                      <span className="text-base font-black tracking-tight text-neutral-950 uppercase">Tazu Mart</span>
+                      {settings.storeName && settings.storeName.trim() !== '' && (
+                        <span className="text-base font-black tracking-tight text-neutral-950 uppercase">{settings.storeName}</span>
+                      )}
                     </Link>
                     <h2 className="text-lg font-bold text-neutral-900 leading-tight">Reset Password</h2>
                     <p className="text-xs text-neutral-500 mt-1">

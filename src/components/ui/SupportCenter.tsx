@@ -38,6 +38,7 @@ import { useOrderStore } from '../../store/useOrderStore';
 import { useProductStore } from '../../store/useProductStore';
 import { usePromoStore } from '../../store/usePromoStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
 import { formatPrice } from '../../lib/utils';
 
 // Web Audio API Synthesizer for pleasant, offline-friendly notification sound feedback
@@ -90,6 +91,7 @@ interface SupportCenterProps {
 
 export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) {
   const { user } = useAuthStore();
+  const masterSettings = useSettingsStore(state => state.settings);
   const { orders } = useOrderStore();
   const { products } = useProductStore();
   const { promoCodes } = usePromoStore();
@@ -136,6 +138,9 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
   const [aiChatHistory, setAiChatHistory] = useState<ChatMessage[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [showEmails, setShowEmails] = useState(false);
+
+  const dynamicPhoneRaw = masterSettings.contactNumber || "+8801711223344";
+  const dynamicWhatsAppNumber = dynamicPhoneRaw.replace(/[^0-9]/g, '');
   const [trackingInput, setTrackingInput] = useState('');
   const [trackedOrder, setTrackedOrder] = useState<any>(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -710,7 +715,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                   <div className="grid grid-cols-2 gap-3">
                     {/* WHATSAPP BOX */}
                     <a 
-                      href="https://wa.me/8801700000000" 
+                      href={`https://wa.me/${dynamicWhatsAppNumber}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="group border border-slate-200 hover:border-green-600 p-5 rounded-2xl bg-white hover:shadow-lg transition-all text-center flex flex-col items-center justify-center space-y-2"
@@ -720,14 +725,14 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                       </div>
                       <div>
                         <h4 className="text-[11px] font-black uppercase text-slate-900">WhatsApp Support</h4>
-                        <p className="text-[10px] font-bold text-zinc-500 mt-0.5">+8801XXXXXXXXX</p>
+                        <p className="text-[10px] font-bold text-zinc-500 mt-0.5">{dynamicPhoneRaw}</p>
                       </div>
                       <span className="inline-block px-3 py-1 bg-green-50 text-green-600 text-[9px] font-black uppercase tracking-tighter rounded-lg group-hover:bg-green-600 group-hover:text-white transition-all">Open WhatsApp</span>
                     </a>
 
                     {/* HOTLINE BOX */}
                     <a 
-                      href="tel:+8801700000000"
+                      href={`tel:${dynamicPhoneRaw}`}
                       className="group border border-slate-200 hover:border-slate-900 p-5 rounded-2xl bg-white hover:shadow-lg transition-all text-center flex flex-col items-center justify-center space-y-2"
                     >
                       <div className="w-10 h-10 bg-slate-50 text-slate-900 group-hover:bg-slate-950 group-hover:text-white rounded-xl flex items-center justify-center transition-all">
@@ -735,7 +740,7 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                       </div>
                       <div>
                         <h4 className="text-[11px] font-black uppercase text-slate-900">Hotline Support</h4>
-                        <p className="text-[10px] font-bold text-zinc-500 mt-0.5">+8801XXXXXXXXX</p>
+                        <p className="text-[10px] font-bold text-zinc-500 mt-0.5">{dynamicPhoneRaw}</p>
                       </div>
                       <span className="inline-block px-3 py-1 bg-slate-50 text-slate-900 text-[9px] font-black uppercase tracking-tighter rounded-lg group-hover:bg-slate-950 group-hover:text-white transition-all">Call Now</span>
                     </a>

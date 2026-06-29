@@ -6,6 +6,7 @@ import { getSupabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useBrandingStore } from '../store/useBrandingStore';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { pixelService } from '../utils/pixelService';
 import { cn } from '../lib/utils';
 
@@ -32,6 +33,7 @@ const SPECIAL_DAY_OPTIONS = [
 
 export default function Register() {
   const { settings: branding } = useBrandingStore();
+  const settings = useSettingsStore(state => state.settings);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -375,21 +377,21 @@ export default function Register() {
       >
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm overflow-hidden">
-              {branding.signup_logo || branding.primary_logo || branding.desktop_logo ? (
+            <div className="h-8 flex items-center justify-center select-none">
+              {(settings.storeLogo || branding.primary_logo || branding.signup_logo || branding.desktop_logo) && (
                 <img 
-                  src={branding.signup_logo || branding.primary_logo || branding.desktop_logo} 
-                  alt={branding.site_short_name || 'Logo'} 
-                  className="w-full h-full object-contain" 
+                  src={settings.storeLogo || branding.primary_logo || branding.signup_logo || branding.desktop_logo} 
+                  alt={settings.storeName || 'Logo'} 
+                  className="h-8 max-w-[120px] object-contain" 
                   referrerPolicy="no-referrer" 
                 />
-              ) : (
-                (branding.site_name || 'T')[0]
               )}
             </div>
-            <span className="text-base font-black tracking-tight uppercase">
-              {branding.site_name || 'Tazu Mart'}
-            </span>
+            {settings.storeName && settings.storeName.trim() !== '' && (
+              <span className="text-base font-black tracking-tight uppercase">
+                {settings.storeName}
+              </span>
+            )}
           </Link>
           <h2 className="text-xl font-black tracking-tight uppercase">Create Account</h2>
           <p className="text-xs text-neutral-500 mt-1">Join us to start secure shopping with premium service.</p>

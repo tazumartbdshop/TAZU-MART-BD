@@ -77,6 +77,14 @@ export default function OrderSuccess() {
       {/* Hero Header */}
       <div className="relative pt-16 pb-12 px-4 overflow-hidden">
         <div className="max-w-4xl mx-auto text-center">
+          {settings.storeLogo && (
+            <img 
+              src={settings.storeLogo} 
+              alt={settings.storeName || "Logo"} 
+              className="h-12 mx-auto object-contain mb-6" 
+              referrerPolicy="no-referrer"
+            />
+          )}
           <motion.div 
             initial={{ scale: 0, rotate: -15 }}
             animate={{ scale: 1, rotate: 0 }}

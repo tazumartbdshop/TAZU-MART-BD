@@ -15,6 +15,7 @@ import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
 import { formatPrice, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import LogoutModal from '../components/ui/LogoutModal';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../lib/loyalty';
 
 const getStatusIcon = (statusName: string) => {
@@ -61,6 +62,7 @@ const darazStatusItems = [
 
 export default function Account() {
   const navigate = useNavigate();
+  const { settings } = useSettingsStore();
   const { user, logout } = useAuthStore();
   const { orders, trackingStatuses } = useOrderStore();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -526,8 +528,24 @@ export default function Account() {
         </section>
 
         {/* Branding Footer */}
-        <div className="text-center py-10">
-          <h2 className="text-xl font-bold text-gray-200 uppercase tracking-[0.4em]">TAZU MART</h2>
+        <div className="text-center py-10 flex flex-col items-center justify-center">
+          {settings.storeLogo ? (
+            <img 
+              src={settings.storeLogo} 
+              alt={settings.storeName || "Logo"} 
+              className="h-9 max-w-[140px] object-contain mb-2 opacity-80" 
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <h2 className="text-xl font-bold text-gray-200 uppercase tracking-[0.4em]">
+              {settings.storeName || "TAZU MART"}
+            </h2>
+          )}
+          {settings.storeLogo && settings.storeName && (
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mt-1">
+              {settings.storeName}
+            </p>
+          )}
           <p className="text-[10px] text-gray-300 font-bold uppercase tracking-wide mt-1">Version 3.0.0 Premium</p>
         </div>
       </div>

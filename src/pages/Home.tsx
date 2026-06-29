@@ -205,8 +205,8 @@ export default function Home() {
     return <HomeSkeleton />;
   }
 
-  const whatsappNumber = (settings.whatsappNumber || "8801314541738").replace(/[^0-9]/g, '');
-  const hotlineNumber = settings.hotlineNumber || settings.contactNumber || settings.phone || "+8801314541738";
+  const whatsappNumber = (settings.contactNumber || "8801314541738").replace(/[^0-9]/g, '');
+  const hotlineNumber = settings.contactNumber || "+8801314541738";
 
   return (
     <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-hidden font-sans">

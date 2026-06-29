@@ -837,9 +837,17 @@ export default function Checkout() {
               </div>
 
               {/* Centered Brand Title & Colored Subtitle */}
-              <div className="text-center w-full pb-1">
-                <h1 className="text-base font-semibold tracking-widest text-neutral-950 uppercase">
-                  TAZU MART BD
+              <div className="text-center w-full pb-1 flex flex-col items-center justify-center">
+                {settings.storeLogo && (
+                  <img 
+                    src={settings.storeLogo} 
+                    alt={settings.storeName || "Logo"} 
+                    className="h-10 max-w-[150px] object-contain mb-2.5" 
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <h1 className="text-base font-black tracking-widest text-neutral-950 uppercase">
+                  {settings.storeName || "TAZU MART BD"}
                 </h1>
                 <p className="text-[15px] font-semibold tracking-[0.3px] mt-1">
                   <span className="text-[#2563EB]">Easy Checkout</span>

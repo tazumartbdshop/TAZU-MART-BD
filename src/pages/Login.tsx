@@ -210,21 +210,21 @@ export default function Login() {
       >
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-neutral-950 rounded-lg flex items-center justify-center text-white font-extrabold text-sm select-none overflow-hidden">
-              {branding.login_logo || branding.primary_logo || branding.desktop_logo ? (
+            <div className="h-8 flex items-center justify-center select-none">
+              {(settings.storeLogo || branding.primary_logo || branding.login_logo || branding.desktop_logo) && (
                 <img 
-                  src={branding.login_logo || branding.primary_logo || branding.desktop_logo} 
-                  alt={branding.site_short_name || 'Logo'} 
-                  className="w-full h-full object-contain" 
+                  src={settings.storeLogo || branding.primary_logo || branding.login_logo || branding.desktop_logo} 
+                  alt={settings.storeName || 'Logo'} 
+                  className="h-8 max-w-[120px] object-contain" 
                   referrerPolicy="no-referrer" 
                 />
-              ) : (
-                (branding.site_name || 'T')[0]
               )}
             </div>
-            <span className="text-base font-black tracking-tight text-neutral-950 uppercase">
-              {branding.site_name || settings.storeName || 'Tazu Mart'}
-            </span>
+            {settings.storeName && settings.storeName.trim() !== '' && (
+              <span className="text-base font-black tracking-tight text-neutral-950 uppercase">
+                {settings.storeName}
+              </span>
+            )}
           </Link>
           <h2 className="text-lg font-bold text-neutral-900 leading-tight">Welcome Back</h2>
           <p className="text-xs text-neutral-500 mt-1">Sign in to continue shopping securely.</p>

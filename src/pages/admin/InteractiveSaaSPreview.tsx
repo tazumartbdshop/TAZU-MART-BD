@@ -26,7 +26,7 @@ export function TemplateDemoModal({ template, onClose, onUse, formData }: Templa
 
   // Multi-Domain SaaS state parameters matching Create Form or defaults
   const websiteName = formData?.name?.trim() || template?.name || 'TAZU MART MASTER UI';
-  const logoUrl = formData?.logo?.trim() || null;
+  const logoUrl = formData?.logo?.trim() || settings.storeLogo || null;
   const bannerUrl = formData?.banner?.trim() || null;
   const primaryColor = formData?.color || '#000000';
   const fontPreset = formData?.font || 'Inter (Sans-serif)';

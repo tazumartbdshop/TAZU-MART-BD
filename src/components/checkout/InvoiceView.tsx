@@ -104,14 +104,14 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
           {/* Header */}
           <div className="border-b pb-6 mb-6" style={{ borderColor: '#d1d5db' }}>
             <div className="flex items-center gap-3 mb-2">
-              {branding.invoice_logo || branding.primary_logo || settings.invoiceLogo ? (
-                <img src={branding.invoice_logo || branding.primary_logo || settings.invoiceLogo} alt="Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
+              {settings.storeLogo || settings.invoiceLogo || branding.invoice_logo || branding.primary_logo ? (
+                <img src={settings.storeLogo || settings.invoiceLogo || branding.invoice_logo || branding.primary_logo} alt="Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
               ) : (
                 <div className="w-10 h-10 bg-black rounded flex items-center justify-center text-white font-black text-lg">
-                  {(branding.site_name || settings.storeName || 'T')[0]}
+                  {(settings.storeName || branding.site_name || 'T')[0]}
                 </div>
               )}
-              <h1 className="text-xl font-black uppercase">{branding.site_name || settings.storeName || 'TAZU MART BD'}</h1>
+              <h1 className="text-xl font-black uppercase">{settings.storeName || branding.site_name || 'TAZU MART BD'}</h1>
             </div>
             <div className="text-[14px]">
                 <p>{settings.storeEmail}</p>

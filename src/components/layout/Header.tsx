@@ -132,9 +132,9 @@ export function Header() {
 
             <Link to="/" className="flex items-center gap-1.5 shrink-0">
               <div className="w-7.5 h-7.5 md:w-8.5 md:h-8.5 bg-theme-secondary rounded flex items-center justify-center text-theme-bg font-sans font-black text-base md:text-lg overflow-hidden shrink-0">
-                 {branding.primary_logo || branding.desktop_logo || settings.storeLogo ? (
+                 {settings.storeLogo || branding.primary_logo || branding.desktop_logo ? (
                    <img 
-                     src={branding.primary_logo || branding.desktop_logo || settings.storeLogo} 
+                     src={settings.storeLogo || branding.primary_logo || branding.desktop_logo} 
                      onError={() => setLogoError(true)} 
                      alt={branding.site_short_name || "Logo"} 
                      className="w-full h-full object-contain" 
@@ -219,9 +219,9 @@ export function Header() {
               <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
                 <Link to="/" className="flex items-center gap-1.5" onClick={() => setIsMobileMenuOpen(false)}>
                   <div className="w-9 h-9 bg-neutral-950 rounded flex items-center justify-center text-white font-black text-xl overflow-hidden">
-                    {branding.mobile_logo || branding.primary_logo || settings.storeLogo ? (
+                    {settings.storeLogo || branding.primary_logo || branding.mobile_logo ? (
                       <img 
-                        src={branding.mobile_logo || branding.primary_logo || settings.storeLogo} 
+                        src={settings.storeLogo || branding.primary_logo || branding.mobile_logo} 
                         alt={branding.site_short_name || "Logo"} 
                         className="w-full h-full object-contain transition-all duration-300" 
                         referrerPolicy="no-referrer" 

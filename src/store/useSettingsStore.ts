@@ -606,6 +606,43 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         console.warn("Failed to update branding_settings:", brandingError.message);
       }
       useBrandingStore.getState().fetchBranding();
+
+      // Sync companion Flutter app config logo and name if available
+      try {
+        const { data: flutterData } = await supabase.from('settings').select('*').eq('id', 'flutter_config').single();
+        if (flutterData && flutterData.config) {
+          const config = flutterData.config;
+          let changed = false;
+          if (updates.storeLogo && config.brand.logoUrl !== updates.storeLogo) {
+            config.brand.logoUrl = updates.storeLogo;
+            changed = true;
+          }
+          if (updates.storeName && config.brand.name !== updates.storeName) {
+            config.brand.name = updates.storeName;
+            changed = true;
+          }
+          if (updates.contactNumber && config.contact) {
+            if (config.contact.phone !== updates.contactNumber) {
+              config.contact.phone = updates.contactNumber;
+              changed = true;
+            }
+            const cleanNum = updates.contactNumber.replace(/[^0-9]/g, '');
+            const waLink = `https://wa.me/${cleanNum}`;
+            if (config.socialLinks && Array.isArray(config.socialLinks)) {
+              const waIdx = config.socialLinks.findIndex((l: any) => l.platform === 'WhatsApp');
+              if (waIdx !== -1 && config.socialLinks[waIdx].url !== waLink) {
+                config.socialLinks[waIdx].url = waLink;
+                changed = true;
+              }
+            }
+          }
+          if (changed) {
+            await supabase.from('settings').upsert([{ id: 'flutter_config', config }]);
+          }
+        }
+      } catch (fErr) {
+        console.warn("Could not sync details to flutter_config during saveSettings:", fErr);
+      }
     }
   },
   updateDraftSettings: (updates) => {
@@ -676,6 +713,43 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         };
         await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
         useBrandingStore.getState().fetchBranding();
+
+        // Sync companion Flutter app config logo and name if available
+        try {
+          const { data: flutterData } = await supabase.from('settings').select('*').eq('id', 'flutter_config').single();
+          if (flutterData && flutterData.config) {
+            const config = flutterData.config;
+            let changed = false;
+            if (draft.storeLogo && config.brand.logoUrl !== draft.storeLogo) {
+              config.brand.logoUrl = draft.storeLogo;
+              changed = true;
+            }
+            if (draft.storeName && config.brand.name !== draft.storeName) {
+              config.brand.name = draft.storeName;
+              changed = true;
+            }
+            if (draft.contactNumber && config.contact) {
+              if (config.contact.phone !== draft.contactNumber) {
+                config.contact.phone = draft.contactNumber;
+                changed = true;
+              }
+              const cleanNum = draft.contactNumber.replace(/[^0-9]/g, '');
+              const waLink = `https://wa.me/${cleanNum}`;
+              if (config.socialLinks && Array.isArray(config.socialLinks)) {
+                const waIdx = config.socialLinks.findIndex((l: any) => l.platform === 'WhatsApp');
+                if (waIdx !== -1 && config.socialLinks[waIdx].url !== waLink) {
+                  config.socialLinks[waIdx].url = waLink;
+                  changed = true;
+                }
+              }
+            }
+            if (changed) {
+              await supabase.from('settings').upsert([{ id: 'flutter_config', config }]);
+            }
+          }
+        } catch (fErr) {
+          console.warn("Could not sync details to flutter_config during publishSettings:", fErr);
+        }
       }
 
       set({ settings: draft });

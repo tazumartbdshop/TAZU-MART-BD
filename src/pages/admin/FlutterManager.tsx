@@ -24,8 +24,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getFlutterConfig, saveFlutterConfig, FlutterConfig } from '../../services/flutterService';
+import { useSettingsStore } from '../../store/useSettingsStore';
 
 export default function FlutterManager() {
+  const settings = useSettingsStore(state => state.settings);
   const [config, setConfig] = useState<FlutterConfig | null>(null);
   const [activeTab, setActiveTab] = useState<'brand' | 'description' | 'social' | 'links' | 'contact' | 'design'>('brand');
   const [saving, setSaving] = useState(false);
@@ -37,6 +39,26 @@ export default function FlutterManager() {
 
   const loadConfig = async () => {
     const data = await getFlutterConfig();
+    // Auto synchronize master store settings to Flutter configuration
+    if (settings.storeLogo && data.brand.logoUrl !== settings.storeLogo) {
+      data.brand.logoUrl = settings.storeLogo;
+    }
+    if (settings.storeName && data.brand.name !== settings.storeName) {
+      data.brand.name = settings.storeName;
+    }
+    if (settings.contactNumber) {
+      if (data.contact.phone !== settings.contactNumber) {
+        data.contact.phone = settings.contactNumber;
+      }
+      const cleanNum = settings.contactNumber.replace(/[^0-9]/g, '');
+      const waLink = `https://wa.me/${cleanNum}`;
+      if (data.socialLinks && Array.isArray(data.socialLinks)) {
+        const waIdx = data.socialLinks.findIndex(l => l.platform === 'WhatsApp');
+        if (waIdx !== -1 && data.socialLinks[waIdx].url !== waLink) {
+          data.socialLinks[waIdx].url = waLink;
+        }
+      }
+    }
     setConfig(data);
   };
 

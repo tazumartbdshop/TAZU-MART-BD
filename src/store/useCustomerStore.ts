@@ -257,6 +257,19 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     customers: state.customers.filter(c => !c.isDemo)
   })),
   fetchCustomers: async () => {
+    try {
+      const response = await fetch('/api/admin/customers');
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.customers) {
+          set({ customers: data.customers });
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("fetchCustomers API failed, falling back to Supabase:", err);
+    }
+
     const supabase = getSupabase();
     if (!supabase) return;
     
@@ -266,31 +279,16 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     }
   },
   subscribe: () => {
-    const supabase = getSupabase();
-    if (!supabase) return () => {};
+    // Initial fetch
+    get().fetchCustomers();
 
-    supabase.from('customers').select('*').then(({ data, error }) => {
-        if (!error && data) {
-            set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
-        } else {
-            console.error(error);
-            set({ customers: [] });
-        }
-    });
-
-    const channel = supabase
-      .channel('public:customers')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, (payload) => {
-          supabase.from('customers').select('*').then(({ data, error }) => {
-            if (!error && data) {
-                set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
-            }
-          });
-      })
-      .subscribe();
+    // Setup active polling every 5 seconds for robust real-time updates across Auth/Admin
+    const interval = setInterval(() => {
+      get().fetchCustomers();
+    }, 5000);
       
     return () => {
-        supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }
 }));

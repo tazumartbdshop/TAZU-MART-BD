@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSettingsStore } from '../store/useSettingsStore';
 import { uploadImage } from '../lib/imageUtils';
 import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
 import { useNotificationStore } from '../store/useNotificationStore';
@@ -434,6 +435,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, updateUser, logout } = useAuthStore();
+  const settings = useSettingsStore(state => state.settings);
   
   // App-wide language settings (defaults to 'en')
   const [lang, setLang] = useState<'en' | 'bn'>((user?.language as 'en' | 'bn') || 'en');
@@ -1903,7 +1905,7 @@ For customer support, call 09612-TAZU-MART.
                   {/* Quick-tiles layout */}
                   <div className="grid grid-cols-2 gap-4">
                     <a 
-                      href="https://wa.me/8801712345678" 
+                      href={`https://wa.me/${(settings.contactNumber || "8801314541738").replace(/[^0-9]/g, '')}`} 
                       target="_blank" 
                       rel="noreferrer"
                       className="p-5 bg-[#25D366]/5 hover:bg-[#25D366]/10 border border-[#25D366]/20 rounded-2xl transition-all group/call text-center flex flex-col items-center justify-center cursor-pointer"

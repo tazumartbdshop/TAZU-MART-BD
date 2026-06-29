@@ -92,17 +92,17 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <Link to="/" className="flex items-center gap-2">
-              {branding.footer_logo || branding.primary_logo || brand.logoUrl ? (
-                <img src={branding.footer_logo || branding.primary_logo || brand.logoUrl} alt={branding.site_name || brand.name} className="h-8 object-contain" referrerPolicy="no-referrer" />
+              {settings.storeLogo || branding.footer_logo || branding.primary_logo || brand.logoUrl ? (
+                <img 
+                  src={settings.storeLogo || branding.footer_logo || branding.primary_logo || brand.logoUrl} 
+                  alt={settings.storeName || branding.site_name || brand.name} 
+                  className="h-8 max-w-[150px] object-contain" 
+                  referrerPolicy="no-referrer" 
+                />
               ) : (
-                <>
-                  <div className="w-8 h-8 rounded flex items-center justify-center font-sans font-bold text-xl text-white" style={{ backgroundColor: brand.brandColor }}>
-                    {(branding.site_name || brand.name).charAt(0)}
-                  </div>
-                  <span className="font-sans font-bold text-xl tracking-wide" style={{ color: brand.brandColor }}>
-                    {branding.site_name || brand.name}
-                  </span>
-                </>
+                <span className="font-sans font-black text-xl tracking-wide uppercase" style={{ color: brand.brandColor || '#000000' }}>
+                  {settings.storeName || branding.site_name || brand.name || 'Tazu Mart'}
+                </span>
               )}
             </Link>
             <p className="text-sm leading-relaxed max-w-xs" style={{ color: mutedColor }}>
