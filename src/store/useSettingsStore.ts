@@ -521,64 +521,88 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   updateSettings: async (updates) => {
     const { settings } = get();
     const newSettings = { ...settings, ...updates };
-    set({ settings: newSettings, draftSettings: newSettings });
 
     const supabase = getSupabase();
-    if (supabase) {
-        // 1. Update main settings table (as JSON in 'value' column to avoid schema issues)
-        const dbPayload = { 
-            id: 'global', 
-            value: JSON.stringify(objectToSnake(newSettings)),
-            updated_at: new Date().toISOString()
-        };
-        const { error: settingsError } = await supabase.from('settings').upsert([dbPayload]);
-        if (settingsError && settingsError.code !== '42P01') console.error("Supabase settings update fail", settingsError);
-        
-        // 2. Sync to store_identity table (Master Source of Truth)
-        const identityPayload = objectToSnake({
-          id: 'global',
-          store_name: newSettings.storeName,
-          store_slug: newSettings.storeSlug,
-          store_description: newSettings.storeDescription || newSettings.storeTagline,
-          support_email: newSettings.supportEmail || newSettings.storeEmail,
-          contact_number: newSettings.contactNumber,
-          website_url: newSettings.websiteUrl,
-          timezone: newSettings.timezone,
-          industry: newSettings.businessType,
-          primary_logo: newSettings.storeLogo,
-          updated_at: new Date().toISOString()
-        });
-        const { error: identityError } = await supabase.from('store_identity').upsert([identityPayload]);
-        if (identityError) console.error("Supabase store_identity update fail", identityError);
-        
-        // 3. Propagate to branding if logo changed
-        if (updates.storeLogo) {
-          await saveLogoToSiteSettings(updates.storeLogo);
-          
-          const logoUrl = updates.storeLogo;
-          const brandingUpdates = {
-            primary_logo: logoUrl,
-            secondary_logo: logoUrl,
-            favicon: logoUrl,
-            apple_touch_icon: logoUrl,
-            mobile_logo: logoUrl,
-            desktop_logo: logoUrl,
-            dark_logo: logoUrl,
-            light_logo: logoUrl,
-            footer_logo: logoUrl,
-            invoice_logo: logoUrl,
-            email_logo: logoUrl,
-            loading_logo: logoUrl,
-            watermark_logo: logoUrl,
-            share_logo: logoUrl,
-            login_logo: logoUrl,
-            signup_logo: logoUrl,
-            updated_at: new Date().toISOString()
-          };
-          
-          await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
-          useBrandingStore.getState().fetchBranding();
-        }
+    if (!supabase) {
+      throw new Error("Supabase is not initialized. Please connect your database first.");
+    }
+
+    // 1. Sync to store_identity table (Master Source of Truth)
+    const identityPayload = objectToSnake({
+      id: 'global',
+      store_name: newSettings.storeName,
+      store_slug: newSettings.storeSlug,
+      store_description: newSettings.storeDescription || newSettings.storeTagline,
+      support_email: newSettings.supportEmail || newSettings.storeEmail,
+      contact_number: newSettings.contactNumber,
+      website_url: newSettings.websiteUrl,
+      timezone: newSettings.timezone,
+      industry: newSettings.businessType,
+      primary_logo: newSettings.storeLogo,
+      updated_at: new Date().toISOString()
+    });
+
+    const { error: identityError } = await supabase.from('store_identity').upsert([identityPayload]);
+    if (identityError) {
+      console.error("Supabase store_identity update fail:", identityError);
+      throw new Error(`[Database Table: store_identity] Save failed: ${identityError.message}. Make sure the table exists and Row Level Security (RLS) is configured correctly.`);
+    }
+
+    // 2. Double-check persistence by querying back the master record immediately
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('store_identity')
+      .select('store_name, store_slug')
+      .eq('id', 'global')
+      .single();
+
+    if (verifyError || !verifyData) {
+      throw new Error(`Database verification failed: Could not read back the saved record from the 'store_identity' table. Details: ${verifyError?.message || 'Empty record'}`);
+    }
+
+    // 3. Update main settings table (as JSON in 'value' column to avoid schema issues)
+    const dbPayload = { 
+        id: 'global', 
+        value: JSON.stringify(objectToSnake(newSettings)),
+        updated_at: new Date().toISOString()
+    };
+    const { error: settingsError } = await supabase.from('settings').upsert([dbPayload]);
+    if (settingsError && settingsError.code !== '42P01') {
+      console.error("Supabase settings update fail:", settingsError);
+    }
+    
+    // 4. Update the local states only after DB confirmation and verification
+    set({ settings: newSettings, draftSettings: newSettings });
+    
+    // 5. Propagate to branding if logo changed
+    if (updates.storeLogo) {
+      await saveLogoToSiteSettings(updates.storeLogo);
+      
+      const logoUrl = updates.storeLogo;
+      const brandingUpdates = {
+        primary_logo: logoUrl,
+        secondary_logo: logoUrl,
+        favicon: logoUrl,
+        apple_touch_icon: logoUrl,
+        mobile_logo: logoUrl,
+        desktop_logo: logoUrl,
+        dark_logo: logoUrl,
+        light_logo: logoUrl,
+        footer_logo: logoUrl,
+        invoice_logo: logoUrl,
+        email_logo: logoUrl,
+        loading_logo: logoUrl,
+        watermark_logo: logoUrl,
+        share_logo: logoUrl,
+        login_logo: logoUrl,
+        signup_logo: logoUrl,
+        updated_at: new Date().toISOString()
+      };
+      
+      const { error: brandingError } = await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
+      if (brandingError) {
+        console.warn("Failed to update branding_settings:", brandingError.message);
+      }
+      useBrandingStore.getState().fetchBranding();
     }
   },
   updateDraftSettings: (updates) => {
@@ -589,60 +613,65 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const draft = get().draftSettings;
 
       const supabase = getSupabase();
-      if (supabase) {
-          // 1. Update settings table
-          const dbPayload = { 
-            id: 'global', 
-            value: JSON.stringify(objectToSnake(draft)),
-            updated_at: new Date().toISOString()
-          };
-          const { error: settingsError } = await supabase.from('settings').upsert([dbPayload]);
-          if (settingsError && settingsError.code !== '42P01') throw settingsError;
-          
-          // 2. Sync to store_identity table
-          const identityPayload = objectToSnake({
-            id: 'global',
-            store_name: draft.storeName,
-            store_slug: draft.storeSlug,
-            store_description: draft.storeDescription || draft.storeTagline,
-            support_email: draft.supportEmail || draft.storeEmail,
-            contact_number: draft.contactNumber,
-            website_url: draft.websiteUrl,
-            timezone: draft.timezone,
-            industry: draft.businessType,
-            primary_logo: draft.storeLogo,
-            updated_at: new Date().toISOString()
-          });
-          const { error: identityError } = await supabase.from('store_identity').upsert([identityPayload]);
-          if (identityError) throw identityError;
-
-          // 3. Branding propagation
-          if (draft.storeLogo) {
-            await saveLogoToSiteSettings(draft.storeLogo);
-            const logoUrl = draft.storeLogo;
-            const brandingUpdates = {
-              primary_logo: logoUrl,
-              secondary_logo: logoUrl,
-              favicon: logoUrl,
-              apple_touch_icon: logoUrl,
-              mobile_logo: logoUrl,
-              desktop_logo: logoUrl,
-              dark_logo: logoUrl,
-              light_logo: logoUrl,
-              footer_logo: logoUrl,
-              invoice_logo: logoUrl,
-              email_logo: logoUrl,
-              loading_logo: logoUrl,
-              watermark_logo: logoUrl,
-              share_logo: logoUrl,
-              login_logo: logoUrl,
-              signup_logo: logoUrl,
-              updated_at: new Date().toISOString()
-            };
-            await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
-            useBrandingStore.getState().fetchBranding();
-          }
+      if (!supabase) {
+        throw new Error("Supabase is not initialized.");
       }
+
+      // 1. Sync to store_identity table
+      const identityPayload = objectToSnake({
+        id: 'global',
+        store_name: draft.storeName,
+        store_slug: draft.storeSlug,
+        store_description: draft.storeDescription || draft.storeTagline,
+        support_email: draft.supportEmail || draft.storeEmail,
+        contact_number: draft.contactNumber,
+        website_url: draft.websiteUrl,
+        timezone: draft.timezone,
+        industry: draft.businessType,
+        primary_logo: draft.storeLogo,
+        updated_at: new Date().toISOString()
+      });
+      const { error: identityError } = await supabase.from('store_identity').upsert([identityPayload]);
+      if (identityError) {
+        throw new Error(`[Database Table: store_identity] Publish failed: ${identityError.message}`);
+      }
+
+      // 2. Update settings table
+      const dbPayload = { 
+        id: 'global', 
+        value: JSON.stringify(objectToSnake(draft)),
+        updated_at: new Date().toISOString()
+      };
+      const { error: settingsError } = await supabase.from('settings').upsert([dbPayload]);
+      if (settingsError && settingsError.code !== '42P01') throw settingsError;
+      
+      // 3. Branding propagation
+      if (draft.storeLogo) {
+        await saveLogoToSiteSettings(draft.storeLogo);
+        const logoUrl = draft.storeLogo;
+        const brandingUpdates = {
+          primary_logo: logoUrl,
+          secondary_logo: logoUrl,
+          favicon: logoUrl,
+          apple_touch_icon: logoUrl,
+          mobile_logo: logoUrl,
+          desktop_logo: logoUrl,
+          dark_logo: logoUrl,
+          light_logo: logoUrl,
+          footer_logo: logoUrl,
+          invoice_logo: logoUrl,
+          email_logo: logoUrl,
+          loading_logo: logoUrl,
+          watermark_logo: logoUrl,
+          share_logo: logoUrl,
+          login_logo: logoUrl,
+          signup_logo: logoUrl,
+          updated_at: new Date().toISOString()
+        };
+        await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
+        useBrandingStore.getState().fetchBranding();
+      }
+
       set({ settings: draft });
       console.log("Settings published to Supabase");
     } catch (error) {

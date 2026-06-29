@@ -81,9 +81,9 @@ export default function AdminStoreIdentity() {
       await toast.promise(
         updateSettings(updatesWithLogo),
         {
-          loading: 'Saving store identity...',
-          success: '🏢 Store identity parameters updated successfully!',
-          error: '❌ Failed to update store identity parameters'
+          loading: 'Saving to Database Table: store_identity...',
+          success: '🏢 Store identity successfully verified and saved globally!',
+          error: (err) => `${err?.message || 'Failed to update store identity'}`
         }
       );
       
