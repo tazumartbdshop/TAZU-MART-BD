@@ -8,7 +8,6 @@ import { useBrandingStore } from '../store/useBrandingStore';
 import { useWebsitesStore } from '../store/useWebsitesStore';
 import { useModeratorStore } from '../store/useModeratorStore';
 import { useLoginHistoryStore } from '../store/useLoginHistoryStore';
-import { useLoginProviderStore } from '../store/useLoginProviderStore';
 import { getSupabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { pixelService } from '../utils/pixelService';
@@ -17,7 +16,6 @@ import { getProviderIcon } from '../components/ProviderIcon';
 export default function Login() {
   const { settings } = useSettingsStore();
   const { settings: branding } = useBrandingStore();
-  const { providers } = useLoginProviderStore();
   const ADMIN_EMAIL = (settings.adminEmail && settings.adminEmail !== "admin@tazumart.com" ? settings.adminEmail : "admin.tazumartbd@gmail.com").toLowerCase().trim();
   const ADMIN_PASSWORD = settings.adminPassword && settings.adminPassword !== "12345678" ? settings.adminPassword : "8963885522";
 
@@ -48,8 +46,11 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, user, isLoading]);
 
-  const activeProviders = providers.filter(p => p.enabled && p.id !== 'email_password');
-  const isEmailPasswordEnabled = providers.find(p => p.id === 'email_password')?.enabled;
+  const activeProviders = [
+    { id: 'google', name: 'Google' },
+    { id: 'facebook', name: 'Facebook' }
+  ];
+  const isEmailPasswordEnabled = true;
 
   const handleOAuthLogin = async (providerId: string) => {
     try {
@@ -254,8 +255,9 @@ export default function Login() {
               {settings.storeName || 'TAZU MART BD'}
             </span>
           </Link>
-          <h2 className="text-lg font-bold text-neutral-900 leading-tight mt-1.5">Welcome Back</h2>
-          <p className="text-xs text-neutral-500 mt-0.5">Sign in to continue shopping securely.</p>
+          <p className="text-[13.5px] text-[#6B7280] text-center leading-[1.3] whitespace-nowrap overflow-hidden text-ellipsis px-1 max-w-[90vw] mx-auto">
+            Sign in to unlock exclusive deals, faster checkout & member rewards.
+          </p>
         </div>
 
         {message && (

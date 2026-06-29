@@ -103,7 +103,6 @@ import AdminSiteManagement from './AdminSiteManagement';
 import AdminStoreIdentity from './AdminStoreIdentity';
 import AdminBusinessAddress from './AdminBusinessAddress';
 import AdminSocialLinks from './AdminSocialLinks';
-import AdminLoginProviders from './AdminLoginProviders';
 import AdminMarketingSetup from './AdminMarketingSetup';
 import AdminMarketingCenter from './AdminMarketingCenter';
 import AdminMarketingTracking from './AdminMarketingTracking';
@@ -613,7 +612,6 @@ export default function AdminDashboard() {
               <Route path="/management/store-identity" element={<PermissionGate moduleId="dashboard"><AdminStoreIdentity /></PermissionGate>} />
               <Route path="/management/business-address" element={<PermissionGate moduleId="dashboard"><AdminBusinessAddress /></PermissionGate>} />
               <Route path="/management/social-links" element={<PermissionGate moduleId="dashboard"><AdminSocialLinks /></PermissionGate>} />
-              <Route path="/management/login-provider" element={<PermissionGate moduleId="dashboard"><AdminLoginProviders /></PermissionGate>} />
               <Route path="/management/support-banner" element={<PermissionGate moduleId="dashboard"><AdminSupportBanner /></PermissionGate>} />
               <Route path="/support" element={<PermissionGate moduleId="support"><AdminSupport /></PermissionGate>} />
               <Route path="/ai-control-center" element={<PermissionGate moduleId="settings"><AdminAIControlCenter /></PermissionGate>} />

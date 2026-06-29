@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { UserLayout } from './components/layout/UserLayout';
 import { useCategoryStore } from './store/useCategoryStore';
 import { useProductStore } from './store/useProductStore';
-import { useLoginProviderStore } from './store/useLoginProviderStore';
 import { useSearchStore } from './store/useSearchStore';
 import { useOrderStore } from './store/useOrderStore';
 import { useSettingsStore } from './store/useSettingsStore';
@@ -102,7 +101,6 @@ export default function App() {
     const unsubBanners = useBannerStore.getState().subscribe();
     const unsubMenuSort = useMenuSortStore.getState().subscribe();
     const unsubDelivery = useDeliveryStore.getState().subscribe();
-    const unsubLoginProviders = useLoginProviderStore.getState().subscribe();
     
     return () => {
       unsubBranding();
@@ -121,7 +119,6 @@ export default function App() {
       unsubBanners();
       unsubMenuSort();
       unsubDelivery();
-      unsubLoginProviders();
     };
   }, [isConfigLoaded, fetchSettings]);
 
@@ -268,17 +265,8 @@ export default function App() {
   const isBrandShowcaseLoaded = useBrandShowcaseStore((state) => state.isLoaded);
   const isCategoryLoaded = useCategoryStore((state) => state.isLoaded);
   const isProductLoaded = useProductStore((state) => state.isLoaded);
-  const isLoginProvidersLoaded = useLoginProviderStore((state) => state.isLoaded);
   
-  const isAppReady = isConfigLoaded && isSettingsLoaded && isBrandingLoaded && isSiteManagementLoaded && isBannerLoaded && isBrandShowcaseLoaded && isCategoryLoaded && isProductLoaded && isLoginProvidersLoaded;
-
-  if (!isAppReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-900">
-        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  const isAppReady = isConfigLoaded && isSettingsLoaded && isBrandingLoaded && isSiteManagementLoaded && isBannerLoaded && isBrandShowcaseLoaded && isCategoryLoaded && isProductLoaded;
 
   return (
     <Router>
