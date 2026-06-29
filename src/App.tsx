@@ -195,6 +195,28 @@ export default function App() {
                   .select('*')
                   .single();
 
+                // Also sync to customers table
+                const customerData = {
+                  id: session.user.id,
+                  name: name,
+                  emails: [session.user.email || ''],
+                  phones: phone ? [phone] : [],
+                  address: {
+                    street: meta.address || '',
+                    division: meta.division || '',
+                    district: meta.district || '',
+                    upazila: meta.upazila || '',
+                    zipCode: meta.postalCode || meta.zipCode || ''
+                  },
+                  profile_image: meta.profileImage || '',
+                  gender: meta.gender || '',
+                  status: 'Active',
+                  customer_type: 'Regular',
+                  created_at: new Date().toISOString(),
+                };
+                
+                await supabase.from('customers').upsert([customerData]);
+
                 if (!insertError && insertedUser) {
                   console.log("[App Auth] Database profile successfully created/synchronized!");
                   const currentAuth = useAuthStore.getState();

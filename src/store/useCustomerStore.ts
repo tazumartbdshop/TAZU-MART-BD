@@ -86,6 +86,13 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
         })
       });
 
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("[Store Add Customer] Non-JSON response:", text);
+        throw new Error("Server returned an invalid response (HTML). Please check server logs.");
+      }
+
       const result = await response.json();
       if (!response.ok) {
         throw new Error(result.error || 'Failed to create customer');
@@ -179,8 +186,15 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
         })
       });
 
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("[Store Update Customer] Non-JSON response:", text);
+        throw new Error("Server returned an invalid response (HTML). Please check server logs.");
+      }
+
+      const result = await response.json();
       if (!response.ok) {
-        const result = await response.json();
         throw new Error(result.error || 'Failed to update customer');
       }
 
@@ -198,8 +212,15 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
         body: JSON.stringify({ id })
       });
 
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("[Store Delete Customer] Non-JSON response:", text);
+        throw new Error("Server returned an invalid response (HTML). Please check server logs.");
+      }
+
+      const result = await response.json();
       if (!response.ok) {
-        const result = await response.json();
         throw new Error(result.error || 'Failed to delete customer');
       }
 

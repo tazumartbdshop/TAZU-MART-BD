@@ -139,23 +139,27 @@ async function startServer() {
 
   // API Routes
   app.get("/api/supabase-config", async (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    let fileUrl = "";
-    let fileKey = "";
-    let fileServiceKey = "";
     try {
-      const data = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
-      const parsed = JSON.parse(data);
-      fileUrl = parsed.supabaseUrl || "";
-      fileKey = parsed.supabaseKey || "";
-      fileServiceKey = parsed.supabaseServiceKey || "";
-    } catch (e) {}
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      let fileUrl = "";
+      let fileKey = "";
+      let fileServiceKey = "";
+      try {
+        const data = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
+        const parsed = JSON.parse(data);
+        fileUrl = parsed.supabaseUrl || "";
+        fileKey = parsed.supabaseKey || "";
+        fileServiceKey = parsed.supabaseServiceKey || "";
+      } catch (e) {}
 
-    let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
-    let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
-    let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || fileServiceKey || "";
-    
-    res.json({ supabaseUrl, supabaseKey, supabaseServiceKey });
+      let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
+      let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
+      let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || fileServiceKey || "";
+      
+      res.json({ supabaseUrl, supabaseKey, supabaseServiceKey });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to get config" });
+    }
   });
 
   app.post("/api/supabase-config", async (req, res) => {
@@ -831,8 +835,29 @@ Please ask me your query or select a quick question template below!`;
       }
 
       // Update DB tables
-      const { error: userError } = await supabaseServiceRole.from('users').update(updates).eq('id', id);
-      const { error: customerError } = await supabaseServiceRole.from('customers').update(updates).eq('id', id);
+      const userFields = ['name', 'email', 'phone', 'role', 'status', 'gender', 'address', 'division', 'district', 'upazila', 'area', 'postal_code', 'profile_image', 'occasion_name', 'special_date'];
+      const customerFields = ['name', 'phones', 'emails', 'address', 'whats_app', 'note', 'profile_image', 'gender', 'social_links', 'occasion_name', 'special_date', 'status', 'customer_type', 'total_orders', 'total_spend', 'last_login', 'total_logins', 'last_ip', 'device_type', 'payment_methods', 'is_read', 'is_demo'];
+
+      const userUpdates: any = {};
+      const customerUpdates: any = {};
+
+      Object.keys(updates).forEach(key => {
+        if (userFields.includes(key)) userUpdates[key] = updates[key];
+        if (customerFields.includes(key)) customerUpdates[key] = updates[key];
+      });
+
+      // Special mapping for email and phone if they are passed as arrays or single values
+      if (updates.email && !userUpdates.email) userUpdates.email = updates.email;
+      if (updates.emails && updates.emails[0] && !userUpdates.email) userUpdates.email = updates.emails[0];
+      if (updates.phone && !userUpdates.phone) userUpdates.phone = updates.phone;
+      if (updates.phones && updates.phones[0] && !userUpdates.phone) userUpdates.phone = updates.phones[0];
+
+      if (Object.keys(userUpdates).length > 0) {
+        await supabaseServiceRole.from('users').update(userUpdates).eq('id', id);
+      }
+      if (Object.keys(customerUpdates).length > 0) {
+        await supabaseServiceRole.from('customers').update(customerUpdates).eq('id', id);
+      }
 
       // If email is updated, sync to Auth
       if (updates.email || (updates.emails && updates.emails[0])) {
@@ -878,6 +903,20 @@ Please ask me your query or select a quick question template below!`;
       console.error("[Admin Delete Customer] Fatal Error:", err);
       res.status(500).json({ error: "Customer deletion failed" });
     }
+  });
+
+  // 404 Handler for API routes to ensure they always return JSON, not HTML
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
+  });
+
+  // Global Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Global Server Error:", err);
+    res.status(500).json({ 
+      error: "Internal Server Error", 
+      message: process.env.NODE_ENV === 'production' ? "An unexpected error occurred" : err.message 
+    });
   });
 
   // Vite middleware for development

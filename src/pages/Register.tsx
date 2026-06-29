@@ -305,7 +305,30 @@ export default function Register() {
 
       if (dbError) console.warn("Profile table insert failed:", dbError.message);
 
-      // 3. Update Stores - Removed addCustomer call (Redundant with syncCustomerFromAuth)
+      // 3. Save to 'customers' table
+      const { error: customerError } = await supabase.from('customers').insert([{
+        id: authData.user.id,
+        name: formData.fullName,
+        emails: [formData.email.toLowerCase().trim()].filter(Boolean),
+        phones: [fullPhoneNumber],
+        address: {
+          street: formData.address.trim(),
+          division: '',
+          district: '',
+          upazila: '',
+          zipCode: ''
+        },
+        profile_image: profileImage || null,
+        gender: formData.gender,
+        occasion_name: occasionJson,
+        status: 'Active',
+        customer_type: 'Regular',
+        created_at: new Date().toISOString()
+      }]);
+
+      if (customerError) console.warn("Customer table insert failed:", customerError.message);
+
+      // 4. Update Stores
       login({
         id: authData.user.id,
         name: formData.fullName,
