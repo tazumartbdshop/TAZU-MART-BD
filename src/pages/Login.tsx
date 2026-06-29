@@ -8,13 +8,16 @@ import { useBrandingStore } from '../store/useBrandingStore';
 import { useWebsitesStore } from '../store/useWebsitesStore';
 import { useModeratorStore } from '../store/useModeratorStore';
 import { useLoginHistoryStore } from '../store/useLoginHistoryStore';
+import { useLoginProviderStore } from '../store/useLoginProviderStore';
 import { getSupabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { pixelService } from '../utils/pixelService';
+import { getProviderIcon } from '../components/ProviderIcon';
 
 export default function Login() {
   const { settings } = useSettingsStore();
   const { settings: branding } = useBrandingStore();
+  const { providers } = useLoginProviderStore();
   const ADMIN_EMAIL = (settings.adminEmail && settings.adminEmail !== "admin@tazumart.com" ? settings.adminEmail : "admin.tazumartbd@gmail.com").toLowerCase().trim();
   const ADMIN_PASSWORD = settings.adminPassword && settings.adminPassword !== "12345678" ? settings.adminPassword : "8963885522";
 
@@ -22,6 +25,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
@@ -43,6 +47,32 @@ export default function Login() {
       }
     }
   }, [isAuthenticated, navigate, user, isLoading]);
+
+  const activeProviders = providers.filter(p => p.enabled && p.id !== 'email_password');
+  const isEmailPasswordEnabled = providers.find(p => p.id === 'email_password')?.enabled;
+
+  const handleOAuthLogin = async (providerId: string) => {
+    try {
+      setOauthLoading(providerId);
+      setError('');
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Database connection not ready.");
+
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: providerId as any,
+        options: {
+          redirectTo: `${window.location.origin}/account/dashboard`,
+        }
+      });
+
+      if (authError) throw new Error(authError.message);
+      
+    } catch (err: any) {
+      console.error(`${providerId} login error:`, err);
+      setError(err.message || `Failed to sign in with ${providerId}`);
+      setOauthLoading(null);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,32 +232,30 @@ export default function Login() {
   if (isAuthenticated) return null;
 
   return (
-    <div className="min-h-screen bg-neutral-50/50 flex flex-col items-center justify-center p-4 font-sans text-neutral-900">
+    <div className="w-full min-h-[calc(100vh-64px)] bg-neutral-50/50 flex flex-col items-center justify-start px-4 pt-6 pb-8 font-sans text-neutral-900">
       <motion.div
         initial={{ opacity: 0, scale: 0.98, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-[440px] bg-white p-6 md:p-8 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-neutral-150"
+        className="w-full max-w-[440px] bg-white px-6 py-5 md:px-8 md:py-6 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-neutral-150"
       >
-        <div className="text-center mb-6">
-          <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="h-8 flex items-center justify-center select-none">
+        <div className="text-center mb-4">
+          <Link to="/" className="flex flex-col items-center gap-1.5 mb-2">
+            <div className="flex items-center justify-center select-none leading-none">
               {(settings.storeLogo || branding.primary_logo || branding.login_logo || branding.desktop_logo) && (
                 <img 
                   src={settings.storeLogo || branding.primary_logo || branding.login_logo || branding.desktop_logo} 
                   alt={settings.storeName || 'Logo'} 
-                  className="h-8 max-w-[120px] object-contain" 
+                  className="h-11 max-w-[150px] object-contain" 
                   referrerPolicy="no-referrer" 
                 />
               )}
             </div>
-            {settings.storeName && settings.storeName.trim() !== '' && (
-              <span className="text-base font-black tracking-tight text-neutral-950 uppercase">
-                {settings.storeName}
-              </span>
-            )}
+            <span className="text-base font-black tracking-tight text-neutral-950 uppercase leading-none">
+              {settings.storeName || 'TAZU MART BD'}
+            </span>
           </Link>
-          <h2 className="text-lg font-bold text-neutral-900 leading-tight">Welcome Back</h2>
-          <p className="text-xs text-neutral-500 mt-1">Sign in to continue shopping securely.</p>
+          <h2 className="text-lg font-bold text-neutral-900 leading-tight mt-1.5">Welcome Back</h2>
+          <p className="text-xs text-neutral-500 mt-0.5">Sign in to continue shopping securely.</p>
         </div>
 
         {message && (
@@ -244,55 +272,93 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email or Mobile Number</label>
-            <div className="relative">
-              <input 
-                type="text" 
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                required 
-                className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
-                placeholder="Enter Email or Phone Number"
-              />
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
+        {isEmailPasswordEnabled && (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email or Mobile Number</label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required 
+                  className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
+                  placeholder="Enter Email or Phone Number"
+                />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between ml-1">
+                <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Password</label>
+                <Link to="/forgot-password" size="sm" className="text-[11px] font-bold text-neutral-400 hover:text-black">Forgot Password?</Link>
+              </div>
+              <div className="relative">
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required 
+                  className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-11 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
+                  placeholder="Enter Password"
+                />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black"
+                >
+                  {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                </button>
+              </div>
+            </div>
+
+            <button 
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-[54px] bg-neutral-950 text-white rounded-[14px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SIGN IN'}
+            </button>
+          </form>
+        )}
+
+        {activeProviders.length > 0 && (
+          <div className="mt-6">
+            {isEmailPasswordEnabled && (
+              <div className="relative mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-neutral-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-2 text-neutral-500 font-medium">Or continue with</span>
+                </div>
+              </div>
+            )}
+            
+            <div className={cn(
+              "grid gap-3",
+              activeProviders.length === 1 ? "grid-cols-1" : "grid-cols-2"
+            )}>
+              {activeProviders.map(p => (
+                <button 
+                  key={p.id}
+                  onClick={() => handleOAuthLogin(p.id)}
+                  disabled={!!oauthLoading}
+                  className="group h-[48px] bg-white rounded-[14px] border border-neutral-200 flex items-center justify-center gap-2.5 font-semibold text-[13px] text-neutral-700 shadow-[0_2px_8px_rgb(0,0,0,0.02)] transition-all hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-50"
+                >
+                  {oauthLoading === p.id ? (
+                    <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                  ) : (
+                    getProviderIcon(p.id)
+                  )}
+                  <span className="truncate">{p.name}</span>
+                </button>
+              ))}
             </div>
           </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between ml-1">
-              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Password</label>
-              <Link to="/forgot-password" size="sm" className="text-[11px] font-bold text-neutral-400 hover:text-black">Forgot Password?</Link>
-            </div>
-            <div className="relative">
-              <input 
-                type={showPassword ? 'text' : 'password'} 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-                className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-11 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
-                placeholder="Enter Password"
-              />
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black"
-              >
-                {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
-              </button>
-            </div>
-          </div>
-
-          <button 
-            type="submit"
-            disabled={isLoading}
-            className="w-full h-[54px] bg-neutral-950 text-white rounded-[14px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2"
-          >
-            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SIGN IN'}
-          </button>
-        </form>
+        )}
 
         <div className="mt-6 text-center pt-5 border-t border-neutral-100">
           <p className="text-xs text-neutral-500">
