@@ -8,9 +8,16 @@ import {
   Clock,
   ShieldCheck,
   Building,
-  Loader2
+  Loader2,
+  Image as ImageIcon,
+  Upload,
+  Trash2,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 import { useSettingsStore, AppSettings } from '../../store/useSettingsStore';
+import { toast } from 'react-hot-toast';
+import { uploadImage } from '../../lib/imageUtils';
 
 export default function AdminStoreIdentity() {
   const { settings, updateSettings, updateDraftSettings } = useSettingsStore();
@@ -26,6 +33,8 @@ export default function AdminStoreIdentity() {
   const [websiteUrl, setWebsiteUrl] = useState(settings.websiteUrl || '');
   const [timezone, setTimezone] = useState(settings.timezone || 'Asia/Dhaka (GMT+6)');
   const [businessType, setBusinessType] = useState(settings.businessType || 'Retail E-commerce');
+  const [storeLogo, setStoreLogo] = useState(settings.storeLogo || '');
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -37,6 +46,7 @@ export default function AdminStoreIdentity() {
       setWebsiteUrl(settings.websiteUrl || '');
       setTimezone(settings.timezone || 'Asia/Dhaka (GMT+6)');
       setBusinessType(settings.businessType || 'Retail E-commerce');
+      setStoreLogo(settings.storeLogo || '');
     }
   }, [settings]);
 
@@ -63,14 +73,45 @@ export default function AdminStoreIdentity() {
 
     try {
       // Keep settings and draft settings updated in parallel
-      await updateSettings(updates);
-      updateDraftSettings(updates);
+      const updatesWithLogo = { ...updates, storeLogo };
+      await updateSettings(updatesWithLogo);
+      updateDraftSettings(updatesWithLogo);
       triggerFeedback('🏢 Store identity parameters updated successfully!');
     } catch (err) {
       console.error(err);
       triggerFeedback('❌ Failed to update store identity parameters');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check size
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Logo size should be less than 2MB');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const downloadUrl = await uploadImage(file, 'branding', `master_logo_${Date.now()}`);
+      setStoreLogo(downloadUrl);
+      toast.success('Professional logo uploaded successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload logo');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    if (window.confirm('Are you sure you want to remove the master logo? This will affect branding across the entire site.')) {
+      setStoreLogo('');
+      toast.success('Logo removed from draft');
     }
   };
 
@@ -89,7 +130,7 @@ export default function AdminStoreIdentity() {
       <div className="bg-white border border-neutral-200 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <Store className="w-6 h-6 text-purple-650" />
+            <Store className="w-6 h-6 text-neutral-800" />
             <h2 className="text-xl font-black text-neutral-950 uppercase tracking-widest leading-none">
               🏢 STORE IDENTITY CONFIGURATION
             </h2>
@@ -97,6 +138,91 @@ export default function AdminStoreIdentity() {
           <p className="text-xs text-neutral-500 mt-1.5 uppercase font-semibold">
             Define basic store demographics, meta descriptions, operational taglines, and system identification slugs.
           </p>
+        </div>
+      </div>
+
+      {/* NEW: Professional Master Logo Section */}
+      <div className="bg-white border border-neutral-200 p-6 shadow-sm overflow-hidden group">
+        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-neutral-100">
+           <div className="p-2 bg-neutral-900 text-white">
+             <Sparkles className="w-4 h-4" />
+           </div>
+           <div>
+             <h3 className="text-xs font-black uppercase text-neutral-950 tracking-widest">MASTER BRANDING LOGO</h3>
+             <p className="text-[10px] text-neutral-400 font-bold uppercase mt-0.5 tracking-tight">Single Source of Truth for your global website branding.</p>
+           </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row items-center gap-8">
+           {/* Logo Preview Container */}
+           <div className="w-48 h-48 bg-neutral-50 border-2 border-dashed border-neutral-200 flex items-center justify-center relative group/preview rounded-lg overflow-hidden shrink-0">
+             {storeLogo ? (
+               <img 
+                 src={storeLogo} 
+                 alt="Store Logo" 
+                 className="w-full h-full object-contain p-4 transition-transform duration-500 group-hover/preview:scale-110" 
+                 referrerPolicy="no-referrer"
+               />
+             ) : (
+               <div className="flex flex-col items-center justify-center text-neutral-300 gap-2">
+                 <ImageIcon className="w-10 h-10" />
+                 <span className="text-[9px] font-black uppercase tracking-widest">NO LOGO ACTIVE</span>
+               </div>
+             )}
+
+             {isUploading && (
+               <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center gap-2 z-20">
+                 <Loader2 className="w-6 h-6 animate-spin text-neutral-900" />
+                 <span className="text-[9px] font-black uppercase text-neutral-900">Uploading...</span>
+               </div>
+             )}
+           </div>
+
+           {/* Controls Container */}
+           <div className="flex-1 space-y-5">
+             <div className="space-y-1">
+               <h4 className="text-sm font-black text-neutral-900 uppercase tracking-tight">Website Primary Logo</h4>
+               <p className="text-xs text-neutral-500 font-semibold leading-relaxed uppercase">
+                 This logo will be used across your entire ecosystem including headers, invoices, emails, and mobile apps.
+               </p>
+             </div>
+
+             <div className="flex flex-wrap items-center gap-3">
+               <label className="bg-neutral-900 hover:bg-black text-white px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] cursor-pointer select-none flex items-center gap-2 transition-all shadow-md active:scale-95 disabled:opacity-50">
+                 <Upload className="w-3.5 h-3.5" />
+                 <span>{storeLogo ? 'Replace Master Logo' : 'Upload Master Logo'}</span>
+                 <input 
+                   type="file" 
+                   className="hidden" 
+                   accept="image/*" 
+                   onChange={handleLogoUpload}
+                   disabled={isUploading}
+                 />
+               </label>
+
+               {storeLogo && (
+                 <button
+                   type="button"
+                   onClick={handleRemoveLogo}
+                   className="bg-white hover:bg-rose-50 text-rose-600 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] border border-neutral-200 hover:border-rose-200 transition-all flex items-center gap-2"
+                 >
+                   <Trash2 className="w-3.5 h-3.5" />
+                   <span>Remove Logo</span>
+                 </button>
+               )}
+             </div>
+
+             <div className="pt-4 border-t border-neutral-50 grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tighter">Recommended: 512x512 PNG/SVG</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tighter">Automatic Site-Wide Updates</span>
+                </div>
+             </div>
+           </div>
         </div>
       </div>
 

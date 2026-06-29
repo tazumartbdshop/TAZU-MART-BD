@@ -233,7 +233,6 @@ export const defaultNavItems: NavItem[] = [
     moduleId: 'dashboard',
     subItems: [
       { name: 'Store Identity', path: '/admin/management/store-identity', icon: Store },
-      { name: 'Branding', path: '/admin/management/branding', icon: Palette },
       { name: 'Business Address', path: '/admin/management/business-address', icon: MapPin },
       { name: 'Site Links', path: '/admin/management/site-management', icon: Link },
       { name: 'Social Links', path: '/admin/management/social-links', icon: Share2 },

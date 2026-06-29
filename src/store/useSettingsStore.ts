@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
+import { useBrandingStore } from './useBrandingStore';
 
 export interface AppSettings {
   // 1. Store Identity
@@ -529,6 +530,36 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         // Also save to specialized site_settings table if storeLogo is updated
         if (updates.storeLogo) {
           await saveLogoToSiteSettings(updates.storeLogo);
+          
+          // Propagate to branding_settings table
+          const supabase = getSupabase();
+          if (supabase) {
+            const logoUrl = updates.storeLogo;
+            const brandingUpdates = {
+              primary_logo: logoUrl,
+              secondary_logo: logoUrl,
+              favicon: logoUrl,
+              apple_touch_icon: logoUrl,
+              mobile_logo: logoUrl,
+              desktop_logo: logoUrl,
+              dark_logo: logoUrl,
+              light_logo: logoUrl,
+              footer_logo: logoUrl,
+              invoice_logo: logoUrl,
+              email_logo: logoUrl,
+              loading_logo: logoUrl,
+              watermark_logo: logoUrl,
+              share_logo: logoUrl,
+              login_logo: logoUrl,
+              signup_logo: logoUrl,
+              updated_at: new Date().toISOString()
+            };
+            
+            await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
+            
+            // Also update the branding store state if it's already loaded to avoid delay
+            useBrandingStore.getState().fetchBranding();
+          }
         }
     }
   },
@@ -548,6 +579,31 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           // Also save to specialized site_settings table if storeLogo exists in draft
           if (draft.storeLogo) {
             await saveLogoToSiteSettings(draft.storeLogo);
+            
+            // Propagate to branding_settings table on publish
+            const logoUrl = draft.storeLogo;
+            const brandingUpdates = {
+              primary_logo: logoUrl,
+              secondary_logo: logoUrl,
+              favicon: logoUrl,
+              apple_touch_icon: logoUrl,
+              mobile_logo: logoUrl,
+              desktop_logo: logoUrl,
+              dark_logo: logoUrl,
+              light_logo: logoUrl,
+              footer_logo: logoUrl,
+              invoice_logo: logoUrl,
+              email_logo: logoUrl,
+              loading_logo: logoUrl,
+              watermark_logo: logoUrl,
+              share_logo: logoUrl,
+              login_logo: logoUrl,
+              signup_logo: logoUrl,
+              updated_at: new Date().toISOString()
+            };
+            
+            await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
+            useBrandingStore.getState().fetchBranding();
           }
       }
       set({ settings: draft });
