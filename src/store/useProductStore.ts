@@ -48,6 +48,7 @@ export interface Product {
 interface ProductState {
   products: Product[];
   isLoading: boolean;
+  isLoaded: boolean;
   addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => Promise<void>;
   updateProduct: (id: string, updatedFields: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
@@ -331,6 +332,7 @@ const saveCachedProducts = (products: Product[]) => {
 export const useProductStore = create<ProductState>((set, get) => ({
   products: getCachedProducts(),
   isLoading: false,
+  isLoaded: getCachedProducts().length > 0,
   autoRankTrending: () => {
     const products = get().products;
     const sorted = [...products].sort((a, b) => (b.reviews || 0) * (b.rating || 0) - (a.reviews || 0) * (a.rating || 0));
@@ -486,6 +488,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const supabase = getSupabase();
     
     if (!supabase) {
+        set({ isLoaded: true });
         return () => {}; // No-op if not configured
     }
     
@@ -506,10 +509,11 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 }
               });
               
-              set({ products: mapped, isLoading: false });
+              set({ products: mapped, isLoading: false, isLoaded: true });
               saveCachedProducts(mapped);
             } catch (mapErr) {
               console.error("[Supabase Product Sync] Critical mapping error:", mapErr);
+              set({ isLoaded: true });
             }
         } else if (error) {
             console.error("%c[Supabase Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
@@ -520,6 +524,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
               httpStatus: status,
               httpStatusText: statusText
             });
+            set({ isLoaded: true });
         }
     }, (pErr) => {
         console.error("[Supabase Product Sync] CONNECTION ERROR:", pErr);

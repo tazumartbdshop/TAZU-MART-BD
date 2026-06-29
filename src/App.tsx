@@ -258,6 +258,24 @@ export default function App() {
     };
   }, []);
 
+  const isSettingsLoaded = useSettingsStore((state) => state.isLoaded);
+  const isBrandingLoaded = useBrandingStore((state) => state.isLoaded);
+  const isSiteManagementLoaded = useSiteManagementStore((state) => state.isLoaded);
+  const isBannerLoaded = useBannerStore((state) => state.isLoaded);
+  const isBrandShowcaseLoaded = useBrandShowcaseStore((state) => state.isLoaded);
+  const isCategoryLoaded = useCategoryStore((state) => state.isLoaded);
+  const isProductLoaded = useProductStore((state) => state.isLoaded);
+  
+  const isAppReady = isConfigLoaded && isSettingsLoaded && isBrandingLoaded && isSiteManagementLoaded && isBannerLoaded && isBrandShowcaseLoaded && isCategoryLoaded && isProductLoaded;
+
+  if (!isAppReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-900">
+        <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <Toaster />

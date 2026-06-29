@@ -4,6 +4,7 @@ import { siteManagementService, SiteManagementData } from '../services/siteManag
 interface SiteManagementState {
   data: SiteManagementData | null;
   isLoading: boolean;
+  isLoaded: boolean;
   error: string | null;
   fetchSettings: () => Promise<void>;
   updateSettings: (updates: Partial<SiteManagementData>) => Promise<void>;
@@ -12,6 +13,7 @@ interface SiteManagementState {
 export const useSiteManagementStore = create<SiteManagementState>((set) => ({
   data: null,
   isLoading: false,
+  isLoaded: false,
   error: null,
   fetchSettings: async () => {
     set({ isLoading: true, error: null });
@@ -34,14 +36,14 @@ export const useSiteManagementStore = create<SiteManagementState>((set) => ({
         timeoutPromise
       ]) as SiteManagementData;
       
-      set({ data: settings, isLoading: false });
+      set({ data: settings, isLoading: false, isLoaded: true });
     } catch (error: any) {
       isFinished = true;
       clearTimeout(timeoutId);
       console.warn("[Boot Notice] Site config fetch status:", error.message);
       // Soft-fallback to default settings to guarantee smooth load
       const defaults = await siteManagementService.getSettings().catch(() => null);
-      set({ data: defaults, isLoading: false });
+      set({ data: defaults, isLoading: false, isLoaded: true });
     }
   },
   updateSettings: async (updates) => {

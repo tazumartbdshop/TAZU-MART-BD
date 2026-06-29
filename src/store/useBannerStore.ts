@@ -123,6 +123,8 @@ export const useBannerStore = create<BannerState>((set, get) => ({
           const mapped = (data as any[]).map(row => objectToCamel(row)) as Banner[];
           set({ banners: mapped, isLoaded: true });
           saveCachedBanners(mapped);
+        } else {
+          set({ isLoaded: true });
         }
     });
 

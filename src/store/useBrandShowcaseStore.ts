@@ -54,7 +54,10 @@ export const useBrandShowcaseStore = create<BrandShowcaseState>((set, get) => ({
   isLoaded: false,
   subscribe: () => {
     const supabase = getSupabase();
-    if (!supabase) return () => {};
+    if (!supabase) {
+        set({ isLoaded: true });
+        return () => {};
+    }
 
     const loadSettings = async () => {
         const { data, error } = await supabase.from('settings').select('*').eq('id', 'brandShowcase').limit(1);
@@ -70,6 +73,8 @@ export const useBrandShowcaseStore = create<BrandShowcaseState>((set, get) => ({
         } else if (!error && data && data.length === 0) {
             supabase.from('settings').upsert([{ id: 'brandShowcase', ...defaultState }]).then(({error}) => error && console.warn(error));
             set({ ...defaultState, isLoaded: true });
+        } else {
+            set({ isLoaded: true });
         }
     };
     

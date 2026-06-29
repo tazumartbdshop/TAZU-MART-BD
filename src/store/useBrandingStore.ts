@@ -27,7 +27,7 @@ export const useBrandingStore = create<BrandingState>((set, get) => ({
       // Dynamically sync theme colors in style tags if present
       applyDynamicThemeColors(data);
     } catch (e: any) {
-      set({ error: e.message || 'Failed to load branding', isLoading: false });
+      set({ error: e.message || 'Failed to load branding', isLoading: false, isLoaded: true });
     }
   },
 
