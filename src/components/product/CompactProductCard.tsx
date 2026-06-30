@@ -71,7 +71,7 @@ export function CompactProductCard({ product, rank }: any) {
         initial={{ opacity: 0, y: 10 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className={`group bg-card-bg rounded-[var(--card-radius)] overflow-hidden border border-theme-border hover:shadow-theme transition-all flex flex-col p-2.5 relative h-full bg-white select-none ${
+        className={`group bg-card-bg rounded-[var(--card-radius)] overflow-hidden border border-theme-border hover:shadow-theme transition-all flex flex-col p-2 relative h-full bg-white select-none ${
           isOutOfStock ? 'opacity-50' : 'hover:border-black'
         }`}
         style={{ boxShadow: 'var(--card-shadow)' }}

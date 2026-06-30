@@ -149,7 +149,14 @@ CREATE TABLE IF NOT EXISTS public.orders (
   is_read BOOLEAN DEFAULT false,
   items JSONB DEFAULT '[]'::jsonb,
   date TIMESTAMP DEFAULT NOW(),
-  utm_params JSONB DEFAULT '{}'::jsonb
+  utm_params JSONB DEFAULT '{}'::jsonb,
+  notes TEXT,
+  tax_percent NUMERIC,
+  tax_amount NUMERIC,
+  paid_amount NUMERIC,
+  due_amount NUMERIC,
+  promo_code_used TEXT,
+  type TEXT DEFAULT 'Online'
 );
 
 CREATE TABLE IF NOT EXISTS public.order_items (
@@ -474,7 +481,53 @@ BEGIN
     CREATE POLICY "Reviews admin access" ON public.reviews FOR ALL TO public USING (is_admin()) WITH CHECK (is_admin());
 END $$;
 
--- 4. ENABLE REAL-TIME PUBLICATIONS
+-- 4. ORDER SYNC TRIGGERS & FUNCTIONS
+-- ---------------------------------------------------------------------
+-- This function automatically populates order_items table when a new order is inserted
+-- or when the items JSONB column in orders table is updated.
+CREATE OR REPLACE FUNCTION public.sync_order_items()
+RETURNS TRIGGER AS $$
+DECLARE
+  item_record jsonb;
+BEGIN
+  -- Safeguard: check if NEW.items is actually a JSON array
+  -- If it's NULL or not an array, we skip processing to avoid "expected JSON array" errors
+  IF NEW.items IS NULL OR jsonb_typeof(NEW.items) <> 'array' THEN
+    RAISE WARNING 'sync_order_items: NEW.items is not a JSON array. Type: %', jsonb_typeof(NEW.items);
+    RETURN NEW;
+  END IF;
+
+  -- Delete existing items for this order to prevent duplicates on update
+  DELETE FROM public.order_items WHERE order_id = NEW.id;
+
+  -- Process each item in the array
+  FOR item_record IN SELECT * FROM jsonb_array_elements(NEW.items)
+  LOOP
+    INSERT INTO public.order_items (
+      id, order_id, product_id, name, price, quantity, variant, image
+    ) VALUES (
+      gen_random_uuid()::text,
+      NEW.id,
+      (COALESCE(item_record->>'productId', item_record->>'product_id', item_record->>'id'))::TEXT,
+      (COALESCE(item_record->>'name', item_record->>'productName', 'Unknown Item'))::TEXT,
+      (COALESCE(item_record->>'price', item_record->>'unitPrice', '0'))::NUMERIC,
+      (COALESCE(item_record->>'quantity', item_record->>'qty', '1'))::INTEGER,
+      (COALESCE(item_record->>'variant', item_record->>'variantName', 'Default'))::TEXT,
+      (COALESCE(item_record->>'image', item_record->>'imageUrl', ''))::TEXT
+    );
+  END LOOP;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create the trigger
+DROP TRIGGER IF EXISTS on_order_sync ON public.orders;
+CREATE TRIGGER on_order_sync
+AFTER INSERT OR UPDATE OF items ON public.orders
+FOR EACH ROW EXECUTE FUNCTION public.sync_order_items();
+
+-- 5. ENABLE REAL-TIME PUBLICATIONS
 -- ---------------------------------------------------------------------
 DO $$
 BEGIN

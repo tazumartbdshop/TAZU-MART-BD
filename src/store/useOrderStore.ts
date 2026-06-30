@@ -291,25 +291,50 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
     const supabase = getSupabase();
     if (supabase) {
+      console.log("[Supabase Sync] addOrder Payload (pre-snake):", newOrder);
       const dbPayload = objectToSnake(newOrder);
       // Fix numeric discount type mapping for database insert
       dbPayload.discount = newOrder.discount?.amount || 0;
 
-      // Fix items mismatch: frontend has array, DB expects numeric
-      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items.length : 0;
-      
-      // Fix orderId mismatch: frontend has string, DB expects text[] (array of strings)
-      if (newOrder.orderId) {
-        dbPayload.order_id = [newOrder.orderId];
+      // Map tax object to flat columns for DB
+      if (newOrder.tax) {
+        dbPayload.tax_percent = newOrder.tax.percent;
+        dbPayload.tax_amount = newOrder.tax.amount;
       }
+
+      // Map items correctly to the JSONB column
+      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items : [];
       
-      // Fix customerName mismatch: DB expects text[] array
-      if (newOrder.customerName) {
-        dbPayload.customer_name = [newOrder.customerName];
+      // Ensure status_history is a valid JSON array
+      dbPayload.status_history = Array.isArray(dbPayload.status_history) ? dbPayload.status_history : [];
+
+      // Ensure mobile_number is a string for the TEXT column in DB
+      if (dbPayload.mobile_number) {
+        dbPayload.mobile_number = dbPayload.mobile_number.toString();
       }
+
+      // Filter payload to only include columns that exist in the database schema
+      const allowedColumns = [
+        'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
+        'mobile_number', 'email', 'full_address', 'city_area', 'postal_code', 
+        'delivery_mode', 'payment_method', 'status', 'status_history', 
+        'status_updated_at', 'edited_by_admin', 'last_edit_time', 
+        'customer_image', 'subtotal', 'delivery_charge', 'discount', 
+        'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
+        'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
+        'promo_code_used', 'type'
+      ];
+
+      const cleanPayload: any = {};
+      allowedColumns.forEach(col => {
+        if (dbPayload[col] !== undefined) {
+          cleanPayload[col] = dbPayload[col];
+        }
+      });
       
-      supabase.from('orders').insert([dbPayload]).then(({error}) => {
-        if (error) console.warn("[Supabase Sync Error]", error);
+      console.log("[Supabase Sync] addOrder cleanPayload to Supabase:", cleanPayload);
+      supabase.from('orders').insert([cleanPayload]).then(({error}) => {
+        if (error) console.warn("[Supabase Sync Error] orders insert:", error);
       });
 
       // Update sold_count and stock for each item
@@ -359,33 +384,49 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
     const supabase = getSupabase();
     if (supabase) {
+      console.log("[Supabase Sync] addOrderAsync Payload (pre-snake):", newOrder);
       const dbPayload = objectToSnake(newOrder);
       // Convert nested discount object to simple numeric amount for the database column
       dbPayload.discount = newOrder.discount?.amount || 0;
       
-      // Fix items mismatch: frontend has array, DB expects numeric (likely item count)
-      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items.length : 0;
-      
-      // Fix orderId mismatch: frontend has string, DB expects text[] (array of strings)
-      if (newOrder.orderId) {
-        dbPayload.order_id = [newOrder.orderId];
-      }
-      
-      // Fix customerName mismatch: DB expects text[] array
-      if (newOrder.customerName) {
-        dbPayload.customer_name = [newOrder.customerName];
-      }
-      
-      // Fix type mismatch: frontend has string ('Online'/'Offline'), DB expects numeric
-      dbPayload.type = newOrder.type === 'Online' ? 1 : 2;
-      
-      // Ensure mobile_number is numeric/string format that postgres numeric can parse
-      if (dbPayload.mobile_number) {
-        dbPayload.mobile_number = Number(dbPayload.mobile_number);
+      // Map tax object to flat columns for DB
+      if (newOrder.tax) {
+        dbPayload.tax_percent = newOrder.tax.percent;
+        dbPayload.tax_amount = newOrder.tax.amount;
       }
 
-      console.log("[Supabase Sync] Attempting insertion into orders table:", dbPayload);
-      const { data, error } = await supabase.from('orders').insert([dbPayload]).select();
+      // Save full items array to the JSONB column
+      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items : [];
+      
+      // Ensure status_history is a valid JSON array
+      dbPayload.status_history = Array.isArray(dbPayload.status_history) ? dbPayload.status_history : [];
+
+      // Ensure mobile_number is string format for the TEXT column
+      if (dbPayload.mobile_number) {
+        dbPayload.mobile_number = dbPayload.mobile_number.toString();
+      }
+
+      // Filter payload to only include columns that exist in the database schema
+      const allowedColumns = [
+        'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
+        'mobile_number', 'email', 'full_address', 'city_area', 'postal_code', 
+        'delivery_mode', 'payment_method', 'status', 'status_history', 
+        'status_updated_at', 'edited_by_admin', 'last_edit_time', 
+        'customer_image', 'subtotal', 'delivery_charge', 'discount', 
+        'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
+        'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
+        'promo_code_used', 'type'
+      ];
+
+      const cleanPayload: any = {};
+      allowedColumns.forEach(col => {
+        if (dbPayload[col] !== undefined) {
+          cleanPayload[col] = dbPayload[col];
+        }
+      });
+
+      console.log("[Supabase Sync] addOrderAsync cleanPayload to Supabase:", cleanPayload);
+      const { data, error } = await supabase.from('orders').insert([cleanPayload]).select();
       
       if (error) {
         console.error("[Supabase Sync] Failed to insert order into Supabase:", error);
@@ -394,11 +435,11 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       
       console.log("[Supabase Sync] Order inserted successfully into orders table:", data);
 
-      // Now attempt order items table insertion
+      // Now attempt order items table insertion (Redundant if the on_order_sync trigger is active in Supabase, but kept for compatibility)
       try {
         const orderItemsPayload = newOrder.items.map(item => ({
           id: Math.random().toString(36).substring(2, 9),
-          order_id: orderId,
+          order_id: id, // Link using the same random string ID used for the orders record
           product_id: item.productId,
           name: item.name,
           price: item.price,
@@ -411,7 +452,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         console.log("[Supabase Sync] Attempting insertion into order_items table:", orderItemsPayload);
         const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
         if (itemsError) {
-          console.error("[Supabase Sync] Failed to insert items into order_items:", itemsError);
+          console.error("[Supabase Sync] Failed to insert items into order_items (Manual fallback):", itemsError);
         } else {
           console.log("[Supabase Sync] Order items inserted successfully into order_items table.");
         }
@@ -458,37 +499,53 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
     const supabase = getSupabase();
     if (supabase) {
-      const dbPayload = objectToSnake({
-        ...updates,
-        last_edit_time: merged.last_edit_time,
-        edited_by_admin: merged.edited_by_admin
-      });
+      console.log("[Supabase Sync] updateOrder Updates:", updates);
+      const dbPayload = objectToSnake(updates);
+      
+      // Update metadata fields
+      dbPayload.last_edit_time = merged.last_edit_time;
+      dbPayload.edited_by_admin = merged.edited_by_admin;
       
       if (dbPayload.discount && typeof dbPayload.discount === 'object') {
         dbPayload.discount = dbPayload.discount.amount || 0;
       }
       
-      if ('items' in dbPayload) {
-        dbPayload.items = Array.isArray(dbPayload.items) ? dbPayload.items.length : 0;
+      if ('items' in dbPayload && Array.isArray(dbPayload.items)) {
+        // Map items to the cleanPayload correctly
       }
 
-      if ('order_id' in dbPayload && typeof dbPayload.order_id === 'string') {
-        dbPayload.order_id = [dbPayload.order_id];
-      }
-      
-      if ('customer_name' in dbPayload && typeof dbPayload.customer_name === 'string') {
-        dbPayload.customer_name = [dbPayload.customer_name];
-      }
-      
-      if ('type' in dbPayload) {
-        dbPayload.type = dbPayload.type === 'Online' ? 1 : 2;
+      if (updates.tax) {
+        dbPayload.tax_percent = updates.tax.percent;
+        dbPayload.tax_amount = updates.tax.amount;
       }
       
       if (dbPayload.mobile_number) {
-        dbPayload.mobile_number = Number(dbPayload.mobile_number);
+        dbPayload.mobile_number = dbPayload.mobile_number.toString();
       }
+
+      // Filter payload to only include columns that exist in the database schema
+      const allowedColumns = [
+        'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
+        'mobile_number', 'email', 'full_address', 'city_area', 'postal_code', 
+        'delivery_mode', 'payment_method', 'status', 'status_history', 
+        'status_updated_at', 'edited_by_admin', 'last_edit_time', 
+        'customer_image', 'subtotal', 'delivery_charge', 'discount', 
+        'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
+        'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
+        'promo_code_used', 'type'
+      ];
+
+      const cleanPayload: any = {};
+      allowedColumns.forEach(col => {
+        if (dbPayload[col] !== undefined) {
+          cleanPayload[col] = dbPayload[col];
+        }
+      });
       
-      supabase.from('orders').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+      console.log("[Supabase Sync] updateOrder cleanPayload to Supabase:", cleanPayload);
+      supabase.from('orders').update(cleanPayload).eq('id', id).then(({error}) => {
+        if (error) console.warn("[Supabase Sync Error] order update:", error);
+      });
     }
 
     set((state) => ({

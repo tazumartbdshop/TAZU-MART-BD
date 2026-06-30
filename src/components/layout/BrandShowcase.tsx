@@ -116,7 +116,7 @@ export function BrandShowcase() {
 
   return (
     <div className="w-full bg-[#111111] text-white pt-10 pb-16 border-t border-zinc-800 flex flex-col gap-8 select-none">
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6">
+      <div className="max-w-7xl mx-auto w-full px-3 sm:px-4">
         
         {/* Apple Style Smooth Transition Image Container */}
         <div 

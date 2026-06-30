@@ -367,9 +367,6 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   },
   
   subscribe: () => {
-    // Strictly database-driven loading: start with isLoaded false on subscription (refresh)
-    set({ isLoaded: false });
-    
     const supabase = getSupabase();
     if (!supabase) {
         console.warn("[Supabase Categories Sync] Supabase client is not available or configured. Defaulting to empty array.");

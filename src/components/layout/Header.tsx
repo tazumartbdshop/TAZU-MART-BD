@@ -103,7 +103,7 @@ export function Header() {
         {/* 1️⃣ Thin premium headline text */}
         {settings.storeTagline && settings.storeTagline.trim() !== '' && (
           <div className="w-full bg-navbar-bg text-navbar-text border-b border-theme-border pt-[calc(10px+env(safe-area-inset-top,0px))] pb-2.5 overflow-hidden select-none font-sans relative">
-            <div className="container mx-auto px-4 flex justify-center items-center">
+            <div className="container mx-auto px-3 flex justify-center items-center">
               {settings.storeTagline.length > 35 ? (
                 <div className="w-full overflow-hidden whitespace-nowrap relative">
                   <span className="animate-marquee inline-block text-[10px] font-bold tracking-[0.25em] uppercase opacity-80">
@@ -120,7 +120,7 @@ export function Header() {
         )}
 
         {/* 2️⃣ Logo/Header row */}
-        <div className="container mx-auto px-4 h-14 md:h-16 flex items-center justify-between">
+        <div className="container mx-auto px-3 h-14 md:h-16 flex items-center justify-between">
           {/* Group 1: Menu + Logo */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <button 

@@ -285,7 +285,6 @@ export default function AdminSettings() {
         <div className="space-y-4 max-w-3xl animate-in fade-in">
           <Toggle label="Customer Registration" field="customerRegistration" />
           <Toggle label="OTP Login" field="otpLogin" />
-          <Toggle label="Gmail Login (Google OAuth)" field="gmailLogin" />
           <Toggle label="Password Login" field="passwordLogin" />
           <Toggle label="Auto Account Create After Checkout" field="autoAccountCreate" />
         </div>

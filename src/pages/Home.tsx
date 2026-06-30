@@ -9,42 +9,11 @@ import { useCategoryStore, resolveCategoryThumbnail } from '../store/useCategory
 import { useProductStore } from '../store/useProductStore';
 import { useBannerStore } from '../store/useBannerStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useReviewStore } from '../store/useReviewStore';
 import { formatPrice } from '../lib/utils';
 import { CompactProductCard } from '../components/product/CompactProductCard';
 import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
 import { motion, AnimatePresence } from 'motion/react';
-
-// Testimonial values are kept as they represent real customer feedback
-const CUSTOMER_TESTIMONIALS = [
-  {
-    name: "Md. Sajjadul Islam",
-    location: "Dhaka",
-    rating: 5,
-    comment: "The mechanical automatic watch build with real leather casing is masterpiece. Extremely fast and secure delivery inside Dhaka.",
-    date: "14 May 2026"
-  },
-  {
-    name: "Imran Chowdhury",
-    location: "Chittagong",
-    rating: 5,
-    comment: "Genuinely surprised by the wallet craftsmanship. Genuine stitched leather details, plenty of card holdings. Incredibly premium.",
-    date: "03 June 2026"
-  },
-  {
-    name: "Dr. Farhana Ahmed",
-    location: "Sylhet",
-    rating: 5,
-    comment: "Gifted the luxury collection set to my husband. The packaging, box leather, and premium clock mechanisms are outstanding.",
-    date: "10 June 2026"
-  },
-  {
-    name: "Asif Faisal",
-    location: "Khulna",
-    rating: 5,
-    comment: "Amazing customer support and genuine watch product warranty. Recommended to anyone looking for premium watches in BD.",
-    date: "15 June 2026"
-  }
-];
 
 // Helper to optimize banner image URLs to WebP with responsive fit and width
 function getOptimizedImageUrl(url: string, width = 1200): string {
@@ -70,6 +39,7 @@ export default function Home() {
   const { products, isLoading: productsLoading } = useProductStore();
   const { banners: storeBanners, isLoaded: isBannerStoreLoaded } = useBannerStore();
   const { settings } = useSettingsStore();
+  const { reviews, fetchReviews, isLoading: reviewsLoading } = useReviewStore();
 
   const [activeSlide, setActiveSlide] = useState(0);
   const [activeReview, setActiveReview] = useState(0);
@@ -130,13 +100,22 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [sliderBanners.length]);
 
+  // Fetch reviews on mount
+  useEffect(() => {
+    fetchReviews(true); // silent fetch
+  }, [fetchReviews]);
+
+  // Dynamic Approved Reviews for Testimonials
+  const approvedReviews = (reviews || []).filter(r => r.status === 'approved');
+
   // Auto-play for testimonials
   useEffect(() => {
+    if (approvedReviews.length <= 1) return;
     const interval = setInterval(() => {
-      setActiveReview((prev) => (prev + 1) % CUSTOMER_TESTIMONIALS.length);
+      setActiveReview((prev) => (prev + 1) % approvedReviews.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [approvedReviews.length]);
 
   // Helper to matching database Category IDs
   const getCategoryRoute = (term: string) => {
@@ -171,7 +150,7 @@ export default function Home() {
 
   const renderProductGrid = (items: any[]) => {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 md:gap-4">
         {items.map((prod) => (
           <div key={prod.id} className="h-full">
             <CompactProductCard product={{
@@ -186,7 +165,7 @@ export default function Home() {
 
   const renderCategoryGrid = (items: any[]) => {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         {items.map((prod) => (
           <div key={prod.id} className="h-full">
             <CompactProductCard product={{
@@ -199,9 +178,12 @@ export default function Home() {
     );
   };
 
-  const isLoading = !categoriesLoaded || productsLoading || !isBannerStoreLoaded || !isBannerReady;
+  // Only show skeleton if we have absolutely no data to show and stores are not loaded yet
+  const hasData = homeCategories.length > 0 || activeProducts.length > 0 || sliderBanners.length > 0;
+  const isActuallyLoading = (!categoriesLoaded && homeCategories.length === 0) || 
+                            (!isBannerStoreLoaded && sliderBanners.length === 0);
 
-  if (isLoading) {
+  if (isActuallyLoading && !hasData) {
     return <HomeSkeleton />;
   }
 
@@ -209,11 +191,11 @@ export default function Home() {
   const hotlineNumber = settings.contactNumber || "+8801314541738";
 
   return (
-    <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-hidden font-sans">
+    <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-clip font-sans">
       
       {/* 1. MAIN SLIDER BANNER (16:9, Dynamic Overlays and Optional Button Actions) */}
       {sliderBanners.length > 0 && (
-        <section className="relative w-full aspect-[16/9] bg-neutral-950 overflow-hidden select-none">
+        <section className="relative w-full aspect-[16/9] bg-neutral-100 overflow-hidden select-none">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSlide}
@@ -234,7 +216,7 @@ export default function Home() {
               />
 
               {/* Text and CTA Button Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 flex flex-col justify-end pb-8 sm:pb-12 md:pb-16 px-4 md:px-12 z-10 select-text">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 flex flex-col justify-end pb-8 sm:pb-12 md:pb-16 px-3 md:px-12 z-10 select-text">
                 <div className="max-w-2xl space-y-1.5 sm:space-y-3">
                   {/* 1. Title (name) */}
                   {sliderBanners[activeSlide].name && (
@@ -328,8 +310,8 @@ export default function Home() {
       {/* 2. CATEGORY SECTION (Circular shape, completely database-driven) */}
       {homeCategories.length > 0 && (
         <section className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
-          <div className="container mx-auto px-4">
-            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl">
+          <div className="container mx-auto px-3">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mx-auto max-w-3xl">
               {homeCategories.map((cat, i) => (
                 <Link 
                   key={i} 
@@ -360,7 +342,7 @@ export default function Home() {
       {/* 4. DYNAMIC SPECIAL SECTIONS */}
       {/* 1) Flash Sale Section */}
       {flashSaleProducts.length > 0 && (
-        <section className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+        <section className="py-4 md:py-6 container mx-auto px-3 border-b border-neutral-100 last:border-b-0">
           <div className="flex items-center justify-between mb-4 md:mb-6">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-pulse" />
@@ -379,7 +361,7 @@ export default function Home() {
 
       {/* 2) Trending Item Section */}
       {trendingProducts.length > 0 && (
-        <section className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+        <section className="py-4 md:py-6 container mx-auto px-3 border-b border-neutral-100 last:border-b-0">
           <div className="flex items-center justify-between mb-4 md:mb-6">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0 animate-pulse" />
@@ -398,7 +380,7 @@ export default function Home() {
 
       {/* 3) Best Selling Section */}
       {bestSellingProducts.length > 0 && (
-        <section className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+        <section className="py-4 md:py-6 container mx-auto px-3 border-b border-neutral-100 last:border-b-0">
           <div className="flex items-center justify-between mb-4 md:mb-6">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 animate-pulse" />
@@ -417,7 +399,7 @@ export default function Home() {
 
       {/* 4) Offer Product Section */}
       {offerProducts.length > 0 && (
-        <section className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+        <section className="py-4 md:py-6 container mx-auto px-3 border-b border-neutral-100 last:border-b-0">
           <div className="flex items-center justify-between mb-4 md:mb-6">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0 animate-pulse" />
@@ -457,7 +439,7 @@ export default function Home() {
           const displayCategoryProducts = categoryProducts.slice(0, 4);
 
           return (
-            <section key={cat.id} className="py-4 md:py-6 container mx-auto px-4 border-b border-neutral-100 last:border-b-0">
+            <section key={cat.id} className="py-4 md:py-6 container mx-auto px-3 border-b border-neutral-100 last:border-b-0">
               {/* Category Banner (Only Category Sections have banners) */}
               {cat.bannerImage && (
                 <div className="mb-4 rounded-xl overflow-hidden shadow-sm">
@@ -490,60 +472,86 @@ export default function Home() {
         });
       })()}
 
-      {/* 8. CUSTOMER REVIEW SECTION (Height: 250-300px, beautiful cards) */}
-      <section className="py-6 bg-neutral-900 text-white select-none">
-        <div className="container mx-auto px-4 max-w-xl">
-          <div className="text-center mb-4">
-            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-amber-400">Trusted By Thousands</span>
-            <h2 className="text-xs md:text-base font-black uppercase tracking-wider mt-1 font-display">Customer Feedback</h2>
-          </div>
+      {/* 8. CUSTOMER REVIEW SECTION (Dynamic, based on approved reviews) */}
+      {approvedReviews.length > 0 && (
+        <section className="py-8 bg-neutral-900 text-white select-none overflow-hidden">
+          <div className="container mx-auto px-3 max-w-xl">
+            <div className="text-center mb-6">
+              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-amber-400 opacity-90">Trusted By Thousands</span>
+              <h2 className="text-sm md:text-lg font-black uppercase tracking-widest mt-1 font-display">Customer Feedback</h2>
+            </div>
 
-          <div className="h-[130px] md:h-[120px] flex flex-col justify-center text-center px-4 relative">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeReview}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.4 }}
-                className="space-y-2"
-              >
-                {/* 5-Star Feedback */}
-                <div className="flex justify-center items-center gap-1 text-amber-400">
-                  {[...Array(CUSTOMER_TESTIMONIALS[activeReview].rating)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  ))}
-                </div>
-                <p className="text-[11px] md:text-xs font-medium text-neutral-200 italic leading-relaxed line-clamp-3 px-2">
-                  " {CUSTOMER_TESTIMONIALS[activeReview].comment} "
-                </p>
-                <div className="pt-1">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-white leading-tight">
-                    {CUSTOMER_TESTIMONIALS[activeReview].name}
-                  </h4>
-                  <p className="text-[8px] font-bold text-neutral-400 uppercase tracking-wider mt-0.5">
-                    {CUSTOMER_TESTIMONIALS[activeReview].location} • {CUSTOMER_TESTIMONIALS[activeReview].date}
+            <div className="relative h-[160px] md:h-[140px] flex flex-col justify-center">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={activeReview}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  onDragEnd={(_, info) => {
+                    if (info.offset.x > 50) {
+                      setActiveReview((prev) => (prev - 1 + approvedReviews.length) % approvedReviews.length);
+                    } else if (info.offset.x < -50) {
+                      setActiveReview((prev) => (prev + 1) % approvedReviews.length);
+                    }
+                  }}
+                  className="w-full text-center px-4 cursor-grab active:cursor-grabbing"
+                >
+                  {/* Rating Feedback */}
+                  <div className="flex justify-center items-center gap-1 mb-3">
+                    {[...Array(5)].map((_, i) => (
+                      <Star 
+                        key={i} 
+                        className={`w-3.5 h-3.5 ${i < (approvedReviews[activeReview]?.rating || 5) ? 'fill-amber-400 text-amber-400' : 'fill-neutral-700 text-neutral-700'}`} 
+                      />
+                    ))}
+                  </div>
+                  
+                  <p className="text-[12px] md:text-[13px] font-medium text-neutral-100 italic leading-relaxed line-clamp-3 px-2 mb-4">
+                    " {approvedReviews[activeReview]?.reviewText} "
                   </p>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
 
-          {/* Testimonial Select Dots */}
-          <div className="flex justify-center items-center gap-1 mt-3">
-            {CUSTOMER_TESTIMONIALS.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setActiveReview(i)}
-                className={`h-1 rounded-full transition-all duration-300 ${i === activeReview ? 'w-4 bg-white' : 'w-1 bg-neutral-600'}`}
-              />
-            ))}
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-[10px] md:text-[11px] font-black uppercase tracking-widest text-white">
+                        {approvedReviews[activeReview]?.customerName}
+                      </h4>
+                      {approvedReviews[activeReview]?.verified && (
+                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                          <CheckCircle2 className="w-2 h-2 text-emerald-400" />
+                          <span className="text-[7px] font-bold text-emerald-400 uppercase tracking-tighter">Verified</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[8px] font-bold text-neutral-500 uppercase tracking-[0.1em]">
+                      {new Date(approvedReviews[activeReview]?.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </p>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Testimonial Select Dots */}
+            {approvedReviews.length > 1 && (
+              <div className="flex justify-center items-center gap-1.5 mt-6">
+                {approvedReviews.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveReview(i)}
+                    className={`h-1 rounded-full transition-all duration-500 ${i === activeReview ? 'w-6 bg-amber-400' : 'w-1.5 bg-neutral-700 hover:bg-neutral-600'}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 9. CONTACT SECTION (WhatsApp + Call Actions) */}
-      <section className="py-4 mb-2 container mx-auto px-4 max-w-sm">
+      <section className="py-4 mb-2 container mx-auto px-3 max-w-sm">
         <div className="bg-white rounded-xl border border-neutral-150 p-4 shadow-sm text-center">
           <div className="flex justify-center mb-2">
             <div className="w-8 h-8 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center text-neutral-900 shadow-sm shrink-0">
@@ -584,7 +592,7 @@ function HomeSkeleton() {
 
       {/* Category List Skeleton */}
       <div className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-3">
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="flex flex-col items-center">
@@ -598,7 +606,7 @@ function HomeSkeleton() {
 
       {/* Products Skeletons - repeated for 2-3 sections */}
       {[...Array(2)].map((_, sectionIdx) => (
-        <section key={sectionIdx} className="py-6 container mx-auto px-4 border-b border-neutral-100 animate-pulse">
+        <section key={sectionIdx} className="py-6 container mx-auto px-3 border-b border-neutral-100 animate-pulse">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-neutral-200 animate-pulse" />

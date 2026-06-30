@@ -87,7 +87,7 @@ export function Footer() {
         boxShadow: design.shadow ? '0 -10px 30px rgba(0,0,0,0.02)' : 'none'
       }}
     >
-      <div className="container mx-auto px-4" style={{ padding: `${design.padding}px` }}>
+      <div className="container mx-auto px-3" style={{ padding: `${design.padding}px` }}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
           {/* Brand */}
           <div className="space-y-4">

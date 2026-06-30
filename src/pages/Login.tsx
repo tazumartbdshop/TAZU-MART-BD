@@ -239,23 +239,23 @@ export default function Login() {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="w-full max-w-[440px] bg-white px-6 py-5 md:px-8 md:py-6 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-neutral-150"
       >
-        <div className="text-center mb-4">
-          <Link to="/" className="flex flex-col items-center gap-1.5 mb-2">
+        <div className="text-center mb-6">
+          <Link to="/" className="flex flex-col items-center gap-2 mb-3">
             <div className="flex items-center justify-center select-none leading-none">
               {(settings.storeLogo || branding.primary_logo || branding.login_logo || branding.desktop_logo) && (
                 <img 
                   src={settings.storeLogo || branding.primary_logo || branding.login_logo || branding.desktop_logo} 
                   alt={settings.storeName || 'Logo'} 
-                  className="h-11 max-w-[150px] object-contain" 
+                  className="h-12 max-w-[160px] object-contain" 
                   referrerPolicy="no-referrer" 
                 />
               )}
             </div>
-            <span className="text-base font-black tracking-tight text-neutral-950 uppercase leading-none">
+            <h1 className="text-lg font-black tracking-tight text-neutral-950 uppercase leading-none">
               {settings.storeName || 'TAZU MART BD'}
-            </span>
+            </h1>
           </Link>
-          <p className="text-[13.5px] text-[#6B7280] text-center leading-[1.3] whitespace-nowrap overflow-hidden text-ellipsis px-1 max-w-[90vw] mx-auto">
+          <p className="text-[13px] md:text-[14px] text-[#6B7280] text-center leading-[1.3] px-2 max-w-[400px] mx-auto">
             Sign in to unlock exclusive deals, faster checkout & member rewards.
           </p>
         </div>

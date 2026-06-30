@@ -602,16 +602,17 @@ export default function Checkout() {
     const paymentS = (paymentMethod === 'cod' ? 'Cash on Delivery' : 'Paid') as 'Paid' | 'Partial' | 'Unpaid' | 'Cash on Delivery';
 
     try {
-      const placedOrder = await addOrderAsync({
+      console.log("[Checkout] Constructing orderData with items:", items);
+      const orderData = {
         customerName: formData.name,
         mobileNumber: formData.phone,
         fullAddress: `${formData.address}${formData.landmark ? `, Landmark: ${formData.landmark}` : ''}`,
         cityArea: formData.division || 'Dhaka',
         deliveryMode: 'Standard Delivery',
         paymentMethod: paymentM,
-        status: 'Confirmed', // Default value = 'Confirmed'
+        status: 'Confirmed' as any, // Default value = 'Confirmed'
         paymentStatus: paymentS,
-        type: 'Online',
+        type: 'Online' as any,
         items: items.map(item => ({
           productId: item.id,
           name: item.name,
@@ -633,7 +634,11 @@ export default function Checkout() {
         total: total,
         notes: formData.note || undefined,
         promoCodeUsed: activePromo ? activePromo.code : undefined,
-      });
+      };
+
+      console.log("[Checkout] Calling addOrderAsync with payload:", JSON.stringify(orderData, null, 2));
+      const placedOrder = await addOrderAsync(orderData);
+      console.log("[Checkout] Order placed successfully:", placedOrder);
 
       pixelService.trackPurchase({
         id: placedOrder.id,
