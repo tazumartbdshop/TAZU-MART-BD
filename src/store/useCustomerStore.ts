@@ -258,23 +258,37 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   })),
   fetchCustomers: async () => {
     try {
+      console.log("[Customer Store] Fetching customers from API...");
       const response = await fetch('/api/admin/customers');
       if (response.ok) {
         const data = await response.json();
-        if (data && data.customers) {
+        console.log("[Customer Store] API Response:", data);
+        if (Array.isArray(data)) {
+          set({ customers: data });
+          return;
+        } else if (data && data.customers && Array.isArray(data.customers)) {
           set({ customers: data.customers });
           return;
         }
+      } else {
+        console.warn("[Customer Store] API response not OK:", response.status);
       }
     } catch (err) {
-      console.error("fetchCustomers API failed, falling back to Supabase:", err);
+      console.error("[Customer Store] fetchCustomers API failed, falling back to Supabase:", err);
     }
 
+    console.log("[Customer Store] Falling back to Supabase fetch...");
     const supabase = getSupabase();
-    if (!supabase) return;
+    if (!supabase) {
+      console.warn("[Customer Store] Supabase client not available for fallback");
+      return;
+    }
     
     const { data, error } = await supabase.from('customers').select('*');
-    if (!error && data) {
+    if (error) {
+      console.error("[Customer Store] Supabase fallback error:", error);
+    } else if (data) {
+      console.log("[Customer Store] Supabase fallback data:", data);
       set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
     }
   },

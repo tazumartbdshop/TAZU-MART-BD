@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Trash2, MessageSquare } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { useOrderStore } from '../../store/useOrderStore';
 import AdminOrdersCardView from './AdminOrdersCardView';
@@ -11,7 +11,7 @@ import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/l
 
 
 function AdminOrderList() {
-  const { orders, updateOrderStatus, markAsRead } = useOrderStore();
+  const { orders, updateOrderStatus, markAsRead, deleteOrder } = useOrderStore();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +50,18 @@ function AdminOrderList() {
       markAsRead(id);
     }
     setExpandedId(expandedId === id ? null : id);
+  };
+
+  const handleDeleteOrder = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this order?')) {
+      deleteOrder(id);
+    }
+  };
+
+  const handleWhatsApp = (phone?: string) => {
+    if (!phone) return;
+    const cleanPhone = phone.replace(/\D/g, '');
+    window.open(`https://wa.me/${cleanPhone}`, '_blank');
   };
 
   return (
@@ -159,22 +171,29 @@ function AdminOrderList() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between sm:justify-end gap-4">
-                  <p className="font-black text-black text-sm sm:text-base">
-                    {formatPrice(order.total)}
-                  </p>
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <select 
-                      value={order.status || ''}
-                      onChange={(e) => updateOrderStatus(order.id, e.target.value as any)}
-                      className={`px-3 py-1 text-xs font-bold rounded-full border outline-none cursor-pointer ${getStatusColor(order.status || '')}`}
-                    >
-                      {['Placed', 'Pending', 'Confirmed', 'Processing', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'].map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
+                  <div className="flex items-center justify-between sm:justify-end gap-4">
+                    <p className="font-black text-black text-sm sm:text-base">
+                      {formatPrice(order.total)}
+                    </p>
+                    {(order.status === 'Delivered' || order.status === 'Completed') ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 select-none uppercase tracking-wider">
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                        Complete Order
+                      </span>
+                    ) : (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <select 
+                          value={order.status || ''}
+                          onChange={(e) => updateOrderStatus(order.id, e.target.value as any)}
+                          className={`px-3 py-1 text-xs font-bold rounded-full border outline-none cursor-pointer ${getStatusColor(order.status || '')}`}
+                        >
+                          {['Placed', 'Pending', 'Confirmed', 'Processing', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
-                </div>
               </div>
 
               {/* Expandable Details Card */}
@@ -183,7 +202,7 @@ function AdminOrderList() {
                   
                   {/* Customer Info Point-by-point */}
                   <div className="space-y-2">
-                    <h4 className="font-extrabold text-[10px] uppercase tracking-wider text-gray-400">Customer Information</h4>
+                    <h4 className="font-extrabold text-[10px] uppercase tracking-wider text-gray-400">Customer Details</h4>
                     <div className="space-y-2">
                       <div>
                         <span className="text-gray-500 block text-xs">Customer Name</span>
@@ -264,7 +283,7 @@ function AdminOrderList() {
                     )}
                   </div>
 
-                  <hr className="border-gray-250" />
+                  <hr className="border-gray-200" />
 
                   {/* Bill Pricing breakdown with Promo codes */}
                   <div className="space-y-2">
@@ -297,7 +316,7 @@ function AdminOrderList() {
                     </div>
                   </div>
 
-                  <hr className="border-gray-250" />
+                  <hr className="border-gray-200" />
 
                   {/* Order Date & Custom formatting */}
                   <div>
@@ -306,15 +325,35 @@ function AdminOrderList() {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3 border-t border-gray-200">
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedInvoiceOrder(order);
                       }}
-                      className="flex-1 bg-black text-white py-2.5 rounded-lg font-bold text-xs sm:text-sm hover:bg-gray-900 transition-colors shadow-sm active:scale-98"
+                      className="bg-black text-white py-2.5 rounded-lg font-bold text-xs sm:text-sm hover:bg-gray-900 transition-colors shadow-sm active:scale-98 flex items-center justify-center gap-2"
                     >
                       Invoice
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleWhatsApp(order.mobileNumber);
+                      }}
+                      className="bg-white border border-black text-black py-2.5 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 hover:bg-black hover:text-white transition-all"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Contact
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteOrder(order.id);
+                      }}
+                      className="border border-red-200 text-red-600 hover:bg-red-50/50 py-2.5 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Order
                     </button>
                   </div>
                 </div>

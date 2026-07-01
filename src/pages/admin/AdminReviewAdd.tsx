@@ -132,9 +132,7 @@ export default function AdminReviewAdd() {
     setDetailedError(null);
     
     try {
-      // Logic for uploading media would go here if we were using a real backend
-      // For now, we use the base64 strings or external URLs
-      
+      // Logic for uploading media
       const { uploadImage } = await import('../../lib/imageUtils');
       
       const finalImageUrls = await Promise.all(
@@ -178,8 +176,17 @@ export default function AdminReviewAdd() {
       navigate('/admin/reviews/list');
     } catch (err: any) {
       console.error("[Review Publish Flow Error]:", err);
-      toast.success('Review added successfully.');
-      navigate('/admin/reviews/list');
+      
+      // Provide detailed error feedback
+      const errorMsg = err.message || 'An unknown error occurred while saving the review.';
+      setDetailedError({
+        title: 'Database Save Failed',
+        reason: errorMsg,
+        table: 'public.reviews',
+        solution: 'Check if the Supabase table "reviews" exists and has all the required columns (product_id, user_id, rating, review_text, etc.).'
+      });
+      
+      toast.error(`Failed to add review: ${errorMsg}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -200,6 +207,37 @@ export default function AdminReviewAdd() {
           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Create a manual customer review entry</p>
         </div>
       </div>
+
+      <AnimatePresence>
+        {detailedError && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-red-50 border border-red-100 p-6 rounded-lg space-y-4"
+          >
+            <div className="flex items-start gap-3 text-red-600">
+              <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+              <div>
+                <h4 className="text-sm font-bold uppercase tracking-wider">{detailedError.title}</h4>
+                <p className="text-xs mt-1 font-medium opacity-90 leading-relaxed">{detailedError.reason}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-red-100">
+              {detailedError.table && (
+                <div>
+                  <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest block mb-1">Target Table</span>
+                  <code className="text-[10px] font-mono bg-red-100/50 px-2 py-1 rounded text-red-700">{detailedError.table}</code>
+                </div>
+              )}
+              <div>
+                <span className="text-[10px] font-bold text-red-400 uppercase tracking-widest block mb-1">Suggested Solution</span>
+                <p className="text-[10px] font-bold text-red-700 leading-tight">{detailedError.solution}</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Customer Information */}

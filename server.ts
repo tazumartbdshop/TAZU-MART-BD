@@ -745,20 +745,25 @@ Please ask me your query or select a quick question template below!`;
   app.get("/api/admin/customers", async (req, res) => {
     try {
       if (!supabaseServiceRole) {
+        console.warn("[Get Customers API] Supabase Service Role key is NOT configured.");
         return res.status(500).json({ error: "Supabase Service Role key is not configured." });
       }
 
+      console.log("[Get Customers API] Fetching from Supabase Auth...");
       const { data, error } = await supabaseServiceRole.auth.admin.listUsers();
       if (error) {
         console.error("[Get Customers] List users error:", error);
         return res.status(500).json({ error: error.message });
       }
 
+      console.log(`[Get Customers API] Found ${data.users.length} users in Auth.`);
+
       const mappedCustomers = data.users
         .filter((u: any) => {
           const meta = u.user_metadata || {};
           // Only return customers
-          return meta.role === 'customer' || !meta.role || u.email?.includes('customer') || u.email?.includes('gmail');
+          const isCustomer = meta.role === 'customer' || !meta.role || u.email?.includes('customer') || u.email?.includes('gmail');
+          return isCustomer;
         })
         .map((u: any) => {
           const meta = u.user_metadata || {};

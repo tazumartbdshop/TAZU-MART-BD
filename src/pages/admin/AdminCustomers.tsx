@@ -50,6 +50,8 @@ function AdminCustomerList() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  console.log("[AdminCustomers] Current customers in store:", customers);
+
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
@@ -100,8 +102,8 @@ function AdminCustomerList() {
         // Priority 1: Search Matches
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
-          const aMatches = a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || a.phones.some(p => p.includes(q)) || a.emails.some(e => e.toLowerCase().includes(q));
-          const bMatches = b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q) || b.phones.some(p => p.includes(q)) || b.emails.some(e => e.toLowerCase().includes(q));
+          const aMatches = a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || (a.phones && a.phones.some(p => p.includes(q))) || (a.emails && a.emails.some(e => e.toLowerCase().includes(q)));
+          const bMatches = b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q) || (b.phones && b.phones.some(p => p.includes(q))) || (b.emails && b.emails.some(e => e.toLowerCase().includes(q)));
           
           if (aMatches && !bMatches) return -1;
           if (!aMatches && bMatches) return 1;
@@ -242,8 +244,8 @@ function AdminCustomerList() {
               const isMatch = searchQuery && (
                 customer.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                 customer.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                customer.phones.some(p => p.includes(searchQuery)) ||
-                customer.emails.some(e => e.toLowerCase().includes(searchQuery.toLowerCase()))
+                (customer.phones && customer.phones.some(p => p.includes(searchQuery))) ||
+                (customer.emails && customer.emails.some(e => e.toLowerCase().includes(searchQuery.toLowerCase())))
               );
 
               const genderBadge = (gender?: string) => {
@@ -305,10 +307,10 @@ function AdminCustomerList() {
                        </div>
                        
                        <p className="text-[10px] font-bold text-zinc-400 truncate">
-                         {customer.phones[0] || 'No Phone'}
+                         {customer.phones?.[0] || 'No Phone'}
                        </p>
                        <p className="text-[10px] font-bold text-zinc-400 truncate">
-                         {customer.emails[0] || 'No Email'}
+                         {customer.emails?.[0] || 'No Email'}
                        </p>
                        <div className="flex items-center gap-2 mt-1">
                           <span className={cn(

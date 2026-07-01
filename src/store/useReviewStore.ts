@@ -108,43 +108,39 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         throw new Error('Review text is required.');
       }
 
-      // 2. Direct Supabase Insertion (Without artificial schema check)
-      let insertedData: any = null;
-      try {
-        const { data, error: insertError } = await supabase
-          .from('reviews')
-          .insert([{
-            product_id: newRev.productId,
-            user_id: newRev.customerId || 'anonymous',
-            customer_name: newRev.customerName || 'Anonymous',
-            rating: newRev.rating,
-            review_text: newRev.reviewText,
-            status: newRev.status || 'approved',
-            media_urls: newRev.mediaUrls || [],
-            verified: newRev.verified ?? true,
-            phone: newRev.phone,
-            email: newRev.email,
-            order_id: newRev.orderId,
-            device_ip: newRev.deviceIP,
-            anonymous: newRev.anonymous,
-            is_pinned: false,
-            created_at: newRev.createdAt || new Date().toISOString()
-          }])
-          .select()
-          .single();
+      // 2. Direct Supabase Insertion
+      const { data, error: insertError } = await supabase
+        .from('reviews')
+        .insert([{
+          product_id: newRev.productId,
+          user_id: newRev.customerId || 'anonymous',
+          customer_name: newRev.customerName || 'Anonymous',
+          rating: newRev.rating,
+          review_text: newRev.reviewText,
+          status: newRev.status || 'approved',
+          media_urls: newRev.mediaUrls || [],
+          verified: newRev.verified ?? true,
+          phone: newRev.phone,
+          email: newRev.email,
+          order_id: newRev.orderId,
+          device_ip: newRev.deviceIP,
+          anonymous: newRev.anonymous,
+          is_pinned: false,
+          created_at: newRev.createdAt || new Date().toISOString()
+        }])
+        .select()
+        .single();
 
-        if (insertError) {
-          console.warn("Supabase insert error (falling back to local state):", insertError);
-        } else {
-          insertedData = data;
-        }
-      } catch (dbErr) {
-        console.warn("Supabase database error (falling back to local state):", dbErr);
+      if (insertError) {
+        console.error("Supabase insert error:", insertError);
+        throw new Error(`Database Error: ${insertError.message}`);
       }
 
-      // 3. Update local state instantly so it appears in the review list
+      const insertedData = data;
+
+      // 3. Update local state
       const addedReview: ProductReview = {
-        reviewId: insertedData?.id || `rev-local-${Date.now()}`,
+        reviewId: insertedData.id,
         productId: newRev.productId,
         customerId: newRev.customerId || 'anonymous',
         customerName: newRev.customerName || 'Anonymous',
@@ -163,7 +159,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       };
 
       set((state) => ({
-        reviews: [addedReview, ...state.reviews.filter(r => r.reviewId !== addedReview.reviewId)]
+        reviews: [addedReview, ...state.reviews]
       }));
 
     } catch (error: any) {
