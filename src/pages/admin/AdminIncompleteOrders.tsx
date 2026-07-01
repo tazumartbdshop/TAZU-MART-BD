@@ -7,50 +7,14 @@ import {
 } from 'lucide-react';
 import { useLeadStore, Lead } from '../../store/useLeadStore';
 import { formatPrice } from '../../lib/utils';
+import { toast } from 'react-hot-toast';
 
 export default function AdminIncompleteOrders() {
   const navigate = useNavigate();
   const { leads, deleteLead, markAsRead } = useLeadStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Demo Data for Preview if no real leads are captured
-  const demoLeads: Lead[] = [
-    {
-      id: "demo1",
-      name: "",
-      phone: "01719188777",
-      address: "Kaliganj, Bangladesh",
-      email: "",
-      lastUpdated: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      status: 'Abandoned',
-      items: [{ name: 'Premium Watch', quantity: 1 }],
-      total: 2500
-    },
-    {
-      id: "demo2",
-      name: "Hasan Ahmed",
-      phone: "",
-      address: "",
-      email: "hasan@gmail.com",
-      lastUpdated: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-      status: 'Abandoned',
-      items: [{ name: 'Leather Wallet', quantity: 2 }],
-      total: 1800
-    },
-    {
-      id: "demo3",
-      name: "",
-      phone: "01888777666",
-      address: "",
-      email: "",
-      lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-      status: 'Abandoned',
-      items: [{ name: 'Casual Shirt', quantity: 1 }],
-      total: 1200
-    }
-  ];
-
-  const displayLeads = leads.length > 0 ? leads : demoLeads;
+  const displayLeads = leads;
 
   const toggleExpand = (id: string) => {
     if (expandedId !== id) {
@@ -244,7 +208,10 @@ export default function AdminIncompleteOrders() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteLead(lead.id);
+                        if (window.confirm('Are you sure you want to delete this lead record?')) {
+                          deleteLead(lead.id);
+                          toast.success('Lead record deleted successfully');
+                        }
                       }}
                       className="border border-red-200 text-red-650 hover:bg-red-50/50 py-2.5 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all"
                     >

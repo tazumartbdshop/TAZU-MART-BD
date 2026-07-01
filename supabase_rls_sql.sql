@@ -567,6 +567,11 @@ BEGIN
     ) THEN
       ALTER PUBLICATION supabase_realtime ADD TABLE public.store_identity;
     END IF;
-  END IF;
-END $$;
+-- 6. EMERGENCY FIXES (Run if you get "malformed array literal" errors)
+-- ---------------------------------------------------------------------
+-- This ensures 'name', 'email', and 'phone' are TEXT and NOT TEXT[] in the users table.
+-- ALTER TABLE IF EXISTS public.users ALTER COLUMN name TYPE TEXT USING name::TEXT;
+-- ALTER TABLE IF EXISTS public.users ALTER COLUMN email TYPE TEXT USING email::TEXT;
+-- ALTER TABLE IF EXISTS public.users ALTER COLUMN phone TYPE TEXT USING phone::TEXT;
+-- ALTER TABLE IF EXISTS public.users ALTER COLUMN occasion_name TYPE TEXT USING occasion_name::TEXT;
 

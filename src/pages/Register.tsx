@@ -287,20 +287,16 @@ export default function Register() {
         phone: fullPhoneNumber,
         role: 'customer',
         status: 'Active',
-        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
         gender: formData.gender,
         address: formData.address.trim(),
-        profileImage: profileImage || null,
         profile_image: profileImage || null,
-        occasionName: occasionJson,
         occasion_name: occasionJson,
-        loginProvider: 'Email',
-        registrationDate: new Date().toISOString(),
+        postal_code: '',
         division: '',
         district: '',
         upazila: '',
         area: '',
-        postalCode: '',
       }]);
 
       if (dbError) {
@@ -458,11 +454,13 @@ export default function Register() {
             <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Full Name *</label>
             <div className="relative">
               <input 
+                id="fullName"
                 type="text" 
                 name="fullName" 
                 value={formData.fullName} 
                 onChange={handleChange} 
                 onBlur={() => handleBlur('fullName')}
+                autoComplete="name"
                 required 
                 className={cn(
                   "w-full h-[50px] border rounded-[14px] pl-10 pr-10 text-sm transition-all duration-150 outline-none",
@@ -496,11 +494,13 @@ export default function Register() {
                 +880
               </span>
               <input 
+                id="phone"
                 type="tel" 
                 name="phone" 
                 value={formData.phone} 
                 onChange={handlePhoneChange} 
                 onBlur={() => handleBlur('phone')}
+                autoComplete="tel"
                 required 
                 className={cn(
                   "w-full h-[50px] border rounded-[14px] pl-24 pr-10 text-sm transition-all duration-150 outline-none",
