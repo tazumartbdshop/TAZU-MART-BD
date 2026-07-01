@@ -357,15 +357,10 @@ CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH
                               e.stopPropagation();
                               handleDeleteLead(lead.id);
                             }}
-                            disabled={isDeleting === lead.id}
-                            className="bg-white border border-red-200 text-red-600 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-50 transition-all disabled:opacity-50"
+                            className="bg-white border border-red-200 text-red-600 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-all shadow-sm"
                           >
-                            {isDeleting === lead.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                            {isDeleting === lead.id ? 'Removing...' : 'Delete'}
+                            <Trash2 className="w-4 h-4" />
+                            Delete
                           </button>
                         </div>
                       </div>

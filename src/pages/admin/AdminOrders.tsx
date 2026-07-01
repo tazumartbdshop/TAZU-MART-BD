@@ -359,15 +359,10 @@ function AdminOrderList() {
                         e.stopPropagation();
                         handleDeleteOrder(order.id);
                       }}
-                      disabled={isDeleting === order.id}
-                      className="border border-red-200 text-red-600 hover:bg-red-50/50 py-2.5 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                      className="border border-red-200 text-red-600 hover:bg-red-600 hover:text-white py-2.5 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all"
                     >
-                      {isDeleting === order.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                      {isDeleting === order.id ? 'Deleting...' : 'Delete Order'}
+                      <Trash2 className="w-4 h-4" />
+                      Delete Order
                     </button>
                   </div>
                 </div>
