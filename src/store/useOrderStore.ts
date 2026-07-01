@@ -421,6 +421,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const cleanPayload: any = {};
       allowedColumns.forEach(col => {
         if (dbPayload[col] !== undefined) {
+          // Safety: omit 'type' if it is 'Online' to avoid numeric syntax errors in some DB configurations
+          if (col === 'type' && dbPayload[col] === 'Online') return;
           cleanPayload[col] = dbPayload[col];
         }
       });

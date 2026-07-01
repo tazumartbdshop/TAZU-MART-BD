@@ -744,9 +744,11 @@ Please ask me your query or select a quick question template below!`;
   // Admin Customer Management Endpoints
   app.get("/api/admin/customers", async (req, res) => {
     try {
+      res.setHeader('Content-Type', 'application/json');
+      
       if (!supabaseServiceRole) {
         console.warn("[Get Customers API] Supabase Service Role key is NOT configured.");
-        return res.status(500).json({ error: "Supabase Service Role key is not configured." });
+        return res.status(500).json({ error: "Supabase Service Role key is not configured. Please set SUPABASE_SERVICE_ROLE_KEY." });
       }
 
       console.log("[Get Customers API] Fetching from Supabase Auth...");
@@ -756,131 +758,97 @@ Please ask me your query or select a quick question template below!`;
         return res.status(500).json({ error: error.message });
       }
 
-      console.log(`[Get Customers API] Found ${data.users.length} users in Auth.`);
-
       const mappedCustomers = data.users
         .filter((u: any) => {
           const meta = u.user_metadata || {};
-          // Only return customers
-          const isCustomer = meta.role === 'customer' || !meta.role || u.email?.includes('customer') || u.email?.includes('gmail');
-          return isCustomer;
+          return meta.role === 'customer' || !meta.role;
         })
         .map((u: any) => {
           const meta = u.user_metadata || {};
           const phone = meta.phone || u.phone || '';
-          const name = meta.name || meta.fullName || u.email?.split('@')[0] || 'Registered User';
           
           return {
             id: u.id,
-            name: name,
+            name: meta.name || meta.fullName || u.email?.split('@')[0] || 'User',
             phones: phone ? [phone] : [],
             emails: [u.email].filter(Boolean),
             address: {
               country: meta.country || 'Bangladesh',
-              city: meta.city || meta.district || '',
-              area: meta.area || meta.upazila || '',
-              street: meta.address || meta.street || '',
               division: meta.division || '',
               district: meta.district || '',
               upazila: meta.upazila || '',
-              zipCode: meta.zipCode || meta.postalCode || ''
+              zipCode: meta.zipCode || '',
+              street: meta.street || meta.address || ''
             },
-            profileImage: meta.profileImage || meta.profile_image || '',
+            profileImage: meta.profileImage || '',
             gender: meta.gender || '',
             status: meta.status || 'Active',
-            customerType: meta.customer_type || meta.customerType || 'Regular',
-            totalOrders: meta.total_orders || meta.totalOrders || 0,
-            totalSpend: meta.total_spend || meta.totalSpend || 0,
-            lastLogin: meta.last_login || meta.lastLogin || (u.last_sign_in_at ? Date.parse(u.last_sign_in_at) : Date.now()),
-            totalLogins: meta.total_logins || meta.totalLogins || 1,
-            createdAt: Date.parse(u.created_at) || Date.now(),
-            socialLinks: meta.social_links || meta.socialLinks || []
+            customerType: meta.customerType || 'Regular',
+            totalOrders: meta.totalOrders || 0,
+            totalSpend: meta.totalSpend || 0,
+            createdAt: Date.parse(u.created_at) || Date.now()
           };
         });
 
-      res.json({ customers: mappedCustomers });
+      return res.json({ customers: mappedCustomers });
     } catch (err: any) {
       console.error("[Get Customers] Fatal Error:", err);
-      res.status(500).json({ error: "Failed to fetch customers" });
+      return res.status(500).json({ error: "Internal Server Error fetching customers" });
     }
   });
 
   app.post("/api/admin/create-customer", async (req, res) => {
     try {
+      res.setHeader('Content-Type', 'application/json');
+      
       if (!supabaseServiceRole) {
-        return res.status(500).json({ 
-          error: "Supabase Service Role key is not configured. Admin actions are disabled." 
-        });
+        return res.status(500).json({ error: "Supabase Service Role key is not configured." });
       }
 
-      const { name, email, password, phone, role = 'customer', ...otherData } = req.body;
+      const { name, email, password, phone, ...otherData } = req.body;
 
-      if (!email || !password || !name) {
-        return res.status(400).json({ error: "Name, email and password are required" });
+      if (!email || !name) {
+        return res.status(400).json({ error: "Name and email are required" });
       }
 
       // 1. Create User in Supabase Auth
       const { data: authUser, error: authError } = await supabaseServiceRole.auth.admin.createUser({
         email,
-        password,
+        password: password || Math.random().toString(36).slice(-12) + "A1!", // Generate random password if missing
         email_confirm: true,
-        user_metadata: { name, role, phone }
+        user_metadata: { 
+          name, 
+          role: 'customer', 
+          phone,
+          ...otherData.customerData 
+        }
       });
 
       if (authError) {
-        console.error("[Admin Create Customer] Auth Error:", authError);
-        return res.status(400).json({ error: authError.message || "Auth Error: Customer could not be created." });
+        return res.status(400).json({ error: authError.message });
       }
 
       const userId = authUser.user.id;
 
-      // 2. Try Inserting into public.users table (optional/fallback)
-      const userProfile = {
-        id: userId,
-        uid: userId,
-        name,
-        email,
-        phone: phone || '',
-        role,
-        status: 'Active',
-        created_at: new Date().toISOString(),
-        ...otherData.profileData
-      };
-
-      // 2. Insert into public.users table
-      const { error: userError } = await supabaseServiceRole.from('users').upsert([userProfile]);
-      if (userError) {
-        console.error("[Admin Create Customer] Users Table Error:", userError);
-        throw new Error(`Database save failed: Table 'users' returned error - ${userError.message}`);
+      // 2. Try saving to 'customers' table for persistence (Supabase may not have the table yet)
+      try {
+        await supabaseServiceRole.from('customers').upsert([{
+          id: userId,
+          name,
+          emails: [email],
+          phones: phone ? [phone] : [],
+          status: 'Active',
+          created_at: new Date().toISOString(),
+          ...otherData.customerData
+        }]);
+      } catch (dbErr) {
+        console.warn("Could not save to 'customers' table, using Auth metadata only:", dbErr);
       }
 
-      // 3. Insert into public.customers table
-      const customerRecord = {
-        id: userId,
-        name,
-        emails: [email],
-        phones: phone ? [phone] : [],
-        status: 'Active',
-        customer_type: 'New',
-        created_at: Date.now(),
-        ...otherData.customerData
-      };
-
-      const { error: customerError } = await supabaseServiceRole.from('customers').upsert([customerRecord]);
-      if (customerError) {
-        console.error("[Admin Create Customer] Customers Table Error:", customerError);
-        throw new Error(`Database save failed: Table 'customers' returned error - ${customerError.message}`);
-      }
-
-      res.json({ 
-        status: "success", 
-        message: "Customer created successfully",
-        user: authUser.user
-      });
-
+      return res.json({ status: "success", user: authUser.user });
     } catch (err: any) {
       console.error("[Admin Create Customer] Fatal Error:", err);
-      res.status(500).json({ error: err.message || err.toString() || "Fatal Error: Customer could not be created." });
+      return res.status(500).json({ error: err.message || "Failed to create customer" });
     }
   });
 

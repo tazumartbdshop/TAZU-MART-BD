@@ -68,42 +68,27 @@ export const initialDemoCustomers: Customer[] = [];
 
 export const useCustomerStore = create<CustomerState>((set, get) => ({
   customers: initialDemoCustomers,
-  addCustomer: async (customerPayload) => {
-    const password = customerPayload.password || '123456';
-    const email = customerPayload.emails[0];
-    const phone = customerPayload.phones[0];
-
+  addCustomer: async (customerData) => {
     try {
       const response = await fetch('/api/admin/create-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: customerPayload.name,
-          email,
-          password,
-          phone,
-          customerData: objectToSnake(customerPayload)
-        })
+        body: JSON.stringify(customerData)
       });
 
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("[Store Add Customer] Non-JSON response:", text);
         throw new Error("Server returned an invalid response (HTML). Please check server logs.");
       }
 
       const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to create customer');
-      }
+      if (!response.ok) throw new Error(result.error || 'Failed to create customer');
 
-      // Success - State is updated by subscription usually, but we can do it manually for immediate feedback
       await get().fetchCustomers();
-      
-    } catch (error: any) {
-      console.error("[Store Add Customer] Error:", error);
-      throw error;
+      return result;
+    } catch (err: any) {
+      console.error("[Store Add Customer] Error:", err);
+      throw err;
     }
   },
   syncCustomerFromAuth: async (user) => {

@@ -2,6 +2,19 @@ import React, { useRef } from "react";
 import html2pdf from "html2pdf.js";
 import { useSettingsStore } from "../../store/useSettingsStore";
 import { useBrandingStore } from "../../store/useBrandingStore";
+import { 
+  Download, 
+  Printer, 
+  Share2, 
+  ChevronLeft, 
+  Phone, 
+  Mail, 
+  Globe, 
+  Copy, 
+  CheckCircle2,
+  QrCode,
+  Barcode
+} from "lucide-react";
 
 interface InvoiceViewProps {
   order: any;
@@ -19,6 +32,7 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
   );
   
   const deliveryCharge = order.deliveryCharge || 0;
+  const discountAmount = order.discount?.amount || 0;
   const grandTotal = order.total;
   const currency = settings.currencySymbol || '৳';
 
@@ -27,171 +41,264 @@ export const InvoiceView: React.FC<InvoiceViewProps> = ({ order, onBack }) => {
     if (!element) return;
     
     const opt = {
-      margin: 5,
+      margin: 0,
       filename: `invoice-${settings.invoicePrefix || 'INV-'}${order.orderId}.pdf`,
       image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      html2canvas: { scale: 3, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
     };
     
     try {
       await html2pdf().set(opt).from(element).save();
-      alert('Invoice Downloaded Successfully');
     } catch (err) {
       console.error('PDF generation failed:', err);
-      alert('Failed to download invoice');
     }
   };
 
-  const printInvoice = () => {
-    window.print();
+  const copyOrderId = () => {
+    navigator.clipboard.writeText(order.orderId);
+    alert('Order ID copied to clipboard');
   };
 
-  const shareInvoice = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Invoice ${order.orderId}`,
-          text: `Here is your invoice for order ${order.orderId}`,
-          url: window.location.href,
-        });
-      } catch (err) {
-        console.error('Error sharing:', err);
-      }
-    } else {
-      alert('Sharing not supported on this browser');
-    }
+  const shareViaWhatsApp = () => {
+    const text = `Check out my invoice for Order #${order.orderId} at Tazu Mart BD!`;
+    const url = window.location.href;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text + " " + url)}`, '_blank');
   };
 
   return (
-    <div className={`min-h-screen p-4 font-sans text-[14px] text-black overflow-x-hidden ${settings.invoiceTheme === 'dark' ? 'bg-gray-900 text-white' : 'bg-[#FFFFFF] text-black'}`}>
-      <div className="max-w-[190mm] mx-auto">
-        {/* Buttons - Hidden on print */}
-        <div className="flex gap-4 justify-center mb-10 no-print flex-wrap">
-          <button
-            onClick={downloadInvoice}
-            className="bg-black text-white px-6 py-3 rounded-md text-sm font-bold border border-black transition-all hover:bg-neutral-800"
-          >
-            Download Invoice
-          </button>
-          <button
-            onClick={printInvoice}
-            className="bg-white text-black border border-black px-6 py-3 rounded-md text-sm font-bold transition-all hover:bg-neutral-100"
-          >
-            Print
-          </button>
-          <button
-            onClick={shareInvoice}
-            className="bg-white text-black border border-black px-6 py-3 rounded-md text-sm font-bold transition-all hover:bg-neutral-100"
-          >
-            Share
-          </button>
+    <div className="min-h-screen bg-neutral-100 py-8 px-4 md:py-12 font-sans selection:bg-neutral-900 selection:text-white">
+      <div className="max-w-4xl mx-auto space-y-8">
+        
+        {/* Top Controls - Hidden on print */}
+        <div className="flex flex-wrap items-center justify-between gap-4 no-print bg-white p-4 rounded-3xl border border-neutral-200 shadow-sm">
           <button
             onClick={onBack}
-            className="bg-white text-black border border-black px-6 py-3 rounded-md text-sm font-bold transition-all hover:bg-neutral-100"
+            className="flex items-center gap-2 px-5 py-2.5 bg-neutral-50 hover:bg-neutral-100 text-neutral-900 rounded-xl font-bold text-sm transition-all active:scale-95 border border-neutral-200"
           >
-            Back to Home
+            <ChevronLeft className="w-4 h-4" />
+            Back
           </button>
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={copyOrderId}
+              className="flex items-center gap-2 px-4 py-2.5 bg-neutral-50 hover:bg-neutral-100 text-neutral-600 rounded-xl font-bold text-sm transition-all active:scale-95 border border-neutral-200"
+            >
+              <Copy className="w-4 h-4" />
+              Copy ID
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 px-4 py-2.5 bg-neutral-50 hover:bg-neutral-100 text-neutral-600 rounded-xl font-bold text-sm transition-all active:scale-95 border border-neutral-200"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+          </div>
         </div>
 
-        {/* Invoice Component */}
+        {/* Invoice Paper */}
         <div
           id="invoice"
           ref={invoiceRef}
-          className="invoice-container mx-auto box-border"
-          style={{ width: "100%", maxWidth: "190mm", minHeight: "277mm", padding: "10mm", backgroundColor: settings.invoiceTheme === 'dark' ? '#1f2937' : '#FFFFFF', color: settings.invoiceTheme === 'dark' ? '#ffffff' : '#000000' }}
+          className="bg-white shadow-[0_40px_80px_-20px_rgba(0,0,0,0.1)] rounded-[40px] overflow-hidden border border-neutral-200"
+          style={{ width: "100%", minHeight: "297mm" }}
         >
-          {/* Header */}
-          <div className="border-b pb-6 mb-6" style={{ borderColor: '#d1d5db' }}>
-            <div className="flex items-center gap-3 mb-2">
-              {settings.storeLogo || settings.invoiceLogo || branding.invoice_logo || branding.primary_logo ? (
-                <img src={settings.storeLogo || settings.invoiceLogo || branding.invoice_logo || branding.primary_logo} alt="Logo" className="w-10 h-10 object-contain" referrerPolicy="no-referrer" />
-              ) : (
-                <div className="w-10 h-10 bg-black rounded flex items-center justify-center text-white font-black text-lg">
-                  {(settings.storeName || branding.site_name || 'T')[0]}
+          {/* Header Banner */}
+          <div className="bg-neutral-950 p-10 md:p-14 text-white">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  {settings.storeLogo || branding.primary_logo ? (
+                    <img src={settings.storeLogo || branding.primary_logo} alt="Logo" className="h-14 w-auto object-contain brightness-0 invert" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-black font-black text-2xl">
+                      {settings.storeName?.[0] || "T"}
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-2xl font-black uppercase tracking-tight leading-none mb-1">
+                      {settings.storeName || "TAZU MART BD"}
+                    </h1>
+                    <p className="text-neutral-400 text-xs font-bold uppercase tracking-widest">Premium Shopping Experience</p>
+                  </div>
                 </div>
-              )}
-              <h1 className="text-xl font-black uppercase">{settings.storeName || branding.site_name || 'TAZU MART BD'}</h1>
-            </div>
-            <div className="text-[14px]">
-                <p>{settings.storeEmail}</p>
-                <p>{settings.contactNumber}</p>
-            </div>
-          </div>
-
-          {/* Customer Details */}
-          <div className="mb-6">
-            <h2 className="text-[18px] font-bold uppercase mb-2 border-b pb-1" style={{ borderColor: '#d1d5db' }}>Customer Details</h2>
-            <div className="space-y-1">
-                <p><strong>Name:</strong> {order.customerName}</p>
-                <p><strong>Phone:</strong> {order.mobileNumber}</p>
-                <p><strong>Address:</strong> {order.fullAddress}</p>
-            </div>
-          </div>
-
-          {/* Invoice Details */}
-          <div className="mb-6">
-            <h2 className="text-[18px] font-bold uppercase mb-2 border-b pb-1" style={{ borderColor: '#d1d5db' }}>Order Details</h2>
-            <div className="space-y-1">
-              <p><strong>Invoice ID:</strong> {order.orderId && order.orderId.startsWith('TMB-') ? order.orderId : `${settings.invoicePrefix || 'INV-'}${order.orderId}`}</p>
-              <p><strong>Date:</strong> {new Date(order.date).toLocaleDateString()}</p>
-              <p><strong>Payment Method:</strong> {order.paymentMethod}</p>
-              <p><strong>Status:</strong> Confirmed</p>
-            </div>
-          </div>
-
-          {/* Product List */}
-          <div className="w-full mb-6">
-            <h2 className="text-[16px] font-bold uppercase mb-3 border-b pb-1" style={{ borderColor: '#d1d5db' }}>Products</h2>
-            {order.items.map((p: any, i: number) => (
-              <div key={i} className="w-full border rounded-md p-2 mb-2 box-border text-[13px]" style={{ borderColor: '#d1d5db' }}>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Product</span>
-                  <span className="text-right ml-2">{p.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Quantity</span>
-                  <span className="text-right">{p.quantity}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Price</span>
-                  <span className="text-right">{currency}{p.price}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-semibold">Total</span>
-                  <span className="font-bold text-right">{currency}{p.quantity * p.price}</span>
+                <div className="flex flex-wrap gap-6 text-[11px] font-bold text-neutral-400 uppercase tracking-widest pt-2">
+                  <div className="flex items-center gap-2"><Phone className="w-3 h-3" /> {settings.contactNumber || "8801314541738"}</div>
+                  <div className="flex items-center gap-2"><Mail className="w-3 h-3" /> {settings.storeEmail || "support@tazumart.com"}</div>
+                  <div className="flex items-center gap-2"><Globe className="w-3 h-3" /> www.tazumartbd.com</div>
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Summary */}
-          <div className="w-full mb-10">
-            <div className="flex justify-between py-1"><span>Subtotal</span><span>{currency}{subtotal}</span></div>
-            {order.discount?.amount > 0 && (
-              <div className="flex justify-between py-1" style={{ color: '#059669' }}>
-                <span>Coupon Discount</span>
-                <span>-{currency}{order.discount.amount}</span>
+              <div className="text-right">
+                <h2 className="text-5xl font-black uppercase tracking-tighter opacity-20 mb-2">INVOICE</h2>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em]">Issued On</p>
+                  <p className="text-lg font-black">{new Date(order.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                </div>
               </div>
-            )}
-            <div className="flex justify-between py-1"><span>Delivery Fee</span><span>{currency}{deliveryCharge}</span></div>
-            <div className="flex justify-between py-2 border-t mt-2" style={{ borderColor: '#d1d5db' }}>
-              <span className="font-black uppercase text-[16px]">Grand Total</span>
-              <span className="grand-total font-black text-[20px]">{currency}{grandTotal}</span>
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="mt-16 text-center border-t pt-5" style={{ borderColor: '#d1d5db' }}>
-            <p className="font-bold">{settings.invoiceFooterText}</p>
-            <p className="mt-1 text-[12px]">{settings.returnPolicy}</p>
+          <div className="p-10 md:p-14">
+            {/* Info Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.3em] mb-4">Billed To</h3>
+                  <div className="space-y-1">
+                    <p className="text-xl font-black text-neutral-900">{order.customerName}</p>
+                    <p className="text-sm font-bold text-neutral-600">{order.mobileNumber}</p>
+                    <p className="text-sm font-medium text-neutral-500 leading-relaxed max-w-xs">{order.fullAddress}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-6 md:text-right">
+                <div className="grid grid-cols-2 gap-8 md:flex md:flex-col md:gap-6">
+                  <div>
+                    <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.3em] mb-1">Invoice Number</h3>
+                    <p className="text-base font-black text-neutral-900">#INV-{order.orderId.split('-').pop()}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.3em] mb-1">Reference</h3>
+                    <p className="text-base font-black text-neutral-900">#{order.orderId}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Product Table */}
+            <div className="mb-16">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b-2 border-neutral-900">
+                    <th className="pb-4 text-[10px] font-black text-neutral-400 uppercase tracking-widest">Item Description</th>
+                    <th className="pb-4 text-[10px] font-black text-neutral-400 uppercase tracking-widest text-center">Qty</th>
+                    <th className="pb-4 text-[10px] font-black text-neutral-400 uppercase tracking-widest text-right">Unit Price</th>
+                    <th className="pb-4 text-[10px] font-black text-neutral-400 uppercase tracking-widest text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {order.items.map((item: any, idx: number) => (
+                    <tr key={idx} className="group">
+                      <td className="py-6">
+                        <p className="text-base font-black text-neutral-900 mb-1">{item.name}</p>
+                        <p className="text-xs font-bold text-neutral-400 uppercase">Product SKU: #{idx + 100}</p>
+                      </td>
+                      <td className="py-6 text-center text-base font-bold text-neutral-900">{item.quantity}</td>
+                      <td className="py-6 text-right text-base font-bold text-neutral-900">{currency}{item.price.toLocaleString()}</td>
+                      <td className="py-6 text-right text-base font-black text-neutral-900">{currency}{(item.price * item.quantity).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Totals Section */}
+            <div className="flex flex-col md:flex-row justify-between items-start gap-12 pt-8 border-t border-neutral-900">
+              <div className="flex-1 space-y-8">
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.3em]">Payment Method</h3>
+                    <div className="inline-flex items-center gap-2 bg-neutral-100 px-3 py-1.5 rounded-lg">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                      <span className="text-[10px] font-black text-neutral-900 uppercase">{order.paymentMethod}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.3em]">Payment Status</h3>
+                    <div className="inline-flex items-center gap-2 bg-orange-50 px-3 py-1.5 rounded-lg">
+                      <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                      <span className="text-[10px] font-black text-orange-700 uppercase">Pending</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6 opacity-30 pt-4">
+                  <QrCode className="w-16 h-16" strokeWidth={1} />
+                  <Barcode className="w-24 h-16" strokeWidth={1} />
+                </div>
+              </div>
+
+              <div className="w-full md:w-72 space-y-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-bold text-neutral-400 uppercase tracking-widest">Subtotal</span>
+                  <span className="font-bold text-neutral-900">{currency}{subtotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-bold text-neutral-400 uppercase tracking-widest">Shipping</span>
+                  <span className="font-bold text-neutral-900">{currency}{deliveryCharge.toLocaleString()}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-bold text-emerald-500 uppercase tracking-widest">Discount</span>
+                    <span className="font-bold text-emerald-500">-{currency}{discountAmount.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="pt-4 border-t-2 border-neutral-900">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-black text-neutral-950 uppercase tracking-widest">Grand Total</span>
+                    <span className="text-3xl font-black text-neutral-950">{currency}{grandTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Signatures & Footer */}
+            <div className="mt-24 pt-12 border-t border-neutral-100">
+              <div className="grid grid-cols-2 gap-12 mb-16">
+                <div className="space-y-4">
+                  <div className="h-16 w-40 border-b border-neutral-300 relative flex items-end justify-center pb-2">
+                    <p className="text-[10px] font-serif italic text-neutral-400">Digital Signature</p>
+                  </div>
+                  <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Customer Signature</p>
+                </div>
+                <div className="space-y-4 text-right flex flex-col items-end">
+                  <div className="h-16 w-40 border-b border-neutral-300 relative flex items-end justify-center pb-2">
+                    <p className="text-[10px] font-serif italic text-neutral-900 opacity-50">Tazu Mart Admin</p>
+                  </div>
+                  <p className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Authorized Signature</p>
+                </div>
+              </div>
+              
+              <div className="text-center space-y-4">
+                <div className="flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  <p className="text-xs font-black text-neutral-900 uppercase tracking-[0.2em]">Thank You For Shopping ❤️</p>
+                </div>
+                <p className="text-[10px] text-neutral-400 font-medium leading-relaxed max-w-sm mx-auto">
+                  {settings.invoiceFooterText || "This is a computer generated document. No signature is required for digital verification."}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Bottom Actions Row - Hidden on print */}
+        <div className="flex flex-wrap items-center justify-center gap-4 no-print bg-neutral-950 p-6 rounded-[32px] shadow-2xl">
+          <button
+            onClick={downloadInvoice}
+            className="flex-1 h-14 bg-white hover:bg-neutral-100 text-neutral-950 rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3"
+          >
+            <Download className="w-4 h-4" />
+            Download PDF
+          </button>
+          <button
+            onClick={shareViaWhatsApp}
+            className="flex-1 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase text-[11px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/20"
+          >
+            <Share2 className="w-4 h-4" />
+            Share WhatsApp
+          </button>
+        </div>
+
       </div>
 
       <style>{`
         @media print {
           .no-print { display: none !important; }
+          body { background-color: white !important; margin: 0 !important; padding: 0 !important; }
+          .min-h-screen { min-height: 0 !important; padding: 0 !important; }
+          #invoice { border: none !important; shadow: none !important; border-radius: 0 !important; }
         }
       `}</style>
     </div>

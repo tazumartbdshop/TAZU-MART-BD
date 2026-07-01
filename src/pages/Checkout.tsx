@@ -608,11 +608,11 @@ export default function Checkout() {
         mobileNumber: formData.phone,
         fullAddress: `${formData.address}${formData.landmark ? `, Landmark: ${formData.landmark}` : ''}`,
         cityArea: formData.division || 'Dhaka',
-        deliveryMode: 'Standard Delivery',
+        deliveryMode: 'Standard Delivery' as 'Standard Delivery',
         paymentMethod: paymentM,
-        status: 'Confirmed' as any, // Default value = 'Confirmed'
+        status: 'Confirmed' as 'Confirmed',
         paymentStatus: paymentS,
-        type: 'Online' as any,
+        type: 'Online' as 'Online',
         items: items.map(item => ({
           productId: item.id,
           name: item.name,
@@ -623,10 +623,10 @@ export default function Checkout() {
         })),
         subtotal: subtotal,
         discount: activePromo ? { 
-          type: activePromo.type === 'Percentage' ? 'percent' : 'fixed', 
+          type: (activePromo.type === 'Percentage' ? 'percent' : 'fixed') as 'percent' | 'fixed', 
           value: activePromo.value, 
           amount: discount
-        } : { type: 'fixed', value: 0, amount: 0 },
+        } : { type: 'fixed' as const, value: 0, amount: 0 },
         tax: { percent: 5, amount: vat },
         deliveryCharge: finalShipping,
         paidAmount: paymentMethod === 'cod' ? 0 : total,

@@ -6,15 +6,8 @@ import { InvoiceView } from '../components/checkout/InvoiceView';
 export default function OrderInvoice() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const { orders, subscribeOrders } = useOrderStore();
+  const { orders } = useOrderStore();
   const order = orders.find(o => o.orderId === orderId);
-
-  useEffect(() => {
-    const unsubscribe = subscribeOrders();
-    return () => {
-      unsubscribe();
-    };
-  }, [subscribeOrders]);
 
   if (!order) {
     return (
