@@ -25,6 +25,7 @@ export default function AdminIncompleteOrders() {
   const { leads, loading, fetchLeads, deleteLead, markAsRead } = useLeadStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showDbGuide, setShowDbGuide] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLeads();
@@ -38,6 +39,20 @@ export default function AdminIncompleteOrders() {
       setExpandedId(id);
     } else {
       setExpandedId(null);
+    }
+  };
+
+  const handleDeleteLead = async (id: string) => {
+    if (window.confirm('Are you sure you want to permanently delete this lead record from the database?')) {
+      try {
+        setIsDeleting(id);
+        await deleteLead(id);
+        toast.success('Record removed from database');
+      } catch (error) {
+        toast.error('Failed to delete record');
+      } finally {
+        setIsDeleting(null);
+      }
     }
   };
 
@@ -340,15 +355,17 @@ CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (window.confirm('Are you sure you want to delete this record?')) {
-                                deleteLead(lead.id);
-                                toast.success('Record removed');
-                              }
+                              handleDeleteLead(lead.id);
                             }}
-                            className="bg-white border border-red-200 text-red-600 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-50 transition-all"
+                            disabled={isDeleting === lead.id}
+                            className="bg-white border border-red-200 text-red-600 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-50 transition-all disabled:opacity-50"
                           >
-                            <Trash2 className="w-4 h-4" />
-                            Delete
+                            {isDeleting === lead.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                            {isDeleting === lead.id ? 'Removing...' : 'Delete'}
                           </button>
                         </div>
                       </div>

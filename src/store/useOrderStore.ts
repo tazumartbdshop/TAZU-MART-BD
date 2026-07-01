@@ -79,7 +79,7 @@ interface OrderState {
   updateOrder: (id: string, updates: Partial<Order>) => void;
   updateOrderStatus: (id: string, status: Order['status']) => void;
   updatePaymentStatus: (id: string, paymentStatus: Order['paymentStatus']) => void;
-  deleteOrder: (id: string) => void;
+  deleteOrder: (id: string) => Promise<void>;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearDemoData: () => void;
