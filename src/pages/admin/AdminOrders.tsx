@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { Search, Plus, Trash2, MessageSquare } from 'lucide-react';
+import { Search, Plus, Trash2, MessageSquare, Loader2 } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { useOrderStore } from '../../store/useOrderStore';
 import AdminOrdersCardView from './AdminOrdersCardView';
@@ -8,7 +8,7 @@ import PremiumOrderAdd from './PremiumOrderAdd';
 import AdminFakeOrderControl from './AdminFakeOrderControl';
 import { InvoiceView } from '../../components/checkout/InvoiceView';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
-
+import { toast } from 'react-hot-toast';
 
 function AdminOrderList() {
   const { orders, updateOrderStatus, markAsRead, deleteOrder } = useOrderStore();
@@ -18,6 +18,7 @@ function AdminOrderList() {
   const [viewType, setViewType] = useState('All'); // 'All' | 'Online' | 'Offline'
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const filteredOrders = orders.filter(order => {
     const matchesTab = activeTab === 'All' || order.status === activeTab;
@@ -52,9 +53,17 @@ function AdminOrderList() {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const handleDeleteOrder = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this order?')) {
-      deleteOrder(id);
+  const handleDeleteOrder = async (id: string) => {
+    if (window.confirm('Are you sure you want to permanently delete this order and all its items from the database?')) {
+      try {
+        setIsDeleting(id);
+        await deleteOrder(id);
+        toast.success('Order deleted successfully from database');
+      } catch (error) {
+        toast.error('Failed to delete order');
+      } finally {
+        setIsDeleting(null);
+      }
     }
   };
 
@@ -350,10 +359,15 @@ function AdminOrderList() {
                         e.stopPropagation();
                         handleDeleteOrder(order.id);
                       }}
-                      className="border border-red-200 text-red-600 hover:bg-red-50/50 py-2.5 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all"
+                      disabled={isDeleting === order.id}
+                      className="border border-red-200 text-red-600 hover:bg-red-50/50 py-2.5 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                     >
-                      <Trash2 className="w-4 h-4" />
-                      Delete Order
+                      {isDeleting === order.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                      {isDeleting === order.id ? 'Deleting...' : 'Delete Order'}
                     </button>
                   </div>
                 </div>

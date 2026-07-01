@@ -171,6 +171,20 @@ CREATE TABLE IF NOT EXISTS public.order_items (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.leads (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  phone TEXT,
+  email TEXT,
+  address TEXT,
+  items JSONB DEFAULT '[]'::jsonb,
+  total NUMERIC DEFAULT 0,
+  last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  status TEXT DEFAULT 'Abandoned',
+  is_read BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS public.settings (
   id TEXT PRIMARY KEY,
   value TEXT
@@ -422,6 +436,11 @@ BEGIN
     ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Order items access" ON public.order_items;
     CREATE POLICY "Order items access" ON public.order_items FOR ALL TO public USING (true) WITH CHECK (true);
+
+    -- Leads Policies
+    ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Leads access" ON public.leads;
+    CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH CHECK (true);
 
     -- Settings Policies
     ALTER TABLE public.settings ENABLE ROW LEVEL SECURITY;

@@ -599,9 +599,15 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       orders: state.orders.map(o => o.id === id ? merged : o)
     }));
   },
-  deleteOrder: (id) => {
+  deleteOrder: async (id) => {
     const supabase = getSupabase();
-    if (supabase) supabase.from('orders').delete().eq('id', id).then(({error}) => error && console.warn(error));
+    if (supabase) {
+      // Delete from order_items first
+      await supabase.from('order_items').delete().eq('order_id', id);
+      // Then delete from orders
+      const { error } = await supabase.from('orders').delete().eq('id', id);
+      if (error) console.warn("[Supabase Sync Error] orders delete:", error);
+    }
 
     set((state) => ({
       orders: state.orders.filter(o => o.id !== id)

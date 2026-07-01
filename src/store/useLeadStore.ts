@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { getSupabase } from '../lib/supabase';
 
 export interface Lead {
   id: string;
@@ -9,60 +9,124 @@ export interface Lead {
   address?: string;
   items?: any[];
   total?: number;
-  lastUpdated: string;
+  last_updated: string;
   status: 'Abandoned';
-  isRead?: boolean;
+  is_read?: boolean;
+  created_at?: string;
 }
 
 interface LeadState {
   leads: Lead[];
-  addOrUpdateLead: (data: Partial<Lead> & { id: string }) => void;
-  deleteLead: (id: string) => void;
-  clearLeads: () => void;
-  markAsRead: (id: string) => void;
-  markAllAsRead: () => void;
+  loading: boolean;
+  fetchLeads: () => Promise<void>;
+  addOrUpdateLead: (data: Partial<Lead> & { id: string }) => Promise<void>;
+  deleteLead: (id: string) => Promise<void>;
+  clearLeads: () => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
 }
 
-export const useLeadStore = create<LeadState>()(
-  persist(
-    (set) => ({
-      leads: [],
-      addOrUpdateLead: (data) => set((state) => {
-        const existingIndex = state.leads.findIndex(l => l.id === data.id);
-        const updatedLeads = [...state.leads];
-        const now = new Date().toISOString();
+export const useLeadStore = create<LeadState>()((set, get) => ({
+  leads: [],
+  loading: false,
 
-        if (existingIndex !== -1) {
-          updatedLeads[existingIndex] = {
-            ...updatedLeads[existingIndex],
-            ...data,
-            lastUpdated: now,
-            isRead: false
-          };
-        } else {
-          updatedLeads.unshift({
-            status: 'Abandoned',
-            lastUpdated: now,
-            isRead: false,
-            ...data
-          } as Lead);
-        }
+  fetchLeads: async () => {
+    const supabase = getSupabase();
+    if (!supabase) return;
 
-        return { leads: updatedLeads };
-      }),
-      deleteLead: (id) => set((state) => ({
-        leads: state.leads.filter(l => l.id !== id)
-      })),
-      clearLeads: () => set({ leads: [] }),
-      markAsRead: (id) => set((state) => ({
-        leads: state.leads.map(l => l.id === id ? { ...l, isRead: true } : l)
-      })),
-      markAllAsRead: () => set((state) => ({
-        leads: state.leads.map(l => ({ ...l, isRead: true }))
-      })),
-    }),
-    {
-      name: 'lead-storage',
+    set({ loading: true });
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*')
+      .order('last_updated', { ascending: false });
+
+    if (!error && data) {
+      set({ leads: data, loading: false });
+    } else {
+      set({ loading: false });
     }
-  )
-);
+  },
+
+  addOrUpdateLead: async (data) => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const now = new Date().toISOString();
+    const leadData = {
+      ...data,
+      last_updated: now,
+      status: 'Abandoned',
+      is_read: false
+    };
+
+    const { error } = await supabase
+      .from('leads')
+      .upsert(leadData, { onConflict: 'id' });
+
+    if (!error) {
+      await get().fetchLeads();
+    }
+  },
+
+  deleteLead: async (id) => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const { error } = await supabase
+      .from('leads')
+      .delete()
+      .eq('id', id);
+
+    if (!error) {
+      set((state) => ({
+        leads: state.leads.filter(l => l.id !== id)
+      }));
+    }
+  },
+
+  clearLeads: async () => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const { error } = await supabase
+      .from('leads')
+      .delete()
+      .neq('id', '');
+
+    if (!error) {
+      set({ leads: [] });
+    }
+  },
+
+  markAsRead: async (id) => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const { error } = await supabase
+      .from('leads')
+      .update({ is_read: true })
+      .eq('id', id);
+
+    if (!error) {
+      set((state) => ({
+        leads: state.leads.map(l => l.id === id ? { ...l, is_read: true } : l)
+      }));
+    }
+  },
+
+  markAllAsRead: async () => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const { error } = await supabase
+      .from('leads')
+      .update({ is_read: true })
+      .neq('id', '');
+
+    if (!error) {
+      set((state) => ({
+        leads: state.leads.map(l => ({ ...l, is_read: true }))
+      }));
+    }
+  },
+}));
