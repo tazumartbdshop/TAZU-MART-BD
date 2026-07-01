@@ -7,7 +7,6 @@ import {
   Plus, 
   Monitor, 
   Smartphone, 
-  Facebook, 
   Store, 
   Code,
   ArrowRight,
@@ -19,10 +18,14 @@ import {
   Palette,
   Link as LinkIcon,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Upload,
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSiteManagementStore } from '../../store/useSiteManagementStore';
+import { uploadImage } from '../../lib/imageUtils';
 import { cn } from '../../lib/utils';
 
 export default function AdminSiteManagement() {
@@ -56,6 +59,40 @@ export default function AdminSiteManagement() {
 
   const handleInputChange = (field: string, value: any) => {
     setLocalData((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddCustomLink = () => {
+    const currentCustomLinks = localData.custom_links || [];
+    if (currentCustomLinks.length >= 2) return;
+
+    const newLink = {
+      id: `custom-${Date.now()}`,
+      name: 'New Button',
+      url: '',
+      status: true,
+      logo: ''
+    };
+
+    setLocalData((prev: any) => ({
+      ...prev,
+      custom_links: [...currentCustomLinks, newLink]
+    }));
+  };
+
+  const handleRemoveCustomLink = (id: string) => {
+    setLocalData((prev: any) => ({
+      ...prev,
+      custom_links: prev.custom_links.filter((l: any) => l.id !== id)
+    }));
+  };
+
+  const handleUpdateCustomLink = (id: string, updates: any) => {
+    setLocalData((prev: any) => ({
+      ...prev,
+      custom_links: prev.custom_links.map((l: any) => 
+        l.id === id ? { ...l, ...updates } : l
+      )
+    }));
   };
 
   if (!localData && isLoading) {
@@ -92,7 +129,7 @@ export default function AdminSiteManagement() {
           
           {/* Button 1: Developer */}
           <SectionCard title="Button 1: Developer Website" icon={Code}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
                 <StatusToggle 
                   label="Enable Button" 
@@ -100,37 +137,36 @@ export default function AdminSiteManagement() {
                   onChange={(v) => handleInputChange('developer_status', v)} 
                 />
               </div>
-              <InputField 
-                label="Button Label" 
-                value={localData.developer_button_name} 
-                onChange={(v) => handleInputChange('developer_button_name', v)}
-                icon={Type}
-              />
-              <InputField 
-                label="Website URL" 
-                value={localData.developer_link} 
-                onChange={(v) => handleInputChange('developer_link', v)}
-                icon={LinkIcon}
-                placeholder="https://developer-site.com"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-zinc-100">
-              <StatusToggle 
-                label="Open In New Tab" 
-                isEnabled={localData.developer_new_tab} 
-                onChange={(v) => handleInputChange('developer_new_tab', v)} 
-              />
-              <StatusToggle 
-                label="Internal WebView" 
-                isEnabled={localData.developer_webview} 
-                onChange={(v) => handleInputChange('developer_webview', v)} 
-              />
+              
+              <div className="md:col-span-1">
+                 <ImageUpload 
+                   label="Logo / Icon"
+                   value={localData.developer_logo}
+                   onChange={(v) => handleInputChange('developer_logo', v)}
+                 />
+              </div>
+
+              <div className="md:col-span-1 space-y-4">
+                <InputField 
+                  label="Button Name" 
+                  value={localData.developer_button_name} 
+                  onChange={(v) => handleInputChange('developer_button_name', v)}
+                  icon={Type}
+                />
+                <InputField 
+                  label="Website URL" 
+                  value={localData.developer_link} 
+                  onChange={(v) => handleInputChange('developer_link', v)}
+                  icon={LinkIcon}
+                  placeholder="https://developer-site.com"
+                />
+              </div>
             </div>
           </SectionCard>
 
           {/* Button 2: Fashion Site */}
           <SectionCard title="Button 2: Fashion Site" icon={Store}>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
                 <StatusToggle 
                   label="Enable Button" 
@@ -138,112 +174,90 @@ export default function AdminSiteManagement() {
                   onChange={(v) => handleInputChange('fashion_status', v)} 
                 />
               </div>
-              <InputField 
-                label="Button Label" 
-                value={localData.fashion_button_name} 
-                onChange={(v) => handleInputChange('fashion_button_name', v)}
-                icon={Type}
-              />
-              <InputField 
-                label="Website URL" 
-                value={localData.fashion_link} 
-                onChange={(v) => handleInputChange('fashion_link', v)}
-                icon={LinkIcon}
-                placeholder="https://fashion-site.com"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-zinc-100">
-              <StatusToggle 
-                label="Open In New Tab" 
-                isEnabled={localData.fashion_new_tab} 
-                onChange={(v) => handleInputChange('fashion_new_tab', v)} 
-              />
-              <StatusToggle 
-                label="Internal WebView" 
-                isEnabled={localData.fashion_webview} 
-                onChange={(v) => handleInputChange('fashion_webview', v)} 
-              />
+
+              <div className="md:col-span-1">
+                 <ImageUpload 
+                   label="Logo / Icon"
+                   value={localData.fashion_logo}
+                   onChange={(v) => handleInputChange('fashion_logo', v)}
+                 />
+              </div>
+
+              <div className="md:col-span-1 space-y-4">
+                <InputField 
+                  label="Button Name" 
+                  value={localData.fashion_button_name} 
+                  onChange={(v) => handleInputChange('fashion_button_name', v)}
+                  icon={Type}
+                />
+                <InputField 
+                  label="Website URL" 
+                  value={localData.fashion_link} 
+                  onChange={(v) => handleInputChange('fashion_link', v)}
+                  icon={LinkIcon}
+                  placeholder="https://fashion-site.com"
+                />
+              </div>
             </div>
           </SectionCard>
 
-          {/* Button 3: Facebook */}
-          <SectionCard title="Facebook Updates Feed" icon={Facebook}>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <StatusToggle 
-                  label="Enable Live Feed Page" 
-                  isEnabled={localData.facebook_status} 
-                  onChange={(v) => handleInputChange('facebook_status', v)} 
-                />
-              </div>
-              
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InputField 
-                    label="Feed Title" 
-                    value={localData.facebook_feed_title || 'Facebook Updates'} 
-                    onChange={(v) => handleInputChange('facebook_feed_title', v)}
+          {/* Custom Buttons */}
+          {(localData.custom_links || []).map((link: any, index: number) => (
+            <SectionCard 
+              key={link.id} 
+              title={`Custom Button ${index + 1}`} 
+              icon={Plus}
+              onRemove={() => handleRemoveCustomLink(link.id)}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <StatusToggle 
+                    label="Enable Button" 
+                    isEnabled={link.status} 
+                    onChange={(v) => handleUpdateCustomLink(link.id, { status: v })} 
+                  />
+                </div>
+
+                <div className="md:col-span-1">
+                   <ImageUpload 
+                     label="Logo / Icon"
+                     value={link.logo}
+                     onChange={(v) => handleUpdateCustomLink(link.id, { logo: v })}
+                   />
+                </div>
+
+                <div className="md:col-span-1 space-y-4">
+                  <InputField 
+                    label="Button Name" 
+                    value={link.name} 
+                    onChange={(v) => handleUpdateCustomLink(link.id, { name: v })}
                     icon={Type}
-                />
-                <InputField 
-                    label="Facebook Feed Source URL" 
-                    value={localData.facebook_link} 
-                    onChange={(v) => handleInputChange('facebook_link', v)}
+                  />
+                  <InputField 
+                    label="Website URL" 
+                    value={link.url} 
+                    onChange={(v) => handleUpdateCustomLink(link.id, { url: v })}
                     icon={LinkIcon}
-                    placeholder="https://facebook.com/your-page"
-                />
-              </div>
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-zinc-100 text-left">
-                <StatusToggle 
-                  label="Open In New Tab" 
-                  isEnabled={localData.facebook_new_tab} 
-                  onChange={(v) => handleInputChange('facebook_new_tab', v)} 
-                />
-                <StatusToggle 
-                  label="Internal WebView" 
-                  isEnabled={localData.facebook_webview} 
-                  onChange={(v) => handleInputChange('facebook_webview', v)} 
-                />
-              </div>
-
-              <div className="md:col-span-2 mt-4 space-y-4 border-t border-zinc-100 pt-6">
-                <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-800">Page Profile Settings</h4>
-                <p className="text-xs text-zinc-500 mb-2">Display settings for the official page viewer.</p>
-                <StatusToggle 
-                  label="Show Header Information" 
-                  isEnabled={localData.facebook_show_header ?? true} 
-                  onChange={(v) => handleInputChange('facebook_show_header', v)} 
-                />
-                <StatusToggle 
-                  label="Show Cover Banner" 
-                  isEnabled={localData.facebook_show_cover ?? true} 
-                  onChange={(v) => handleInputChange('facebook_show_cover', v)} 
-                />
-              </div>
-
-              <div className="md:col-span-2 mt-4 space-y-4 border-t border-zinc-100 pt-6">
-                <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-800">Feed Engine Settings</h4>
-                
-                <StatusToggle 
-                  label="Auto Refresh Feed" 
-                  isEnabled={localData.facebook_auto_refresh ?? true} 
-                  onChange={(v) => handleInputChange('facebook_auto_refresh', v)} 
-                />
-                
-                <div className="w-full">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-2">Posts Per Load</label>
-                  <select 
-                    value={localData.facebook_posts_per_load ?? 10} 
-                    onChange={(e) => handleInputChange('facebook_posts_per_load', Number(e.target.value))}
-                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 text-sm focus:outline-none focus:border-black focus:bg-white transition-all rounded-none font-bold"
-                  >
-                    {[10, 20, 30].map(num => (
-                       <option key={num} value={num}>{num} / Scroll</option>
-                    ))}
-                  </select>
+                    placeholder="https://your-site.com"
+                  />
                 </div>
               </div>
-            </div>
-          </SectionCard>
+            </SectionCard>
+          ))}
+
+          {/* Create New Button */}
+          {(localData.custom_links || []).length < 2 && (
+            <button 
+              onClick={handleAddCustomLink}
+              className="w-full py-6 border-2 border-dashed border-zinc-200 hover:border-black hover:bg-zinc-50 transition-all flex flex-col items-center gap-2 group"
+            >
+              <div className="p-3 bg-zinc-100 rounded-full group-hover:bg-black group-hover:text-white transition-all">
+                <Plus className="w-6 h-6" />
+              </div>
+              <span className="text-xs font-black uppercase tracking-widest text-zinc-500 group-hover:text-black">Create New Button</span>
+              <span className="text-[10px] text-zinc-400 font-medium">({2 - (localData.custom_links?.length || 0)} slots remaining)</span>
+            </button>
+          )}
 
           {/* Link Pages Management */}
           <div className="bg-white border border-zinc-200 p-6 shadow-sm">
@@ -282,22 +296,25 @@ export default function AdminSiteManagement() {
                   {localData.developer_status && (
                     <PreviewButton 
                       name={localData.developer_button_name}
+                      logo={localData.developer_logo}
                       icon={Code}
                     />
                   )}
                   {localData.fashion_status && (
                     <PreviewButton 
                       name={localData.fashion_button_name}
+                      logo={localData.fashion_logo}
                       icon={Store}
                     />
                   )}
-                  {localData.facebook_status && (
+                  {(localData.custom_links || []).filter((l: any) => l.status).map((link: any) => (
                     <PreviewButton 
-                      name={localData.facebook_button_name}
-                      isBlue={true}
-                      icon={Facebook}
+                      key={link.id}
+                      name={link.name}
+                      logo={link.logo}
+                      icon={Plus}
                     />
-                  )}
+                  ))}
                 </div>
              </div>
 
@@ -339,17 +356,91 @@ export default function AdminSiteManagement() {
   );
 }
 
-function SectionCard({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) {
+function SectionCard({ title, icon: Icon, children, onRemove }: { title: string, icon: any, children: React.ReactNode, onRemove?: () => void, key?: any }) {
   return (
     <div className="bg-white border border-zinc-200 shadow-sm overflow-hidden group">
-      <div className="px-6 py-4 border-b border-zinc-100 flex items-center gap-3 bg-zinc-50/50">
-        <div className="p-2 bg-black rounded-none transition-colors">
-          <Icon className="w-4 h-4 text-white" />
+      <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50/50">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-black rounded-none transition-colors">
+            <Icon className="w-4 h-4 text-white" />
+          </div>
+          <h3 className="font-black text-black uppercase tracking-wider text-xs">{title}</h3>
         </div>
-        <h3 className="font-black text-black uppercase tracking-wider text-xs">{title}</h3>
+        {onRemove && (
+          <button 
+            onClick={onRemove}
+            className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
       <div className="p-6">
         {children}
+      </div>
+    </div>
+  );
+}
+
+function ImageUpload({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      const url = await uploadImage(file, 'site-links');
+      onChange(url);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+        <ImageIcon className="w-3 h-3" /> {label}
+      </label>
+      <div className="relative group">
+        <div className="aspect-square w-full max-w-[120px] border-2 border-dashed border-zinc-200 flex flex-col items-center justify-center gap-2 overflow-hidden bg-zinc-50 relative">
+          {value ? (
+            <>
+              <img src={value} alt="Preview" className="w-full h-full object-contain p-2" />
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onChange('');
+                }}
+                className="absolute top-1 right-1 p-1 bg-black text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </>
+          ) : (
+            <>
+              {uploading ? (
+                <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
+              ) : (
+                <>
+                  <Upload className="w-6 h-6 text-zinc-300" />
+                  <span className="text-[8px] font-black uppercase text-zinc-400">Upload</span>
+                </>
+              )}
+            </>
+          )}
+          <input 
+            type="file" 
+            accept="image/*"
+            onChange={handleFileChange}
+            disabled={uploading}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+          />
+        </div>
       </div>
     </div>
   );
@@ -368,31 +459,6 @@ function InputField({ label, value, onChange, icon: Icon, placeholder = '' }: { 
         placeholder={placeholder}
         className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 text-sm focus:outline-none focus:border-black focus:bg-white transition-all rounded-none font-bold"
       />
-    </div>
-  );
-}
-
-function ColorInput({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-        <Palette className="w-3 h-3" /> {label}
-      </label>
-      <div className="flex items-center gap-3">
-         <div className="flex-1">
-           <input 
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 text-sm focus:outline-none focus:border-black focus:bg-white transition-all rounded-none font-bold"
-           />
-         </div>
-         <div 
-          className="w-12 h-12 border border-zinc-200 rounded-none shrink-0 shadow-sm"
-          style={{ background: value }}
-         />
-      </div>
-      <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-tighter mt-1 italic">Supports HEX codes or CSS Linear Gradients (e.g. linear-gradient(135deg, #000 0%, #333 100%))</p>
     </div>
   );
 }
@@ -422,14 +488,18 @@ function StatusToggle({ label, isEnabled, onChange }: { label: string, isEnabled
   );
 }
 
-function PreviewButton({ name, icon: Icon, isBlue }: { name: string, isBlue?: boolean, icon: any }) {
+function PreviewButton({ name, logo, icon: Icon }: { name: string, logo?: string, icon: any, key?: any }) {
   return (
     <div 
       className="w-full h-14 bg-white border border-gray-200 rounded-[14px] flex items-center justify-between px-4 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
     >
       <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 ${isBlue ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-600'}`}>
-           <Icon className="w-4 h-4" />
+        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 bg-gray-50 text-gray-600 overflow-hidden p-1">
+           {logo ? (
+             <img src={logo} alt={name} className="w-full h-full object-contain" />
+           ) : (
+             <Icon className="w-4 h-4" />
+           )}
         </div>
         <span className="font-bold text-[13px] text-gray-800 tracking-tight">{name}</span>
       </div>

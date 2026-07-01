@@ -33,12 +33,15 @@ function cn(...classes: any[]) {
   return classes.filter(Boolean).join(' ');
 }
 
+import AdminCustomerProfile from './AdminCustomerProfile';
+
 export default function AdminCustomers() {
   return (
     <Routes>
       <Route path="/" element={<AdminCustomerList />} />
       <Route path="/add" element={<AdminCustomerAdd />} />
       <Route path="/edit/:id" element={<AdminCustomerAdd />} />
+      <Route path="/profile/:id" element={<AdminCustomerProfile />} />
     </Routes>
   );
 }
@@ -55,21 +58,15 @@ function AdminCustomerList() {
   // Search and filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
   // Auto-open profile from query param
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const profileId = params.get('profile');
     if (profileId) {
-      setSelectedCustomerId(profileId);
+      navigate(`/admin/customers/profile/${profileId}`);
     }
-  }, [location.search]);
-
-  const selectedCustomer = useMemo(() => 
-    customers.find(c => c.id === selectedCustomerId), 
-    [customers, selectedCustomerId]
-  );
+  }, [location.search, navigate]);
 
   const handleDeleteCustomer = (customerId: string) => {
     if (window.confirm('IRREVERSIBLE: Delete this customer profile permanently? This will instantly terminate their current session.')) {
@@ -275,7 +272,7 @@ function AdminCustomerList() {
               return (
                 <div 
                   key={customer.id}
-                  onClick={() => setSelectedCustomerId(customer.id)}
+                  onClick={() => navigate(`/admin/customers/profile/${customer.id}`)}
                   className={cn(
                     "bg-white rounded-lg border transition-all duration-300 flex flex-col group cursor-pointer overflow-hidden",
                     isMatch ? "border-black shadow-lg ring-1 ring-black/5 z-10" : "border-zinc-100 shadow-sm hover:shadow-md"
@@ -336,7 +333,7 @@ function AdminCustomerList() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedCustomerId(customer.id);
+                        navigate(`/admin/customers/profile/${customer.id}`);
                       }}
                       className="w-full h-8 bg-zinc-50 hover:bg-zinc-100 text-zinc-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-zinc-200 transition-all flex items-center justify-center gap-2"
                     >
@@ -346,181 +343,6 @@ function AdminCustomerList() {
                 </div>
               );
             })}
-          </div>
-        )}
-
-        {/* Customer Detail Expansion Modal */}
-        {selectedCustomer && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div 
-              className="bg-white w-full max-w-2xl rounded-lg overflow-hidden shadow-2xl animate-scale-in"
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="bg-zinc-900 px-6 py-4 flex justify-between items-center text-white">
-                <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                      <Sparkles className="w-5 h-5 text-purple-400" />
-                   </div>
-                   <div>
-                     <h3 className="text-sm font-black uppercase tracking-wider">Customer Profile Overview</h3>
-                     <p className="text-[9px] text-zinc-400 uppercase tracking-widest font-black">Sync ID: {selectedCustomer.id}</p>
-                   </div>
-                </div>
-                <button 
-                  onClick={() => setSelectedCustomerId(null)}
-                  className="w-8 h-8 flex items-center justify-center hover:bg-zinc-800 rounded-full transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Modal Content */}
-              <div className="p-6 max-h-[80vh] overflow-y-auto no-scrollbar space-y-6">
-                <div className="flex flex-col md:flex-row gap-6">
-                   {/* Left Side: Identity */}
-                   <div className="w-full md:w-48 shrink-0 flex flex-col items-center text-center space-y-4">
-                      <div className="w-32 h-32 rounded-lg border-4 border-zinc-50 shadow-xl overflow-hidden">
-                        {selectedCustomer.profileImage ? (
-                          <img src={selectedCustomer.profileImage} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className={cn("w-full h-full flex items-center justify-center text-4xl font-black uppercase", getAvatarStyle(selectedCustomer.name).bg)}>
-                            {selectedCustomer.name.charAt(0)}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <h4 className="text-lg font-black text-zinc-900 uppercase leading-none">{selectedCustomer.name}</h4>
-                        <div className="mt-2 flex justify-center">
-                          <span className={cn(
-                            "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-sm",
-                            selectedCustomer.status === 'Active' ? "bg-emerald-50 text-emerald-700 border-emerald-100" :
-                            selectedCustomer.status === 'VIP' ? "bg-amber-50 text-amber-700 border-amber-100 animate-pulse" :
-                            selectedCustomer.status === 'Blocked' ? "bg-rose-50 text-rose-700 border-rose-100" :
-                            "bg-zinc-100 text-zinc-600 border-zinc-200"
-                          )}>
-                            {selectedCustomer.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 w-full">
-                        <button 
-                          onClick={() => navigate(`/admin/customers/edit/${selectedCustomer.id}`)}
-                          className="flex-1 h-10 bg-black text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-zinc-800 flex items-center justify-center gap-2"
-                        >
-                          <Edit className="w-3 h-3" /> Edit
-                        </button>
-                        <button 
-                          onClick={() => {
-                            const sId = createNewSession(selectedCustomer.name, selectedCustomer.phones?.[0] || 'N/A');
-                            setActiveSession(sId);
-                            navigate('/admin/support');
-                          }}
-                          className="flex-1 h-10 bg-zinc-100 text-zinc-900 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-zinc-200 flex items-center justify-center gap-2 underline underline-offset-2"
-                        >
-                          <MessageSquare className="w-3 h-3" /> Chat
-                        </button>
-                      </div>
-                   </div>
-
-                   {/* Right Side: Details Grid */}
-                   <div className="flex-1 space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 bg-zinc-50 rounded-lg border border-zinc-100">
-                           <span className="block text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Total Orders</span>
-                           <span className="text-xl font-black text-zinc-900 leading-none">{selectedCustomer.totalOrders || 0}</span>
-                        </div>
-                        <div className="p-4 bg-emerald-50/30 rounded-lg border border-emerald-100">
-                           <span className="block text-[9px] font-black text-emerald-600/60 uppercase tracking-widest mb-1">Total Spent</span>
-                           <span className="text-xl font-black text-emerald-600 leading-none">৳{(selectedCustomer.totalSpend || 0).toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-[11px]">
-                         <div>
-                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Customer ID</label>
-                            <span className="font-black text-zinc-900">{selectedCustomer.id}</span>
-                         </div>
-                         <div>
-                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Gender</label>
-                            <span className="font-black text-zinc-900 uppercase">{selectedCustomer.gender || 'Not Set'}</span>
-                         </div>
-                         <div>
-                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Join Date</label>
-                            <span className="font-black text-zinc-900">{new Date(selectedCustomer.createdAt).toLocaleDateString()}</span>
-                         </div>
-                         <div>
-                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Last Login</label>
-                            <span className="font-black text-zinc-900">{selectedCustomer.lastLoginAt ? new Date(selectedCustomer.lastLoginAt).toLocaleString() : selectedCustomer.lastLogin ? new Date(selectedCustomer.lastLogin).toLocaleString() : 'Never'}</span>
-                         </div>
-                         <div>
-                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Login Provider</label>
-                            <span className="font-black text-zinc-900 uppercase">{selectedCustomer.loginProvider || 'Email'}</span>
-                         </div>
-                         <div>
-                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Loyalty Score</label>
-                            <span className="font-black text-zinc-900">{selectedCustomer.totalLogins || 0} Professional Sessions</span>
-                         </div>
-                         <div>
-                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Special Day</label>
-                            <span className="font-black text-purple-600 uppercase">{selectedCustomer.occasionName || 'None'} {selectedCustomer.specialDate ? `(${selectedCustomer.specialDate})` : ''}</span>
-                         </div>
-                         <div className="col-span-2">
-                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Primary Phone</label>
-                            <span className="font-black text-zinc-900">{selectedCustomer.phones.join(', ') || 'N/A'}</span>
-                         </div>
-                         <div className="col-span-2">
-                            <label className="block text-zinc-400 font-bold uppercase mb-0.5">Email Address</label>
-                            <span className="font-black text-zinc-900">{selectedCustomer.emails.join(', ') || 'N/A'}</span>
-                         </div>
-                         <div className="col-span-2 space-y-1.5 bg-zinc-50 p-4 rounded-lg border border-zinc-100">
-                             <label className="block text-zinc-400 font-black uppercase text-[9px] mb-1 tracking-widest opacity-70">Operational Address Breakdown</label>
-                             <div className="space-y-1">
-                                <p className="text-[11px] font-black text-zinc-900 uppercase tracking-tight flex items-center gap-2">
-                                  <span className="text-sm opacity-90">📍</span> Division: {selectedCustomer.address.division || 'Not Provided'}
-                                </p>
-                                <p className="text-[11px] font-black text-zinc-900 uppercase tracking-tight flex items-center gap-2">
-                                  <span className="text-sm opacity-90">📍</span> District: {selectedCustomer.address.district || 'Not Provided'}
-                                </p>
-                                <p className="text-[11px] font-black text-zinc-900 uppercase tracking-tight flex items-center gap-2">
-                                  <span className="text-sm opacity-90">📍</span> Thana: {selectedCustomer.address.upazila || selectedCustomer.address.area || 'Not Provided'}
-                                </p>
-                                <p className="text-[11px] font-black text-zinc-950 uppercase tracking-tight flex items-start gap-2 pt-2 mt-1 border-t border-zinc-200">
-                                  <span className="text-sm opacity-90">🏠</span> Full Address: {selectedCustomer.address.street || 'Not Provided'}
-                                </p>
-                                {selectedCustomer.address.zipCode && (
-                                  <p className="text-[10px] font-bold text-zinc-400 uppercase mt-1 pl-6 italic">Post Code: {selectedCustomer.address.zipCode}</p>
-                                )}
-                             </div>
-                          </div>
-                         {selectedCustomer.note && (
-                           <div className="col-span-2 bg-amber-50 p-4 rounded-lg border border-amber-100">
-                              <label className="block text-amber-700 font-black uppercase text-[9px] mb-1">Administrative Notes</label>
-                              <p className="text-amber-800 leading-relaxed font-bold italic">"{selectedCustomer.note}"</p>
-                           </div>
-                         )}
-                      </div>
-                   </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="p-6 bg-zinc-50 border-t border-zinc-100 flex justify-end gap-3">
-                <button 
-                  onClick={() => handleDeleteCustomer(selectedCustomer.id)}
-                  className="px-6 h-12 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all border border-rose-100 shadow-sm"
-                >
-                  Terminate Account
-                </button>
-                <button 
-                  onClick={() => setSelectedCustomerId(null)}
-                  className="px-8 h-12 bg-white text-zinc-900 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-zinc-100 transition-all border border-zinc-200 shadow-sm"
-                >
-                  Close Profile
-                </button>
-              </div>
-            </div>
           </div>
         )}
       </div>

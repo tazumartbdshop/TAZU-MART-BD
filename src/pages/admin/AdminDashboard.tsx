@@ -285,16 +285,16 @@ export default function AdminDashboard() {
   const { leads, markAllAsRead: markLeadsRead } = useLeadStore();
 
   const getSubItemCount = (name: string): number => {
-    if (name === 'Incomplete Orders') return leads.filter(l => !l.isRead).length;
+    if (name === 'Incomplete Orders') return leads.filter(l => !l.is_read).length;
     if (name === 'Complete Orders') return orders.filter(o => o.status === 'Delivered').length;
     if (name === 'Customer Listing') return customers.filter(c => !c.isRead).length;
     return 0;
   };
 
   const getMainItemCount = (name: string): number => {
-    if (name === 'Orders') return orders.filter(o => !o.isRead).length + leads.filter(l => !l.isRead).length;
+    if (name === 'Orders') return (orders.filter(o => !o.isRead).length || 0) + (leads.filter(l => !l.is_read).length || 0);
     if (name === 'Customers') return customers.filter(c => !c.isRead).length;
-    if (name === 'Search Listing') return searches.filter(s => !s.isRead).length;
+    if (name === 'Search Listing') return (searches as any[]).filter(s => !s.isRead).length;
     return 0;
   };
 
@@ -315,15 +315,15 @@ export default function AdminDashboard() {
 
   const getBadgeStyle = (name: string) => {
     if (name === 'Orders' || name === 'Incomplete Orders' || name === 'Complete Orders') {
-      return 'bg-gradient-to-br from-rose-500 via-red-600 to-rose-700 shadow-[0_0_15px_rgba(225,29,72,0.4)] animate-pulse border border-white/10';
+      return 'bg-rose-500 text-white shadow-sm';
     }
     if (name === 'Customers' || name === 'Customer Listing' || name === 'Add Customer') {
-      return 'bg-gradient-to-br from-violet-500 via-purple-600 to-violet-700 shadow-[0_0_15px_rgba(147,51,234,0.4)] border border-white/10';
+      return 'bg-purple-500 text-white shadow-sm';
     }
     if (name === 'Search Listing') {
-      return 'bg-gradient-to-br from-cyan-500 via-blue-600 to-cyan-700 shadow-[0_0_15px_rgba(37,99,235,0.4)] animate-pulse border border-white/10';
+      return 'bg-cyan-500 text-white shadow-sm';
     }
-    return 'bg-red-600';
+    return 'bg-rose-500 text-white shadow-sm';
   };
 
   const navItems = getSortedNavItems();
@@ -383,7 +383,7 @@ export default function AdminDashboard() {
 
       {/* Sidebar */}
       <aside 
-        className={`fixed md:sticky top-0 bottom-0 left-0 z-[100] h-screen admin-sidebar bg-[#000000] text-white shadow-2xl transition-all duration-300 ease-in-out overflow-hidden
+        className={`fixed md:sticky top-0 bottom-0 left-0 z-[100] h-screen admin-sidebar bg-white text-[#222222] border-r border-[#EEEEEE] shadow-xl transition-all duration-300 ease-in-out overflow-hidden
           ${sidebarOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full md:translate-x-0'}
           ${!sidebarOpen && !isSidebarCollapsed ? 'md:w-72' : 'md:w-20'}
         `}
@@ -393,17 +393,17 @@ export default function AdminDashboard() {
           className="h-full flex flex-col overflow-y-auto overscroll-contain custom-scrollbar"
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         >
-            <div className={`p-6 mb-4 shrink-0 flex items-start transition-all duration-300 ${isSidebarCollapsed && !sidebarOpen ? 'justify-center p-4' : 'justify-between'}`}>
+            <div className={`p-6 flex items-start transition-all duration-300 ${isSidebarCollapsed && !sidebarOpen ? 'justify-center p-4' : 'justify-between'} border-b border-[#EEEEEE] mb-4`}>
               <div className={`${isSidebarCollapsed && !sidebarOpen ? 'hidden' : 'block'}`}>
-                <h2 className="text-xl font-sans font-black tracking-widest uppercase text-white mb-1">TAZU MART</h2>
-                <span className="text-[10px] font-black text-gray-500 tracking-[0.1em] uppercase">Admin Core</span>
+                <h2 className="text-xl font-sans font-black tracking-widest uppercase text-[#111111] mb-1">TAZU MART</h2>
+                <span className="text-[10px] font-black text-[#777777] tracking-[0.1em] uppercase">Admin Core</span>
               </div>
-              <button onClick={() => setSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white mt-1">
+              <button onClick={() => setSidebarOpen(false)} className="md:hidden text-[#444444] hover:text-black mt-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
           
-          <nav className="space-y-1 flex-grow">
+          <nav className="space-y-1.5 flex-grow px-3">
             {filteredNavItems.map((item) => {
               const active = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
               const hasSubmenu = item.subItems && item.subItems.length > 0;
@@ -421,21 +421,20 @@ export default function AdminDashboard() {
                         } else {
                           toggleSubmenu(item.name);
                         }
-                        if (item.path) {
-                          navigate(item.path);
-                          if (window.innerWidth < 768) setSidebarOpen(false);
-                        }
                       }}
-                      className={`flex items-center group px-6 py-4 rounded-none transition-all w-full border-l-[3px] 
-                        ${active && !isExpanded ? 'bg-white/10 text-white font-bold border-purple-500' : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent'}
+                      className={`flex items-center group px-[18px] py-[14px] rounded-[12px] transition-all duration-200 w-full relative
+                        ${active && !isExpanded ? 'bg-[#F4EEFF] text-black font-semibold' : 'text-[#222222] hover:bg-[#F8F8F8]'}
                         ${!showLabels ? 'justify-center px-0' : 'justify-between'}
                       `}
                     >
+                      {active && !isExpanded && showLabels && (
+                        <div className="absolute left-0 top-3 bottom-3 w-[4px] bg-[#7C3AED] rounded-r-full" />
+                      )}
                       <div className={`flex items-center ${!showLabels ? 'justify-center' : 'gap-4'}`}>
-                        <item.icon className={`w-[20px] h-[20px] transition-all duration-300 ${active && !isExpanded ? 'text-purple-400 scale-110' : 'text-current opacity-70 group-hover:opacity-100'}`} />
+                        <item.icon className={`w-[20px] h-[20px] transition-all duration-300 ${active && !isExpanded ? 'text-[#7C3AED] scale-110' : 'text-[#444444] group-hover:text-black'}`} />
                         {showLabels && (
                           <div className="flex items-center gap-2">
-                            <span className="text-[13px] font-bold uppercase tracking-tight">{item.name}</span>
+                            <span className={`text-[15px] tracking-tight ${active && !isExpanded ? 'font-semibold' : 'font-medium'}`}>{item.name}</span>
                             {getMainItemCount(item.name) > 0 && (
                               <span className={`px-2 py-0.5 text-[9px] font-black text-white rounded-full ${getBadgeStyle(item.name)}`}>
                                 {getMainItemCount(item.name)}
@@ -445,7 +444,7 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       {showLabels && (
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                        <ChevronDown className={`w-3.5 h-3.5 text-[#999999] transition-transform duration-300 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
                       )}
                     </button>
                   ) : (
@@ -454,16 +453,19 @@ export default function AdminDashboard() {
                       onClick={() => {
                         if (window.innerWidth < 768) setSidebarOpen(false);
                       }}
-                      className={`flex items-center group px-6 py-4 rounded-none transition-all border-l-[3px] 
-                        ${active ? 'bg-white text-[#000000] font-black border-purple-600' : 'text-gray-400 hover:bg-white/5 hover:text-white border-transparent'}
+                      className={`flex items-center group px-[18px] py-[14px] rounded-[12px] transition-all duration-200 relative
+                        ${active ? 'bg-[#F4EEFF] text-black font-semibold' : 'text-[#222222] hover:bg-[#F8F8F8]'}
                         ${!showLabels ? 'justify-center px-0' : 'justify-between'}
                       `}
                     >
+                      {active && showLabels && (
+                        <div className="absolute left-0 top-3 bottom-3 w-[4px] bg-[#7C3AED] rounded-r-full" />
+                      )}
                       <div className={`flex items-center ${!showLabels ? 'justify-center' : 'gap-4'}`}>
-                        <item.icon className={`w-[20px] h-[20px] transition-all duration-300 ${active ? 'text-purple-600 scale-110' : 'text-current opacity-70 group-hover:opacity-100'}`} />
+                        <item.icon className={`w-[20px] h-[20px] transition-all duration-300 ${active ? 'text-[#7C3AED] scale-110' : 'text-[#444444] group-hover:text-black'}`} />
                         {showLabels && (
                           <div className="flex items-center gap-2">
-                             <span className="text-[13px] font-bold uppercase tracking-tight">{item.name}</span>
+                             <span className={`text-[15px] tracking-tight ${active ? 'font-semibold' : 'font-medium'}`}>{item.name}</span>
                              {getMainItemCount(item.name) > 0 && (
                                <span className={`px-2 py-0.5 text-[9px] font-black text-white rounded-full ${getBadgeStyle(item.name)}`}>
                                  {getMainItemCount(item.name)}
@@ -473,17 +475,17 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       {showLabels && item.name === '🛠 Admin Management' && (
-                        <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+                        <ChevronRight className="w-3.5 h-3.5 text-[#999999] opacity-40" />
                       )}
                     </Link>
                   )}
 
                   {hasSubmenu && showLabels && (
                     <div 
-                       className="overflow-hidden transition-all duration-500 ease-in-out"
+                       className="overflow-hidden transition-all duration-300 ease-in-out"
                        style={{ maxHeight: isExpanded ? `${item.subItems!.length * 50 + 20}px` : '0px', opacity: isExpanded ? 1 : 0 }}
                     >
-                      <div className="pl-6 py-2 flex flex-col gap-1 border-l border-white/10 ml-8 mt-1 mb-2">
+                      <div className="pl-4 py-2 flex flex-col gap-1 ml-10 mt-1 mb-2 border-l border-[#EEEEEE]">
                         {item.subItems!.map(subItem => {
                           const subActive = location.pathname === subItem.path;
                           return (
@@ -493,10 +495,9 @@ export default function AdminDashboard() {
                               onClick={() => {
                                 if (window.innerWidth < 768) setSidebarOpen(false);
                               }}
-                              className={`flex items-center gap-3 px-6 py-2.5 rounded-none text-[11px] transition-all group/sub ${subActive ? 'text-white font-bold' : 'text-gray-500 hover:text-white'}`}
+                              className={`flex items-center gap-3 px-4 py-2 rounded-[8px] text-[13px] transition-all group/sub ${subActive ? 'text-[#7C3AED] font-semibold bg-[#F4EEFF]' : 'text-[#666666] hover:text-black hover:bg-[#F8F8F8]'}`}
                             >
-                              <div className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${subActive ? 'bg-cyan-400 scale-125' : 'bg-gray-700 group-hover/sub:bg-gray-400'}`} />
-                              <span className="uppercase tracking-[0.15em] flex-1 font-semibold">{subItem.name}</span>
+                              <span className="flex-1">{subItem.name}</span>
                               {getSubItemCount(subItem.name) > 0 && (
                                 <span className={`px-2 py-0.5 text-[8px] font-black text-white rounded-full ${getBadgeStyle(subItem.name)}`}>
                                   {getSubItemCount(subItem.name)}
@@ -513,12 +514,12 @@ export default function AdminDashboard() {
             })}
           </nav>
           
-          <div className={`mt-auto p-6 flex flex-col gap-5 border-t border-white/5 transition-all ${isSidebarCollapsed && !sidebarOpen ? 'px-0 items-center' : ''}`}>
-             <Link to="/" className={`text-gray-500 hover:text-white flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
-                <Monitor className="w-5 h-5" />
+          <div className={`mt-auto p-6 flex flex-col gap-4 border-t border-[#EEEEEE] transition-all ${isSidebarCollapsed && !sidebarOpen ? 'px-0 items-center' : ''}`}>
+             <Link to="/" className={`text-[#666666] hover:text-black flex items-center gap-4 text-[13px] font-medium transition-all ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
+                <Monitor className="w-5 h-5 text-[#444444]" />
                 {(!isSidebarCollapsed || sidebarOpen) && "Back to Store"}
              </Link>
-             <button onClick={handleLogout} className={`text-red-500/80 hover:text-red-400 flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all text-left ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
+             <button onClick={handleLogout} className={`text-red-500 hover:text-red-600 flex items-center gap-4 text-[13px] font-medium transition-all text-left ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
                 <LogOut className="w-5 h-5" />
                 {(!isSidebarCollapsed || sidebarOpen) && "End Session"}
              </button>

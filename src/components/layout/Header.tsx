@@ -17,7 +17,7 @@ import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import LogoutModal from '../ui/LogoutModal';
 import SearchDrawer from './SearchDrawer';
-import { Facebook, Code, Store, ArrowRight } from 'lucide-react';
+import { Code, Store, ArrowRight } from 'lucide-react';
 
 export function Header() {
   const navigate = useNavigate();
@@ -372,17 +372,16 @@ export function Header() {
                         <motion.button
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
-                          onClick={() => handleExternalLink(
-                             siteData.developer_link, 
-                             siteData.developer_button_name, 
-                             siteData.developer_webview, 
-                             siteData.developer_new_tab
-                          )}
+                          onClick={() => window.open(siteData.developer_link, '_self')}
                           className="w-full h-14 bg-white border border-gray-200 hover:border-gray-300 rounded-[14px] flex items-center justify-between px-4 transition-all group/btn shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)]"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gray-50 text-gray-600 rounded-[10px] flex items-center justify-center shrink-0">
-                               <Code className="w-4 h-4" />
+                            <div className="w-8 h-8 bg-gray-50 text-gray-600 rounded-[10px] flex items-center justify-center shrink-0 overflow-hidden p-1">
+                               {siteData.developer_logo ? (
+                                 <img src={siteData.developer_logo} alt={siteData.developer_button_name} className="w-full h-full object-contain" />
+                               ) : (
+                                 <Code className="w-4 h-4" />
+                               )}
                             </div>
                             <span className="font-bold text-[13px] text-gray-800 tracking-tight">{siteData.developer_button_name}</span>
                           </div>
@@ -394,17 +393,16 @@ export function Header() {
                         <motion.button
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
-                          onClick={() => handleExternalLink(
-                              siteData.fashion_link, 
-                              siteData.fashion_button_name, 
-                              siteData.fashion_webview, 
-                              siteData.fashion_new_tab
-                          )}
+                          onClick={() => window.open(siteData.fashion_link, '_self')}
                           className="w-full h-14 bg-white border border-gray-200 hover:border-gray-300 rounded-[14px] flex items-center justify-between px-4 transition-all group/btn shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)]"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gray-50 text-gray-600 rounded-[10px] flex items-center justify-center shrink-0">
-                               <Store className="w-4 h-4" />
+                            <div className="w-8 h-8 bg-gray-50 text-gray-600 rounded-[10px] flex items-center justify-center shrink-0 overflow-hidden p-1">
+                               {siteData.fashion_logo ? (
+                                 <img src={siteData.fashion_logo} alt={siteData.fashion_button_name} className="w-full h-full object-contain" />
+                               ) : (
+                                 <Store className="w-4 h-4" />
+                               )}
                             </div>
                             <span className="font-bold text-[13px] text-gray-800 tracking-tight">{siteData.fashion_button_name}</span>
                           </div>
@@ -412,31 +410,27 @@ export function Header() {
                         </motion.button>
                       )}
 
-                      {siteData.facebook_status && (
+                      {(siteData.custom_links || []).filter(l => l.status).map((link) => (
                         <motion.button
+                          key={link.id}
                           whileHover={{ scale: 1.01 }}
                           whileTap={{ scale: 0.99 }}
-                          onClick={() => {
-                             if (siteData.facebook_webview) {
-                               handleExternalLink(siteData.facebook_link, siteData.facebook_button_name, true, false);
-                             } else if (siteData.facebook_new_tab) {
-                               window.open(siteData.facebook_link, '_blank', 'noopener,noreferrer');
-                             } else {
-                               navigate('/facebook-updates');
-                               setIsMobileMenuOpen(false);
-                             }
-                          }}
+                          onClick={() => window.open(link.url, '_self')}
                           className="w-full h-14 bg-white border border-gray-200 hover:border-gray-300 rounded-[14px] flex items-center justify-between px-4 transition-all group/btn shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.04)]"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-[10px] flex items-center justify-center shrink-0">
-                               <Facebook className="w-4 h-4" />
+                            <div className="w-8 h-8 bg-gray-50 text-gray-600 rounded-[10px] flex items-center justify-center shrink-0 overflow-hidden p-1">
+                               {link.logo ? (
+                                 <img src={link.logo} alt={link.name} className="w-full h-full object-contain" />
+                               ) : (
+                                 <ArrowRight className="w-4 h-4" />
+                               )}
                             </div>
-                            <span className="font-bold text-[13px] text-gray-800 tracking-tight">{siteData.facebook_button_name}</span>
+                            <span className="font-bold text-[13px] text-gray-800 tracking-tight">{link.name}</span>
                           </div>
-                          <ArrowRight className="w-4 h-4 text-gray-300 group-hover/btn:text-blue-600 group-hover/btn:translate-x-1 transition-all" />
+                          <ArrowRight className="w-4 h-4 text-gray-300 group-hover/btn:text-gray-600 group-hover/btn:translate-x-1 transition-all" />
                         </motion.button>
-                      )}
+                      ))}
                     </div>
                   </div>
                 )}

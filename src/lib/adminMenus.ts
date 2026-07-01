@@ -48,7 +48,6 @@ import {
   MessageSquareCode,
   RefreshCw,
   Play,
-  Facebook,
   Video,
   Fingerprint,
   Tag,
@@ -171,7 +170,6 @@ export const defaultNavItems: NavItem[] = [
     icon: Megaphone,
     moduleId: 'dashboard',
     subItems: [
-      { name: 'Facebook', path: '/admin/marketing/facebook', icon: Facebook },
       { name: 'TikTok', path: '/admin/marketing/tiktok', icon: Video },
       { name: 'Google', path: '/admin/marketing/google', icon: Globe },
       { name: 'Server Side Tracking', path: '/admin/marketing/serverside', icon: Zap },
