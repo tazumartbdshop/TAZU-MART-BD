@@ -73,7 +73,7 @@ export default function AdminLoginInfo() {
 
   const filteredCustomers = customers.filter(customer => 
     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    customer.emails[0]?.toLowerCase().includes(searchQuery.toLowerCase())
+    (customer.email || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const resetFilters = () => {
@@ -443,7 +443,7 @@ export default function AdminLoginInfo() {
                           <span className="text-xs font-black text-neutral-950 group-hover:text-indigo-650 transition-colors uppercase tracking-tight">{customer.name}</span>
                         </div>
                       </td>
-                      <td className="p-4 text-xs font-semibold text-neutral-500 select-all font-mono lowercase">{customer.emails[0] || 'No Email'}</td>
+                      <td className="p-4 text-xs font-semibold text-neutral-500 select-all font-mono lowercase">{customer.email || 'No Email'}</td>
                       <td className="p-4 text-right">
                         <ChevronRight className="w-4 h-4 text-neutral-355 group-hover:text-black transition-colors ml-auto" />
                       </td>
@@ -510,8 +510,8 @@ export default function AdminLoginInfo() {
                 </div>
 
                 <div className="space-y-4">
-                  <DetailItem icon={Mail} label="Gmail Address" value={selectedCustomer.emails[0] || 'Not specified'} />
-                  <DetailItem icon={Phone} label="Mobile Number" value={selectedCustomer.phones[0] || 'Not specified'} />
+                  <DetailItem icon={Mail} label="Gmail Address" value={selectedCustomer.email || 'Not specified'} />
+                  <DetailItem icon={Phone} label="Mobile Number" value={selectedCustomer.phone || 'Not specified'} />
                   <DetailItem 
                     icon={MapPin} 
                     label="Delivery Address" 

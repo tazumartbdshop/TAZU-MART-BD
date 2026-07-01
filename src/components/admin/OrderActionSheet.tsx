@@ -78,7 +78,7 @@ export const OrderActionSheet: React.FC<OrderActionSheetProps> = ({
 
   // Find linked customer profile if exists
   const matchedCustomer = customers.find(
-    c => c.phones.includes(order.mobileNumber) || (order.email && c.emails.includes(order.email))
+    c => c.phone === order.mobileNumber || (order.email && c.email === order.email)
   );
 
   const subtotal = order.items.reduce(

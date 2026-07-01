@@ -99,8 +99,8 @@ function AdminCustomerList() {
         // Priority 1: Search Matches
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
-          const aMatches = a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || (a.phones && a.phones.some(p => p.includes(q))) || (a.emails && a.emails.some(e => e.toLowerCase().includes(q)));
-          const bMatches = b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q) || (b.phones && b.phones.some(p => p.includes(q))) || (b.emails && b.emails.some(e => e.toLowerCase().includes(q)));
+          const aMatches = a.name.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || (a.phone && a.phone.includes(q)) || (a.email && a.email.toLowerCase().includes(q));
+          const bMatches = b.name.toLowerCase().includes(q) || b.id.toLowerCase().includes(q) || (b.phone && b.phone.includes(q)) || (b.email && b.email.toLowerCase().includes(q));
           
           if (aMatches && !bMatches) return -1;
           if (!aMatches && bMatches) return 1;
@@ -241,8 +241,8 @@ function AdminCustomerList() {
               const isMatch = searchQuery && (
                 customer.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                 customer.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (customer.phones && customer.phones.some(p => p.includes(searchQuery))) ||
-                (customer.emails && customer.emails.some(e => e.toLowerCase().includes(searchQuery.toLowerCase())))
+                (customer.phone && customer.phone.includes(searchQuery)) ||
+                (customer.email && customer.email.toLowerCase().includes(searchQuery.toLowerCase()))
               );
 
               const genderBadge = (gender?: string) => {
@@ -304,10 +304,10 @@ function AdminCustomerList() {
                        </div>
                        
                        <p className="text-[10px] font-bold text-zinc-400 truncate">
-                         {customer.phones?.[0] || 'No Phone'}
+                         {customer.phone || 'No Phone'}
                        </p>
                        <p className="text-[10px] font-bold text-zinc-400 truncate">
-                         {customer.emails?.[0] || 'No Email'}
+                         {customer.email || 'No Email'}
                        </p>
                        <div className="flex items-center gap-2 mt-1">
                           <span className={cn(
@@ -380,8 +380,8 @@ function AdminCustomerAdd() {
     if (editingCustomer) {
       setFormData({
         name: editingCustomer.name || '',
-        phone: editingCustomer.phones?.[0] || '',
-        email: editingCustomer.emails?.[0] || '',
+        phone: editingCustomer.phone || '',
+        email: editingCustomer.email || '',
         gender: editingCustomer.gender || 'Male',
         address: {
           division: editingCustomer.address.division || '',
@@ -417,8 +417,8 @@ function AdminCustomerAdd() {
     try {
       const payload = {
         name: formData.name,
-        phones: [formData.phone],
-        emails: [formData.email],
+        phone: formData.phone,
+        email: formData.email,
         gender: formData.gender,
         address: formData.address,
         password: formData.password || undefined,

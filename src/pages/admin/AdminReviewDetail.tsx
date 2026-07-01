@@ -230,7 +230,7 @@ export default function AdminReviewDetail() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 leading-none">Email Address</p>
-                  <p className="text-xs font-bold text-zinc-700 truncate">{customer?.emails[0] || review.email || 'N/A'}</p>
+                  <p className="text-xs font-bold text-zinc-700 truncate">{customer?.email || review.email || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -239,7 +239,7 @@ export default function AdminReviewDetail() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-[8px] font-bold uppercase tracking-widest text-zinc-400 leading-none">Phone Number</p>
-                  <p className="text-xs font-bold text-zinc-700">{customer?.phones[0] || review.phone || 'N/A'}</p>
+                  <p className="text-xs font-bold text-zinc-700">{customer?.phone || review.phone || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">

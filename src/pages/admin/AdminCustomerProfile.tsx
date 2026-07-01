@@ -15,8 +15,8 @@ import { motion } from 'motion/react';
 interface CustomerProfile {
   id: string;
   name: string;
-  emails: string[];
-  phones: string[];
+  email: string;
+  phone: string;
   gender?: string;
   status: string;
   customer_type?: string;
@@ -45,7 +45,7 @@ export default function AdminCustomerProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { createNewSession, setActiveSession } = useSupportStore();
-  const { deleteCustomer } = useCustomerStore();
+  const { customers, deleteCustomer } = useCustomerStore();
   
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,23 +55,32 @@ export default function AdminCustomerProfile() {
     if (id) {
       fetchCustomerData();
     }
-  }, [id]);
+  }, [id, customers]);
 
   const fetchCustomerData = async () => {
     try {
-      setLoading(true);
+      if (!customer) setLoading(true);
       setError(null);
 
       // 1. Fetch customer identity
-      const { data, error: fetchError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (fetchError) throw fetchError;
+      let data = null;
+      try {
+        const { data: dbData, error: fetchError } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+        if (!fetchError && dbData) {
+          data = dbData;
+        }
+      } catch (err) {
+        console.warn('Could not fetch from customers table, falling back to store:', err);
+      }
       
-      if (!data) {
+      const storeCustomer = customers.find(c => c.id === id);
+      const customerData = data || storeCustomer;
+
+      if (!customerData) {
         setError('Customer not found');
         return;
       }
@@ -84,40 +93,53 @@ export default function AdminCustomerProfile() {
 
       // 3. Fetch last order date (querying by email or phone if user_id link is weak)
       let lastOrderDate = null;
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('date')
-        .or(`email.eq.${data.emails?.[0]},mobile_number.eq.${data.phones?.[0]}`)
-        .order('date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      
-      if (ordersData) {
-        lastOrderDate = ordersData.date;
+      try {
+        const orConditions = [];
+        const email = customerData.email || customerData.emails?.[0];
+        const phone = customerData.phone || customerData.phones?.[0];
+        
+        if (email) orConditions.push(`email.eq.${email}`);
+        if (phone) orConditions.push(`mobile_number.eq.${phone}`);
+        
+        if (orConditions.length > 0) {
+          const { data: ordersData, error: ordersError } = await supabase
+            .from('orders')
+            .select('date')
+            .or(orConditions.join(','))
+            .order('date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+            
+          if (!ordersError && ordersData) {
+            lastOrderDate = ordersData.date;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch last order date', e);
       }
 
       // Map to camelCase if necessary (matching the DB structure)
       const mappedCustomer: CustomerProfile = {
-        id: data.id,
-        name: data.name || 'Anonymous User',
-        emails: data.emails || [],
-        phones: data.phones || [],
-        gender: data.gender,
-        status: data.status || 'Active',
-        customer_type: data.customer_type || 'Regular',
-        profile_image: data.profile_image || data.profileImage,
-        created_at: data.created_at || data.createdAt,
-        last_login: data.last_login,
-        last_login_at: data.last_login_at,
-        total_orders: data.total_orders,
-        total_spend: data.total_spend,
+        id: customerData.id,
+        name: customerData.name || 'Anonymous User',
+        email: customerData.email || (customerData.emails?.[0] || ''),
+        phone: customerData.phone || (customerData.phones?.[0] || ''),
+        gender: customerData.gender,
+        status: customerData.status || 'Active',
+        customer_type: customerData.customer_type || customerData.customerType || 'Regular',
+        profile_image: customerData.profile_image || customerData.profileImage,
+        created_at: customerData.created_at || customerData.createdAt,
+        last_login: customerData.last_login,
+        last_login_at: customerData.last_login_at,
+        total_orders: customerData.total_orders || customerData.totalOrders,
+        total_spend: customerData.total_spend || customerData.totalSpend,
         total_reviews: reviewCount || 0,
         last_order_date: lastOrderDate,
-        total_logins: data.total_logins,
-        occasion_name: data.occasion_name,
-        special_date: data.special_date,
-        note: data.note,
-        address: data.address || {}
+        total_logins: customerData.total_logins,
+        occasion_name: customerData.occasion_name,
+        special_date: customerData.special_date,
+        note: customerData.note,
+        address: customerData.address || {}
       };
 
       setCustomer(mappedCustomer);
@@ -145,7 +167,7 @@ export default function AdminCustomerProfile() {
 
   const handleChat = () => {
     if (!customer) return;
-    const sId = createNewSession(customer.name, customer.phones?.[0] || 'N/A');
+    const sId = createNewSession(customer.name, customer.phone || 'N/A');
     setActiveSession(sId);
     navigate('/admin/support');
   };
@@ -153,8 +175,8 @@ export default function AdminCustomerProfile() {
   if (loading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
-        <Loader2 className="w-12 h-12 text-purple-600 animate-spin mb-4" />
-        <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">Synchronizing Secure Data...</p>
+        <Loader2 className="w-8 h-8 text-zinc-400 animate-spin mb-4" />
+        <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px]">Loading Profile...</p>
       </div>
     );
   }
@@ -280,7 +302,7 @@ export default function AdminCustomerProfile() {
                   </div>
                   <div className="flex-1 truncate">
                     <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Email Address</p>
-                    <p className="text-xs font-bold text-zinc-900 truncate">{customer.emails?.[0] || 'N/A'}</p>
+                    <p className="text-xs font-bold text-zinc-900 truncate">{customer.email || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -289,7 +311,7 @@ export default function AdminCustomerProfile() {
                   </div>
                   <div className="flex-1 truncate">
                     <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Mobile Number</p>
-                    <p className="text-xs font-bold text-zinc-900 truncate">{customer.phones?.[0] || 'N/A'}</p>
+                    <p className="text-xs font-bold text-zinc-900 truncate">{customer.phone || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

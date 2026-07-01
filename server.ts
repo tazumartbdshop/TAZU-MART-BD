@@ -770,8 +770,8 @@ Please ask me your query or select a quick question template below!`;
           return {
             id: u.id,
             name: meta.name || meta.fullName || u.email?.split('@')[0] || 'User',
-            phones: phone ? [phone] : [],
-            emails: [u.email].filter(Boolean),
+            phone: phone,
+            email: u.email || '',
             address: {
               country: meta.country || 'Bangladesh',
               division: meta.division || '',
@@ -835,8 +835,8 @@ Please ask me your query or select a quick question template below!`;
         await supabaseServiceRole.from('customers').upsert([{
           id: userId,
           name,
-          emails: [email],
-          phones: phone ? [phone] : [],
+          email,
+          phone: phone || '',
           status: 'Active',
           created_at: new Date().toISOString(),
           ...otherData.customerData
@@ -874,7 +874,7 @@ Please ask me your query or select a quick question template below!`;
 
       // Update DB tables (with try-catch so it doesn't fail if tables do not exist)
       const userFields = ['name', 'email', 'phone', 'role', 'status', 'gender', 'address', 'division', 'district', 'upazila', 'area', 'postal_code', 'profile_image', 'occasion_name', 'special_date'];
-      const customerFields = ['name', 'phones', 'emails', 'address', 'whats_app', 'note', 'profile_image', 'gender', 'social_links', 'occasion_name', 'special_date', 'status', 'customer_type', 'total_orders', 'total_spend', 'last_login', 'total_logins', 'last_ip', 'device_type', 'payment_methods', 'is_read', 'is_demo'];
+      const customerFields = ['name', 'phone', 'email', 'address', 'whats_app', 'note', 'profile_image', 'gender', 'social_links', 'occasion_name', 'special_date', 'status', 'customer_type', 'total_orders', 'total_spend', 'last_login', 'total_logins', 'last_ip', 'device_type', 'payment_methods', 'is_read', 'is_demo'];
 
       const userUpdates: any = {};
       const customerUpdates: any = {};
@@ -884,11 +884,9 @@ Please ask me your query or select a quick question template below!`;
         if (customerFields.includes(key)) customerUpdates[key] = updates[key];
       });
 
-      // Special mapping for email and phone if they are passed as arrays or single values
+      // Special mapping for email and phone
       if (updates.email && !userUpdates.email) userUpdates.email = updates.email;
-      if (updates.emails && updates.emails[0] && !userUpdates.email) userUpdates.email = updates.emails[0];
       if (updates.phone && !userUpdates.phone) userUpdates.phone = updates.phone;
-      if (updates.phones && updates.phones[0] && !userUpdates.phone) userUpdates.phone = updates.phones[0];
 
       if (Object.keys(userUpdates).length > 0) {
         const { error: userError } = await supabaseServiceRole.from('users').update(userUpdates).eq('id', id);
@@ -914,8 +912,8 @@ Please ask me your query or select a quick question template below!`;
           ...existingMeta,
           ...updates,
           name: updates.name || existingMeta.name,
-          phone: updates.phone || updates.phones?.[0] || existingMeta.phone,
-          email: updates.email || updates.emails?.[0] || existingMeta.email,
+          phone: updates.phone || existingMeta.phone,
+          email: updates.email || existingMeta.email,
         };
 
         const { error: metaError } = await supabaseServiceRole.auth.admin.updateUserById(id, {
@@ -929,8 +927,8 @@ Please ask me your query or select a quick question template below!`;
       }
 
       // If email is updated, sync to Auth
-      if (updates.email || (updates.emails && updates.emails[0])) {
-        const newEmail = updates.email || updates.emails[0];
+      if (updates.email) {
+        const newEmail = updates.email;
         const { error: authEmailError } = await supabaseServiceRole.auth.admin.updateUserById(id, {
           email: newEmail,
           email_confirm: true

@@ -111,7 +111,7 @@ export default function AdminSupport() {
   const getCustomerForSession = (session: ChatSession) => {
     if (session.id === 'TAZU-MART-BD-OFFICIAL') return null;
     const cleanPhone = session.customerPhone.replace(/[+\s-]+/g, '');
-    return customers.find(c => c.phones.some(p => p.replace(/[+\s-]+/g, '') === cleanPhone));
+    return customers.find(c => (c.phone || '').replace(/[+\s-]+/g, '') === cleanPhone);
   };
   
   // Settings Form state
@@ -740,7 +740,7 @@ export default function AdminSupport() {
                                          if (item.action === 'open' && customer) {
                                            navigate(`/admin/customers?profile=${customer.id}`);
                                          } else if (item.action === 'orders' && customer) {
-                                           navigate(`/admin/orders?search=${customer.phones[0]}`);
+                                           navigate(`/admin/orders?search=${customer.phone}`);
                                          } else if (item.action === 'addresses') {
                                            setActiveModalView('addresses');
                                          } else if (item.action === 'tickets') {
@@ -1610,7 +1610,7 @@ export default function AdminSupport() {
                  <div className="space-y-3">
                     {(() => {
                        const customer = getCustomerForSession(currentChat);
-                       const customerTickets = tickets.filter(t => t.email === customer?.emails[0] || t.phoneNumber === currentChat.customerPhone);
+                       const customerTickets = tickets.filter(t => t.email === customer?.email || t.phoneNumber === currentChat.customerPhone);
                        
                        if (customerTickets.length === 0) {
                          return (
@@ -1657,7 +1657,7 @@ export default function AdminSupport() {
                     {(() => {
                        const customer = getCustomerForSession(currentChat);
                        const phone = currentChat.customerPhone.replace(/\s+/g, '');
-                       const email = customer?.emails[0];
+                       const email = customer?.email;
                        
                        // Filtered Data from Real Stores
                        const customerOrders = orders.filter(o => 

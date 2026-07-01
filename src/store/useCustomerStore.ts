@@ -14,7 +14,7 @@ export interface PaymentMethod {
 export interface Customer {
   id: string;
   name: string;
-  phones: string[];
+  phone: string;
   address: {
     country: string;
     city: string;
@@ -25,7 +25,7 @@ export interface Customer {
     upazila?: string;
     zipCode?: string;
   };
-  emails: string[];
+  email: string;
   whatsApp?: string;
   note?: string;
   profileImage?: string;
@@ -100,8 +100,8 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     const customers = get().customers;
     const existing = customers.find(c => 
       c.id === user.id || 
-      c.emails.includes(user.email) || 
-      (user.phone && c.phones.includes(user.phone))
+      c.email === user.email || 
+      (user.phone && c.phone === user.phone)
     );
     
     if (existing) {
@@ -124,8 +124,8 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     const customerRecord = {
       id: user.id,
       name: user.name || 'New Customer',
-      emails: [user.email],
-      phones: user.phone ? [user.phone] : [],
+      email: user.email,
+      phone: user.phone || '',
       address: {
         country: user.country || 'Bangladesh',
         city: user.city || user.district || '',

@@ -201,8 +201,8 @@ export default function App() {
                 const customerData = {
                   id: session.user.id,
                   name: name,
-                  emails: [session.user.email || ''],
-                  phones: phone ? [phone] : [],
+                  email: session.user.email || '',
+                  phone: phone,
                   address: {
                     street: meta.address || '',
                     division: meta.division || '',

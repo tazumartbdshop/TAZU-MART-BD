@@ -750,11 +750,11 @@ export default function Checkout() {
       }
 
       // Automatically create/link temporary customer profile if they don't exist
-      const exists = customers.find(c => c.phones.includes(formData.phone));
+      const exists = customers.find(c => c.phone === formData.phone);
       if (!exists) {
         addCustomer({
           name: formData.name,
-          phones: [formData.phone],
+          phone: formData.phone,
           address: {
             country: 'Bangladesh',
             division: formData.division,
@@ -765,7 +765,7 @@ export default function Checkout() {
             zipCode: formData.postalCode,
             city: formData.district || ''
           },
-          emails: formData.email ? [formData.email] : [],
+          email: formData.email || '',
           socialLinks: [],
           note: `Temporary profile created via secure checkout on ${new Date().toLocaleDateString()}`,
           status: 'Active',

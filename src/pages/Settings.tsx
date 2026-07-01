@@ -678,8 +678,8 @@ export default function SettingsPage() {
       if (currentCustomer) {
         customersStore.updateCustomer(user.id, {
           name: fullName,
-          phones: [phone],
-          emails: [email],
+          phone: phone,
+          email: email,
           gender: gender,
           occasionName: occasionJoined,
           specialDate: datesJoined

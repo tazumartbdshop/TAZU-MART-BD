@@ -283,8 +283,8 @@ export default function Register() {
         id: authData.user.id,
         uid: authData.user.id,
         name: formData.fullName,
-        email: formData.email.toLowerCase().trim() || null,
-        phone: fullPhoneNumber,
+        email: formData.email.toLowerCase().trim() || '',
+        phone: fullPhoneNumber || '',
         role: 'customer',
         status: 'Active',
         created_at: new Date().toISOString(),
@@ -308,8 +308,8 @@ export default function Register() {
       const { error: customerError } = await supabase.from('customers').insert([{
         id: authData.user.id,
         name: formData.fullName,
-        emails: [formData.email.toLowerCase().trim()].filter(Boolean),
-        phones: [fullPhoneNumber],
+        email: formData.email.toLowerCase().trim() || '',
+        phone: fullPhoneNumber || '',
         address: {
           street: formData.address.trim(),
           division: '',
@@ -349,7 +349,11 @@ export default function Register() {
 
     } catch (err: any) {
       console.error("Registration Error:", err);
-      setError(err.message || 'Registration failed. Please try again.');
+      if (err.message?.includes('rate limit')) {
+        setError('Email rate limit exceeded. Please disable "Confirm Email" in your Supabase Auth settings to continue testing, or try again in an hour.');
+      } else {
+        setError(err.message || 'Registration failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

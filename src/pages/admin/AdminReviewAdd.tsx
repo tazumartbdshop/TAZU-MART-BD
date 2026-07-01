@@ -57,8 +57,8 @@ export default function AdminReviewAdd() {
       const customer = customers.find(c => c.id === id);
       if (customer) {
         setCustomerName(customer.name);
-        setCustomerEmail(customer.emails?.[0] || '');
-        setCustomerPhone(customer.phones?.[0] || '');
+        setCustomerEmail(customer.email || '');
+        setCustomerPhone(customer.phone || '');
       }
     }
   };
