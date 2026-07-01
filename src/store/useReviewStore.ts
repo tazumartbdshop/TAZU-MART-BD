@@ -113,18 +113,18 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         .from('reviews')
         .insert([{
           product_id: newRev.productId,
-          user_id: newRev.customerId || 'anonymous',
-          customer_name: newRev.customerName || 'Anonymous',
-          rating: newRev.rating,
-          review_text: newRev.reviewText,
+          user_id: String(newRev.customerId || 'anonymous'),
+          customer_name: String(newRev.customerName || 'Anonymous'),
+          rating: Number(newRev.rating),
+          review_text: String(newRev.reviewText),
           status: newRev.status || 'approved',
-          media_urls: newRev.mediaUrls || [],
+          media_urls: Array.isArray(newRev.mediaUrls) ? newRev.mediaUrls : [],
           verified: newRev.verified ?? true,
-          phone: newRev.phone,
-          email: newRev.email,
-          order_id: newRev.orderId,
+          phone: newRev.phone ? String(newRev.phone) : null,
+          email: newRev.email ? String(newRev.email) : null,
+          order_id: newRev.orderId ? String(newRev.orderId) : null,
           device_ip: newRev.deviceIP,
-          anonymous: newRev.anonymous,
+          anonymous: !!newRev.anonymous,
           is_pinned: false,
           created_at: newRev.createdAt || new Date().toISOString()
         }])

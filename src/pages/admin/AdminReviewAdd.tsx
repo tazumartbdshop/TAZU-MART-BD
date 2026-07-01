@@ -173,8 +173,26 @@ export default function AdminReviewAdd() {
         createdAt: new Date(createdAt).toISOString()
       } as any);
 
-      toast.success('Review added successfully.');
-      navigate('/admin/reviews/list');
+      toast.success('Thank You! Your feedback has been submitted successfully.');
+      
+      // Reset Form
+      setProductId('');
+      setCustomerId('');
+      setCustomerName('');
+      setCustomerEmail('');
+      setCustomerPhone('');
+      setRating(5);
+      setReviewText('');
+      setAttachedMedia([]);
+      setVideoUrl('');
+      setStatus('approved');
+      setVerifiedToggle(true);
+      setAnonymousToggle(false);
+      setCreatedAt(new Date().toISOString().split('T')[0]);
+      setDetailedError(null);
+
+      // Navigate back to list after a short delay so user can see success
+      setTimeout(() => navigate('/admin/reviews/list'), 1500);
     } catch (err: any) {
       console.error("[Review Publish Flow Error]:", err);
       
