@@ -51,16 +51,17 @@ export default function AdminReviewAdd() {
     }
   }, [products, productId]);
 
-  useEffect(() => {
-    if (customerId) {
-      const customer = customers.find(c => c.id === customerId);
+  const handleCustomerSelect = (id: string) => {
+    setCustomerId(id);
+    if (id) {
+      const customer = customers.find(c => c.id === id);
       if (customer) {
         setCustomerName(customer.name);
         setCustomerEmail(customer.emails?.[0] || '');
         setCustomerPhone(customer.phones?.[0] || '');
       }
     }
-  }, [customerId, customers]);
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -252,7 +253,7 @@ export default function AdminReviewAdd() {
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Select Customer *</label>
               <select 
                 value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
+                onChange={(e) => handleCustomerSelect(e.target.value)}
                 className="w-full h-11 px-4 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-medium focus:outline-none focus:border-zinc-950 transition-all"
                 required
               >
