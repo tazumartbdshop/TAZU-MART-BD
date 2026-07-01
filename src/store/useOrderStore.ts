@@ -602,11 +602,21 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   deleteOrder: async (id) => {
     const supabase = getSupabase();
     if (supabase) {
-      // Delete from order_items first
-      await supabase.from('order_items').delete().eq('order_id', id);
-      // Then delete from orders
-      const { error } = await supabase.from('orders').delete().eq('id', id);
-      if (error) console.warn("[Supabase Sync Error] orders delete:", error);
+      try {
+        // 1. Delete associated reviews first if any
+        await supabase.from('reviews').delete().eq('order_id', id);
+        
+        // 2. Delete associated order items
+        await supabase.from('order_items').delete().eq('order_id', id);
+        
+        // 3. Finally delete the order itself
+        const { error } = await supabase.from('orders').delete().eq('id', id);
+        
+        if (error) throw error;
+      } catch (error) {
+        console.error("[Supabase Delete Error]:", error);
+        throw error;
+      }
     }
 
     set((state) => ({

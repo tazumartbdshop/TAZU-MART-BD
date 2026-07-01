@@ -25,8 +25,7 @@ export default function AdminIncompleteOrders() {
   const { leads, loading, fetchLeads, deleteLead, markAsRead } = useLeadStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showDbGuide, setShowDbGuide] = useState(false);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
-
+  
   useEffect(() => {
     fetchLeads();
   }, []);
@@ -45,13 +44,10 @@ export default function AdminIncompleteOrders() {
   const handleDeleteLead = async (id: string) => {
     if (window.confirm('Are you sure you want to permanently delete this lead record from the database?')) {
       try {
-        setIsDeleting(id);
         await deleteLead(id);
-        toast.success('Record removed from database');
+        toast.success('Record removed successfully');
       } catch (error) {
         toast.error('Failed to delete record');
-      } finally {
-        setIsDeleting(null);
       }
     }
   };

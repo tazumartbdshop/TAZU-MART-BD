@@ -18,7 +18,6 @@ function AdminOrderList() {
   const [viewType, setViewType] = useState('All'); // 'All' | 'Online' | 'Offline'
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any>(null);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const filteredOrders = orders.filter(order => {
     const matchesTab = activeTab === 'All' || order.status === activeTab;
@@ -56,13 +55,10 @@ function AdminOrderList() {
   const handleDeleteOrder = async (id: string) => {
     if (window.confirm('Are you sure you want to permanently delete this order and all its items from the database?')) {
       try {
-        setIsDeleting(id);
         await deleteOrder(id);
-        toast.success('Order deleted successfully from database');
+        toast.success('Order deleted successfully');
       } catch (error) {
         toast.error('Failed to delete order');
-      } finally {
-        setIsDeleting(null);
       }
     }
   };
