@@ -280,9 +280,11 @@ export default function Login() {
               <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email or Mobile Number</label>
               <div className="relative">
                 <input 
+                  id="login-identifier"
                   type="text" 
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
+                  autoComplete="username"
                   required 
                   className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
                   placeholder="Enter Email or Phone Number"
@@ -298,9 +300,11 @@ export default function Login() {
               </div>
               <div className="relative">
                 <input 
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'} 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   required 
                   className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-11 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
                   placeholder="Enter Password"

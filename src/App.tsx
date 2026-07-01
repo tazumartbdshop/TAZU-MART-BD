@@ -129,10 +129,13 @@ export default function App() {
       const { getSupabase } = await import('./lib/supabase');
       const supabase = getSupabase();
       if (supabase) {
+        let isProcessing = false;
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (event === 'SIGNED_OUT') {
             useAuthStore.getState().logout();
           } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+            if (isProcessing) return;
+            isProcessing = true;
             // Keep state synchronized with database user profile
             try {
               const { data: dbUserProfile, error } = await supabase
@@ -244,6 +247,8 @@ export default function App() {
               }
             } catch (err) {
               console.warn("Could not sync profile metadata from Supabase:", err);
+            } finally {
+              isProcessing = false;
             }
           }
         });

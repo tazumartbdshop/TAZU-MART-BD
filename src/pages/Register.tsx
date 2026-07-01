@@ -126,7 +126,8 @@ export default function Register() {
   };
 
   // Password Strength Logic
-  const evaluatePasswordStrength = (pass: string) => {
+  const passStrength = React.useMemo(() => {
+    const pass = formData.password;
     if (!pass) return { strength: 'empty', message: '', borderClass: 'border-[#E5E5E5]' };
 
     const hasLetter = /[a-zA-Z]/.test(pass);
@@ -158,18 +159,17 @@ export default function Register() {
       message: 'Medium Password',
       borderClass: 'border-amber-500 focus:border-amber-600 focus:ring-amber-500/10'
     };
-  };
+  }, [formData.password]);
 
-  const passStrength = evaluatePasswordStrength(formData.password);
   const isConfirmDisabled = passStrength.strength === 'weak' || passStrength.strength === 'empty';
 
   // Dynamic Password Suggestions based on Full Name
-  const generatePasswordSuggestions = (name: string) => {
-    const cleanName = name.trim();
-    if (!cleanName) return [];
+  const suggestions = React.useMemo(() => {
+    const name = formData.fullName.trim();
+    if (!name) return [];
 
-    const nameWithoutSpaces = cleanName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const firstWord = cleanName.split(' ')[0].replace(/[^a-zA-Z0-9]/g, '');
+    const nameWithoutSpaces = name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const firstWord = name.split(' ')[0].replace(/[^a-zA-Z0-9]/g, '');
     const firstWordCap = firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
 
     return [
@@ -177,9 +177,7 @@ export default function Register() {
       `${firstWordCap}@1234`,
       `${firstWordCap}Mart#2026`
     ];
-  };
-
-  const suggestions = generatePasswordSuggestions(formData.fullName);
+  }, [formData.fullName]);
 
   const applySuggestion = (suggestion: string) => {
     setFormData(prev => ({
@@ -606,11 +604,13 @@ export default function Register() {
             </div>
             <div className="relative">
               <input 
+                id="password"
                 type={showPassword ? 'text' : 'password'} 
                 name="password" 
                 value={formData.password} 
                 onChange={handleChange} 
                 onBlur={() => handleBlur('password')}
+                autoComplete="new-password"
                 required 
                 className={cn(
                   "w-full h-[50px] border rounded-[14px] pl-10 pr-12 text-sm outline-none transition-all duration-150",
@@ -621,8 +621,11 @@ export default function Register() {
               <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
               <button 
                 type="button" 
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-1"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowPassword(!showPassword);
+                }}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-1 z-10"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -653,12 +656,14 @@ export default function Register() {
             <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Confirm Password *</label>
             <div className="relative">
               <input 
+                id="confirmPassword"
                 type={showPassword ? 'text' : 'password'} 
                 name="confirmPassword" 
                 value={formData.confirmPassword} 
                 onChange={handleChange} 
                 onBlur={() => handleBlur('confirmPassword')}
                 disabled={isConfirmDisabled}
+                autoComplete="new-password"
                 required 
                 className={cn(
                   "w-full h-[50px] border rounded-[14px] pl-10 pr-10 text-sm outline-none transition-all duration-150",
