@@ -1216,20 +1216,38 @@ export default function AdminMarketingTracking() {
             </div>
             <div className="flex-1">
               <h3 className="text-sm font-black uppercase tracking-wider text-red-950 flex items-center gap-2">
-                Supabase Connection Audit Required
+                Database Schema Audit Failure
               </h3>
               <p className="text-xs font-bold text-red-700 mt-1 uppercase tracking-wide">
-                সুপারবেস ডাটাবেজের সাথে সংযোগ স্থাপন করা যাচ্ছে না অথবা স্কিমা ক্যাশে সমস্যা হয়েছে। অনুগ্রহ করে নিচের বিষয়টি নিশ্চিত করুন:
+                সুপারবেস ডাটাবেজে সঠিক টেবিল বা কলাম পাওয়া যায়নি। ডাটাবেজের প্রোপার স্ট্রাকচার ছাড়া কনফিগারেশন সেভ হবে না। অনুগ্রহ করে নিচের তথ্যগুলো যাচাই করুন:
               </p>
             </div>
           </div>
           
-          <div className="text-xs text-neutral-800 bg-neutral-950 text-neutral-100 p-4 rounded-lg overflow-x-auto">
-            <p className="font-semibold mb-2 text-red-400">🚨 Recommended Action Steps:</p>
-            <ol className="list-decimal list-inside space-y-1 text-neutral-300">
-              <li>Verify that your Supabase URL and Keys are correctly entered in the Admin Settings.</li>
-              <li>Ensure your active database matches the current project connection.</li>
-              <li>Click "Reload Schema" or "Refresh Schema Cache" inside your Supabase project dashboard to force API update.</li>
+          <div className="text-xs text-neutral-800 bg-neutral-950 text-neutral-100 font-mono p-4 rounded-lg overflow-x-auto relative group">
+            <pre className="whitespace-pre-wrap leading-relaxed">{dbErrorGuide}</pre>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(dbErrorGuide);
+                toast.success('📋 Copied audit details & SQL to clipboard!', {
+                  duration: 2000,
+                  style: { background: '#10b981', color: '#fff' }
+                });
+              }}
+              className="absolute top-2 right-2 px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded text-[10px] font-black uppercase tracking-wider transition-colors"
+            >
+              Copy Details / SQL
+            </button>
+          </div>
+
+          <div className="text-xs bg-red-100/60 p-3 rounded-lg border border-red-200/50 text-red-900 space-y-1">
+            <p className="font-bold flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
+              💡 Quick Resolution Steps:
+            </p>
+            <ol className="list-decimal list-inside text-xs space-y-0.5 text-neutral-800">
+              <li>যদি <code className="font-mono bg-red-200/80 px-1 rounded font-bold">settings</code> টেবিল না থাকে, তবে উপরের SQL কোডটি কপি করে Supabase SQL Editor-এ রান করুন।</li>
+              <li>যদি <code className="font-mono bg-red-200/80 px-1 rounded font-bold">value</code> কলামটি না থাকে, তবে ALTER TABLE কমান্ডটি রান করে কলামটি যুক্ত করুন।</li>
+              <li>সুপারবেস ড্যাশবোর্ডে গিয়ে <span className="font-bold">"Reload Schema" / "Refresh Schema Cache"</span> ক্লিক করুন যাতে API আপডেট হয়।</li>
             </ol>
           </div>
         </div>

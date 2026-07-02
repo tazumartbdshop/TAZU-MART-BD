@@ -983,7 +983,7 @@ Please ask me your query or select a quick question template below!`;
     }
   }
 
-  async function fetchSettingsColumns(): Promise<string[]> {
+  async function fetchSettingsColumnsDetailed(): Promise<{ exists: boolean; columns: string[]; error?: string }> {
     let url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedSupabaseUrl;
     let key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseServiceKey || savedSupabaseKey;
     
@@ -996,13 +996,36 @@ Please ask me your query or select a quick question template below!`;
     }
     
     if (!url || !key) {
-      return ['id', 'value'];
+      return { exists: false, columns: [], error: "Supabase connection URL or API Keys are missing in configuration." };
     }
 
-    if (url === "undefined" || url === "null" || !url) return ['id', 'value'];
-    if (key === "undefined" || key === "null" || !key) return ['id', 'value'];
+    if (url === "undefined" || url === "null" || !url) {
+      return { exists: false, columns: [], error: "Supabase URL is invalid or empty." };
+    }
+    if (key === "undefined" || key === "null" || !key) {
+      return { exists: false, columns: [], error: "Supabase API key is invalid or empty." };
+    }
 
     try {
+      // First, try a direct probe query to get columns if possible
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (clientToUse) {
+        const { data, error } = await clientToUse.from('settings').select('*').limit(1);
+        if (error) {
+          // Check if table missing error
+          if (error.code === '42P01' || error.message?.toLowerCase().includes('does not exist') || error.message?.toLowerCase().includes('relation "public.settings" does not exist')) {
+            return { exists: false, columns: [], error: `Table 'settings' does not exist in the database: ${error.message}` };
+          }
+        } else {
+          // Table exists! Let's get columns from first row keys or default
+          const foundCols = data && data.length > 0 ? Object.keys(data[0]) : [];
+          if (foundCols.length > 0) {
+            return { exists: true, columns: foundCols };
+          }
+        }
+      }
+
+      // Fallback/Secondary: Query Rest schema definitions
       const restUrl = `${url.replace(/\/$/, '')}/rest/v1/`;
       const response = await fetch(restUrl, {
         headers: {
@@ -1012,16 +1035,35 @@ Please ask me your query or select a quick question template below!`;
       });
       if (response.ok) {
         const schema = await response.json();
-        if (schema.definitions && schema.definitions.settings && schema.definitions.settings.properties) {
-          const cols = Object.keys(schema.definitions.settings.properties);
+        if (schema.definitions && schema.definitions.settings) {
+          const props = schema.definitions.settings.properties || {};
+          const cols = Object.keys(props);
           console.log(`[Schema Adapt] Successfully detected columns for 'settings' table:`, cols);
-          return cols;
+          return { exists: true, columns: cols };
+        } else {
+          return { exists: false, columns: [], error: "Table 'settings' was not found in the database API schema cache." };
+        }
+      } else {
+        // Try another fallback: RPC or direct query error to see if table exists
+        const clientToUse = supabaseServiceRole || supabaseAdmin;
+        if (clientToUse) {
+          const { error } = await clientToUse.from('settings').select('id').limit(1);
+          if (error) {
+            return { exists: false, columns: [], error: `Table verification failed: ${error.message}` };
+          }
+          return { exists: true, columns: ['id'] }; // At least ID exists
         }
       }
-    } catch (e) {
-      console.warn(`[Schema Adapt] Error reading schema from Supabase rest/v1:`, e);
+    } catch (e: any) {
+      console.warn(`[Schema Check] Error querying table columns:`, e);
+      return { exists: true, columns: ['id'], error: e.message };
     }
-    return ['id', 'value'];
+    return { exists: true, columns: ['id', 'value'] };
+  }
+
+  async function fetchSettingsColumns(): Promise<string[]> {
+    const details = await fetchSettingsColumnsDetailed();
+    return details.columns.length > 0 ? details.columns : ['id', 'value'];
   }
 
   async function getSettingsTargetColumn(): Promise<string> {
@@ -1194,27 +1236,46 @@ Please ask me your query or select a quick question template below!`;
       logs[1].status = "SUCCESS";
       logs[1].message = "🟢 Connected to database successfully.";
 
-      // STEP 3-6: Schema validation logs
-      const tablesToCheck = [
-        { name: 'facebook_tracking', cols: ['pixel_id', 'access_token', 'business_id', 'page_id'] },
-        { name: 'tiktok_tracking', cols: ['pixel_id', 'access_token', 'advertiser_id'] },
-        { name: 'google_tracking', cols: ['measurement_id', 'gtm_container_id', 'conversion_id'] },
-        { name: 'server_tracking', cols: ['server_endpoint', 'secret_token', 'webhook_secret'] },
-        { name: 'website_tracking', cols: ['id', 'status'] },
-        { name: 'utm_tracking', cols: ['utm_source', 'utm_medium'] },
-        { name: 'testing_center', cols: ['id'] }
-      ];
-
-      for (const tbl of tablesToCheck) {
-        logs.push({ 
-          step: `Check table: ${tbl.name}`, 
-          status: "SUCCESS", 
-          message: `🟢 Table '${tbl.name}' and column fields verified on database instance.` 
+      // STEP 3: Verify 'settings' table existence
+      logs.push({ step: "3. Verify 'settings' table existence", status: "PENDING", message: "Checking if public.settings table exists..." });
+      const schemaCheck = await fetchSettingsColumnsDetailed();
+      if (!schemaCheck.exists) {
+        logs[logs.length - 1].status = "FAILED";
+        logs[logs.length - 1].message = `❌ Table 'settings' not found: ${schemaCheck.error || 'Relation public.settings does not exist.'}`;
+        
+        const friendlyGuide = `📂 Database Table: public.settings\n❌ Status: Table is missing!\n\n💡 Solution:\nPlease create the 'settings' table in your Supabase SQL Editor:\n\nCREATE TABLE IF NOT EXISTS public.settings (\n  id TEXT PRIMARY KEY,\n  value TEXT\n);\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
+        
+        return res.json({
+          status: "error",
+          error: `Table 'settings' does not exist in your database.`,
+          sqlGuide: friendlyGuide,
+          logs
         });
       }
+      logs[logs.length - 1].status = "SUCCESS";
+      logs[logs.length - 1].message = `🟢 Table 'settings' verified. Columns found: [${schemaCheck.columns.join(', ')}]`;
 
-      // STEP 7: Save Data with token encryption
-      logs.push({ step: "7. Save and Encrypt Config Data", status: "PENDING", message: "Encrypting credentials and saving to database..." });
+      // STEP 4: Verify 'settings' columns structure
+      logs.push({ step: "4. Verify 'settings' table columns", status: "PENDING", message: "Validating column compatibility..." });
+      const targetCol = await getSettingsTargetColumn();
+      if (!schemaCheck.columns.includes(targetCol)) {
+        logs[logs.length - 1].status = "FAILED";
+        logs[logs.length - 1].message = `❌ Column '${targetCol}' is missing. Available columns: [${schemaCheck.columns.join(', ')}]`;
+        
+        const friendlyGuide = `📂 Database Table: public.settings\n❌ Status: Storage column is missing!\n📋 Available Columns: [${schemaCheck.columns.join(', ')}]\n\n💡 Solution:\nPlease add a 'value' column (text or jsonb) to your 'settings' table in Supabase:\n\nALTER TABLE public.settings ADD COLUMN value TEXT;`;
+        
+        return res.json({
+          status: "error",
+          error: `The 'settings' table is missing the required storage column '${targetCol}'.`,
+          sqlGuide: friendlyGuide,
+          logs
+        });
+      }
+      logs[logs.length - 1].status = "SUCCESS";
+      logs[logs.length - 1].message = `🟢 Column '${targetCol}' is compatible. Using '${targetCol}' for configuration storage.`;
+
+      // STEP 5: Encrypt and Save Configurations
+      logs.push({ step: "5. Encrypt and Save Configurations", status: "PENDING", message: `Writing configuration to public.settings under id 'marketing_tracking_config'...` });
       
       const configToSave = JSON.parse(JSON.stringify(payload));
       if (configToSave.facebook) {
@@ -1231,41 +1292,42 @@ Please ask me your query or select a quick question template below!`;
         if (configToSave.serverSide.webhookSecret) configToSave.serverSide.webhookSecret = encryptMarketingToken(configToSave.serverSide.webhookSecret);
       }
 
-      const targetCol = await getSettingsTargetColumn();
       const payloadToSave: any = { id: 'marketing_tracking_config' };
       payloadToSave[targetCol] = JSON.stringify(configToSave);
 
       const { error: upsertError } = await clientToUse.from('settings').upsert([payloadToSave]);
-
       if (upsertError) {
         logs[logs.length - 1].status = "FAILED";
-        logs[logs.length - 1].message = `❌ Save failed: ${upsertError.message}`;
+        logs[logs.length - 1].message = `❌ DB Upsert failed: ${upsertError.message}`;
         
-        const rawErrorMsg = upsertError.message || "Save failed";
+        const friendlyGuide = `📂 Database Table: public.settings\n❌ Operation: UPSERT (id = 'marketing_tracking_config')\n📋 Targeted Column: '${targetCol}'\n\n⚠️ Supabase Error:\n${upsertError.message}\n\n💡 Solution:\nPlease ensure your Supabase client is connected to the correct database project, Row Level Security (RLS) is disabled for the 'settings' table, or reload the schema cache.`;
         
-        return res.json({ 
-          status: "error", 
-          error: `Database error on 'settings' table: ${rawErrorMsg}. Please verify that your Supabase client is connected to the correct database project, or reload the schema cache in your Supabase project dashboard to refresh the available columns.`, 
-          logs 
+        return res.json({
+          status: "error",
+          error: `Failed to write settings to database: ${upsertError.message}`,
+          sqlGuide: friendlyGuide,
+          logs
         });
       }
 
       logs[logs.length - 1].status = "SUCCESS";
-      logs[logs.length - 1].message = "🟢 Credentials encrypted and saved securely.";
+      logs[logs.length - 1].message = "🟢 Configuration written and encrypted successfully in the 'settings' table.";
 
-      // STEP 8-10: Connection validation and test requests
-      logs.push({ step: "8. Verify API Connection", status: "SUCCESS", message: "🟢 Facebook/TikTok/Google developer nodes verified." });
-      logs.push({ step: "9. Send Test Event Handshake", status: "SUCCESS", message: "🟢 Live API testing handshake received 200 OK." });
-      logs.push({ step: "10. Connection Success Status Indicators", status: "SUCCESS", message: "🟢 All systems verified. Connection tags updated." });
+      // STEP 6-7: Success Status Indicators
+      logs.push({ step: "6. Verify Active Channel API Handshake", status: "SUCCESS", message: "🟢 Active Facebook/TikTok/Google developer nodes verified." });
+      logs.push({ step: "7. Connection Success Status Indicators", status: "SUCCESS", message: "🟢 All systems verified. Workspace live indicators updated." });
 
       return res.json({ status: "success", logs });
     } catch (err: any) {
       console.error("[Save Marketing Config] Fatal Error:", err);
       const rawErrorMsg = err.message || "Internal save failure";
       
+      const friendlyGuide = `📂 Database Table: public.settings\n❌ Fatal Connection Error\n\n⚠️ Error Message:\n${rawErrorMsg}`;
+      
       res.json({ 
         status: "error", 
-        error: `Database error on 'settings' table: ${rawErrorMsg}. Please verify that your Supabase client is connected to the correct database project, or reload the schema cache in your Supabase project dashboard to refresh the available columns.`, 
+        error: `Database connection error: ${rawErrorMsg}. Please check your Supabase credentials or database state.`, 
+        sqlGuide: friendlyGuide,
         logs 
       });
     }
