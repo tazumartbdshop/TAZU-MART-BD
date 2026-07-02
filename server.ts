@@ -101,9 +101,17 @@ async function startServer() {
   let supabaseAdmin: any = null;
   let supabaseServiceRole: any = null;
   try {
-    let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedSupabaseUrl;
-    let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseKey;
-    let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || savedSupabaseServiceKey;
+    let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+    let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (supabaseUrl === "undefined" || supabaseUrl === "null" || supabaseUrl === "") supabaseUrl = undefined;
+    if (supabaseKey === "undefined" || supabaseKey === "null" || supabaseKey === "") supabaseKey = undefined;
+    if (supabaseServiceKey === "undefined" || supabaseServiceKey === "null" || supabaseServiceKey === "") supabaseServiceKey = undefined;
+
+    supabaseUrl = supabaseUrl || savedSupabaseUrl;
+    supabaseKey = supabaseKey || savedSupabaseKey;
+    supabaseServiceKey = supabaseServiceKey || savedSupabaseServiceKey;
     
     if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
       console.log("[Server Boot] Supabase credentials empty in env/file. Attempting Firestore fallback...");
@@ -977,11 +985,12 @@ Please ask me your query or select a quick question template below!`;
 
   app.get("/api/admin/marketing/config", async (req, res) => {
     try {
-      if (!supabaseAdmin) {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (!clientToUse) {
         return res.json({ status: "success", config: {} });
       }
 
-      const { data, error } = await supabaseAdmin.from('settings').select('*').eq('id', 'marketing_tracking_config').single();
+      const { data, error } = await clientToUse.from('settings').select('*').eq('id', 'marketing_tracking_config').single();
       let config: any = {};
       
       if (!error && data && data.value) {
@@ -1116,10 +1125,11 @@ Please ask me your query or select a quick question template below!`;
 
       // STEP 2: Check Database Connection
       logs.push({ step: "2. Check Database Connection", status: "PENDING", message: "Connecting to database..." });
-      if (!supabaseAdmin) {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (!clientToUse) {
         logs[1].status = "FAILED";
         logs[1].message = "❌ Database Connection Failed. Supabase client not initialized.";
-        return res.json({ status: "error", error: "Table \"settings\" not found in database. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).", logs });
+        return res.json({ status: "error", error: "❌ Supabase database connection failed. Please ensure you have correctly configured your Supabase Credentials in the Admin Settings.", logs });
       }
       logs[1].status = "SUCCESS";
       logs[1].message = "🟢 Connected to database successfully.";
@@ -1161,18 +1171,27 @@ Please ask me your query or select a quick question template below!`;
         if (configToSave.serverSide.webhookSecret) configToSave.serverSide.webhookSecret = encryptMarketingToken(configToSave.serverSide.webhookSecret);
       }
 
-      const { error: upsertError } = await supabaseAdmin.from('settings').upsert([
+      const { error: upsertError } = await clientToUse.from('settings').upsert([
         { id: 'marketing_tracking_config', value: JSON.stringify(configToSave) }
       ]);
 
       if (upsertError) {
         logs[logs.length - 1].status = "FAILED";
         logs[logs.length - 1].message = `❌ Save failed: ${upsertError.message}`;
-        let errMsg = upsertError.message || "Save failed";
-        if (errMsg.toLowerCase().includes('settings') || errMsg.toLowerCase().includes('relation') || errMsg.toLowerCase().includes('not found')) {
-          errMsg = `-- CREATE TABLE settings IN SUPABASE SQL EDITOR\n\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
+        
+        const rawErrorMsg = upsertError.message || "Save failed";
+        let sqlGuide: string | null = null;
+        
+        if (rawErrorMsg.toLowerCase().includes('settings') || rawErrorMsg.toLowerCase().includes('relation') || rawErrorMsg.toLowerCase().includes('not found')) {
+          sqlGuide = `-- CREATE TABLE settings IN SUPABASE SQL EDITOR\n\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
         }
-        return res.json({ status: "error", error: errMsg, logs });
+        
+        return res.json({ 
+          status: "error", 
+          error: `Database error on 'settings' table: ${rawErrorMsg}`, 
+          sqlGuide,
+          logs 
+        });
       }
 
       logs[logs.length - 1].status = "SUCCESS";
@@ -1186,11 +1205,19 @@ Please ask me your query or select a quick question template below!`;
       return res.json({ status: "success", logs });
     } catch (err: any) {
       console.error("[Save Marketing Config] Fatal Error:", err);
-      let errMsg = err.message || "Internal save failure";
-      if (errMsg.toLowerCase().includes('settings') || errMsg.toLowerCase().includes('relation') || errMsg.toLowerCase().includes('not found')) {
-        errMsg = `-- CREATE TABLE settings IN SUPABASE SQL EDITOR\n\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
+      const rawErrorMsg = err.message || "Internal save failure";
+      let sqlGuide: string | null = null;
+      
+      if (rawErrorMsg.toLowerCase().includes('settings') || rawErrorMsg.toLowerCase().includes('relation') || rawErrorMsg.toLowerCase().includes('not found')) {
+        sqlGuide = `-- CREATE TABLE settings IN SUPABASE SQL EDITOR\n\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
       }
-      res.json({ status: "error", error: errMsg, logs });
+      
+      res.json({ 
+        status: "error", 
+        error: `Database error on 'settings' table: ${rawErrorMsg}`, 
+        sqlGuide,
+        logs 
+      });
     }
   });
 

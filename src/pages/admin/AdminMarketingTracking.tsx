@@ -683,10 +683,10 @@ export default function AdminMarketingTracking() {
       return "❌ Column campaign_name is missing.";
     }
     if (msg.includes('relation "settings" does not exist') || msg.includes('settings not found') || msg.includes('table "settings"') || msg.includes('relation "public.settings"')) {
-      return "❌ Table \"settings\" not found. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).";
+      return "❌ Table \"settings\" not found in database.";
     }
     if (msg.includes('marketing_tracking') || msg.includes('relation "marketing_tracking"')) {
-      return "❌ Table \"marketing_tracking\" not found. Please create a table named \"marketing_tracking\" in your database.";
+      return "❌ Table \"marketing_tracking\" not found in database.";
     }
     if (msg.includes('column') && msg.includes('missing')) {
       const match = errorMsg.match(/column\s+['"]?([a-zA-Z0-9_]+)['"]?\s+/i);
@@ -704,7 +704,7 @@ export default function AdminMarketingTracking() {
     }
 
     if (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('failed to fetch') || msg.includes('database connection') || msg.includes('connection failed')) {
-      return "❌ Table \"settings\" not found. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).";
+      return "❌ Database Connection Error: Could not connect to Supabase. Please verify your Supabase credentials in Admin Settings.";
     }
 
     return `❌ Save Failed: ${errorMsg}`;
@@ -877,8 +877,10 @@ export default function AdminMarketingTracking() {
         });
       } else {
         const errorText = data?.error || 'Validation error';
-        if (errorText.includes('CREATE TABLE') || errorText.includes('ALTER TABLE') || errorText.toLowerCase().includes('settings') || errorText.toLowerCase().includes('marketing_tracking') || errorText.toLowerCase().includes('table') || errorText.toLowerCase().includes('column')) {
-          setDbErrorGuide(errorText);
+        if (data?.sqlGuide) {
+          setDbErrorGuide(data.sqlGuide);
+        } else {
+          setDbErrorGuide(null);
         }
         const friendlyError = getFriendlyErrorMessage(errorText);
         toast.error(friendlyError, {
@@ -895,9 +897,7 @@ export default function AdminMarketingTracking() {
     } catch (err: any) {
       console.error('Save failed:', err);
       const errorText = err.message || 'Database connection error.';
-      if (errorText.includes('CREATE TABLE') || errorText.includes('ALTER TABLE') || errorText.toLowerCase().includes('settings') || errorText.toLowerCase().includes('marketing_tracking') || errorText.toLowerCase().includes('table') || errorText.toLowerCase().includes('column')) {
-        setDbErrorGuide(errorText);
-      }
+      setDbErrorGuide(null);
       const friendlyError = getFriendlyErrorMessage(errorText);
       toast.error(friendlyError, {
         duration: 4000,
