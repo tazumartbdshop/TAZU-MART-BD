@@ -1182,8 +1182,8 @@ Please ask me your query or select a quick question template below!`;
         const rawErrorMsg = upsertError.message || "Save failed";
         let sqlGuide: string | null = null;
         
-        if (rawErrorMsg.toLowerCase().includes('settings') || rawErrorMsg.toLowerCase().includes('relation') || rawErrorMsg.toLowerCase().includes('not found')) {
-          sqlGuide = `-- CREATE TABLE settings IN SUPABASE SQL EDITOR\n\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
+        if (rawErrorMsg.toLowerCase().includes('settings') || rawErrorMsg.toLowerCase().includes('relation') || rawErrorMsg.toLowerCase().includes('not found') || rawErrorMsg.toLowerCase().includes('column') || rawErrorMsg.toLowerCase().includes('value')) {
+          sqlGuide = `-- 1. যদি 'settings' টেবিল আগে থেকেই তৈরি থাকে কিন্তু 'value' কলাম না থাকে, তবে নিচের কোডটি রান করুন:\nALTER TABLE public.settings ADD COLUMN IF NOT EXISTS value TEXT;\n\n-- 2. অথবা টেবিলটি নতুনভাবে তৈরি করতে সম্পূর্ণ কোডটি রান করুন:\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value TEXT,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS ডিজেবল করতে:\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
         }
         
         return res.json({ 
@@ -1208,8 +1208,8 @@ Please ask me your query or select a quick question template below!`;
       const rawErrorMsg = err.message || "Internal save failure";
       let sqlGuide: string | null = null;
       
-      if (rawErrorMsg.toLowerCase().includes('settings') || rawErrorMsg.toLowerCase().includes('relation') || rawErrorMsg.toLowerCase().includes('not found')) {
-        sqlGuide = `-- CREATE TABLE settings IN SUPABASE SQL EDITOR\n\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
+      if (rawErrorMsg.toLowerCase().includes('settings') || rawErrorMsg.toLowerCase().includes('relation') || rawErrorMsg.toLowerCase().includes('not found') || rawErrorMsg.toLowerCase().includes('column') || rawErrorMsg.toLowerCase().includes('value')) {
+        sqlGuide = `-- 1. যদি 'settings' টেবিল আগে থেকেই তৈরি থাকে কিন্তু 'value' কলাম না থাকে, তবে নিচের কোডটি রান করুন:\nALTER TABLE public.settings ADD COLUMN IF NOT EXISTS value TEXT;\n\n-- 2. অথবা টেবিলটি নতুনভাবে তৈরি করতে সম্পূর্ণ কোডটি রান করুন:\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value TEXT,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS ডিজেবল করতে:\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
       }
       
       res.json({ 

@@ -682,7 +682,10 @@ export default function AdminMarketingTracking() {
     if (msg.includes('campaign_name') || msg.includes('campaignname')) {
       return "❌ Column campaign_name is missing.";
     }
-    if (msg.includes('relation "settings" does not exist') || msg.includes('settings not found') || msg.includes('table "settings"') || msg.includes('relation "public.settings"')) {
+    if (msg.includes('column') && msg.includes('value') && (msg.includes('settings') || msg.includes('schema cache'))) {
+      return "❌ Table 'settings' exists, but is missing the 'value' column. Please run the ALTER TABLE SQL command below in your Supabase SQL Editor.";
+    }
+    if (msg.includes('relation "settings" does not exist') || msg.includes('relation "public.settings" does not exist') || (msg.includes('settings') && (msg.includes('not found') || msg.includes('does not exist') || msg.includes('undefined')) && !msg.includes('column'))) {
       return "❌ Table \"settings\" not found in database.";
     }
     if (msg.includes('marketing_tracking') || msg.includes('relation "marketing_tracking"')) {
