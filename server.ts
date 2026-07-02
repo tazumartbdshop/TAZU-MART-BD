@@ -1170,7 +1170,7 @@ Please ask me your query or select a quick question template below!`;
         logs[logs.length - 1].message = `❌ Save failed: ${upsertError.message}`;
         let errMsg = upsertError.message || "Save failed";
         if (errMsg.toLowerCase().includes('settings') || errMsg.toLowerCase().includes('relation') || errMsg.toLowerCase().includes('not found')) {
-          errMsg = "Table \"settings\" not found. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).";
+          errMsg = `-- CREATE TABLE settings IN SUPABASE SQL EDITOR\n\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
         }
         return res.json({ status: "error", error: errMsg, logs });
       }
@@ -1188,7 +1188,7 @@ Please ask me your query or select a quick question template below!`;
       console.error("[Save Marketing Config] Fatal Error:", err);
       let errMsg = err.message || "Internal save failure";
       if (errMsg.toLowerCase().includes('settings') || errMsg.toLowerCase().includes('relation') || errMsg.toLowerCase().includes('not found')) {
-        errMsg = "Table \"settings\" not found. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).";
+        errMsg = `-- CREATE TABLE settings IN SUPABASE SQL EDITOR\n\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value JSONB NOT NULL,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
       }
       res.json({ status: "error", error: errMsg, logs });
     }

@@ -237,6 +237,7 @@ const DEFAULT_TRACKING_STATE: TrackingConfigState = {
 export default function AdminMarketingTracking() {
   const [state, setState] = useState<TrackingConfigState>(DEFAULT_TRACKING_STATE);
   const [saving, setSaving] = useState(false);
+  const [dbErrorGuide, setDbErrorGuide] = useState<string | null>(null);
   const [revealedKeys, setRevealedKeys] = useState<{ [key: string]: boolean }>({});
   const location = useLocation();
   const navigate = useNavigate();
@@ -670,6 +671,9 @@ export default function AdminMarketingTracking() {
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   const getFriendlyErrorMessage = (errorMsg: string): string => {
+    if (errorMsg.includes('CREATE TABLE') || errorMsg.includes('ALTER TABLE')) {
+      return "❌ Database Schema Error: Table or Column is missing. Please review the SQL integration guide below.";
+    }
     const msg = errorMsg.toLowerCase();
     
     if (msg.includes('tracking_id') || msg.includes('trackingid')) {
@@ -803,6 +807,7 @@ export default function AdminMarketingTracking() {
       }
 
       if (response.ok && data.status === 'success') {
+        setDbErrorGuide(null); // Clear database errors on success
         // Save locally as a secondary local fallback cache
         const configToSave = {
           facebook: {
@@ -871,7 +876,11 @@ export default function AdminMarketingTracking() {
           }
         });
       } else {
-        const friendlyError = getFriendlyErrorMessage(data.error || 'Validation error');
+        const errorText = data?.error || 'Validation error';
+        if (errorText.includes('CREATE TABLE') || errorText.includes('ALTER TABLE') || errorText.toLowerCase().includes('settings') || errorText.toLowerCase().includes('marketing_tracking') || errorText.toLowerCase().includes('table') || errorText.toLowerCase().includes('column')) {
+          setDbErrorGuide(errorText);
+        }
+        const friendlyError = getFriendlyErrorMessage(errorText);
         toast.error(friendlyError, {
           duration: 4000,
           style: {
@@ -885,7 +894,11 @@ export default function AdminMarketingTracking() {
       }
     } catch (err: any) {
       console.error('Save failed:', err);
-      const friendlyError = getFriendlyErrorMessage(err.message || 'Database connection error.');
+      const errorText = err.message || 'Database connection error.';
+      if (errorText.includes('CREATE TABLE') || errorText.includes('ALTER TABLE') || errorText.toLowerCase().includes('settings') || errorText.toLowerCase().includes('marketing_tracking') || errorText.toLowerCase().includes('table') || errorText.toLowerCase().includes('column')) {
+        setDbErrorGuide(errorText);
+      }
+      const friendlyError = getFriendlyErrorMessage(errorText);
       toast.error(friendlyError, {
         duration: 4000,
         style: {
@@ -1197,6 +1210,43 @@ export default function AdminMarketingTracking() {
           )}
         </button>
       </div>
+
+      {dbErrorGuide && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-5 shadow-sm space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="p-1.5 bg-red-600 text-white rounded-lg shrink-0">
+              <Database className="w-4 h-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-black uppercase tracking-wider text-red-950 flex items-center gap-2">
+                Database Schema Error & Integration Guide
+              </h3>
+              <p className="text-xs font-bold text-red-700 mt-1 uppercase tracking-wide">
+                সুপারবেস ডাটাবেজে সঠিক টেবিল বা কলাম পাওয়া যায়নি। এটি সমাধান করতে নিচের নির্দেশিকাটি অনুসরণ করুন:
+              </p>
+            </div>
+          </div>
+          
+          <div className="text-xs text-neutral-800 bg-neutral-950 text-neutral-100 font-mono p-4 rounded-lg overflow-x-auto relative group">
+            <pre className="whitespace-pre-wrap">{dbErrorGuide}</pre>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(dbErrorGuide);
+                toast.success('📋 Copied SQL Guide to clipboard!', {
+                  duration: 2000,
+                  style: { background: '#10b981', color: '#fff' }
+                });
+              }}
+              className="absolute top-2 right-2 px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded text-[10px] font-black uppercase tracking-wider transition-colors"
+            >
+              Copy SQL Code
+            </button>
+          </div>
+          <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-1">
+            💡 সুপাবেজ (Supabase) এর SQL Editor-এ গিয়ে এই কোডটি রান করুন, তারপর আবার "Save Workspace Layout" বাটনে চাপুন।
+          </p>
+        </div>
+      )}
 
       {/* Primary Channel Cockpit Switcher TABS - Clean Flat Design */}
       <div className="platform-tabs flex overflow-x-auto gap-2 p-2 bg-white border border-neutral-200 rounded-b-xl scrollbar-none sticky top-0 z-20 shadow-xs mb-4 !mt-0 border-t border-neutral-100">
