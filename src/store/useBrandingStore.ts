@@ -13,7 +13,7 @@ interface BrandingState {
 }
 
 export const useBrandingStore = create<BrandingState>((set, get) => ({
-  settings: DEFAULT_BRANDING_SETTINGS,
+  settings: brandingService.getFallbackSettings(),
   isLoading: false,
   isLoaded: false,
   error: null,

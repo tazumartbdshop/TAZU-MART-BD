@@ -35,6 +35,11 @@ export function Header() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { settings } = useSettingsStore();
   const { settings: branding } = useBrandingStore();
+  const isSettingsLoaded = useSettingsStore((state) => state.isLoaded);
+  const isBrandingLoaded = useBrandingStore((state) => state.isLoaded);
+
+  const logoUrl = !logoError ? (settings.storeLogo || branding.primary_logo || branding.desktop_logo || branding.mobile_logo) : '';
+  const isLoadingLogo = !isSettingsLoaded && !isBrandingLoaded;
 
   const { data: siteData, fetchSettings } = useSiteManagementStore();
 
@@ -131,15 +136,17 @@ export function Header() {
             </button>
 
             <Link to="/" className="flex items-center gap-1.5 shrink-0">
-              <div className="w-7.5 h-7.5 md:w-8.5 md:h-8.5 bg-theme-secondary rounded flex items-center justify-center text-theme-bg font-sans font-black text-base md:text-lg overflow-hidden shrink-0">
-                 {settings.storeLogo || branding.primary_logo || branding.desktop_logo ? (
+              <div className={`w-7.5 h-7.5 md:w-8.5 md:h-8.5 rounded flex items-center justify-center font-sans font-black text-base md:text-lg overflow-hidden shrink-0 ${logoUrl || isLoadingLogo ? 'bg-transparent' : 'bg-theme-secondary text-theme-bg'}`}>
+                 {logoUrl ? (
                    <img 
-                     src={settings.storeLogo || branding.primary_logo || branding.desktop_logo} 
+                     src={logoUrl} 
                      onError={() => setLogoError(true)} 
                      alt={branding.site_short_name || "Logo"} 
                      className="w-full h-full object-contain" 
                      referrerPolicy="no-referrer" 
                    />
+                 ) : isLoadingLogo ? (
+                   null
                  ) : (
                    (branding.site_name || 'T')[0]
                  )}
@@ -218,15 +225,17 @@ export function Header() {
               {/* Drawer Header */}
               <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
                 <Link to="/" className="flex items-center gap-1.5" onClick={() => setIsMobileMenuOpen(false)}>
-                  <div className="w-9 h-9 bg-neutral-950 rounded flex items-center justify-center text-white font-black text-xl overflow-hidden">
-                    {settings.storeLogo || branding.primary_logo || branding.mobile_logo ? (
+                  <div className={`w-9 h-9 rounded flex items-center justify-center font-black text-xl overflow-hidden ${logoUrl || isLoadingLogo ? 'bg-transparent' : 'bg-neutral-950 text-white'}`}>
+                    {logoUrl ? (
                       <img 
-                        src={settings.storeLogo || branding.primary_logo || branding.mobile_logo} 
+                        src={logoUrl} 
                         alt={branding.site_short_name || "Logo"} 
                         className="w-full h-full object-contain transition-all duration-300" 
                         referrerPolicy="no-referrer" 
                         onError={() => setLogoError(true)}
                       />
+                    ) : isLoadingLogo ? (
+                      null
                     ) : (
                       (settings.storeName || 'T')[0]
                     )}

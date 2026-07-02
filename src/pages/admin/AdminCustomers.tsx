@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { 
   Search, Plus, Edit, Trash2, X, Image as ImageIcon, Eye, EyeOff, Lock, Mail, 
-  Smartphone, MapPin, Calendar, Trash, RotateCw, UploadCloud, ChevronDown, Check, Sparkles, MessageSquare
+  Smartphone, MapPin, Calendar, Trash, RotateCw, UploadCloud, ChevronDown, Check, Sparkles, MessageSquare, User
 } from 'lucide-react';
 import { useCustomerStore, Customer } from '../../store/useCustomerStore';
 import { useOrderStore } from '../../store/useOrderStore';
@@ -359,6 +359,10 @@ function AdminCustomerAdd() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  const [showPassword, setShowPassword] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -373,7 +377,9 @@ function AdminCustomerAdd() {
       zipCode: ''
     },
     password: '',
-    status: 'Active' as Customer['status']
+    confirmPassword: '',
+    status: 'Active' as Customer['status'],
+    profileImage: ''
   });
 
   useEffect(() => {
@@ -391,19 +397,95 @@ function AdminCustomerAdd() {
           zipCode: editingCustomer.address.zipCode || ''
         },
         password: '',
-        status: editingCustomer.status || 'Active'
+        confirmPassword: '',
+        status: editingCustomer.status || 'Active',
+        profileImage: editingCustomer.profileImage || ''
       });
     }
   }, [editingCustomer]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+    }
+  }, [formData.address.street]);
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, profileImage: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFormData(prev => ({ ...prev, profileImage: '' }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const generatePassword = () => {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    let pass = "";
+    for (let i = 0; i < 12; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setFormData(prev => ({ ...prev, password: pass, confirmPassword: pass }));
+  };
+
+  const passStrength = useMemo(() => {
+    const pass = formData.password;
+    if (!pass) return { strength: 'empty', message: '', borderClass: 'border-[#E5E5E5]' };
+
+    const hasLetter = /[a-zA-Z]/.test(pass);
+    const hasNumber = /[0-9]/.test(pass);
+    const hasSpecial = /[@#$!%*?&]/.test(pass);
+    const isOnlyNumbers = /^[0-9]+$/.test(pass);
+
+    if (isOnlyNumbers) {
+      return {
+        strength: 'weak',
+        message: 'Password must include letters and special characters.',
+        borderClass: 'border-red-500 focus:border-red-600 focus:ring-red-500/10'
+      };
+    }
+
+    if (hasLetter && hasNumber && hasSpecial && pass.length >= 6) {
+      return {
+        strength: 'strong',
+        message: 'Strong Password',
+        borderClass: 'border-emerald-500 focus:border-emerald-600 focus:ring-emerald-500/10'
+      };
+    }
+
+    return {
+      strength: 'medium',
+      message: 'Medium Password',
+      borderClass: 'border-amber-500 focus:border-amber-600 focus:ring-amber-500/10'
+    };
+  }, [formData.password]);
+
+  const isPasswordsMatching = formData.password && formData.password === formData.confirmPassword;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name) newErrors.name = 'Full Client Legal Name is required';
-    if (!formData.phone) newErrors.phone = 'Primary Mobile Phone is required';
-    if (!formData.email) newErrors.email = 'Primary Email Address is required';
-    if (!id && !formData.password) newErrors.password = 'Initial Account Password is required';
+    if (!formData.name) newErrors.name = 'Full Name is required';
+    if (!formData.phone) newErrors.phone = 'Phone Number is required';
+    if (!formData.address.street) newErrors.address = 'Address is required';
+    if (!id && !formData.password) newErrors.password = 'Password is required';
+    if (formData.password && !isPasswordsMatching) newErrors.confirmPassword = 'Passwords do not match';
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -422,7 +504,8 @@ function AdminCustomerAdd() {
         gender: formData.gender,
         address: formData.address,
         password: formData.password || undefined,
-        status: formData.status
+        status: formData.status,
+        profileImage: formData.profileImage
       };
 
       if (id) {
@@ -442,187 +525,279 @@ function AdminCustomerAdd() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-20">
-      <div className="bg-black text-white p-8 rounded-xl flex justify-between items-center relative overflow-hidden">
-        <div className="relative z-10">
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-2 block">Configure User Logins and Days Benefits</span>
-          <h1 className="text-2xl font-black uppercase tracking-tight">
-            {id ? 'Modify Existing Client' : 'Enroll New Core Client'}
-          </h1>
-        </div>
-        <button onClick={() => navigate('/admin/customers')} className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center hover:bg-zinc-700 transition-all">
-          <X className="w-6 h-6" />
+    <div className="min-h-screen bg-neutral-50/50 flex flex-col items-center p-4 py-8 md:py-12 font-sans text-neutral-900">
+      <div className="w-full max-w-[550px] bg-white p-6 md:p-8 rounded-[24px] border border-neutral-200 shadow-sm relative">
+        <button 
+          type="button"
+          onClick={() => navigate('/admin/customers')} 
+          className="absolute right-6 top-6 w-8 h-8 bg-neutral-100 rounded-full flex items-center justify-center hover:bg-neutral-200 transition-colors"
+        >
+          <X className="w-4 h-4 text-neutral-500" />
         </button>
-      </div>
 
-      {Object.keys(errors).length > 0 && (
-        <div className="bg-rose-50 border border-rose-100 p-6 rounded-xl flex items-start gap-4">
-          <div className="w-10 h-10 bg-rose-600 rounded-lg flex items-center justify-center shrink-0">
-             <X className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h4 className="text-rose-600 font-black uppercase text-sm tracking-wider">Core Enrollment Errors Found:</h4>
-            <ul className="mt-1 space-y-0.5">
-              {Object.values(errors).map((err, i) => (
-                <li key={i} className="text-rose-500 text-xs font-bold uppercase tracking-tight">• {err}</li>
-              ))}
-            </ul>
-          </div>
+        <div className="text-center mb-6">
+          <h2 className="text-xl font-black tracking-tight uppercase">ADD CUSTOMER</h2>
         </div>
-      )}
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Core Identification */}
-        <div className="bg-white border border-zinc-200 rounded-xl p-8 space-y-8 shadow-sm">
-          <div className="flex items-center gap-4">
-             <div className="w-1 h-8 bg-purple-600 rounded-full"></div>
-             <h2 className="text-lg font-black uppercase tracking-tight">Core Identification Details</h2>
+        {Object.keys(errors).length > 0 && (
+          <div className="mb-5 p-3.5 rounded-xl bg-red-50 text-red-700 text-xs font-semibold border border-red-100 flex items-start gap-2.5">
+            <X className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <ul className="space-y-1">
+                {Object.values(errors).map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Profile Picture Box (1:1 Square) */}
+          <div className="flex flex-col items-center space-y-2 mb-4">
+            <label className="block text-[11px] font-extrabold text-neutral-500 uppercase tracking-wider">
+              Profile Picture
+            </label>
+            <div 
+              onClick={handleImageClick}
+              className="relative w-28 h-28 rounded-2xl border-2 border-dashed border-neutral-200 hover:border-black bg-neutral-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 group shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
+            >
+              {formData.profileImage ? (
+                <>
+                  <img src={formData.profileImage} alt="Preview" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white space-y-1">
+                    <ImageIcon className="w-4 h-4" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Change</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center text-center p-3 text-neutral-400 group-hover:text-neutral-600 transition-colors">
+                  <ImageIcon className="w-5 h-5 mb-1 text-neutral-400 group-hover:text-black transition-colors" />
+                  <UploadCloud className="w-3.5 h-3.5 text-neutral-300 group-hover:text-black transition-colors mb-1.5" />
+                  <span className="text-[9px] font-extrabold uppercase tracking-widest leading-none">Tap to Upload</span>
+                </div>
+              )}
+              <input 
+                ref={fileInputRef}
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageChange} 
+                className="hidden" 
+              />
+            </div>
+            {formData.profileImage && (
+              <button 
+                type="button" 
+                onClick={handleRemoveImage}
+                className="text-[10px] font-extrabold text-red-500 hover:text-red-600 uppercase tracking-wider"
+              >
+                Remove Image
+              </button>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2 md:col-span-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">Full Client Legal Name</label>
+          {/* Full Name */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Full Name *</label>
+            <div className="relative">
               <input 
                 type="text" 
                 value={formData.name}
                 onChange={e => setFormData({...formData, name: e.target.value})}
-                placeholder="Enter full name"
-                className="w-full h-14 px-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold uppercase tracking-tight focus:bg-white focus:border-black transition-all"
+                className="w-full h-[50px] border border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black rounded-[14px] pl-10 pr-10 text-sm transition-all duration-150 outline-none"
+                placeholder="Full Name" 
               />
+              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">Primary Email Address</label>
+          {/* Phone Number */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Phone Number *</label>
+            <div className="relative flex items-center">
+              <span className="absolute left-10 text-sm font-bold text-neutral-800 border-r border-neutral-200 pr-2 h-5 flex items-center select-none">
+                +880
+              </span>
+              <input 
+                type="tel" 
+                value={formData.phone}
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+                  setFormData({...formData, phone: val});
+                }}
+                className="w-full h-[50px] border border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black rounded-[14px] pl-24 pr-10 text-sm transition-all duration-150 outline-none"
+                placeholder="1834800916" 
+              />
+              <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+            </div>
+          </div>
+
+          {/* Address */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Address *</label>
+            <div className="relative">
+              <textarea 
+                ref={textareaRef}
+                value={formData.address.street}
+                onChange={e => setFormData({...formData, address: {...formData.address, street: e.target.value}})}
+                className="w-full h-[50px] min-h-[50px] max-h-[180px] border border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black rounded-[14px] py-3.5 pl-10 pr-10 text-sm transition-all duration-150 outline-none resize-none overflow-y-auto block leading-relaxed"
+                placeholder="Street Address, Village/City, Division *" 
+              />
+              <MapPin className="absolute left-3.5 top-[15px] w-4 h-4 text-neutral-400" />
+            </div>
+          </div>
+
+          {/* Email (Optional) */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Email (Optional)</label>
+            <div className="relative">
               <input 
                 type="email" 
                 value={formData.email}
                 onChange={e => setFormData({...formData, email: e.target.value})}
-                placeholder="email@example.com"
-                className="w-full h-14 px-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold lowercase tracking-tight focus:bg-white focus:border-black transition-all"
+                className="w-full h-[50px] border border-[#E5E5E5] rounded-[14px] pl-10 pr-4 text-sm focus:border-black focus:ring-1 focus:ring-black outline-none transition-all duration-150"
+                placeholder="john@example.com" 
               />
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">Gender Identity</label>
-              <select 
-                value={formData.gender}
-                onChange={e => setFormData({...formData, gender: e.target.value})}
-                className="w-full h-14 px-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold uppercase tracking-tight focus:bg-white focus:border-black transition-all"
-              >
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
+          {/* Password with Generate option */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center px-1">
+              <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider">Password {id ? '(Optional)' : '*'}</label>
+              {passStrength.strength !== 'empty' && (
+                <span className={cn(
+                  "text-[10px] font-extrabold uppercase tracking-widest",
+                  passStrength.strength === 'weak' && "text-red-500",
+                  passStrength.strength === 'medium' && "text-amber-500",
+                  passStrength.strength === 'strong' && "text-emerald-500"
+                )}>
+                  {passStrength.message}
+                </span>
+              )}
             </div>
-
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">Primary Mobile Phone</label>
+            <div className="relative">
               <input 
-                type="text" 
-                value={formData.phone}
-                onChange={e => setFormData({...formData, phone: e.target.value})}
-                placeholder="017XXXXXXXX"
-                className="w-full h-14 px-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold tracking-tight focus:bg-white focus:border-black transition-all"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">Account Password</label>
-              <input 
-                type="password" 
+                type={showPassword ? 'text' : 'password'} 
                 value={formData.password}
                 onChange={e => setFormData({...formData, password: e.target.value})}
-                placeholder={id ? "Leave empty to keep current" : "Minimum 6 characters"}
-                className="w-full h-14 px-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold tracking-tight focus:bg-white focus:border-black transition-all"
+                className={cn(
+                  "w-full h-[50px] border rounded-[14px] pl-10 pr-12 text-sm outline-none transition-all duration-150",
+                  passStrength.strength === 'empty' ? "border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black" : passStrength.borderClass
+                )}
+                placeholder={id ? "Leave blank to keep current" : "••••••••"} 
               />
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+              <button 
+                type="button" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowPassword(!showPassword);
+                }}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-1 z-10"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={generatePassword}
+                className="text-[10px] font-black uppercase text-blue-600 hover:text-blue-700 tracking-widest transition-colors flex items-center gap-1"
+              >
+                <Sparkles className="w-3 h-3" />
+                Generate Password
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* Operational Address */}
-        <div className="bg-white border border-zinc-200 rounded-xl p-8 space-y-8 shadow-sm">
-          <div className="flex items-center gap-4">
-             <div className="w-1 h-8 bg-blue-600 rounded-full"></div>
-             <h2 className="text-lg font-black uppercase tracking-tight">Operational Address Breakdown</h2>
+          {/* Confirm Password */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Confirm Password {id ? '(Optional)' : '*'}</label>
+            <div className="relative">
+              <input 
+                type={showPassword ? 'text' : 'password'} 
+                value={formData.confirmPassword}
+                onChange={e => setFormData({...formData, confirmPassword: e.target.value})}
+                className={cn(
+                  "w-full h-[50px] border rounded-[14px] pl-10 pr-10 text-sm outline-none transition-all duration-150",
+                  !formData.confirmPassword 
+                    ? "border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black" 
+                    : isPasswordsMatching
+                      ? "border-emerald-500 bg-emerald-50/5 focus:ring-1 focus:ring-emerald-500"
+                      : "border-red-500 bg-red-50/5 focus:ring-1 focus:ring-red-500"
+                )}
+                placeholder="••••••••" 
+              />
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+              {formData.confirmPassword && (
+                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center">
+                  {isPasswordsMatching ? (
+                    <Check className="w-4 h-4 text-emerald-500" />
+                  ) : (
+                    <X className="w-4 h-4 text-red-500" />
+                  )}
+                </div>
+              )}
+            </div>
+            {formData.confirmPassword && !isPasswordsMatching && (
+              <p className="text-[10.5px] text-red-500 font-bold uppercase tracking-wider ml-1 mt-1">
+                Password does not match.
+              </p>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">Division / State</label>
-              <input 
-                type="text" 
-                value={formData.address.division}
-                onChange={e => setFormData({...formData, address: {...formData.address, division: e.target.value}})}
-                placeholder="e.g. Dhaka"
-                className="w-full h-14 px-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold uppercase tracking-tight focus:bg-white focus:border-black transition-all"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">District / City</label>
-              <input 
-                type="text" 
-                value={formData.address.district}
-                onChange={e => setFormData({...formData, address: {...formData.address, district: e.target.value}})}
-                placeholder="e.g. Gazipur"
-                className="w-full h-14 px-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold uppercase tracking-tight focus:bg-white focus:border-black transition-all"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">Area / Upazila</label>
-              <input 
-                type="text" 
-                value={formData.address.upazila}
-                onChange={e => setFormData({...formData, address: {...formData.address, upazila: e.target.value}})}
-                placeholder="e.g. Tongi"
-                className="w-full h-14 px-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold uppercase tracking-tight focus:bg-white focus:border-black transition-all"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">Postal Code</label>
-              <input 
-                type="text" 
-                value={formData.address.zipCode}
-                onChange={e => setFormData({...formData, address: {...formData.address, zipCode: e.target.value}})}
-                placeholder="1700"
-                className="w-full h-14 px-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold tracking-tight focus:bg-white focus:border-black transition-all"
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <label className="block text-[11px] font-black uppercase tracking-[0.15em] text-zinc-500">Detailed Street Address</label>
-              <textarea 
-                value={formData.address.street}
-                onChange={e => setFormData({...formData, address: {...formData.address, street: e.target.value}})}
-                placeholder="House No, Road Name, Landmarks..."
-                rows={3}
-                className="w-full p-6 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-bold uppercase tracking-tight focus:bg-white focus:border-black transition-all resize-none"
-              />
+          {/* Gender selection */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Gender *</label>
+            <div className="flex gap-6 pl-1 pt-1">
+              {['Male', 'Female', 'Other'].map(g => (
+                <label key={g} className="flex items-center gap-2 cursor-pointer group">
+                  <input 
+                    type="radio" 
+                    name="gender" 
+                    value={g} 
+                    checked={formData.gender === g} 
+                    onChange={e => setFormData({...formData, gender: e.target.value})}
+                    className="w-4.5 h-4.5 accent-black text-black border-neutral-300 focus:ring-0" 
+                  />
+                  <span className="text-sm font-semibold text-neutral-700 group-hover:text-black transition-colors">{g}</span>
+                </label>
+              ))}
             </div>
           </div>
-        </div>
+          
+          {/* Status */}
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Account Status</label>
+            <div className="relative">
+              <select 
+                value={formData.status}
+                onChange={e => setFormData({...formData, status: e.target.value as Customer['status']})}
+                className="w-full h-[50px] border border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black rounded-[14px] px-4 text-sm transition-all duration-150 outline-none appearance-none bg-white"
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Suspended">Suspended</option>
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                <ChevronDown className="w-4 h-4 text-neutral-400" />
+              </div>
+            </div>
+          </div>
 
-        {/* Action Button */}
-        <div className="flex flex-col md:flex-row gap-4 pt-4">
-           <button 
-             type="button"
-             onClick={() => navigate('/admin/customers')}
-             className="flex-1 h-16 bg-white border border-zinc-200 text-zinc-500 rounded-xl text-[12px] font-black uppercase tracking-[0.2em] hover:bg-zinc-50 transition-all"
-           >
-             Discard Changes
-           </button>
-           <button 
-             type="submit"
-             disabled={isSubmitting}
-             className="flex-[2] h-16 bg-black text-white rounded-xl text-[12px] font-black uppercase tracking-[0.2em] hover:bg-zinc-900 transition-all shadow-xl shadow-black/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-           >
-             {isSubmitting ? <RotateCw className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5 text-purple-400" />}
-             {id ? 'Sync Modified Profile' : 'Enroll Core Client'}
-           </button>
-        </div>
-      </form>
+          {/* Submit Button */}
+          <button 
+            type="submit" 
+            disabled={isSubmitting} 
+            className="w-full h-[54px] bg-neutral-950 hover:bg-neutral-900 text-white rounded-[16px] font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 mt-4 transition-all duration-150 active:scale-98 shadow-[0_4px_12px_rgba(0,0,0,0.1)] disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? <RotateCw className="w-5 h-5 animate-spin" /> : 'SAVE CUSTOMER'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
+

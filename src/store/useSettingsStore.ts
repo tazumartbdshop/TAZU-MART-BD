@@ -226,14 +226,14 @@ export interface AppSettings {
 }
 
 const defaultSettings: AppSettings = {
-  storeName: '',
+  storeName: 'TAZU MART BD',
   storeEmail: '',
   contactNumber: '',
   timezone: '',
   websiteUrl: '',
   storeSlug: '',
   businessType: '',
-  storeTagline: '',
+  storeTagline: 'PREMIUM LIFETIME COLLECTION',
   storeDescription: '',
 
   primaryColor: '#000000',
@@ -489,12 +489,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       
       if (data && data.length > 0) {
         let foundUrl = '';
+        let updatedAt = '';
         const keysToSearch = ['logo_url', 'logoUrl', 'value', 'url', 'storeLogo', 'logo'];
         for (const row of data) {
           const camelRow = objectToCamel(row);
           for (const k of keysToSearch) {
             if (camelRow[k] && typeof camelRow[k] === 'string' && camelRow[k].startsWith('http')) {
               foundUrl = camelRow[k];
+              updatedAt = row.updated_at || camelRow.updatedAt || '';
               break;
             }
           }
@@ -503,8 +505,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
         if (foundUrl) {
           const cleanUrl = foundUrl.split('?')[0];
-          // Cache bust URL by appending current timestamp
-          const bustedUrl = `${cleanUrl}?t=${Date.now()}`;
+          // Use stable database updatedAt as a cache-buster instead of Date.now() to allow perfect browser caching
+          const cacheBuster = updatedAt ? `t=${encodeURIComponent(updatedAt)}` : 'v=1';
+          const bustedUrl = `${cleanUrl}?${cacheBuster}`;
           
           set((state) => ({
             settings: { ...state.settings, storeLogo: bustedUrl },

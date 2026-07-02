@@ -48,7 +48,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 import { useOrderStore } from '../../store/useOrderStore';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // Extended State interface representing all existing fields + new enterprise configurations
 interface TrackingConfigState {
@@ -63,6 +63,13 @@ interface TrackingConfigState {
   fbTestEventCode: string;
   fbCapiActive: boolean;
 
+  // Meta App & Business Manager Credentials
+  fbAppId: string;
+  fbAppSecret: string;
+  fbBusinessId: string;
+  fbAdAccountId: string;
+  fbPageId: string;
+
   // 3. TikTok Pixel
   ttPixelId: string;
   ttAccessToken: string;
@@ -72,6 +79,9 @@ interface TrackingConfigState {
   ttApiAccessToken: string;
   ttDatasetId: string;
   ttApiActive: boolean;
+  ttAdvertiserId: string;
+  ttBusinessCenterId: string;
+  ttCatalogId: string;
 
   // 5. Google Analytics 4
   ga4MeasurementId: string;
@@ -93,6 +103,8 @@ interface TrackingConfigState {
   ssEndpoint: string;
   ssSecretKey: string;
   ssActive: boolean;
+  ssWebhookSecret: string;
+  ssGatewayStatus: string;
 
   // 10. Microsoft Clarity
   clarityProjectId: string;
@@ -139,76 +151,87 @@ interface TrackingConfigState {
 }
 
 const DEFAULT_TRACKING_STATE: TrackingConfigState = {
-  fbPixelId: 'FB-9981024-X2',
-  fbAccessToken: 'EAABy36YZA1YIBADb3ZCOp05C8CO7dE0mSg1mP6mZCw9bIiz24ZC7',
-  fbActive: true,
+  fbPixelId: '',
+  fbAccessToken: '',
+  fbActive: false,
 
-  fbDatasetId: 'DS-481923182',
-  fbCapiAccessToken: 'capi_token_fb_120893120381028390',
-  fbTestEventCode: 'TEST90831',
-  fbCapiActive: true,
+  fbDatasetId: '',
+  fbCapiAccessToken: '',
+  fbTestEventCode: '',
+  fbCapiActive: false,
 
-  ttPixelId: 'TT-PXL-900381',
-  ttAccessToken: 'tt_access_89e4cbf8da029bcf8910d6a4fe3',
-  ttActive: true,
+  fbAppId: '',
+  fbAppSecret: '',
+  fbBusinessId: '',
+  fbAdAccountId: '',
+  fbPageId: '',
 
-  ttApiAccessToken: 'tt_api_tok_e901a8f2f66304cb3b4aef9b2eb8',
-  ttDatasetId: 'TT-CAT-11029',
-  ttApiActive: true,
+  ttPixelId: '',
+  ttAccessToken: '',
+  ttActive: false,
 
-  ga4MeasurementId: 'G-XNK827B1LZ',
-  ga4Active: true,
+  ttApiAccessToken: '',
+  ttDatasetId: '',
+  ttApiActive: false,
+  ttAdvertiserId: '',
+  ttBusinessCenterId: '',
+  ttCatalogId: '',
 
-  gtmId: 'GTM-K98ZFXB',
-  gtmActive: true,
+  ga4MeasurementId: '',
+  ga4Active: false,
 
-  gAdsConversionId: 'AW-110283918-X',
-  gAdsConversionLabel: 'g_ads_purchase_conv',
-  gAdsActive: true,
+  gtmId: '',
+  gtmActive: false,
 
-  webTrackingActive: true,
+  gAdsConversionId: '',
+  gAdsConversionLabel: '',
+  gAdsActive: false,
 
-  ssEndpoint: 'https://ss-capi.tazumart.com/v1/collect',
-  ssSecretKey: 'ss_tok_ef48a901f4cb3b4aef9b2eb8c1507d',
-  ssActive: true,
+  webTrackingActive: false,
 
-  clarityProjectId: 'CL-8921B',
-  clarityActive: true,
+  ssEndpoint: '',
+  ssSecretKey: '',
+  ssActive: false,
+  ssWebhookSecret: '',
+  ssGatewayStatus: '',
 
-  pinterestTagId: 'PN-9018A',
+  clarityProjectId: '',
+  clarityActive: false,
+
+  pinterestTagId: '',
   pinterestActive: false,
 
-  snapchatPixelId: 'SN-91028X',
+  snapchatPixelId: '',
   snapchatActive: false,
 
-  linkedinPartnerId: 'LI-772159',
+  linkedinPartnerId: '',
   linkedinActive: false,
 
-  fbDomainVerificationCode: 'meta-verification-9812na09n8fba102',
+  fbDomainVerificationCode: '',
   fbCatalogFeedUrl: 'https://ss-capi.tazumart.com/feeds/facebook-catalog.xml',
-  fbCatalogFeedActive: true,
+  fbCatalogFeedActive: false,
 
-  gSearchConsoleVerificationId: 'google-site-verification=xn08912u12b89da12',
-  gMerchantCenterId: 'MC-892102931',
-  gMerchantActive: true,
+  gSearchConsoleVerificationId: '',
+  gMerchantCenterId: '',
+  gMerchantActive: false,
 
-  trackUserJourney: true,
-  trackSessionRecording: true,
-  trackClicks: true,
-  trackScrollDepth: true,
-  trackFormSubmissions: true,
-  trackCustomSearchTriggers: true,
+  trackUserJourney: false,
+  trackSessionRecording: false,
+  trackClicks: false,
+  trackScrollDepth: false,
+  trackFormSubmissions: false,
+  trackCustomSearchTriggers: false,
 
-  gEnhancedConversionsActive: true,
+  gEnhancedConversionsActive: false,
   eventDeduplicationWindow: 15,
 
-  notifyOnPixelFailure: true,
-  notifyWeeklyReportByEmail: true,
-  notifyTelegramBotToken: '730198231:AAF_u8912u8a9sbN_89u01f112',
-  notifyTelegramChatId: '-100819238',
+  notifyOnPixelFailure: false,
+  notifyWeeklyReportByEmail: false,
+  notifyTelegramBotToken: '',
+  notifyTelegramChatId: '',
   notifyTelegramActive: false,
 
-  adSpendBudget: 1500, // mock monthly ad budget in USD for ROAS
+  adSpendBudget: 0,
 };
 
 export default function AdminMarketingTracking() {
@@ -216,7 +239,13 @@ export default function AdminMarketingTracking() {
   const [saving, setSaving] = useState(false);
   const [revealedKeys, setRevealedKeys] = useState<{ [key: string]: boolean }>({});
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'facebook' | 'tiktok' | 'google' | 'website' | 'serverside' | 'pinterest' | 'snapchat' | 'linkedin' | 'microsoft' | 'attribution' | 'notifications' | 'testing'>('facebook');
+
+  const handleTabClick = (tabId: string) => {
+    setActiveTab(tabId as any);
+    navigate(`/admin/marketing/${tabId}`);
+  };
 
   const [verifyingCard, setVerifyingCard] = useState<string | null>(null);
 
@@ -306,6 +335,42 @@ export default function AdminMarketingTracking() {
         }
       });
     }, 1200);
+  };
+
+  const [verifyingMeta, setVerifyingMeta] = useState(false);
+  const [metaVerifyResult, setMetaVerifyResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleVerifyMetaConnection = async () => {
+    setVerifyingMeta(true);
+    setMetaVerifyResult(null);
+    try {
+      const response = await fetch('/api/admin/marketing/verify-facebook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pixelId: state.fbPixelId,
+          accessToken: state.fbAccessToken || state.fbCapiAccessToken,
+          appId: state.fbAppId,
+          appSecret: state.fbAppSecret,
+          businessId: state.fbBusinessId,
+          adAccountId: state.fbAdAccountId,
+          pageId: state.fbPageId
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMetaVerifyResult({ success: true, message: data.message });
+        toast.success(data.message, { id: 'meta-v-success' });
+      } else {
+        setMetaVerifyResult({ success: false, message: data.error });
+        toast.error(data.error, { id: 'meta-v-error' });
+      }
+    } catch (e) {
+      setMetaVerifyResult({ success: false, message: '🔴 Connection verification failed.' });
+      toast.error('Connection verification failed.', { id: 'meta-v-error' });
+    } finally {
+      setVerifyingMeta(false);
+    }
   };
 
   const handleSetupClick = (tab: 'facebook' | 'tiktok' | 'google' | 'serverside' | 'website') => {
@@ -519,220 +584,258 @@ export default function AdminMarketingTracking() {
   const { orders } = useOrderStore();
 
   useEffect(() => {
-    const saved = localStorage.getItem('tazumart_marketing_center_config_v2');
-    if (saved) {
+    const fetchConfig = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        setState(prev => ({
-          ...prev,
-          fbPixelId: parsed.facebook?.pixelId || parsed.fbPixelId || prev.fbPixelId,
-          fbAccessToken: parsed.facebook?.accessToken || parsed.fbAccessToken || prev.fbAccessToken,
-          fbActive: parsed.facebook?.active !== undefined ? parsed.facebook.active : prev.fbActive,
+        const response = await fetch('/api/admin/marketing/config');
+        if (response.ok) {
+          const resData = await response.json();
+          if (resData.status === 'success' && resData.config) {
+            const parsed = resData.config;
+            setState(prev => ({
+              ...prev,
+              fbPixelId: parsed.facebook?.pixelId || '',
+              fbAccessToken: parsed.facebook?.accessToken || '',
+              fbActive: parsed.facebook?.active || false,
+              fbDatasetId: parsed.facebook?.datasetId || '',
+              fbCapiAccessToken: parsed.facebook?.conversionApiToken || '',
+              fbTestEventCode: parsed.facebook?.testEventCode || '',
+              fbCapiActive: parsed.facebook?.activeCapi || false,
+              fbAppId: parsed.facebook?.appId || '',
+              fbAppSecret: parsed.facebook?.appSecret || '',
+              fbBusinessId: parsed.facebook?.businessId || '',
+              fbAdAccountId: parsed.facebook?.adAccountId || '',
+              fbPageId: parsed.facebook?.pageId || '',
 
-          fbDatasetId: parsed.facebook?.datasetId || parsed.fbDatasetId || prev.fbDatasetId,
-          fbCapiAccessToken: parsed.facebook?.conversionApiToken || parsed.fbCapiAccessToken || prev.fbCapiAccessToken,
-          fbTestEventCode: parsed.facebook?.testEventCode || parsed.fbTestEventCode || prev.fbTestEventCode,
-          fbCapiActive: parsed.facebook?.activeCapi !== undefined ? parsed.facebook.activeCapi : prev.fbCapiActive,
+              ttPixelId: parsed.tiktok?.pixelId || '',
+              ttAccessToken: parsed.tiktok?.accessToken || '',
+              ttActive: parsed.tiktok?.active || false,
+              ttApiAccessToken: parsed.tiktok?.eventApiToken || '',
+              ttDatasetId: parsed.tiktok?.datasetId || '',
+              ttApiActive: parsed.tiktok?.activeApi || false,
+              ttAdvertiserId: parsed.tiktok?.advertiserId || '',
+              ttBusinessCenterId: parsed.tiktok?.businessCenterId || '',
+              ttCatalogId: parsed.tiktok?.catalogId || '',
 
-          ttPixelId: parsed.tiktok?.pixelId || parsed.ttPixelId || prev.ttPixelId,
-          ttAccessToken: parsed.tiktok?.accessToken || parsed.ttAccessToken || prev.ttAccessToken,
-          ttActive: parsed.tiktok?.active !== undefined ? parsed.tiktok.active : prev.ttActive,
+              ga4MeasurementId: parsed.google?.measurementId || '',
+              ga4Active: parsed.google?.active || false,
+              gtmId: parsed.google?.gtmContainerId || '',
+              gtmActive: parsed.google?.gtmActive || false,
+              gAdsConversionId: parsed.google?.conversionId || '',
+              gAdsConversionLabel: parsed.google?.conversionLabel || '',
+              gAdsActive: parsed.google?.activeAds || false,
+              gSearchConsoleVerificationId: parsed.google?.searchConsoleVerification || '',
+              gMerchantCenterId: parsed.google?.merchantCenterId || '',
+              gMerchantActive: parsed.google?.merchantActive || false,
 
-          ttApiAccessToken: parsed.tiktok?.eventApiToken || parsed.ttApiAccessToken || prev.ttApiAccessToken,
-          ttDatasetId: parsed.tiktok?.datasetId || parsed.ttDatasetId || prev.ttDatasetId,
-          ttApiActive: parsed.tiktok?.activeApi !== undefined ? parsed.tiktok.activeApi : prev.ttApiActive,
+              webTrackingActive: parsed.websiteTracking?.active || false,
+              trackUserJourney: parsed.websiteTracking?.trackUserJourney || false,
+              trackSessionRecording: parsed.websiteTracking?.trackSessionRecording || false,
+              trackClicks: parsed.websiteTracking?.trackClicks || false,
+              trackScrollDepth: parsed.websiteTracking?.trackScrollDepth || false,
+              trackFormSubmissions: parsed.websiteTracking?.trackFormSubmissions || false,
+              trackCustomSearchTriggers: parsed.websiteTracking?.trackCustomSearchTriggers || false,
 
-          ga4MeasurementId: parsed.google?.measurementId || parsed.ga4MeasurementId || prev.ga4MeasurementId,
-          ga4Active: parsed.google?.active !== undefined ? parsed.google.active : prev.ga4Active,
+              ssEndpoint: parsed.serverSide?.endpointUrl || '',
+              ssSecretKey: parsed.serverSide?.trackingToken || '',
+              ssActive: parsed.serverSide?.active || false,
+              ssWebhookSecret: parsed.serverSide?.webhookSecret || '',
+              ssGatewayStatus: parsed.serverSide?.gatewayStatus || '',
 
-          gtmId: parsed.google?.gtmContainerId || parsed.gtmId || prev.gtmId,
-          gtmActive: parsed.google?.gtmActive !== undefined ? parsed.google.gtmActive : prev.gtmActive,
+              fbDomainVerificationCode: parsed.fbDomainVerificationCode || '',
+              fbCatalogFeedUrl: parsed.fbCatalogFeedUrl || 'https://ss-capi.tazumart.com/feeds/facebook-catalog.xml',
+              fbCatalogFeedActive: parsed.fbCatalogFeedActive || false,
 
-          gAdsConversionId: parsed.google?.conversionId || parsed.gAdsConversionId || prev.gAdsConversionId,
-          gAdsConversionLabel: parsed.google?.conversionLabel || parsed.gAdsConversionLabel || prev.gAdsConversionLabel,
-          gAdsActive: parsed.google?.activeAds !== undefined ? parsed.google.activeAds : prev.gAdsActive,
-
-          webTrackingActive: parsed.websiteTracking?.active !== undefined ? parsed.websiteTracking.active : prev.webTrackingActive,
-
-          ssEndpoint: parsed.serverSide?.endpointUrl || parsed.ssEndpoint || prev.ssEndpoint,
-          ssSecretKey: parsed.serverSide?.trackingToken || parsed.ssSecretKey || prev.ssSecretKey,
-          ssActive: parsed.serverSide?.active !== undefined ? parsed.serverSide.active : prev.ssActive,
-
-          clarityProjectId: parsed.clarity?.projectId || parsed.clarityProjectId || prev.clarityProjectId,
-          clarityActive: parsed.clarity?.active !== undefined ? parsed.clarity.active : prev.clarityActive,
-
-          pinterestTagId: parsed.pinterest?.tagId || parsed.pinterestTagId || prev.pinterestTagId,
-          pinterestActive: parsed.pinterest?.active !== undefined ? parsed.pinterest.active : prev.pinterestActive,
-
-          snapchatPixelId: parsed.snapchat?.pixelId || parsed.snapchatPixelId || prev.snapchatPixelId,
-          snapchatActive: parsed.snapchat?.active !== undefined ? parsed.snapchat.active : prev.snapchatActive,
-
-          linkedinPartnerId: parsed.linkedin?.partnerId || parsed.linkedinPartnerId || prev.linkedinPartnerId,
-          linkedinActive: parsed.linkedin?.active !== undefined ? parsed.linkedin.active : prev.linkedinActive,
-
-          fbDomainVerificationCode: parsed.fbDomainVerificationCode || prev.fbDomainVerificationCode,
-          fbCatalogFeedUrl: parsed.fbCatalogFeedUrl || prev.fbCatalogFeedUrl,
-          fbCatalogFeedActive: parsed.fbCatalogFeedActive !== undefined ? parsed.fbCatalogFeedActive : prev.fbCatalogFeedActive,
-
-          gSearchConsoleVerificationId: parsed.gSearchConsoleVerificationId || prev.gSearchConsoleVerificationId,
-          gMerchantCenterId: parsed.gMerchantCenterId || prev.gMerchantCenterId,
-          gMerchantActive: parsed.gMerchantActive !== undefined ? parsed.gMerchantActive : prev.gMerchantActive,
-
-          trackUserJourney: parsed.trackUserJourney !== undefined ? parsed.trackUserJourney : prev.trackUserJourney,
-          trackSessionRecording: parsed.trackSessionRecording !== undefined ? parsed.trackSessionRecording : prev.trackSessionRecording,
-          trackClicks: parsed.trackClicks !== undefined ? parsed.trackClicks : prev.trackClicks,
-          trackScrollDepth: parsed.trackScrollDepth !== undefined ? parsed.trackScrollDepth : prev.trackScrollDepth,
-          trackFormSubmissions: parsed.trackFormSubmissions !== undefined ? parsed.trackFormSubmissions : prev.trackFormSubmissions,
-          trackCustomSearchTriggers: parsed.trackCustomSearchTriggers !== undefined ? parsed.trackCustomSearchTriggers : prev.trackCustomSearchTriggers,
-
-          gEnhancedConversionsActive: parsed.gEnhancedConversionsActive !== undefined ? parsed.gEnhancedConversionsActive : prev.gEnhancedConversionsActive,
-          eventDeduplicationWindow: parsed.eventDeduplicationWindow || prev.eventDeduplicationWindow,
-
-          notifyOnPixelFailure: parsed.notifyOnPixelFailure !== undefined ? parsed.notifyOnPixelFailure : prev.notifyOnPixelFailure,
-          notifyWeeklyReportByEmail: parsed.notifyWeeklyReportByEmail !== undefined ? parsed.notifyWeeklyReportByEmail : prev.notifyWeeklyReportByEmail,
-          notifyTelegramBotToken: parsed.notifyTelegramBotToken || prev.notifyTelegramBotToken,
-          notifyTelegramChatId: parsed.notifyTelegramChatId || prev.notifyTelegramChatId,
-          notifyTelegramActive: parsed.notifyTelegramActive !== undefined ? parsed.notifyTelegramActive : prev.notifyTelegramActive,
-
-          adSpendBudget: parsed.adSpendBudget || prev.adSpendBudget,
-        }));
+              gEnhancedConversionsActive: parsed.gEnhancedConversionsActive || false,
+              eventDeduplicationWindow: parsed.eventDeduplicationWindow || 15,
+              notifyOnPixelFailure: parsed.notifyOnPixelFailure || false,
+              notifyWeeklyReportByEmail: parsed.notifyWeeklyReportByEmail || false,
+              notifyTelegramBotToken: parsed.notifyTelegramBotToken || '',
+              notifyTelegramChatId: parsed.notifyTelegramChatId || '',
+              notifyTelegramActive: parsed.notifyTelegramActive || false,
+              adSpendBudget: parsed.adSpendBudget || 0,
+            }));
+          }
+        }
       } catch (err) {
-        console.error('Error parsing saved marketing config:', err);
-      }
-    }
-
-    // Populate initial logs with gorgeous test data so it is colorful on load
-    setLogs([
-      {
-        id: Math.random().toString(),
-        timestamp: new Date(Date.now() - 1200000).toLocaleTimeString(),
-        channel: 'Facebook Pixel Client',
-        eventName: 'PageView',
-        status: 'SUCCESS',
-        payload: { page_url: 'https://tazumart.com/', user_agent: 'Chrome/125.0', fp_cookie: '_fbp.1.58392182.90' }
-      },
-      {
-        id: Math.random().toString(),
-        timestamp: new Date(Date.now() - 950000).toLocaleTimeString(),
-        channel: 'Google Analytics stream',
-        eventName: 'view_item',
-        status: 'SUCCESS',
-        payload: { item_id: 'prod-901', item_name: 'Genuine Leather Wallet', price: 1850, currency: 'BDT' }
-      },
-      {
-        id: Math.random().toString(),
-        timestamp: new Date(Date.now() - 400000).toLocaleTimeString(),
-        channel: 'Meta Conversions API',
-        eventName: 'AddToCart',
-        status: 'SUCCESS',
-        payload: { event_source_url: 'https://tazumart.com/wallets', client_ip_address: '103.111.45.2', event_id: 'event_cart_981290a' }
-      }
-    ]);
-  }, []);
-
-  const handleSave = () => {
-    setSaving(true);
-    // Backward compatible nested object saving + our primary tracking state structure
-    const configToSave = {
-      ...state,
-      facebook: {
-        active: state.fbActive,
-        pixelId: state.fbPixelId,
-        accessToken: state.fbAccessToken,
-        datasetId: state.fbDatasetId,
-        conversionApiToken: state.fbCapiAccessToken,
-        testEventCode: state.fbTestEventCode,
-        activeCapi: state.fbCapiActive,
-        events: {
-          pageView: true,
-          viewContent: true,
-          search: true,
-          addToWishlist: true,
-          addToCart: true,
-          initiateCheckout: true,
-          purchase: true,
-        }
-      },
-      tiktok: {
-        active: state.ttActive,
-        pixelId: state.ttPixelId,
-        accessToken: state.ttAccessToken,
-        eventApiToken: state.ttApiAccessToken,
-        datasetId: state.ttDatasetId,
-        activeApi: state.ttApiActive,
-        events: {
-          pageView: true,
-          viewContent: true,
-          search: true,
-          addToCart: true,
-          checkout: true,
-          purchase: true,
-        }
-      },
-      google: {
-        active: state.ga4Active,
-        measurementId: state.ga4MeasurementId,
-        gtmContainerId: state.gtmId,
-        conversionId: state.gAdsConversionId,
-        conversionLabel: state.gAdsConversionLabel,
-        gtmActive: state.gtmActive,
-        activeAds: state.gAdsActive,
-        events: {
-          productView: true,
-          search: true,
-          addToCart: true,
-          beginCheckout: true,
-          purchase: true,
-        }
-      },
-      websiteTracking: {
-        active: state.webTrackingActive,
-      },
-      serverSide: {
-        active: state.ssActive,
-        endpointUrl: state.ssEndpoint,
-        trackingToken: state.ssSecretKey,
-      },
-      clarity: {
-        active: state.clarityActive,
-        projectId: state.clarityProjectId
-      },
-      pinterest: {
-        active: state.pinterestActive,
-        tagId: state.pinterestTagId
-      },
-      snapchat: {
-        active: state.snapchatActive,
-        pixelId: state.snapchatPixelId
-      },
-      linkedin: {
-        active: state.linkedinActive,
-        partnerId: state.linkedinPartnerId
+        console.error('Failed to load marketing config from API:', err);
       }
     };
+    fetchConfig();
 
-    setTimeout(() => {
-      localStorage.setItem('tazumart_marketing_center_config_v2', JSON.stringify(configToSave));
-      // Save to alternative storage key for compatibility across other components
-      localStorage.setItem('tazu_mart_marketing_config', JSON.stringify({
-        facebook: { ...configToSave.facebook, status: state.fbActive && state.fbPixelId ? 'CONNECTED' : 'NOT_CONNECTED' },
-        tiktok: { ...configToSave.tiktok, status: state.ttActive && state.ttPixelId ? 'CONNECTED' : 'NOT_CONNECTED' },
-        google: { ...configToSave.google, status: state.ga4Active && state.ga4MeasurementId ? 'CONNECTED' : 'NOT_CONNECTED' }
-      }));
+    // Populate initial logs with empty array as requested to remove all mock/demo data
+    setLogs([]);
+  }, []);
 
-      setSaving(false);
-      toast.success('Enterprise Analytics & Marketing Suite Saved!', {
-        duration: 3000,
-        style: {
-          background: '#18181b',
-          color: '#ffffff',
-          fontWeight: 'bold',
-          borderRadius: '8px',
-          border: '1px solid #27272a',
-          fontSize: '12px',
-        }
+  const [saveLogs, setSaveLogs] = useState<Array<{ step: string; status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'SKIPPED'; message: string }>>([]);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setShowSaveModal(true);
+    setSaveLogs([
+      { step: 'Init', status: 'PENDING', message: 'Initiating Enterprise Tracking Core Save...' }
+    ]);
+
+    try {
+      // Send configurations to our new live REST integration endpoint
+      const response = await fetch('/api/admin/marketing/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facebook: {
+            active: state.fbActive,
+            pixelId: state.fbPixelId,
+            accessToken: state.fbAccessToken,
+            datasetId: state.fbDatasetId,
+            conversionApiToken: state.fbCapiAccessToken,
+            testEventCode: state.fbTestEventCode,
+            activeCapi: state.fbCapiActive,
+            appId: state.fbAppId,
+            appSecret: state.fbAppSecret,
+            businessId: state.fbBusinessId,
+            adAccountId: state.fbAdAccountId,
+            pageId: state.fbPageId
+          },
+          tiktok: {
+            active: state.ttActive,
+            pixelId: state.ttPixelId,
+            accessToken: state.ttAccessToken,
+            eventApiToken: state.ttApiAccessToken,
+            datasetId: state.ttDatasetId,
+            activeApi: state.ttApiActive,
+            advertiserId: state.ttAdvertiserId,
+            businessCenterId: state.ttBusinessCenterId,
+            catalogId: state.ttCatalogId
+          },
+          google: {
+            active: state.ga4Active,
+            measurementId: state.ga4MeasurementId,
+            gtmContainerId: state.gtmId,
+            conversionId: state.gAdsConversionId,
+            conversionLabel: state.gAdsConversionLabel,
+            gtmActive: state.gtmActive,
+            activeAds: state.gAdsActive,
+            searchConsoleVerification: state.gSearchConsoleVerificationId,
+            merchantCenterId: state.gMerchantCenterId,
+            merchantActive: state.gMerchantActive
+          },
+          serverSide: {
+            active: state.ssActive,
+            endpointUrl: state.ssEndpoint,
+            trackingToken: state.ssSecretKey,
+            webhookSecret: state.ssWebhookSecret
+          },
+          websiteTracking: {
+            active: state.webTrackingActive,
+            trackUserJourney: state.trackUserJourney,
+            trackSessionRecording: state.trackSessionRecording,
+            trackClicks: state.trackClicks,
+            trackScrollDepth: state.trackScrollDepth,
+            trackFormSubmissions: state.trackFormSubmissions,
+            trackCustomSearchTriggers: state.trackCustomSearchTriggers
+          }
+        })
       });
-    }, 1000);
+
+      const data = await response.json();
+
+      if (response.ok && data.status === 'success') {
+        const backendLogs = data.logs || [];
+        setSaveLogs([]);
+        
+        // Stream the logs one by one for maximum visual impact
+        for (let i = 0; i < backendLogs.length; i++) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+          setSaveLogs(prev => [...prev, backendLogs[i]]);
+        }
+
+        // Save locally as a secondary local fallback cache
+        const configToSave = {
+          facebook: {
+            active: state.fbActive,
+            pixelId: state.fbPixelId,
+            accessToken: state.fbAccessToken,
+            datasetId: state.fbDatasetId,
+            conversionApiToken: state.fbCapiAccessToken,
+            testEventCode: state.fbTestEventCode,
+            activeCapi: state.fbCapiActive,
+            appId: state.fbAppId,
+            appSecret: state.fbAppSecret,
+            businessId: state.fbBusinessId,
+            adAccountId: state.fbAdAccountId,
+            pageId: state.fbPageId
+          },
+          tiktok: {
+            active: state.ttActive,
+            pixelId: state.ttPixelId,
+            accessToken: state.ttAccessToken,
+            eventApiToken: state.ttApiAccessToken,
+            datasetId: state.ttDatasetId,
+            activeApi: state.ttApiActive,
+            advertiserId: state.ttAdvertiserId,
+            businessCenterId: state.ttBusinessCenterId,
+            catalogId: state.ttCatalogId
+          },
+          google: {
+            active: state.ga4Active,
+            measurementId: state.ga4MeasurementId,
+            gtmContainerId: state.gtmId,
+            conversionId: state.gAdsConversionId,
+            conversionLabel: state.gAdsConversionLabel,
+            gtmActive: state.gtmActive,
+            activeAds: state.gAdsActive,
+            searchConsoleVerification: state.gSearchConsoleVerificationId,
+            merchantCenterId: state.gMerchantCenterId,
+            merchantActive: state.gMerchantActive
+          },
+          serverSide: {
+            active: state.ssActive,
+            endpointUrl: state.ssEndpoint,
+            trackingToken: state.ssSecretKey,
+            webhookSecret: state.ssWebhookSecret
+          },
+          websiteTracking: {
+            active: state.webTrackingActive,
+            trackUserJourney: state.trackUserJourney,
+            trackSessionRecording: state.trackSessionRecording,
+            trackClicks: state.trackClicks,
+            trackScrollDepth: state.trackScrollDepth,
+            trackFormSubmissions: state.trackFormSubmissions,
+            trackCustomSearchTriggers: state.trackCustomSearchTriggers
+          }
+        };
+        localStorage.setItem('tazumart_marketing_center_config_v2', JSON.stringify(configToSave));
+
+        toast.success('🟢 Enterprise Analytics & Marketing Suite Saved & Verified!', {
+          duration: 3000,
+          style: {
+            background: '#18181b',
+            color: '#ffffff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            border: '1px solid #27272a',
+            fontSize: '12px',
+          }
+        });
+      } else {
+        const errorLogs = data.logs || [
+          { step: 'Error', status: 'FAILED', message: data.error || 'Validation error' }
+        ];
+        setSaveLogs(errorLogs);
+        toast.error(`🔴 Save Failed: ${data.error || 'Form validation mismatch'}`, {
+          duration: 4000
+        });
+      }
+    } catch (err: any) {
+      console.error('Save failed:', err);
+      setSaveLogs(prev => [
+        ...prev,
+        { step: 'Database Connection', status: 'FAILED', message: '❌ Network connection error: Server-side REST endpoint timed out.' }
+      ]);
+      toast.error('🔴 Database connection error.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleReveal = (key: string) => {
@@ -751,7 +854,7 @@ export default function AdminMarketingTracking() {
 
   // Test Events dispatcher function block
   // Test Events dispatcher function block with real configuration validation
-  const triggerTestEvent = (channel: 'facebook' | 'tiktok' | 'google' | 'serverside', eventName: string, customPayload?: any) => {
+  const triggerTestEvent = async (channel: 'facebook' | 'tiktok' | 'google' | 'serverside', eventName: string, customPayload?: any) => {
     const id = Math.random().toString();
     
     // Evaluate validity on the fly
@@ -779,9 +882,9 @@ export default function AdminMarketingTracking() {
       } else if (!state.ttPixelId.trim()) {
         finalStatus = 'ERROR';
         errorMessage = '🔴 Missing TikTok Pixel ID.';
-      } else if (state.ttPixelId.trim().length < 6) {
+      } else if (!/^[A-Za-z0-9_]{13,18}$/.test(state.ttPixelId.trim())) {
         finalStatus = 'ERROR';
-        errorMessage = `🔴 TikTok Pixel ID "${state.ttPixelId}" is too short for meta-validation.`;
+        errorMessage = `🔴 TikTok Pixel ID "${state.ttPixelId}" is invalid. Format must be alphanumeric 13-18 characters.`;
       }
     } else if (channel === 'google') {
       if (!state.ga4Active && !state.gtmActive) {
@@ -789,7 +892,7 @@ export default function AdminMarketingTracking() {
         errorMessage = '🔴 Both Google Analytics and Tag Manager are inactive. Toggle active channels on Google page first.';
       } else if (state.ga4Active && !isGa4MeasurementValid) {
         finalStatus = 'ERROR';
-        errorMessage = `🔴 Invalid GA4 Measurement ID: "${state.ga4MeasurementId}". Formatting must correspond to "G-[A-Za-z0-9]{10}" template.`;
+        errorMessage = `🔴 Invalid GA4 Measurement ID: "${state.ga4MeasurementId}". Formatting must correspond to "G-XXXXXXXXXX" template.`;
       }
     } else if (channel === 'serverside') {
       if (!state.ssActive) {
@@ -806,38 +909,40 @@ export default function AdminMarketingTracking() {
 
     const payloadChannelName = channel === 'facebook' ? 'Meta Conversions API' : channel === 'tiktok' ? 'TikTok Events Stream' : channel === 'google' ? 'GA4 Data Stream' : 'Secure S2S Gate';
 
+    const defaultPayload = customPayload || {
+      event_time: Math.floor(Date.now() / 1000),
+      event_name: eventName,
+      action_source: 'website',
+      user_data: {
+        client_user_agent: navigator.userAgent,
+        client_ip_address: '109.124.9.412',
+        fbp: 'fb.1.' + Math.random().toString(36).substring(7),
+        external_id: 'customer_77189a'
+      },
+      custom_data: {
+        currency: 'BDT',
+        value: eventName === 'Purchase' ? 4400 : eventName === 'AddToCart' ? 1200 : 0,
+        content_type: 'product',
+        content_name: 'Premium Leather Loafers Bangladesh',
+        content_category: 'Footwear > Premium'
+      }
+    };
+
     const newLog = {
       id,
       timestamp: new Date().toLocaleTimeString(),
       channel: payloadChannelName,
       eventName,
       status: 'SENDING' as const,
-      payload: customPayload || {
-        event_time: Math.floor(Date.now() / 1000),
-        event_name: eventName,
-        action_source: 'website',
-        user_data: {
-          client_user_agent: navigator.userAgent,
-          client_ip_address: '109.124.9.412',
-          fbp: 'fb.1.' + Math.random().toString(36).substring(7),
-          external_id: 'customer_77189a'
-        },
-        custom_data: {
-          currency: 'BDT',
-          value: eventName === 'Purchase' ? 4400 : eventName === 'AddToCart' ? 1200 : 0,
-          content_type: 'product',
-          content_name: 'Premium Leather Loafers Bangladesh',
-          content_category: 'Footwear > Premium'
-        }
-      }
+      payload: defaultPayload
     };
 
     setLogs(prev => [...prev, newLog]);
 
-    setTimeout(() => {
-      setLogs(prev => prev.map(item => {
-        if (item.id === id) {
-          if (finalStatus === 'ERROR') {
+    if (finalStatus === 'ERROR') {
+      setTimeout(() => {
+        setLogs(prev => prev.map(item => {
+          if (item.id === id) {
             return {
               ...item,
               status: 'ERROR' as any,
@@ -846,19 +951,54 @@ export default function AdminMarketingTracking() {
                 event_meta: item.payload
               }
             };
-          } else {
-            return { ...item, status: 'SUCCESS' as any };
           }
+          return item;
+        }));
+        toast.error(`🔴 Event Failed! Reason: ${errorMessage.substring(2)}`, { id: 'test-event-toast-err', duration: 4000 });
+      }, 500);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/marketing/test-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: payloadChannelName,
+          eventName,
+          payload: defaultPayload
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setLogs(prev => prev.map(item => {
+          if (item.id === id) {
+            return {
+              ...item,
+              status: 'SUCCESS' as any,
+              payload: result
+            };
+          }
+          return item;
+        }));
+        toast.success(`🟢 Event Fired Successfully to ${payloadChannelName}! (Response: ${result.responseTime})`, { id: 'test-event-toast-success', duration: 2500 });
+      } else {
+        throw new Error('Failed response');
+      }
+    } catch (err) {
+      setLogs(prev => prev.map(item => {
+        if (item.id === id) {
+          return {
+            ...item,
+            status: 'ERROR' as any,
+            payload: { error: "🔴 Failed to transmit test event payload to Server-Side API gateway." }
+          };
         }
         return item;
       }));
-
-      if (finalStatus === 'ERROR') {
-        toast.error(`🔴 Event Failed! Reason: ${errorMessage.substring(2)}`, { id: 'test-event-toast-err', duration: 4000 });
-      } else {
-        toast.success(`🟢 Event Fired Successfully to ${payloadChannelName}!`, { id: 'test-event-toast-success', duration: 2500 });
-      }
-    }, 600);
+      toast.error(`🔴 Connection timeout. API server unreachable.`, { id: 'test-event-toast-err' });
+    }
   };
 
   // Auto Scroll Logger Stream down
@@ -893,6 +1033,39 @@ export default function AdminMarketingTracking() {
     return /^\d{10,18}$/.test(state.fbPixelId.trim());
   }, [state.fbPixelId]);
 
+  const isFbAccessTokenValid = useMemo(() => {
+    return state.fbAccessToken.trim().length >= 40;
+  }, [state.fbAccessToken]);
+
+  const isFbCapiAccessTokenValid = useMemo(() => {
+    return state.fbCapiAccessToken.trim().length >= 40;
+  }, [state.fbCapiAccessToken]);
+
+  const isFbAppIdValid = useMemo(() => {
+    return /^\d{10,18}$/.test(state.fbAppId.trim());
+  }, [state.fbAppId]);
+
+  const isFbAppSecretValid = useMemo(() => {
+    return /^[a-f0-9]{32}$/i.test(state.fbAppSecret.trim());
+  }, [state.fbAppSecret]);
+
+  const isFbBusinessIdValid = useMemo(() => {
+    return /^\d{10,18}$/.test(state.fbBusinessId.trim());
+  }, [state.fbBusinessId]);
+
+  const isFbAdAccountIdValid = useMemo(() => {
+    const val = state.fbAdAccountId.trim();
+    return /^\d{10,18}$/.test(val) || /^act_\d+$/.test(val);
+  }, [state.fbAdAccountId]);
+
+  const isFbPageIdValid = useMemo(() => {
+    return /^\d{10,18}$/.test(state.fbPageId.trim());
+  }, [state.fbPageId]);
+
+  const isFbDatasetIdValid = useMemo(() => {
+    return /^\d{10,18}$/.test(state.fbDatasetId.trim());
+  }, [state.fbDatasetId]);
+
   const isGa4MeasurementValid = useMemo(() => {
     return /^G-[A-Za-z0-9]{10}$/i.test(state.ga4MeasurementId.trim());
   }, [state.ga4MeasurementId]);
@@ -907,21 +1080,31 @@ export default function AdminMarketingTracking() {
     }
   }, [state.ssEndpoint]);
 
+  const renderFieldIndicator = (value: string, isValid: boolean, errorText: string) => {
+    if (!value || String(value).trim() === '') {
+      return (
+        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded border tracking-wider bg-red-50 text-red-700 border-red-250 font-mono">
+          🔴 Required
+        </span>
+      );
+    }
+    return (
+      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border tracking-wider font-mono ${
+        isValid 
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-250' 
+          : 'bg-red-50 text-red-700 border-red-250'
+      }`}>
+        {isValid ? '🟢 Verified' : `🔴 ${errorText}`}
+      </span>
+    );
+  };
+
   return (
-    <div className="space-y-6 font-sans text-neutral-900 pb-12">
+    <div className="space-y-4 font-sans text-neutral-900 pb-12">
       
       {/* Enterprise Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 border border-neutral-200 bg-white shadow-xs rounded-xl gap-4">
+      <div className="meta-signal-suite flex flex-col md:flex-row justify-between items-start md:items-center p-6 border border-neutral-200 bg-white shadow-xs rounded-t-xl gap-4 border-b-0">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] bg-black text-white font-black px-2.5 py-0.5 rounded-full uppercase tracking-[0.2em]">
-              V3 Enterprise Core
-            </span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              ANALYTICS SYSTEM ACTIVE
-            </span>
-          </div>
           <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight text-neutral-900 flex items-center gap-2.5">
             <div className="p-1.5 bg-black text-white rounded-lg">
               <Megaphone className="w-5 h-5 text-yellow-400" />
@@ -952,52 +1135,30 @@ export default function AdminMarketingTracking() {
         </button>
       </div>
 
-      {/* Dynamic Tracking Format Mismatch Alert Banner */}
-      {Object.keys(activeErrors).length > 0 && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl shadow-xs space-y-2 animate-bounce">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-red-600 shrink-0" />
-            <span className="text-xs font-black uppercase text-red-900 font-sans tracking-wide font-black">Tracking Mismatch Errors Detected!</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-[11px] font-extrabold text-red-700 uppercase pl-7">
-            {Object.values(activeErrors).map((err, i) => (
-              <div key={i} className="flex items-center gap-1">
-                <span className="w-1 h-1 rounded-full bg-red-600 shrink-0" />
-                <span>{err}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Primary Channel Cockpit Switcher TABS */}
-      <div className="flex overflow-x-auto gap-1.5 p-2 bg-neutral-100 border border-neutral-250 rounded-xl scrollbar-none sticky top-0 z-20 shadow-xs mb-2">
+      {/* Primary Channel Cockpit Switcher TABS - Clean Flat Design */}
+      <div className="platform-tabs flex overflow-x-auto gap-2 p-2 bg-white border border-neutral-200 rounded-b-xl scrollbar-none sticky top-0 z-20 shadow-xs mb-4 !mt-0 border-t border-neutral-100">
         {[
-          { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'hover:text-blue-600 hover:bg-blue-50/50' },
-          { id: 'tiktok', name: 'TikTok', icon: Video, color: 'hover:text-rose-600 hover:bg-rose-50/50' },
-          { id: 'google', name: 'Google', icon: Globe, color: 'hover:text-neutral-900 hover:bg-neutral-50' },
-          { id: 'serverside', name: 'Server Side', icon: Zap, color: 'hover:text-teal-600 hover:bg-teal-50/50' },
-          { id: 'website', name: 'Website Tracking', icon: Fingerprint, color: 'hover:text-indigo-600 hover:bg-indigo-50/50' },
-          { id: 'pinterest', name: 'Pinterest', icon: Tag, color: 'hover:text-red-500 hover:bg-red-50/50' },
-          { id: 'snapchat', name: 'Snapchat', icon: Sparkles, color: 'hover:text-yellow-600 hover:bg-yellow-50/50' },
-          { id: 'linkedin', name: 'LinkedIn', icon: UserCheck, color: 'hover:text-sky-600 hover:bg-sky-50/50' },
-          { id: 'microsoft', name: 'Clarity', icon: SlidersHorizontal, color: 'hover:text-pink-600 hover:bg-pink-50/50' },
-          { id: 'attribution', name: 'Attribution & UTM', icon: BarChart3, color: 'hover:text-purple-600 hover:bg-purple-50/50' },
-          { id: 'testing', name: 'Testing Center', icon: Terminal, color: 'hover:text-emerald-600 hover:bg-emerald-50/50' }
+          { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'hover:text-blue-600 hover:bg-blue-50/40' },
+          { id: 'tiktok', name: 'TikTok', icon: Video, color: 'hover:text-rose-600 hover:bg-rose-50/40' },
+          { id: 'google', name: 'Google', icon: Globe, color: 'hover:text-neutral-900 hover:bg-neutral-100/50' },
+          { id: 'serverside', name: 'Server Side', icon: Zap, color: 'hover:text-teal-600 hover:bg-teal-50/40' },
+          { id: 'website', name: 'Website Tracking', icon: Fingerprint, color: 'hover:text-indigo-600 hover:bg-indigo-50/40' },
+          { id: 'attribution', name: 'Attribution & UTM', icon: BarChart3, color: 'hover:text-purple-600 hover:bg-purple-50/40' },
+          { id: 'testing', name: 'Testing Center', icon: Terminal, color: 'hover:text-emerald-600 hover:bg-emerald-50/40' }
         ].map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all shrink-0 ${
+              onClick={() => handleTabClick(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-md text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all shrink-0 border ${
                 isActive 
-                  ? 'bg-zinc-950 text-white shadow-sm border border-zinc-950 scale-102' 
-                  : `bg-white text-neutral-600 border border-neutral-200/80 ${tab.color}`
+                  ? 'bg-zinc-950 text-white shadow-sm border-zinc-950 font-black' 
+                  : `bg-white text-neutral-600 border-neutral-200 ${tab.color}`
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-yellow-405' : 'text-neutral-500'}`} />
+              <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white' : 'text-neutral-500'}`} />
               <span>{tab.name}</span>
             </button>
           );
@@ -1043,26 +1204,9 @@ export default function AdminMarketingTracking() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     
                     {/* Panel: Facebook Pixel */}
-                    <div className={`border rounded-xl p-5 space-y-4 shadow-xs transition-all ${
-                      !state.fbPixelId 
-                        ? 'bg-white border-neutral-200' 
-                        : isFbPixelValid 
-                          ? 'bg-white border-emerald-500 ring-1 ring-emerald-500/25' 
-                          : 'bg-red-50/10 border-red-500 ring-1 ring-red-500/25'
-                    }`}>
+                    <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4 shadow-xs">
                       <div className="flex justify-between items-center border-b border-neutral-100 pb-2.5 font-sans">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black uppercase text-neutral-900">Facebook Pixel</span>
-                          {state.fbPixelId && (
-                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border tracking-wider ${
-                              isFbPixelValid 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-250 font-black text-[9px]' 
-                                : 'bg-red-50 text-red-700 border-red-250 font-black text-[9px]'
-                            }`}>
-                              {isFbPixelValid ? '🟢 Verified' : '🔴 Invalid Pixel ID'}
-                            </span>
-                          )}
-                        </div>
+                        <span className="text-xs font-black uppercase text-neutral-900">Core Pixel Settings</span>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-bold text-neutral-400">ENABLE</span>
                           <button 
@@ -1074,57 +1218,66 @@ export default function AdminMarketingTracking() {
                         </div>
                       </div>
 
-                      <div className="space-y-3 font-sans">
+                      <div className="space-y-4 font-sans">
                         <div>
-                          <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block mb-1">Pixel ID</label>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">Pixel ID</label>
+                            {renderFieldIndicator(state.fbPixelId, isFbPixelValid, 'Invalid Pixel ID')}
+                          </div>
                           <input 
                             type="text"
                             value={state.fbPixelId}
                             onChange={(e) => handleChange('fbPixelId', e.target.value)}
                             placeholder="e.g. 9981024"
-                            className={`w-full bg-neutral-50 text-neutral-900 rounded-lg h-9 px-3 text-xs font-black tracking-wider focus:outline-none focus:bg-white focus:ring-1 focus:ring-black transition-all ${
-                              !state.fbPixelId 
-                                ? 'border border-neutral-200' 
-                                : isFbPixelValid 
-                                  ? 'border border-emerald-500 ring-1 ring-emerald-500 focus:ring-emerald-500 text-emerald-950 font-black' 
-                                  : 'border border-red-500 ring-1 ring-red-500 focus:ring-red-500 text-red-900 font-bold'
-                            }`}
+                            className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-black tracking-wider focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
                           />
-                          {state.fbPixelId && !isFbPixelValid && (
-                            <p className="text-[9px] text-red-650 font-black uppercase mt-1">
-                              🔴 Invalid Pixel ID: must be 10-18 numeric digits only.
-                            </p>
-                          )}
                         </div>
 
                         <div>
                           <div className="flex justify-between items-center mb-1">
-                            <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">Access Token</label>
+                            <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">Pixel Access Token</label>
+                            {renderFieldIndicator(state.fbAccessToken, isFbAccessTokenValid, 'Invalid Token')}
+                          </div>
+                          <div className="relative">
+                            <input 
+                              type={revealedKeys['fbAccessToken'] ? 'text' : 'password'}
+                              value={state.fbAccessToken}
+                              onChange={(e) => handleChange('fbAccessToken', e.target.value)}
+                              placeholder="e.g. EAABy36..."
+                              className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 pl-3 pr-10 text-xs font-semibold tracking-wide focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
+                            />
                             <button 
+                              type="button"
                               onClick={() => toggleReveal('fbAccessToken')}
-                              className="text-[9px] font-bold text-neutral-400 hover:text-black uppercase tracking-wider flex items-center gap-1"
+                              className="absolute right-3 top-2.5 text-neutral-400 hover:text-black"
                             >
-                              {revealedKeys['fbAccessToken'] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              {revealedKeys['fbAccessToken'] ? 'Hide' : 'Reveal'}
+                              {revealedKeys['fbAccessToken'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                           </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">Dataset ID</label>
+                            {renderFieldIndicator(state.fbDatasetId, isFbDatasetIdValid, 'Invalid Dataset ID')}
+                          </div>
                           <input 
-                            type={revealedKeys['fbAccessToken'] ? 'text' : 'password'}
-                            value={state.fbAccessToken}
-                            onChange={(e) => handleChange('fbAccessToken', e.target.value)}
-                            placeholder="e.g. EAABy36..."
-                            className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-semibold tracking-wide focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
+                            type="text"
+                            value={state.fbDatasetId}
+                            onChange={(e) => handleChange('fbDatasetId', e.target.value)}
+                            placeholder="e.g. 481923182"
+                            className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-black tracking-wider focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
                           />
                         </div>
                       </div>
                     </div>
 
-                    {/* Panel: Meta Conversion API */}
+                    {/* Panel: Meta Conversion API & App Credentials */}
                     <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4 shadow-xs">
-                      <div className="flex justify-between items-center border-b border-neutral-100 pb-2.5">
-                        <span className="text-xs font-black uppercase text-neutral-900 font-mono">Meta Conversion API</span>
+                      <div className="flex justify-between items-center border-b border-neutral-100 pb-2.5 font-sans">
+                        <span className="text-xs font-black uppercase text-neutral-900">Developer & CAPI Credentials</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-neutral-400 font-mono">CAPI</span>
+                          <span className="text-[10px] font-bold text-neutral-400">CAPI</span>
                           <button 
                             onClick={() => handleChange('fbCapiActive', !state.fbCapiActive)}
                             className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none ${state.fbCapiActive ? 'bg-blue-600' : 'bg-neutral-200'}`}
@@ -1134,36 +1287,67 @@ export default function AdminMarketingTracking() {
                         </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block mb-1 font-mono">Dataset ID (Pixel Dataset)</label>
-                          <input 
-                            type="text"
-                            value={state.fbDatasetId}
-                            onChange={(e) => handleChange('fbDatasetId', e.target.value)}
-                            placeholder="e.g. DS-481923182"
-                            className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-black tracking-wider focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
-                          />
+                      <div className="space-y-4 font-sans">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">App ID</label>
+                              {renderFieldIndicator(state.fbAppId, isFbAppIdValid, 'Invalid App ID')}
+                            </div>
+                            <input 
+                              type="text"
+                              value={state.fbAppId}
+                              onChange={(e) => handleChange('fbAppId', e.target.value)}
+                              placeholder="e.g. 84128491"
+                              className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-black tracking-wider focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
+                            />
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">App Secret</label>
+                              {renderFieldIndicator(state.fbAppSecret, isFbAppSecretValid, 'Invalid Secret')}
+                            </div>
+                            <div className="relative">
+                              <input 
+                                type={revealedKeys['fbAppSecret'] ? 'text' : 'password'}
+                                value={state.fbAppSecret}
+                                onChange={(e) => handleChange('fbAppSecret', e.target.value)}
+                                placeholder="e.g. f83c..."
+                                className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 pl-3 pr-10 text-xs font-semibold focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
+                              />
+                              <button 
+                                type="button"
+                                onClick={() => toggleReveal('fbAppSecret')}
+                                className="absolute right-3 top-2.5 text-neutral-400 hover:text-black"
+                              >
+                                {revealedKeys['fbAppSecret'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
                         </div>
 
                         <div>
                           <div className="flex justify-between items-center mb-1">
-                            <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block font-mono">Server Access Token (Bearer)</label>
+                            <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">Conversion API Token</label>
+                            {renderFieldIndicator(state.fbCapiAccessToken, isFbCapiAccessTokenValid, 'Invalid CAPI Token')}
+                          </div>
+                          <div className="relative">
+                            <input 
+                              type={revealedKeys['fbCapiAccessToken'] ? 'text' : 'password'}
+                              value={state.fbCapiAccessToken}
+                              onChange={(e) => handleChange('fbCapiAccessToken', e.target.value)}
+                              placeholder="e.g. capi_token_fb..."
+                              className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 pl-3 pr-10 text-xs font-semibold tracking-wide focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
+                            />
                             <button 
+                              type="button"
                               onClick={() => toggleReveal('fbCapiAccessToken')}
-                              className="text-[9px] font-bold text-neutral-400 hover:text-black uppercase tracking-wider flex items-center gap-1 font-mono"
+                              className="absolute right-3 top-2.5 text-neutral-400 hover:text-black"
                             >
-                              {revealedKeys['fbCapiAccessToken'] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              {revealedKeys['fbCapiAccessToken'] ? 'Hide' : 'Reveal'}
+                              {revealedKeys['fbCapiAccessToken'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                           </div>
-                          <input 
-                            type={revealedKeys['fbCapiAccessToken'] ? 'text' : 'password'}
-                            value={state.fbCapiAccessToken}
-                            onChange={(e) => handleChange('fbCapiAccessToken', e.target.value)}
-                            placeholder="e.g. capi_token_fb..."
-                            className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-semibold tracking-wide focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
-                          />
                         </div>
 
                         <div>
@@ -1174,6 +1358,58 @@ export default function AdminMarketingTracking() {
                             onChange={(e) => handleChange('fbTestEventCode', e.target.value)}
                             placeholder="e.g. TEST90831"
                             className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-black uppercase tracking-wider focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Panel: Account Connection Parameters */}
+                    <div className="bg-white border border-neutral-200 rounded-xl p-5 space-y-4 shadow-xs md:col-span-2">
+                      <div className="border-b border-neutral-100 pb-2.5">
+                        <span className="text-xs font-black uppercase text-neutral-900">Facebook Account & Asset Parameters</span>
+                        <p className="text-[10px] text-neutral-400 mt-0.5">Asset references used to coordinate catalog events and campaign telemetry</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">Business Manager ID</label>
+                            {renderFieldIndicator(state.fbBusinessId, isFbBusinessIdValid, 'Not Connected')}
+                          </div>
+                          <input 
+                            type="text"
+                            value={state.fbBusinessId}
+                            onChange={(e) => handleChange('fbBusinessId', e.target.value)}
+                            placeholder="e.g. 74819238"
+                            className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-black tracking-wider focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">Ad Account ID</label>
+                            {renderFieldIndicator(state.fbAdAccountId, isFbAdAccountIdValid, 'Not Connected')}
+                          </div>
+                          <input 
+                            type="text"
+                            value={state.fbAdAccountId}
+                            onChange={(e) => handleChange('fbAdAccountId', e.target.value)}
+                            placeholder="e.g. act_1823912 or numeric"
+                            className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-black tracking-wider focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <label className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 block">Facebook Page ID</label>
+                            {renderFieldIndicator(state.fbPageId, isFbPageIdValid, 'Not Connected')}
+                          </div>
+                          <input 
+                            type="text"
+                            value={state.fbPageId}
+                            onChange={(e) => handleChange('fbPageId', e.target.value)}
+                            placeholder="e.g. 481923182"
+                            className="w-full bg-neutral-50 border border-neutral-200 text-neutral-900 rounded-lg h-9 px-3 text-xs font-black tracking-wider focus:outline-none focus:bg-white focus:ring-1 focus:ring-black"
                           />
                         </div>
                       </div>
@@ -1308,6 +1544,43 @@ export default function AdminMarketingTracking() {
                       </div>
                     </div>
 
+                  </div>
+
+                  {/* Real-time Connection Verifiers and Actions */}
+                  <div className="bg-white border border-neutral-200 rounded-xl p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-xs font-black uppercase text-neutral-900">Integration Control Panel</h4>
+                      <p className="text-[10px] text-neutral-500 font-bold uppercase mt-0.5 font-mono">Test individual events or run a full verified webhook handshake simulation</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2.5 w-full sm:w-auto">
+                      <button 
+                        type="button"
+                        onClick={handleVerifyMetaConnection}
+                        disabled={verifyingMeta}
+                        className="flex-1 sm:flex-initial h-10 px-5 bg-neutral-900 hover:bg-neutral-800 text-white font-extrabold uppercase text-[10px] tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {verifyingMeta ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>Verifying Credentials...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Verify Connection</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button 
+                        type="button"
+                        onClick={() => triggerTestEvent('facebook', 'PageView')}
+                        className="flex-1 sm:flex-initial h-10 px-5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold uppercase text-[10px] tracking-wider rounded-lg transition-all flex items-center justify-center gap-2"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
+                        <span>Test Event</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2437,6 +2710,75 @@ export default function AdminMarketingTracking() {
             </motion.div>
           </AnimatePresence>
         </div>
+
+      {/* Visual Activity Log Verification Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white border border-neutral-200 rounded-xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col"
+          >
+            <div className="bg-zinc-950 px-6 py-4 flex justify-between items-center text-white">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-emerald-400 animate-pulse" />
+                <span className="font-mono text-xs uppercase tracking-[2px] font-black">Suite Verification Console</span>
+              </div>
+              {!saving && (
+                <button 
+                  onClick={() => setShowSaveModal(false)}
+                  className="text-zinc-400 hover:text-white transition-colors"
+                >
+                  <XCircle className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-96 space-y-3.5 bg-neutral-50/50">
+              {saveLogs.map((log, index) => (
+                <div key={index} className="flex gap-3 bg-white p-3.5 rounded-lg border border-neutral-200 shadow-2xs">
+                  <div className="shrink-0 mt-0.5">
+                    {log.status === 'SUCCESS' ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    ) : log.status === 'FAILED' ? (
+                      <XCircle className="w-5 h-5 text-red-500" />
+                    ) : log.status === 'SKIPPED' ? (
+                      <HelpCircle className="w-5 h-5 text-neutral-400" />
+                    ) : (
+                      <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black uppercase text-neutral-900 tracking-wider">
+                      {log.step}
+                    </p>
+                    <p className="text-xs text-neutral-600 mt-1 font-medium leading-relaxed break-words">
+                      {log.message}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              
+              {saving && (
+                <div className="flex items-center justify-center gap-2 py-6 text-neutral-500 font-bold uppercase text-[10px] tracking-widest">
+                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-500" />
+                  <span>Validating credentials with live system...</span>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-neutral-100 p-4 border-t border-neutral-200 flex justify-end gap-3">
+              <button
+                disabled={saving}
+                onClick={() => setShowSaveModal(false)}
+                className="px-4 py-2 bg-zinc-950 text-white rounded text-[11px] font-black uppercase tracking-wider disabled:opacity-50 hover:bg-zinc-800 transition-colors"
+              >
+                Close Verification Log
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
     </div>
   );

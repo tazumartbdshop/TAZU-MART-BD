@@ -174,10 +174,6 @@ export const defaultNavItems: NavItem[] = [
       { name: 'Google', path: '/admin/marketing/google', icon: Globe },
       { name: 'Server Side Tracking', path: '/admin/marketing/serverside', icon: Zap },
       { name: 'Website Tracking', path: '/admin/marketing/website', icon: Fingerprint },
-      { name: 'Pinterest', path: '/admin/marketing/pinterest', icon: Tag },
-      { name: 'Snapchat', path: '/admin/marketing/snapchat', icon: Sparkles },
-      { name: 'LinkedIn', path: '/admin/marketing/linkedin', icon: UserCheck },
-      { name: 'Microsoft Clarity', path: '/admin/marketing/microsoft', icon: SlidersHorizontal },
       { name: 'Attribution & UTM', path: '/admin/marketing/attribution', icon: BarChart3 },
       { name: 'Testing Center', path: '/admin/marketing/testing', icon: Terminal }
     ]

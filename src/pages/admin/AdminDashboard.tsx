@@ -605,6 +605,7 @@ export default function AdminDashboard() {
               <Route path="/theme-settings" element={<PermissionGate moduleId="settings"><AdminThemeSettings /></PermissionGate>} />
               <Route path="/flutter-manager" element={<PermissionGate moduleId="settings"><FlutterManager /></PermissionGate>} />
               <Route path="/activity-logs" element={<PermissionGate moduleId="logs"><ComingSoon title="Activity Logs" /></PermissionGate>} />
+              <Route path="/marketing/*" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
               <Route path="/banner/create" element={<PermissionGate moduleId="banners"><AdminBanners /></PermissionGate>} />
               <Route path="/banner/list" element={<PermissionGate moduleId="banners"><BannerListing /></PermissionGate>} />
               <Route path="/flutter-banner" element={<PermissionGate moduleId="banners"><AdminFlutterBanner /></PermissionGate>} />

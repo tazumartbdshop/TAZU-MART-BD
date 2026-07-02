@@ -68,34 +68,63 @@ export const siteManagementService = {
     
     try {
       const { data, error } = await supabase.from('site_management').select('*').eq('id', 'global').limit(1);
+      
+      if (error) {
+        console.warn("[Developer Log] Fetch settings failed (table might be missing):", error.message);
+        return DEFAULT_DATA;
+      }
+
       if (data && data.length > 0) {
         return { ...DEFAULT_DATA, ...data[0] };
       } else {
-        await supabase.from('site_management').upsert([{ id: 'global', ...DEFAULT_DATA }]);
+        const { error: insertError } = await supabase.from('site_management').upsert([{ id: 'global', ...DEFAULT_DATA }]);
+        if (insertError) {
+          console.warn("[Developer Log] Insert defaults failed:", insertError.message);
+        }
         return DEFAULT_DATA;
       }
     } catch (e) {
-      console.warn("Supabase getSettings failed, using defaults:", e);
+      console.warn("[Developer Log] Supabase getSettings exception:", e);
       return DEFAULT_DATA;
     }
   },
 
   async updateSettings(updates: Partial<SiteManagementData>): Promise<void> {
     const supabase = getSupabase();
-    if (!supabase) return;
+    if (!supabase) throw new Error('System configuration error.');
     
     try {
+      // Don't use getSettings here, as it might return DEFAULT_DATA if table is missing,
+      // and we want to know if the table actually exists before upserting.
+      
+      // Let's first check if table exists by doing a simple select
+      const { error: checkError } = await supabase.from('site_management').select('id').limit(1);
+      
+      if (checkError) {
+        console.error("[Developer Log] Table check failed before update:", checkError.message);
+        throw new Error('System synchronization failed. Please try again later.');
+      }
+
       const current = await this.getSettings();
       const updated = {
         ...current,
         ...updates,
         updated_at: Date.now()
       };
+      
       const { error } = await supabase.from('site_management').upsert([{ id: 'global', ...updated }]);
-      if (error && error.code !== '42P01') throw error;
-    } catch (e) {
-      console.error("Supabase updateSettings failed:", e);
-      throw e;
+      
+      if (error) {
+        console.error("[Developer Log] Supabase upsert failed:", error.message);
+        throw new Error('Failed to save settings. System error occurred.');
+      }
+    } catch (e: any) {
+      console.error("[Developer Log] Supabase updateSettings exception:", e);
+      // Ensure we never leak table/schema names to UI
+      const safeErrorMessage = e.message?.includes('schema') || e.message?.includes('table') || e.message?.includes('relation') 
+        ? 'Settings could not be saved. System synchronization failed.' 
+        : (e.message || 'Settings could not be saved.');
+      throw new Error(safeErrorMessage);
     }
   },
 
@@ -105,24 +134,40 @@ export const siteManagementService = {
     
     try {
       const { data, error } = await supabase.from('link_pages').select('*');
-      if (error && error.code !== '42P01') throw error;
+      if (error) {
+        console.warn("[Developer Log] Fetch link_pages failed:", error.message);
+        return [];
+      }
       return (data || []) as LinkPage[];
     } catch (e) {
-      console.error("Supabase getLinkPages failed:", e);
+      console.error("[Developer Log] Supabase getLinkPages failed:", e);
       return [];
     }
   },
 
   async saveLinkPage(page: LinkPage): Promise<void> {
     const supabase = getSupabase();
-    if (!supabase) return;
+    if (!supabase) throw new Error('System configuration error.');
     
     try {
+      const { error: checkError } = await supabase.from('link_pages').select('id').limit(1);
+      if (checkError) {
+        console.error("[Developer Log] Table check failed before saving link page:", checkError.message);
+        throw new Error('System synchronization failed. Please try again later.');
+      }
+
       const { error } = await supabase.from('link_pages').upsert([{ ...page }]);
-      if (error && error.code !== '42P01') throw error;
-    } catch (err) {
-      console.error("Supabase saveLinkPage failed:", err);
-      throw err;
+      
+      if (error) {
+        console.error("[Developer Log] Supabase saveLinkPage failed:", error.message);
+        throw new Error('Failed to save link page. System error occurred.');
+      }
+    } catch (e: any) {
+      console.error("[Developer Log] Supabase saveLinkPage exception:", e);
+      const safeErrorMessage = e.message?.includes('schema') || e.message?.includes('table') || e.message?.includes('relation') 
+        ? 'Page could not be saved. System synchronization failed.' 
+        : (e.message || 'Page could not be saved.');
+      throw new Error(safeErrorMessage);
     }
   },
 
@@ -132,7 +177,10 @@ export const siteManagementService = {
     
     try {
       const { data, error } = await supabase.from('link_pages').select('*').eq('slug', slug).limit(1);
-      if (error && error.code !== '42P01') throw error;
+      if (error) {
+        console.warn("[Developer Log] Fetch link page by slug failed:", error.message);
+        return null;
+      }
       
       if (!data || data.length === 0) {
         return null;
@@ -140,7 +188,7 @@ export const siteManagementService = {
       
       return data[0] as LinkPage;
     } catch (e) {
-      console.error('Error fetching link page by slug in siteManagementService:', e);
+      console.error('[Developer Log] Error fetching link page by slug:', e);
       return null;
     }
   }
