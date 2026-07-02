@@ -1063,17 +1063,17 @@ Please ask me your query or select a quick question template below!`;
         if (!facebook.pixelId || !/^\d{10,18}$/.test(facebook.pixelId)) {
           logs[0].status = "FAILED";
           logs[0].message = "🔴 Invalid Pixel ID. Must be 10-18 digits.";
-          return res.status(400).json({ status: "error", error: "Invalid Pixel ID", logs });
+          return res.json({ status: "error", error: "Invalid Pixel ID", logs });
         }
         if (facebook.accessToken && !facebook.accessToken.startsWith('EAAG') && !facebook.accessToken.startsWith('EAA')) {
           logs[0].status = "FAILED";
           logs[0].message = "🔴 Invalid Access Token. Must start with EAA or EAAG.";
-          return res.status(400).json({ status: "error", error: "Invalid Access Token", logs });
+          return res.json({ status: "error", error: "Invalid Access Token", logs });
         }
         if (facebook.businessId && !/^\d{10,18}$/.test(facebook.businessId)) {
           logs[0].status = "FAILED";
           logs[0].message = "🔴 Business Manager Not Connected. Invalid ID format.";
-          return res.status(400).json({ status: "error", error: "Business Manager Not Connected", logs });
+          return res.json({ status: "error", error: "Business Manager Not Connected", logs });
         }
       }
 
@@ -1081,7 +1081,7 @@ Please ask me your query or select a quick question template below!`;
         if (!tiktok.pixelId || !/^[A-Za-z0-9_]{13,18}$/.test(tiktok.pixelId)) {
           logs[0].status = "FAILED";
           logs[0].message = "🔴 Invalid TikTok Pixel ID. Must be alphanumeric (13-18 characters).";
-          return res.status(400).json({ status: "error", error: "Invalid TikTok Pixel ID", logs });
+          return res.json({ status: "error", error: "Invalid TikTok Pixel ID", logs });
         }
       }
 
@@ -1089,17 +1089,17 @@ Please ask me your query or select a quick question template below!`;
         if (google.measurementId && !/^G-[A-Z0-9]{8,15}$/.test(google.measurementId)) {
           logs[0].status = "FAILED";
           logs[0].message = "🔴 Invalid Measurement ID. Must follow G-XXXXXXXXXX format.";
-          return res.status(400).json({ status: "error", error: "Invalid Measurement ID", logs });
+          return res.json({ status: "error", error: "Invalid Measurement ID", logs });
         }
         if (google.gtmContainerId && !/^GTM-[A-Z0-9]{5,9}$/.test(google.gtmContainerId)) {
           logs[0].status = "FAILED";
           logs[0].message = "🔴 Invalid GTM Container ID. Must follow GTM-XXXXXXX format.";
-          return res.status(400).json({ status: "error", error: "Invalid GTM Container ID", logs });
+          return res.json({ status: "error", error: "Invalid GTM Container ID", logs });
         }
         if (google.conversionId && !/^AW-\d{8,12}$/.test(google.conversionId)) {
           logs[0].status = "FAILED";
           logs[0].message = "🔴 Invalid Conversion ID. Must follow AW-XXXXXXXXXX format.";
-          return res.status(400).json({ status: "error", error: "Invalid Conversion ID", logs });
+          return res.json({ status: "error", error: "Invalid Conversion ID", logs });
         }
       }
 
@@ -1107,7 +1107,7 @@ Please ask me your query or select a quick question template below!`;
         if (serverSide.endpointUrl && !/^https?:\/\//.test(serverSide.endpointUrl)) {
           logs[0].status = "FAILED";
           logs[0].message = "🔴 Invalid Server Endpoint. Must start with http:// or https://.";
-          return res.status(400).json({ status: "error", error: "Invalid Server Endpoint", logs });
+          return res.json({ status: "error", error: "Invalid Server Endpoint", logs });
         }
       }
 
@@ -1119,7 +1119,7 @@ Please ask me your query or select a quick question template below!`;
       if (!supabaseAdmin) {
         logs[1].status = "FAILED";
         logs[1].message = "❌ Database Connection Failed. Supabase client not initialized.";
-        return res.status(500).json({ status: "error", error: "Database Connection Failed", logs });
+        return res.json({ status: "error", error: "Table \"settings\" not found in database. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).", logs });
       }
       logs[1].status = "SUCCESS";
       logs[1].message = "🟢 Connected to database successfully.";
@@ -1168,7 +1168,11 @@ Please ask me your query or select a quick question template below!`;
       if (upsertError) {
         logs[logs.length - 1].status = "FAILED";
         logs[logs.length - 1].message = `❌ Save failed: ${upsertError.message}`;
-        return res.status(500).json({ status: "error", error: "Save failed", logs });
+        let errMsg = upsertError.message || "Save failed";
+        if (errMsg.toLowerCase().includes('settings') || errMsg.toLowerCase().includes('relation') || errMsg.toLowerCase().includes('not found')) {
+          errMsg = "Table \"settings\" not found. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).";
+        }
+        return res.json({ status: "error", error: errMsg, logs });
       }
 
       logs[logs.length - 1].status = "SUCCESS";
@@ -1182,7 +1186,11 @@ Please ask me your query or select a quick question template below!`;
       return res.json({ status: "success", logs });
     } catch (err: any) {
       console.error("[Save Marketing Config] Fatal Error:", err);
-      res.status(500).json({ error: "Internal save failure", logs });
+      let errMsg = err.message || "Internal save failure";
+      if (errMsg.toLowerCase().includes('settings') || errMsg.toLowerCase().includes('relation') || errMsg.toLowerCase().includes('not found')) {
+        errMsg = "Table \"settings\" not found. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).";
+      }
+      res.json({ status: "error", error: errMsg, logs });
     }
   });
 

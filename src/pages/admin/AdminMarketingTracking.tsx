@@ -678,8 +678,11 @@ export default function AdminMarketingTracking() {
     if (msg.includes('campaign_name') || msg.includes('campaignname')) {
       return "❌ Column campaign_name is missing.";
     }
-    if (msg.includes('marketing_tracking') || msg.includes('settings not found') || msg.includes('relation "settings" does not exist') || msg.includes('relation "marketing_tracking"')) {
-      return "❌ Table marketing_tracking not found.";
+    if (msg.includes('relation "settings" does not exist') || msg.includes('settings not found') || msg.includes('table "settings"') || msg.includes('relation "public.settings"')) {
+      return "❌ Table \"settings\" not found. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).";
+    }
+    if (msg.includes('marketing_tracking') || msg.includes('relation "marketing_tracking"')) {
+      return "❌ Table \"marketing_tracking\" not found. Please create a table named \"marketing_tracking\" in your database.";
     }
     if (msg.includes('column') && msg.includes('missing')) {
       const match = errorMsg.match(/column\s+['"]?([a-zA-Z0-9_]+)['"]?\s+/i);
@@ -697,7 +700,7 @@ export default function AdminMarketingTracking() {
     }
 
     if (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('failed to fetch') || msg.includes('database connection') || msg.includes('connection failed')) {
-      return "❌ Table marketing_tracking not found.";
+      return "❌ Table \"settings\" not found. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).";
     }
 
     return `❌ Save Failed: ${errorMsg}`;
@@ -705,6 +708,28 @@ export default function AdminMarketingTracking() {
 
   const handleSave = async () => {
     setSaving(true);
+
+    // Client-side empty form validation
+    const hasActiveChannel = state.fbActive || state.ttActive || state.ga4Active || state.ssActive || state.webTrackingActive;
+    const hasAnyFieldFilled = state.fbPixelId || state.fbAccessToken || state.fbDatasetId || 
+                              state.ttPixelId || state.ttAccessToken || state.ttDatasetId || 
+                              state.ga4MeasurementId || state.gtmId || state.gAdsConversionId || 
+                              state.ssEndpoint || state.ssSecretKey;
+    
+    if (!hasActiveChannel && !hasAnyFieldFilled) {
+      toast.error("❌ Please fill up your form first. Enable and configure at least one tracking channel.", {
+        duration: 4000,
+        style: {
+          background: '#ef4444',
+          color: '#ffffff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          fontSize: '13px',
+        }
+      });
+      setSaving(false);
+      return;
+    }
 
     try {
       // Send configurations to our new live REST integration endpoint
@@ -767,7 +792,15 @@ export default function AdminMarketingTracking() {
         })
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get("content-type");
+      let data: any = null;
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error("Non-JSON response received:", text);
+        throw new Error("Table settings not found. Please create a table named \"settings\" in your database with columns: id (text, primary key) and value (text or jsonb).");
+      }
 
       if (response.ok && data.status === 'success') {
         // Save locally as a secondary local fallback cache
