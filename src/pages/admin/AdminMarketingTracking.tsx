@@ -656,6 +656,12 @@ export default function AdminMarketingTracking() {
               adSpendBudget: parsed.adSpendBudget || 0,
             }));
           }
+          
+          if (resData.sqlGuide) {
+            setDbErrorGuide(resData.sqlGuide);
+          } else {
+            setDbErrorGuide(null);
+          }
         }
       } catch (err) {
         console.error('Failed to load marketing config from API:', err);
@@ -709,28 +715,6 @@ export default function AdminMarketingTracking() {
 
   const handleSave = async () => {
     setSaving(true);
-
-    // Client-side empty form validation
-    const hasActiveChannel = state.fbActive || state.ttActive || state.ga4Active || state.ssActive || state.webTrackingActive;
-    const hasAnyFieldFilled = state.fbPixelId || state.fbAccessToken || state.fbDatasetId || 
-                              state.ttPixelId || state.ttAccessToken || state.ttDatasetId || 
-                              state.ga4MeasurementId || state.gtmId || state.gAdsConversionId || 
-                              state.ssEndpoint || state.ssSecretKey;
-    
-    if (!hasActiveChannel && !hasAnyFieldFilled) {
-      toast.error("❌ Please fill up your form first. Enable and configure at least one tracking channel.", {
-        duration: 4000,
-        style: {
-          background: '#ef4444',
-          color: '#ffffff',
-          fontWeight: 'bold',
-          borderRadius: '8px',
-          fontSize: '13px',
-        }
-      });
-      setSaving(false);
-      return;
-    }
 
     try {
       // Send configurations to our new live REST integration endpoint
@@ -862,7 +846,7 @@ export default function AdminMarketingTracking() {
         };
         localStorage.setItem('tazumart_marketing_center_config_v2', JSON.stringify(configToSave));
 
-        toast.success('✅ Successfully Saved', {
+        toast.success('Settings saved successfully.', {
           duration: 3000,
           style: {
             background: '#10b981',
@@ -1209,17 +1193,17 @@ export default function AdminMarketingTracking() {
       </div>
 
       {dbErrorGuide && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-5 shadow-sm space-y-3">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 shadow-sm space-y-3">
           <div className="flex items-start gap-3">
-            <div className="p-1.5 bg-red-600 text-white rounded-lg shrink-0">
-              <Database className="w-4 h-4 text-white" />
+            <div className="p-1.5 bg-amber-600 text-white rounded-lg shrink-0">
+              <Database className="w-4 h-4 text-white animate-pulse" />
             </div>
             <div className="flex-1">
-              <h3 className="text-sm font-black uppercase tracking-wider text-red-950 flex items-center gap-2">
-                Database Schema Audit Failure
+              <h3 className="text-sm font-black uppercase tracking-wider text-amber-950 flex items-center gap-2">
+                ডাটাবেজ সংযুক্ত: স্কিমা ভেরিফিকেশন সতর্কতা (Schema Verification Warning)
               </h3>
-              <p className="text-xs font-bold text-red-700 mt-1 uppercase tracking-wide">
-                সুপারবেস ডাটাবেজে সঠিক টেবিল বা কলাম পাওয়া যায়নি। ডাটাবেজের প্রোপার স্ট্রাকচার ছাড়া কনফিগারেশন সেভ হবে না। অনুগ্রহ করে নিচের তথ্যগুলো যাচাই করুন:
+              <p className="text-xs font-bold text-amber-800 mt-1 uppercase tracking-wide leading-relaxed">
+                আপনার সম্পূর্ণ সুপারবেস ডাটাবেজ প্রজেক্টটি সঠিকভাবে সংযুক্ত রয়েছে। তবে, মার্কেটিং কনফিগারেশনগুলো সংরক্ষণ করার জন্য আপনার ডাটাবেজে <code className="font-mono bg-amber-100 px-1 rounded font-black text-amber-900">settings</code> নামক টেবিলটি পাওয়া যায়নি। ডাটাবেজে সঠিক টেবিল স্ট্রাকচার তৈরি না হওয়া পর্যন্ত এই কনফিগারেশনটি সেভ করা যাবে না। নিচে দেওয়া SQL কোডটি কপি করে আপনার Supabase SQL Editor-এ রান (Run) করলেই প্রয়োজনীয় টেবিলটি তৈরি হয়ে যাবে এবং ডাটা সফলভাবে সংরক্ষিত হবে!
               </p>
             </div>
           </div>
@@ -1229,25 +1213,25 @@ export default function AdminMarketingTracking() {
             <button
               onClick={() => {
                 navigator.clipboard.writeText(dbErrorGuide);
-                toast.success('📋 Copied audit details & SQL to clipboard!', {
+                toast.success('📋 Copied SQL Code to clipboard!', {
                   duration: 2000,
                   style: { background: '#10b981', color: '#fff' }
                 });
               }}
               className="absolute top-2 right-2 px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded text-[10px] font-black uppercase tracking-wider transition-colors"
             >
-              Copy Details / SQL
+              Copy SQL Code
             </button>
           </div>
 
-          <div className="text-xs bg-red-100/60 p-3 rounded-lg border border-red-200/50 text-red-900 space-y-1">
+          <div className="text-xs bg-amber-100/60 p-3 rounded-lg border border-amber-200/50 text-amber-900 space-y-1">
             <p className="font-bold flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
               💡 Quick Resolution Steps:
             </p>
             <ol className="list-decimal list-inside text-xs space-y-0.5 text-neutral-800">
-              <li>যদি <code className="font-mono bg-red-200/80 px-1 rounded font-bold">settings</code> টেবিল না থাকে, তবে উপরের SQL কোডটি কপি করে Supabase SQL Editor-এ রান করুন।</li>
-              <li>যদি <code className="font-mono bg-red-200/80 px-1 rounded font-bold">value</code> কলামটি না থাকে, তবে ALTER TABLE কমান্ডটি রান করে কলামটি যুক্ত করুন।</li>
-              <li>সুপারবেস ড্যাশবোর্ডে গিয়ে <span className="font-bold">"Reload Schema" / "Refresh Schema Cache"</span> ক্লিক করুন যাতে API আপডেট হয়।</li>
+              <li>উপরের SQL কোডটি <span className="font-bold">Copy SQL Code</span> বাটনে ক্লিক করে কপি করুন।</li>
+              <li>আপনার Supabase Dashboard-এ গিয়ে <span className="font-bold">SQL Editor</span> ওপেন করুন এবং একটি New Query তৈরি করে রান (Run) করুন।</li>
+              <li>কোডটি রান হওয়ার পর, আপনার ডোমেনগুলোতে এই ডাটা সম্পূর্ণ সচল ও সিঙ্ক হয়ে যাবে!</li>
             </ol>
           </div>
         </div>
