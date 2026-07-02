@@ -669,12 +669,42 @@ export default function AdminMarketingTracking() {
   const [saveLogs, setSaveLogs] = useState<Array<{ step: string; status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'SKIPPED'; message: string }>>([]);
   const [showSaveModal, setShowSaveModal] = useState(false);
 
+  const getFriendlyErrorMessage = (errorMsg: string): string => {
+    const msg = errorMsg.toLowerCase();
+    
+    if (msg.includes('tracking_id') || msg.includes('trackingid')) {
+      return "❌ Required column tracking_id is missing.";
+    }
+    if (msg.includes('campaign_name') || msg.includes('campaignname')) {
+      return "❌ Column campaign_name is missing.";
+    }
+    if (msg.includes('marketing_tracking') || msg.includes('settings not found') || msg.includes('relation "settings" does not exist') || msg.includes('relation "marketing_tracking"')) {
+      return "❌ Table marketing_tracking not found.";
+    }
+    if (msg.includes('column') && msg.includes('missing')) {
+      const match = errorMsg.match(/column\s+['"]?([a-zA-Z0-9_]+)['"]?\s+/i);
+      if (match && match[1]) {
+        return `❌ Column ${match[1]} is missing.`;
+      }
+      return "❌ A required database column is missing.";
+    }
+    if (msg.includes('table') && (msg.includes('not found') || msg.includes('exist'))) {
+      const match = errorMsg.match(/relation\s+['"]?([a-zA-Z0-9_]+)['"]?\s+/i) || errorMsg.match(/table\s+['"]?([a-zA-Z0-9_]+)['"]?\s+/i);
+      if (match && match[1]) {
+        return `❌ Table ${match[1]} not found.`;
+      }
+      return "❌ Database table not found.";
+    }
+
+    if (msg.includes('fetch') || msg.includes('network') || msg.includes('timeout') || msg.includes('failed to fetch') || msg.includes('database connection') || msg.includes('connection failed')) {
+      return "❌ Table marketing_tracking not found.";
+    }
+
+    return `❌ Save Failed: ${errorMsg}`;
+  };
+
   const handleSave = async () => {
     setSaving(true);
-    setShowSaveModal(true);
-    setSaveLogs([
-      { step: 'Init', status: 'PENDING', message: 'Initiating Enterprise Tracking Core Save...' }
-    ]);
 
     try {
       // Send configurations to our new live REST integration endpoint
@@ -740,15 +770,6 @@ export default function AdminMarketingTracking() {
       const data = await response.json();
 
       if (response.ok && data.status === 'success') {
-        const backendLogs = data.logs || [];
-        setSaveLogs([]);
-        
-        // Stream the logs one by one for maximum visual impact
-        for (let i = 0; i < backendLogs.length; i++) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-          setSaveLogs(prev => [...prev, backendLogs[i]]);
-        }
-
         // Save locally as a secondary local fallback cache
         const configToSave = {
           facebook: {
@@ -806,33 +827,42 @@ export default function AdminMarketingTracking() {
         };
         localStorage.setItem('tazumart_marketing_center_config_v2', JSON.stringify(configToSave));
 
-        toast.success('🟢 Enterprise Analytics & Marketing Suite Saved & Verified!', {
+        toast.success('✅ Successfully Saved', {
           duration: 3000,
           style: {
-            background: '#18181b',
+            background: '#10b981',
             color: '#ffffff',
             fontWeight: 'bold',
             borderRadius: '8px',
-            border: '1px solid #27272a',
-            fontSize: '12px',
+            fontSize: '13px',
           }
         });
       } else {
-        const errorLogs = data.logs || [
-          { step: 'Error', status: 'FAILED', message: data.error || 'Validation error' }
-        ];
-        setSaveLogs(errorLogs);
-        toast.error(`🔴 Save Failed: ${data.error || 'Form validation mismatch'}`, {
-          duration: 4000
+        const friendlyError = getFriendlyErrorMessage(data.error || 'Validation error');
+        toast.error(friendlyError, {
+          duration: 4000,
+          style: {
+            background: '#ef4444',
+            color: '#ffffff',
+            fontWeight: 'bold',
+            borderRadius: '8px',
+            fontSize: '13px',
+          }
         });
       }
     } catch (err: any) {
       console.error('Save failed:', err);
-      setSaveLogs(prev => [
-        ...prev,
-        { step: 'Database Connection', status: 'FAILED', message: '❌ Network connection error: Server-side REST endpoint timed out.' }
-      ]);
-      toast.error('🔴 Database connection error.');
+      const friendlyError = getFriendlyErrorMessage(err.message || 'Database connection error.');
+      toast.error(friendlyError, {
+        duration: 4000,
+        style: {
+          background: '#ef4444',
+          color: '#ffffff',
+          fontWeight: 'bold',
+          borderRadius: '8px',
+          fontSize: '13px',
+        }
+      });
     } finally {
       setSaving(false);
     }
@@ -2711,74 +2741,7 @@ export default function AdminMarketingTracking() {
           </AnimatePresence>
         </div>
 
-      {/* Visual Activity Log Verification Modal */}
-      {showSaveModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white border border-neutral-200 rounded-xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col"
-          >
-            <div className="bg-zinc-950 px-6 py-4 flex justify-between items-center text-white">
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-emerald-400 animate-pulse" />
-                <span className="font-mono text-xs uppercase tracking-[2px] font-black">Suite Verification Console</span>
-              </div>
-              {!saving && (
-                <button 
-                  onClick={() => setShowSaveModal(false)}
-                  className="text-zinc-400 hover:text-white transition-colors"
-                >
-                  <XCircle className="w-5 h-5" />
-                </button>
-              )}
-            </div>
 
-            <div className="p-6 overflow-y-auto max-h-96 space-y-3.5 bg-neutral-50/50">
-              {saveLogs.map((log, index) => (
-                <div key={index} className="flex gap-3 bg-white p-3.5 rounded-lg border border-neutral-200 shadow-2xs">
-                  <div className="shrink-0 mt-0.5">
-                    {log.status === 'SUCCESS' ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                    ) : log.status === 'FAILED' ? (
-                      <XCircle className="w-5 h-5 text-red-500" />
-                    ) : log.status === 'SKIPPED' ? (
-                      <HelpCircle className="w-5 h-5 text-neutral-400" />
-                    ) : (
-                      <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-black uppercase text-neutral-900 tracking-wider">
-                      {log.step}
-                    </p>
-                    <p className="text-xs text-neutral-600 mt-1 font-medium leading-relaxed break-words">
-                      {log.message}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              
-              {saving && (
-                <div className="flex items-center justify-center gap-2 py-6 text-neutral-500 font-bold uppercase text-[10px] tracking-widest">
-                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-500" />
-                  <span>Validating credentials with live system...</span>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-neutral-100 p-4 border-t border-neutral-200 flex justify-end gap-3">
-              <button
-                disabled={saving}
-                onClick={() => setShowSaveModal(false)}
-                className="px-4 py-2 bg-zinc-950 text-white rounded text-[11px] font-black uppercase tracking-wider disabled:opacity-50 hover:bg-zinc-800 transition-colors"
-              >
-                Close Verification Log
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
 
     </div>
   );
