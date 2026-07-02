@@ -671,9 +671,6 @@ export default function AdminMarketingTracking() {
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   const getFriendlyErrorMessage = (errorMsg: string): string => {
-    if (errorMsg.includes('CREATE TABLE') || errorMsg.includes('ALTER TABLE')) {
-      return "❌ Database Schema Error: Table or Column is missing. Please review the SQL integration guide below.";
-    }
     const msg = errorMsg.toLowerCase();
     
     if (msg.includes('tracking_id') || msg.includes('trackingid')) {
@@ -682,11 +679,8 @@ export default function AdminMarketingTracking() {
     if (msg.includes('campaign_name') || msg.includes('campaignname')) {
       return "❌ Column campaign_name is missing.";
     }
-    if (msg.includes('column') && msg.includes('value') && (msg.includes('settings') || msg.includes('schema cache'))) {
-      return "❌ Table 'settings' exists, but is missing the 'value' column. Please run the ALTER TABLE SQL command below in your Supabase SQL Editor.";
-    }
-    if (msg.includes('relation "settings" does not exist') || msg.includes('relation "public.settings" does not exist') || (msg.includes('settings') && (msg.includes('not found') || msg.includes('does not exist') || msg.includes('undefined')) && !msg.includes('column'))) {
-      return "❌ Table \"settings\" not found in database.";
+    if (msg.includes('settings') || msg.includes('schema cache')) {
+      return "❌ Database Error: Please verify that your Supabase client is connected to the correct database project, or reload the schema cache in your Supabase project dashboard.";
     }
     if (msg.includes('marketing_tracking') || msg.includes('relation "marketing_tracking"')) {
       return "❌ Table \"marketing_tracking\" not found in database.";
@@ -1222,32 +1216,22 @@ export default function AdminMarketingTracking() {
             </div>
             <div className="flex-1">
               <h3 className="text-sm font-black uppercase tracking-wider text-red-950 flex items-center gap-2">
-                Database Schema Error & Integration Guide
+                Supabase Connection Audit Required
               </h3>
               <p className="text-xs font-bold text-red-700 mt-1 uppercase tracking-wide">
-                সুপারবেস ডাটাবেজে সঠিক টেবিল বা কলাম পাওয়া যায়নি। এটি সমাধান করতে নিচের নির্দেশিকাটি অনুসরণ করুন:
+                সুপারবেস ডাটাবেজের সাথে সংযোগ স্থাপন করা যাচ্ছে না অথবা স্কিমা ক্যাশে সমস্যা হয়েছে। অনুগ্রহ করে নিচের বিষয়টি নিশ্চিত করুন:
               </p>
             </div>
           </div>
           
-          <div className="text-xs text-neutral-800 bg-neutral-950 text-neutral-100 font-mono p-4 rounded-lg overflow-x-auto relative group">
-            <pre className="whitespace-pre-wrap">{dbErrorGuide}</pre>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(dbErrorGuide);
-                toast.success('📋 Copied SQL Guide to clipboard!', {
-                  duration: 2000,
-                  style: { background: '#10b981', color: '#fff' }
-                });
-              }}
-              className="absolute top-2 right-2 px-2.5 py-1 bg-neutral-800 hover:bg-neutral-700 text-white border border-neutral-700 rounded text-[10px] font-black uppercase tracking-wider transition-colors"
-            >
-              Copy SQL Code
-            </button>
+          <div className="text-xs text-neutral-800 bg-neutral-950 text-neutral-100 p-4 rounded-lg overflow-x-auto">
+            <p className="font-semibold mb-2 text-red-400">🚨 Recommended Action Steps:</p>
+            <ol className="list-decimal list-inside space-y-1 text-neutral-300">
+              <li>Verify that your Supabase URL and Keys are correctly entered in the Admin Settings.</li>
+              <li>Ensure your active database matches the current project connection.</li>
+              <li>Click "Reload Schema" or "Refresh Schema Cache" inside your Supabase project dashboard to force API update.</li>
+            </ol>
           </div>
-          <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider flex items-center gap-1">
-            💡 সুপাবেজ (Supabase) এর SQL Editor-এ গিয়ে এই কোডটি রান করুন, তারপর আবার "Save Workspace Layout" বাটনে চাপুন।
-          </p>
         </div>
       )}
 

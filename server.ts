@@ -983,6 +983,62 @@ Please ask me your query or select a quick question template below!`;
     }
   }
 
+  async function fetchSettingsColumns(): Promise<string[]> {
+    let url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedSupabaseUrl;
+    let key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseServiceKey || savedSupabaseKey;
+    
+    if (!url || !key) {
+      const fsConfig = await getSupabaseCredentialsFromFirestore();
+      if (fsConfig) {
+        url = fsConfig.supabaseUrl;
+        key = fsConfig.supabaseServiceKey || fsConfig.supabaseKey;
+      }
+    }
+    
+    if (!url || !key) {
+      return ['id', 'value'];
+    }
+
+    if (url === "undefined" || url === "null" || !url) return ['id', 'value'];
+    if (key === "undefined" || key === "null" || !key) return ['id', 'value'];
+
+    try {
+      const restUrl = `${url.replace(/\/$/, '')}/rest/v1/`;
+      const response = await fetch(restUrl, {
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`
+        }
+      });
+      if (response.ok) {
+        const schema = await response.json();
+        if (schema.definitions && schema.definitions.settings && schema.definitions.settings.properties) {
+          const cols = Object.keys(schema.definitions.settings.properties);
+          console.log(`[Schema Adapt] Successfully detected columns for 'settings' table:`, cols);
+          return cols;
+        }
+      }
+    } catch (e) {
+      console.warn(`[Schema Adapt] Error reading schema from Supabase rest/v1:`, e);
+    }
+    return ['id', 'value'];
+  }
+
+  async function getSettingsTargetColumn(): Promise<string> {
+    const columns = await fetchSettingsColumns();
+    if (columns.includes('value')) {
+      return 'value';
+    }
+    // Check common backups
+    const backups = ['config', 'data', 'content', 'settings', 'val'];
+    const foundBackup = backups.find(col => columns.includes(col));
+    if (foundBackup) {
+      console.log(`[Schema Adapt] 'value' column is missing, dynamically using fallback column: '${foundBackup}'`);
+      return foundBackup;
+    }
+    return 'value'; // Fallback to 'value'
+  }
+
   app.get("/api/admin/marketing/config", async (req, res) => {
     try {
       const clientToUse = supabaseServiceRole || supabaseAdmin;
@@ -990,14 +1046,18 @@ Please ask me your query or select a quick question template below!`;
         return res.json({ status: "success", config: {} });
       }
 
+      const targetCol = await getSettingsTargetColumn();
       const { data, error } = await clientToUse.from('settings').select('*').eq('id', 'marketing_tracking_config').single();
       let config: any = {};
       
-      if (!error && data && data.value) {
-        try {
-          config = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-        } catch (e) {
-          console.error("Failed to parse marketing_tracking_config JSON:", e);
+      if (!error && data) {
+        const rawValue = data[targetCol] || data['value'];
+        if (rawValue) {
+          try {
+            config = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+          } catch (e) {
+            console.error("Failed to parse marketing_tracking_config JSON:", e);
+          }
         }
       }
 
@@ -1171,25 +1231,21 @@ Please ask me your query or select a quick question template below!`;
         if (configToSave.serverSide.webhookSecret) configToSave.serverSide.webhookSecret = encryptMarketingToken(configToSave.serverSide.webhookSecret);
       }
 
-      const { error: upsertError } = await clientToUse.from('settings').upsert([
-        { id: 'marketing_tracking_config', value: JSON.stringify(configToSave) }
-      ]);
+      const targetCol = await getSettingsTargetColumn();
+      const payloadToSave: any = { id: 'marketing_tracking_config' };
+      payloadToSave[targetCol] = JSON.stringify(configToSave);
+
+      const { error: upsertError } = await clientToUse.from('settings').upsert([payloadToSave]);
 
       if (upsertError) {
         logs[logs.length - 1].status = "FAILED";
         logs[logs.length - 1].message = `❌ Save failed: ${upsertError.message}`;
         
         const rawErrorMsg = upsertError.message || "Save failed";
-        let sqlGuide: string | null = null;
-        
-        if (rawErrorMsg.toLowerCase().includes('settings') || rawErrorMsg.toLowerCase().includes('relation') || rawErrorMsg.toLowerCase().includes('not found') || rawErrorMsg.toLowerCase().includes('column') || rawErrorMsg.toLowerCase().includes('value')) {
-          sqlGuide = `-- 1. যদি 'settings' টেবিল আগে থেকেই তৈরি থাকে কিন্তু 'value' কলাম না থাকে, তবে নিচের কোডটি রান করুন:\nALTER TABLE public.settings ADD COLUMN IF NOT EXISTS value TEXT;\n\n-- 2. অথবা টেবিলটি নতুনভাবে তৈরি করতে সম্পূর্ণ কোডটি রান করুন:\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value TEXT,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS ডিজেবল করতে:\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
-        }
         
         return res.json({ 
           status: "error", 
-          error: `Database error on 'settings' table: ${rawErrorMsg}`, 
-          sqlGuide,
+          error: `Database error on 'settings' table: ${rawErrorMsg}. Please verify that your Supabase client is connected to the correct database project, or reload the schema cache in your Supabase project dashboard to refresh the available columns.`, 
           logs 
         });
       }
@@ -1206,16 +1262,10 @@ Please ask me your query or select a quick question template below!`;
     } catch (err: any) {
       console.error("[Save Marketing Config] Fatal Error:", err);
       const rawErrorMsg = err.message || "Internal save failure";
-      let sqlGuide: string | null = null;
-      
-      if (rawErrorMsg.toLowerCase().includes('settings') || rawErrorMsg.toLowerCase().includes('relation') || rawErrorMsg.toLowerCase().includes('not found') || rawErrorMsg.toLowerCase().includes('column') || rawErrorMsg.toLowerCase().includes('value')) {
-        sqlGuide = `-- 1. যদি 'settings' টেবিল আগে থেকেই তৈরি থাকে কিন্তু 'value' কলাম না থাকে, তবে নিচের কোডটি রান করুন:\nALTER TABLE public.settings ADD COLUMN IF NOT EXISTS value TEXT;\n\n-- 2. অথবা টেবিলটি নতুনভাবে তৈরি করতে সম্পূর্ণ কোডটি রান করুন:\nCREATE TABLE IF NOT EXISTS public.settings (\n    id TEXT PRIMARY KEY,\n    value TEXT,\n    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS ডিজেবল করতে:\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
-      }
       
       res.json({ 
         status: "error", 
-        error: `Database error on 'settings' table: ${rawErrorMsg}`, 
-        sqlGuide,
+        error: `Database error on 'settings' table: ${rawErrorMsg}. Please verify that your Supabase client is connected to the correct database project, or reload the schema cache in your Supabase project dashboard to refresh the available columns.`, 
         logs 
       });
     }
