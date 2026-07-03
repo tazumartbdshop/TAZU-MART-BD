@@ -170,12 +170,11 @@ export const defaultNavItems: NavItem[] = [
     icon: Megaphone,
     moduleId: 'dashboard',
     subItems: [
+      { name: 'Facebook', path: '/admin/marketing/facebook', icon: Fingerprint },
       { name: 'TikTok', path: '/admin/marketing/tiktok', icon: Video },
       { name: 'Google', path: '/admin/marketing/google', icon: Globe },
-      { name: 'Server Side Tracking', path: '/admin/marketing/serverside', icon: Zap },
-      { name: 'Website Tracking', path: '/admin/marketing/website', icon: Fingerprint },
-      { name: 'Attribution & UTM', path: '/admin/marketing/attribution', icon: BarChart3 },
-      { name: 'Testing Center', path: '/admin/marketing/testing', icon: Terminal }
+      { name: 'Server Side', path: '/admin/marketing/server-side', icon: Zap },
+      { name: 'Tracking Overview', path: '/admin/marketing/tracking-overview', icon: Activity }
     ]
   },
 

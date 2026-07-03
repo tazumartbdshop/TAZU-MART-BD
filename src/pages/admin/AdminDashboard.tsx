@@ -103,9 +103,11 @@ import AdminSiteManagement from './AdminSiteManagement';
 import AdminStoreIdentity from './AdminStoreIdentity';
 import AdminBusinessAddress from './AdminBusinessAddress';
 import AdminSocialLinks from './AdminSocialLinks';
-import AdminMarketingSetup from './AdminMarketingSetup';
-import AdminMarketingCenter from './AdminMarketingCenter';
-import AdminMarketingTracking from './AdminMarketingTracking';
+import AdminMarketingFacebook from './AdminMarketingFacebook';
+import AdminMarketingTikTok from './AdminMarketingTikTok';
+import AdminMarketingGoogle from './AdminMarketingGoogle';
+import AdminMarketingServerSide from './AdminMarketingServerSide';
+import AdminMarketingTrackingOverview from './AdminMarketingTrackingOverview';
 import AdminPushNotifications from './AdminPushNotifications';
 import AdminSearchListing from './AdminSearchListing';
 import AdminOffers from './AdminOffers';
@@ -605,7 +607,11 @@ export default function AdminDashboard() {
               <Route path="/theme-settings" element={<PermissionGate moduleId="settings"><AdminThemeSettings /></PermissionGate>} />
               <Route path="/flutter-manager" element={<PermissionGate moduleId="settings"><FlutterManager /></PermissionGate>} />
               <Route path="/activity-logs" element={<PermissionGate moduleId="logs"><ComingSoon title="Activity Logs" /></PermissionGate>} />
-              <Route path="/marketing/*" element={<PermissionGate moduleId="dashboard"><AdminMarketingTracking /></PermissionGate>} />
+              <Route path="/marketing/facebook" element={<PermissionGate moduleId="dashboard"><AdminMarketingFacebook /></PermissionGate>} />
+              <Route path="/marketing/tiktok" element={<PermissionGate moduleId="dashboard"><AdminMarketingTikTok /></PermissionGate>} />
+              <Route path="/marketing/google" element={<PermissionGate moduleId="dashboard"><AdminMarketingGoogle /></PermissionGate>} />
+              <Route path="/marketing/server-side" element={<PermissionGate moduleId="dashboard"><AdminMarketingServerSide /></PermissionGate>} />
+              <Route path="/marketing/tracking-overview" element={<PermissionGate moduleId="dashboard"><AdminMarketingTrackingOverview /></PermissionGate>} />
               <Route path="/banner/create" element={<PermissionGate moduleId="banners"><AdminBanners /></PermissionGate>} />
               <Route path="/banner/list" element={<PermissionGate moduleId="banners"><BannerListing /></PermissionGate>} />
               <Route path="/flutter-banner" element={<PermissionGate moduleId="banners"><AdminFlutterBanner /></PermissionGate>} />

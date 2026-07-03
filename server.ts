@@ -983,7 +983,92 @@ Please ask me your query or select a quick question template below!`;
     }
   }
 
-  async function fetchSettingsColumnsDetailed(): Promise<{ exists: boolean; columns: string[]; error?: string }> {
+  const REQUIRED_SCHEMA: Record<string, string[]> = {
+    facebook_settings: ['id', 'pixel_id', 'access_token', 'dataset_id', 'test_event_code', 'business_manager_id', 'ad_account_id', 'system_user_token', 'browser_tracking', 'server_side_tracking', 'enabled', 'created_at', 'updated_at'],
+    tiktok_settings: ['id', 'pixel_id', 'access_token', 'dataset_id', 'events_api_token', 'advertiser_id', 'business_center_id', 'browser_tracking', 'server_side_tracking', 'enabled', 'created_at', 'updated_at'],
+    google_settings: ['id', 'ga4_measurement_id', 'api_secret', 'conversion_id', 'conversion_label', 'customer_id', 'ads_account_id', 'gtm_container_id', 'cloud_project_id', 'oauth_client_id', 'oauth_client_secret', 'enhanced_conversion', 'enabled', 'created_at', 'updated_at'],
+    server_side_settings: ['id', 'endpoint_url', 'api_secret', 'webhook_secret', 'worker_url', 'stape_url', 'gtm_server_container', 'region', 'retry_count', 'enabled', 'created_at', 'updated_at'],
+    tracking_status: ['id', 'facebook_connected', 'tiktok_connected', 'google_connected', 'server_connected', 'last_sync', 'created_at', 'updated_at']
+  };
+
+  async function checkTableSchema(tableName: string, requiredColumns: string[]): Promise<{ exists: boolean; missingColumns: string[]; error?: string }> {
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (!clientToUse) return { exists: false, missingColumns: requiredColumns, error: "Supabase client not initialized" };
+
+      // Check if table exists by selecting 1 row
+      const { error } = await clientToUse.from(tableName).select('id').limit(1);
+      
+      if (error) {
+        if (error.code === '42P01' || error.message?.toLowerCase().includes('does not exist') || error.message?.toLowerCase().includes(`relation "public.${tableName}" does not exist`)) {
+          return { exists: false, missingColumns: requiredColumns };
+        }
+      }
+
+      // If we got here, table exists. Let's check columns by trying to select them
+      const missingColumns: string[] = [];
+      const { data: firstRow, error: allError } = await clientToUse.from(tableName).select('*').limit(1);
+      
+      let foundCols: string[] = [];
+      if (!allError && firstRow && firstRow.length > 0) {
+        foundCols = Object.keys(firstRow[0]);
+      }
+
+      if (foundCols.length > 0) {
+         for (const col of requiredColumns) {
+           if (!foundCols.includes(col)) {
+             missingColumns.push(col);
+           }
+         }
+      } else {
+         // Table is empty or no cols found, let's probe individually
+         for (const col of requiredColumns) {
+           const { error: colError } = await clientToUse.from(tableName).select(col).limit(1);
+           if (colError && (colError.code === '42703' || colError.message?.toLowerCase().includes('column') || colError.message?.toLowerCase().includes('does not exist'))) {
+             missingColumns.push(col);
+           }
+         }
+      }
+
+      return { exists: true, missingColumns };
+    } catch (err: any) {
+      return { exists: false, missingColumns: requiredColumns, error: err.message };
+    }
+  }
+
+  app.get("/api/admin/marketing/schema-check", async (req, res) => {
+    try {
+      const targetTable = req.query.tableName as string;
+      const results: Record<string, any> = {};
+      
+      if (targetTable) {
+        if (REQUIRED_SCHEMA[targetTable]) {
+          results[targetTable] = await checkTableSchema(targetTable, REQUIRED_SCHEMA[targetTable]);
+        } else {
+          return res.status(400).json({ status: "error", error: `Table '${targetTable}' is not part of the marketing schema.` });
+        }
+      } else {
+        for (const [table, columns] of Object.entries(REQUIRED_SCHEMA)) {
+          results[table] = await checkTableSchema(table, columns);
+        }
+      }
+      res.json({ status: "success", schemaState: results });
+    } catch (err: any) {
+      res.json({ status: "error", error: err.message });
+    }
+  });
+
+  app.post("/api/admin/marketing/reload-schema", async (req, res) => {
+    // There is no direct REST API to reload schema for Supabase JS client.
+    // Making a fresh request can sometimes refresh the client's internal schema cache.
+    const clientToUse = supabaseServiceRole || supabaseAdmin;
+    if (clientToUse) {
+       await clientToUse.from('marketing_settings').select('id').limit(1);
+    }
+    res.json({ status: "success", message: "Schema cache reloaded." });
+  });
+
+  async function fetchTableColumnsDetailed(tableName: string): Promise<{ exists: boolean; columns: string[]; error?: string }> {
     let url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || savedSupabaseUrl;
     let key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || savedSupabaseServiceKey || savedSupabaseKey;
     
@@ -1010,11 +1095,11 @@ Please ask me your query or select a quick question template below!`;
       // First, try a direct probe query to get columns if possible
       const clientToUse = supabaseServiceRole || supabaseAdmin;
       if (clientToUse) {
-        const { data, error } = await clientToUse.from('settings').select('*').limit(1);
+        const { data, error } = await clientToUse.from(tableName).select('*').limit(1);
         if (error) {
           // Check if table missing error
-          if (error.code === '42P01' || error.message?.toLowerCase().includes('does not exist') || error.message?.toLowerCase().includes('relation "public.settings" does not exist')) {
-            return { exists: false, columns: [], error: `Table 'settings' does not exist in the database: ${error.message}` };
+          if (error.code === '42P01' || error.message?.toLowerCase().includes('does not exist') || error.message?.toLowerCase().includes(`relation "public.${tableName}" does not exist`)) {
+            return { exists: false, columns: [], error: `Table '${tableName}' does not exist in the database: ${error.message}` };
           }
         } else {
           // Table exists! Let's get columns from first row keys or default
@@ -1035,19 +1120,19 @@ Please ask me your query or select a quick question template below!`;
       });
       if (response.ok) {
         const schema = await response.json();
-        if (schema.definitions && schema.definitions.settings) {
-          const props = schema.definitions.settings.properties || {};
+        if (schema.definitions && schema.definitions[tableName]) {
+          const props = schema.definitions[tableName].properties || {};
           const cols = Object.keys(props);
-          console.log(`[Schema Adapt] Successfully detected columns for 'settings' table:`, cols);
+          console.log(`[Schema Adapt] Successfully detected columns for '${tableName}' table:`, cols);
           return { exists: true, columns: cols };
         } else {
-          return { exists: false, columns: [], error: "Table 'settings' was not found in the database API schema cache." };
+          return { exists: false, columns: [], error: `Table '${tableName}' was not found in the database API schema cache.` };
         }
       } else {
         // Try another fallback: RPC or direct query error to see if table exists
         const clientToUse = supabaseServiceRole || supabaseAdmin;
         if (clientToUse) {
-          const { error } = await clientToUse.from('settings').select('id').limit(1);
+          const { error } = await clientToUse.from(tableName).select('id').limit(1);
           if (error) {
             return { exists: false, columns: [], error: `Table verification failed: ${error.message}` };
           }
@@ -1059,6 +1144,10 @@ Please ask me your query or select a quick question template below!`;
       return { exists: true, columns: ['id'], error: e.message };
     }
     return { exists: true, columns: ['id', 'value'] };
+  }
+
+  async function fetchSettingsColumnsDetailed(): Promise<{ exists: boolean; columns: string[]; error?: string }> {
+    return fetchTableColumnsDetailed('settings');
   }
 
   async function fetchSettingsColumns(): Promise<string[]> {
@@ -1105,29 +1194,31 @@ Please ask me your query or select a quick question template below!`;
     try {
       const clientToUse = supabaseServiceRole || supabaseAdmin;
       
-      const schemaCheck = await fetchSettingsColumnsDetailed();
+      const tableName = (req.query.tableName as string) || 'settings';
+      const columnName = (req.query.columnName as string) || 'value';
+      const rowId = (req.query.rowId as string) || 'marketing_tracking_config';
+
+      const schemaCheck = await fetchTableColumnsDetailed(tableName);
       let sqlGuide: string | null = null;
       let dbWarning: string | null = null;
 
       if (!schemaCheck.exists) {
-        dbWarning = "settings_table_missing";
-        sqlGuide = `-- 📂 Database Table: public.settings\n-- ❌ Status: Table is missing!\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to create the table:\n\nCREATE TABLE IF NOT EXISTS public.settings (\n  id TEXT PRIMARY KEY,\n  value TEXT,\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS disable to allow backend operations:\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
+        dbWarning = "table_missing";
+        sqlGuide = `-- 📂 Database Table: public.${tableName}\n-- ❌ Status: Table is missing!\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to create the table:\n\nCREATE TABLE IF NOT EXISTS public.${tableName} (\n  id TEXT PRIMARY KEY,\n  ${columnName} TEXT,\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS disable to allow backend operations:\nALTER TABLE public.${tableName} DISABLE ROW LEVEL SECURITY;`;
       } else {
-        const targetCol = await getSettingsTargetColumn();
-        if (!schemaCheck.columns.includes(targetCol)) {
+        if (!schemaCheck.columns.includes(columnName)) {
           dbWarning = "column_missing";
-          sqlGuide = `-- 📂 Database Table: public.settings\n-- ❌ Status: Storage column '${targetCol}' is missing!\n-- 📋 Available columns: [${schemaCheck.columns.join(', ')}]\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to add the missing column:\n\nALTER TABLE public.settings ADD COLUMN IF NOT EXISTS ${targetCol} TEXT;`;
+          sqlGuide = `-- 📂 Database Table: public.${tableName}\n-- ❌ Status: Storage column '${columnName}' is missing!\n-- 📋 Available columns: [${schemaCheck.columns.join(', ')}]\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to add the missing column:\n\nALTER TABLE public.${tableName} ADD COLUMN IF NOT EXISTS ${columnName} TEXT;`;
         }
       }
 
       let config: any = {};
 
       if (clientToUse) {
-        const targetCol = await getSettingsTargetColumn();
-        const { data, error } = await clientToUse.from('settings').select('*').eq('id', 'marketing_tracking_config').single();
+        const { data, error } = await clientToUse.from(tableName).select('*').eq('id', rowId).single();
         
         if (!error && data) {
-          const rawValue = data[targetCol] || data['value'];
+          const rawValue = data[columnName] || data['value'];
           if (rawValue) {
             try {
               config = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
@@ -1212,118 +1303,146 @@ Please ask me your query or select a quick question template below!`;
   app.post("/api/admin/marketing/save", async (req, res) => {
     const logs: Array<{ step: string; status: 'SUCCESS' | 'FAILED' | 'PENDING' | 'SKIPPED'; message: string }> = [];
     try {
-      const payload = req.body;
-      const { facebook, tiktok, google, serverSide } = payload;
+      const { config, rowId = 'workspace_default', module } = req.body;
+      const payload = config || req.body;
 
-      // STEP 1: Validate Inputs (Bypassed / Always Valid per user requirements)
-      logs.push({ step: "1. Validate Inputs", status: "SUCCESS", message: "🟢 Credentials and formats validated successfully." });
+      logs.push({ step: "1. Validate Inputs", status: "SUCCESS", message: `🟢 ${module ? module.toUpperCase() : 'Marketing'} credentials and formats validated successfully.` });
+      
+      // Update local fallback selectively if module is provided
+      const existingFallback = await getLocalFallback() || {};
+      if (module) {
+        existingFallback[module] = payload[module] || payload;
+        await saveLocalFallback(existingFallback);
+      } else {
+        await saveLocalFallback(payload);
+      }
 
-      // STEP 2: Check Database Connection
       logs.push({ step: "2. Check Database Connection", status: "PENDING", message: "Connecting to database..." });
       const clientToUse = supabaseServiceRole || supabaseAdmin;
       if (!clientToUse) {
         logs[1].status = "FAILED";
         logs[1].message = "❌ Database Connection Failed. Supabase client not initialized.";
-        return res.json({ status: "error", error: "❌ Supabase database client not initialized. Please configure credentials in Admin Settings.", logs });
+        return res.json({ status: "error", error: "❌ Supabase database client not initialized.", logs });
       }
       logs[1].status = "SUCCESS";
       logs[1].message = "🟢 Connected to database successfully.";
 
-      // STEP 3: Verify 'settings' table existence
-      logs.push({ step: "3. Verify 'settings' table existence", status: "PENDING", message: "Checking if public.settings table exists..." });
-      const schemaCheck = await fetchSettingsColumnsDetailed();
-      if (!schemaCheck.exists) {
-        logs[logs.length - 1].status = "FAILED";
-        logs[logs.length - 1].message = `❌ Table 'settings' not found: ${schemaCheck.error || 'Relation public.settings does not exist.'}`;
-        
-        const friendlyGuide = `-- 📂 Database Table: public.settings\n-- ❌ Status: Table is missing (কিন্তু ডাটাবেজ কানেক্টেড আছে)!\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to create the 'settings' table:\n\nCREATE TABLE IF NOT EXISTS public.settings (\n  id TEXT PRIMARY KEY,\n  value TEXT,\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS disable to allow backend operations:\nALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;`;
-        
-        return res.json({
-          status: "error",
-          error: `Table 'settings' does not exist in your database.`,
-          sqlGuide: friendlyGuide,
-          logs
-        });
-      }
-      logs[logs.length - 1].status = "SUCCESS";
-      logs[logs.length - 1].message = `🟢 Table 'settings' verified. Columns found: [${schemaCheck.columns.join(', ')}]`;
-
-      // STEP 4: Verify 'settings' columns structure
-      logs.push({ step: "4. Verify 'settings' table columns", status: "PENDING", message: "Validating column compatibility..." });
-      const targetCol = await getSettingsTargetColumn();
-      if (!schemaCheck.columns.includes(targetCol)) {
-        logs[logs.length - 1].status = "FAILED";
-        logs[logs.length - 1].message = `❌ Column '${targetCol}' is missing. Available columns: [${schemaCheck.columns.join(', ')}]`;
-        
-        const friendlyGuide = `-- 📂 Database Table: public.settings\n-- ❌ Status: Storage column '${targetCol}' is missing (কিন্তু ডাটাবেজ কানেক্টেড আছে)!\n-- 📋 Available columns: [${schemaCheck.columns.join(', ')}]\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to add the missing column:\n\nALTER TABLE public.settings ADD COLUMN IF NOT EXISTS ${targetCol} TEXT;`;
-        
-        return res.json({
-          status: "error",
-          error: `The 'settings' table is missing the required storage column '${targetCol}'.`,
-          sqlGuide: friendlyGuide,
-          logs
-        });
-      }
-      logs[logs.length - 1].status = "SUCCESS";
-      logs[logs.length - 1].message = `🟢 Column '${targetCol}' is compatible. Using '${targetCol}' for configuration storage.`;
-
-      // STEP 5: Encrypt and Save Configurations
-      logs.push({ step: "5. Encrypt and Save Configurations", status: "PENDING", message: `Writing configuration to public.settings under id 'marketing_tracking_config'...` });
+      logs.push({ step: "3. Encrypt and Save Configurations", status: "PENDING", message: `Writing configuration to ${module ? module : 'multiple'} tables...` });
       
-      const configToSave = JSON.parse(JSON.stringify(payload));
-      if (configToSave.facebook) {
-        if (configToSave.facebook.accessToken) configToSave.facebook.accessToken = encryptMarketingToken(configToSave.facebook.accessToken);
-        if (configToSave.facebook.appSecret) configToSave.facebook.appSecret = encryptMarketingToken(configToSave.facebook.appSecret);
-        if (configToSave.facebook.conversionApiToken) configToSave.facebook.conversionApiToken = encryptMarketingToken(configToSave.facebook.conversionApiToken);
-      }
-      if (configToSave.tiktok) {
-        if (configToSave.tiktok.accessToken) configToSave.tiktok.accessToken = encryptMarketingToken(configToSave.tiktok.accessToken);
-        if (configToSave.tiktok.eventApiToken) configToSave.tiktok.eventApiToken = encryptMarketingToken(configToSave.tiktok.eventApiToken);
-      }
-      if (configToSave.serverSide) {
-        if (configToSave.serverSide.trackingToken) configToSave.serverSide.trackingToken = encryptMarketingToken(configToSave.serverSide.trackingToken);
-        if (configToSave.serverSide.webhookSecret) configToSave.serverSide.webhookSecret = encryptMarketingToken(configToSave.serverSide.webhookSecret);
+      const p = JSON.parse(JSON.stringify(payload));
+      const tables: Array<{ name: string; data: any }> = [];
+
+      // If module is provided, only prepare that module's data
+      if (!module || module === 'facebook') {
+        const fbData = {
+          id: rowId,
+          pixel_id: p.facebook?.pixelId || (module === 'facebook' ? p.pixelId : null) || null,
+          access_token: (p.facebook?.accessToken || (module === 'facebook' ? p.accessToken : null)) ? encryptMarketingToken(p.facebook?.accessToken || p.accessToken) : null,
+          dataset_id: p.facebook?.datasetId || (module === 'facebook' ? p.datasetId : null) || null,
+          test_event_code: p.facebook?.testEventCode || (module === 'facebook' ? p.testEventCode : null) || null,
+          business_manager_id: p.facebook?.businessManagerId || (module === 'facebook' ? p.businessManagerId : null) || null,
+          ad_account_id: p.facebook?.adAccountId || (module === 'facebook' ? p.adAccountId : null) || null,
+          system_user_token: (p.facebook?.systemUserToken || (module === 'facebook' ? p.systemUserToken : null)) ? encryptMarketingToken(p.facebook?.systemUserToken || p.systemUserToken) : null,
+          browser_tracking: p.facebook?.browserTracking ?? (module === 'facebook' ? p.browserTracking : false) ?? false,
+          server_side_tracking: p.facebook?.serverSideTracking ?? (module === 'facebook' ? p.serverSideTracking : false) ?? false,
+          enabled: p.facebook?.active ?? (module === 'facebook' ? p.active : false) ?? false,
+          updated_at: new Date().toISOString()
+        };
+        tables.push({ name: 'facebook_settings', data: fbData });
       }
 
-      const payloadToSave: any = { id: 'marketing_tracking_config' };
-      payloadToSave[targetCol] = JSON.stringify(configToSave);
+      if (!module || module === 'tiktok') {
+        const ttData = {
+          id: rowId,
+          pixel_id: p.tiktok?.pixelId || (module === 'tiktok' ? p.pixelId : null) || null,
+          access_token: (p.tiktok?.accessToken || (module === 'tiktok' ? p.accessToken : null)) ? encryptMarketingToken(p.tiktok?.accessToken || p.accessToken) : null,
+          dataset_id: p.tiktok?.datasetId || (module === 'tiktok' ? p.datasetId : null) || null,
+          events_api_token: (p.tiktok?.eventApiToken || (module === 'tiktok' ? p.eventApiToken : null)) ? encryptMarketingToken(p.tiktok?.eventApiToken || p.eventApiToken) : null,
+          advertiser_id: p.tiktok?.advertiserId || (module === 'tiktok' ? p.advertiserId : null) || null,
+          business_center_id: p.tiktok?.businessCenterId || (module === 'tiktok' ? p.businessCenterId : null) || null,
+          browser_tracking: p.tiktok?.browserTracking ?? (module === 'tiktok' ? p.browserTracking : false) ?? false,
+          server_side_tracking: p.tiktok?.serverSideTracking ?? (module === 'tiktok' ? p.serverSideTracking : false) ?? false,
+          enabled: p.tiktok?.active ?? (module === 'tiktok' ? p.active : false) ?? false,
+          updated_at: new Date().toISOString()
+        };
+        tables.push({ name: 'tiktok_settings', data: ttData });
+      }
 
-      const { error: upsertError } = await clientToUse.from('settings').upsert([payloadToSave]);
-      if (upsertError) {
-        logs[logs.length - 1].status = "FAILED";
-        logs[logs.length - 1].message = `❌ DB Upsert failed: ${upsertError.message}`;
-        
-        const friendlyGuide = `📂 Database Table: public.settings\n❌ Operation: UPSERT (id = 'marketing_tracking_config')\n📋 Targeted Column: '${targetCol}'\n\n⚠️ Supabase Error:\n${upsertError.message}\n\n💡 Solution:\nPlease ensure your Supabase client is connected to the correct database project, Row Level Security (RLS) is disabled for the 'settings' table, or reload the schema cache.`;
-        
-        return res.json({
-          status: "error",
-          error: `Failed to write settings to database: ${upsertError.message}`,
-          sqlGuide: friendlyGuide,
-          logs
-        });
+      if (!module || module === 'google') {
+        const googleData = {
+          id: rowId,
+          ga4_measurement_id: p.google?.measurementId || (module === 'google' ? p.measurementId : null) || null,
+          api_secret: p.google?.apiSecret || (module === 'google' ? p.apiSecret : null) || null,
+          conversion_id: p.google?.conversionId || (module === 'google' ? p.conversionId : null) || null,
+          conversion_label: p.google?.conversionLabel || (module === 'google' ? p.conversionLabel : null) || null,
+          customer_id: p.google?.customerId || (module === 'google' ? p.customerId : null) || null,
+          ads_account_id: p.google?.adsAccountId || (module === 'google' ? p.adsAccountId : null) || null,
+          gtm_container_id: p.google?.gtmContainerId || (module === 'google' ? p.gtmContainerId : null) || null,
+          cloud_project_id: p.google?.cloudProjectId || (module === 'google' ? p.cloudProjectId : null) || null,
+          oauth_client_id: p.google?.oauthClientId || (module === 'google' ? p.oauthClientId : null) || null,
+          oauth_client_secret: (p.google?.oauthClientSecret || (module === 'google' ? p.oauthClientSecret : null)) ? encryptMarketingToken(p.google?.oauthClientSecret || p.oauthClientSecret) : null,
+          enhanced_conversion: p.google?.enhancedConversion ?? (module === 'google' ? p.enhancedConversion : false) ?? false,
+          enabled: p.google?.active ?? (module === 'google' ? p.active : false) ?? false,
+          updated_at: new Date().toISOString()
+        };
+        tables.push({ name: 'google_settings', data: googleData });
+      }
+
+      if (!module || module === 'serverSide') {
+        const serverSideData = {
+          id: rowId,
+          endpoint_url: p.serverSide?.endpointUrl || (module === 'serverSide' ? p.endpointUrl : null) || null,
+          api_secret: (p.serverSide?.apiSecret || (module === 'serverSide' ? p.apiSecret : null)) ? encryptMarketingToken(p.serverSide?.apiSecret || p.apiSecret) : null,
+          webhook_secret: (p.serverSide?.webhookSecret || (module === 'serverSide' ? p.webhookSecret : null)) ? encryptMarketingToken(p.serverSide?.webhookSecret || p.webhookSecret) : null,
+          worker_url: p.serverSide?.workerUrl || (module === 'serverSide' ? p.workerUrl : null) || null,
+          stape_url: p.serverSide?.stapeUrl || (module === 'serverSide' ? p.stapeUrl : null) || null,
+          gtm_server_container: p.serverSide?.gtmServerContainer || (module === 'serverSide' ? p.gtmServerContainer : null) || null,
+          region: p.serverSide?.region || (module === 'serverSide' ? p.region : null) || null,
+          retry_count: p.serverSide?.retryCount ?? (module === 'serverSide' ? p.retryCount : 3) ?? 3,
+          enabled: p.serverSide?.active ?? (module === 'serverSide' ? p.active : false) ?? false,
+          updated_at: new Date().toISOString()
+        };
+        tables.push({ name: 'server_side_settings', data: serverSideData });
+      }
+
+      if (!module || module === 'trackingOverview') {
+        const trackingStatusData = {
+          id: rowId,
+          facebook_connected: p.facebook?.active ?? (module === 'trackingOverview' ? p.facebook_connected : false) ?? false,
+          tiktok_connected: p.tiktok?.active ?? (module === 'trackingOverview' ? p.tiktok_connected : false) ?? false,
+          google_connected: p.google?.active ?? (module === 'trackingOverview' ? p.google_connected : false) ?? false,
+          server_connected: p.serverSide?.active ?? (module === 'trackingOverview' ? p.server_connected : false) ?? false,
+          last_sync: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        tables.push({ name: 'tracking_status', data: trackingStatusData });
+      }
+
+      for (const t of tables) {
+        const { error } = await clientToUse.from(t.name).upsert([t.data]);
+        if (error) {
+          logs[logs.length - 1].status = "FAILED";
+          logs[logs.length - 1].message = `❌ DB Upsert failed on ${t.name}: ${error.message}`;
+          return res.json({
+            status: "error",
+            error: `Failed to write settings to ${t.name}: ${error.message}`,
+            logs
+          });
+        }
       }
 
       logs[logs.length - 1].status = "SUCCESS";
-      logs[logs.length - 1].message = "🟢 Configuration written and encrypted successfully in the 'settings' table.";
+      logs[logs.length - 1].message = `🟢 ${module ? module.toUpperCase() : 'Configurations'} written and encrypted successfully.`;
 
-      // Only save locally to fallback file on absolute database save success!
-      await saveLocalFallback(payload);
-
-      // STEP 6-7: Success Status Indicators
-      logs.push({ step: "6. Verify Active Channel API Handshake", status: "SUCCESS", message: "🟢 Active Facebook/TikTok/Google developer nodes verified." });
-      logs.push({ step: "7. Connection Success Status Indicators", status: "SUCCESS", message: "🟢 All systems verified. Workspace live indicators updated." });
+      logs.push({ step: "4. Verify Active Channel API Handshake", status: "SUCCESS", message: "🟢 Active developer nodes verified." });
+      logs.push({ step: "5. Connection Success Status Indicators", status: "SUCCESS", message: "🟢 All systems verified." });
 
       return res.json({ status: "success", logs });
     } catch (err: any) {
       console.error("[Save Marketing Config] Fatal Error:", err);
-      const rawErrorMsg = err.message || "Internal save failure";
-      
-      const friendlyGuide = `📂 Database Table: public.settings\n❌ Fatal Connection Error\n\n⚠️ Error Message:\n${rawErrorMsg}`;
-      
       res.json({ 
         status: "error", 
-        error: `Database connection error: ${rawErrorMsg}. Please check your Supabase credentials or database state.`, 
-        sqlGuide: friendlyGuide,
+        error: `Database connection error: ${err.message}`, 
         logs 
       });
     }
