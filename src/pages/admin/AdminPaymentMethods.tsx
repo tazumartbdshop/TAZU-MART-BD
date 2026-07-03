@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { 
   CreditCard, 
@@ -9,69 +9,62 @@ import {
   Upload, 
   Save, 
   AlertCircle,
-  Eye,
   Info,
-  Lock
+  Database
 } from 'lucide-react';
-
-interface PaymentMethodConfig {
-  id: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card';
-  title: string;
-  type: 'cod' | 'mfs' | 'card';
-  enabledKey: 'codEnabled' | 'bkashEnabled' | 'nagadEnabled' | 'rocketEnabled' | 'cardEnabled';
-  nameKey: 'codName' | 'bkashName' | 'nagadName' | 'rocketName' | 'cardName';
-  logoKey: 'codLogo' | 'bkashLogo' | 'nagadLogo' | 'rocketLogo' | 'cardLogo';
-  numberKey?: 'bkashNumber' | 'nagadNumber' | 'rocketNumber' | 'cardNumber';
-  instructionKey: 'codInstruction' | 'bkashInstruction' | 'nagadInstruction' | 'rocketInstruction' | 'cardInstruction';
-  gatewayLinkKey?: 'cardGatewayLink';
-  presetLogo: string;
-}
+import { toast } from 'react-hot-toast';
 
 export default function AdminPaymentMethods() {
   const { settings, updateSettings } = useSettingsStore();
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  
+  // Database integration state
+  const [dbWarning, setDbWarning] = useState<string | null>(null);
+  const [sqlGuide, setSqlGuide] = useState<string>('');
+  const [showSchemaModal, setShowSchemaModal] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  // Local state for each method to allow previewing edits before clicking "Save"
+  // Local state for configs - empty by default!
   const [configs, setConfigs] = useState({
     cod: {
-      enabled: settings.codEnabled,
-      name: settings.codName || 'Cash on Delivery',
-      logo: settings.codLogo || '',
+      enabled: false,
+      name: '',
+      logo: '',
       number: '',
-      instruction: settings.codInstruction || 'Pay with cash upon receiving your order at your doorstep.',
+      instruction: '',
     },
     bkash: {
-      enabled: settings.bkashEnabled,
-      name: settings.bkashName || 'bKash Personal',
-      logo: settings.bkashLogo || '',
-      number: settings.bkashNumber || '',
-      instruction: settings.bkashInstruction || 'Please Send Money to the bKash Personal number above. Enter your bKash wallet number and your transaction reference ID (TxnID) below.',
+      enabled: false,
+      name: '',
+      logo: '',
+      number: '',
+      instruction: '',
     },
     nagad: {
-      enabled: settings.nagadEnabled,
-      name: settings.nagadName || 'Nagad Personal',
-      logo: settings.nagadLogo || '',
-      number: settings.nagadNumber || '',
-      instruction: settings.nagadInstruction || 'Please Send Money to the Nagad Personal number above. Enter your Nagad wallet number and your transaction reference ID (TxnID) below.',
+      enabled: false,
+      name: '',
+      logo: '',
+      number: '',
+      instruction: '',
     },
     rocket: {
-      enabled: settings.rocketEnabled,
-      name: settings.rocketName || 'Rocket Personal',
-      logo: settings.rocketLogo || '',
-      number: settings.rocketNumber || '',
-      instruction: settings.rocketInstruction || 'Please Send Money to the Rocket Personal number above. Enter your Rocket wallet number and your transaction reference ID (TxnID) below.',
+      enabled: false,
+      name: '',
+      logo: '',
+      number: '',
+      instruction: '',
     },
     card: {
-      enabled: settings.cardEnabled,
-      name: settings.cardName || 'Secure SSL Gateway',
-      logo: settings.cardLogo || '',
-      number: settings.cardNumber || 'Secure 256-Bit Sandbox Handshake',
-      instruction: settings.cardInstruction || 'Please authorize card payment securely via our sandbox-integrated SSL connection gateway.',
-      gatewayLink: settings.cardGatewayLink || '',
+      enabled: false,
+      name: '',
+      logo: '',
+      number: '',
+      instruction: '',
+      gatewayLink: '',
     }
   });
 
-  // Pre-bundled SVG paths/data URLs for fallback/preset options
+  // Default fallback preset logos
   const defaultLogos = {
     cod: 'https://cdn-icons-png.flaticon.com/512/6491/6491517.png',
     bkash: 'https://www.logo.wine/a/logo/BKash/BKash-Icon-Logo.wine.svg',
@@ -79,6 +72,59 @@ export default function AdminPaymentMethods() {
     rocket: 'https://www.logo.wine/a/logo/Dutch_Bangla_Bank/Dutch_Bangla_Bank-Logo.wine.svg',
     card: 'https://cdn-icons-png.flaticon.com/512/349/349228.png',
   };
+
+  // 1. Fetch saved methods on mount
+  useEffect(() => {
+    const initAndFetch = async () => {
+      setLoading(true);
+      try {
+        // Run schema check first
+        const sCheck = await fetch('/api/admin/payment-methods/schema-check');
+        const sData = await sCheck.json();
+        if (sData.status === 'success' && sData.schemaState?.payment_methods) {
+          const pm = sData.schemaState.payment_methods;
+          if (!pm.exists || pm.missingColumns?.length > 0) {
+            setDbWarning("table_missing");
+            setSqlGuide(pm.sqlGuide || '');
+          }
+        }
+
+        // Fetch actual values
+        const response = await fetch('/api/admin/payment-methods');
+        const data = await response.json();
+        if (data.status === 'success' && data.methods) {
+          const updated = {
+            cod: { enabled: false, name: '', logo: '', number: '', instruction: '' },
+            bkash: { enabled: false, name: '', logo: '', number: '', instruction: '' },
+            nagad: { enabled: false, name: '', logo: '', number: '', instruction: '' },
+            rocket: { enabled: false, name: '', logo: '', number: '', instruction: '' },
+            card: { enabled: false, name: '', logo: '', number: '', instruction: '', gatewayLink: '' }
+          };
+
+          data.methods.forEach((m: any) => {
+            const code = m.payment_code;
+            if (code in updated) {
+              (updated as any)[code] = {
+                enabled: m.enabled ?? false,
+                name: m.payment_name || '',
+                logo: m.logo_url || '',
+                number: m.account_number || '',
+                instruction: m.instruction || '',
+                gatewayLink: m.gateway_link || ''
+              };
+            }
+          });
+          setConfigs(updated);
+        }
+      } catch (err) {
+        console.error("Failed to load DB payment methods:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAndFetch();
+  }, []);
 
   const handleInputChange = (methodId: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card', field: string, value: any) => {
     setConfigs(prev => ({
@@ -98,63 +144,136 @@ export default function AdminPaymentMethods() {
       const { uploadImage } = await import('../../lib/imageUtils');
       const url = await uploadImage(file, 'payment-logos', `logo-${methodId}-${Date.now()}`);
       handleInputChange(methodId, 'logo', url);
+      toast.success("Logo uploaded successfully!");
     } catch (err) {
       console.error('Failed to upload image:', err);
-      alert('Failed to upload logo');
+      toast.error('Failed to upload logo');
     }
   };
 
   const handleApplyPreset = (methodId: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card') => {
     handleInputChange(methodId, 'logo', defaultLogos[methodId]);
+    toast.success("Applied recommended preset logo.");
   };
 
   const handleRemoveLogo = (methodId: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card') => {
     handleInputChange(methodId, 'logo', '');
+    toast.success("Logo removed.");
   };
 
   // Save changes specifically for one payment method
-  const handleSaveMethod = (methodId: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card') => {
+  const handleSaveMethod = async (methodId: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card') => {
     const data = configs[methodId];
-    
-    const updates: any = {};
-    if (methodId === 'cod') {
-      updates.codEnabled = data.enabled;
-      updates.codName = data.name;
-      updates.codLogo = data.logo;
-      updates.codInstruction = data.instruction;
-    } else if (methodId === 'bkash') {
-      updates.bkashEnabled = data.enabled;
-      updates.bkashName = data.name;
-      updates.bkashLogo = data.logo;
-      updates.bkashNumber = data.number;
-      updates.bkashInstruction = data.instruction;
-    } else if (methodId === 'nagad') {
-      updates.nagadEnabled = data.enabled;
-      updates.nagadName = data.name;
-      updates.nagadLogo = data.logo;
-      updates.nagadNumber = data.number;
-      updates.nagadInstruction = data.instruction;
-    } else if (methodId === 'rocket') {
-      updates.rocketEnabled = data.enabled;
-      updates.rocketName = data.name;
-      updates.rocketLogo = data.logo;
-      updates.rocketNumber = data.number;
-      updates.rocketInstruction = data.instruction;
-    } else if (methodId === 'card') {
-      updates.cardEnabled = data.enabled;
-      updates.cardName = data.name;
-      updates.cardLogo = data.logo;
-      updates.cardNumber = data.number;
-      updates.cardInstruction = data.instruction;
-      updates.cardGatewayLink = data.gatewayLink;
+
+    // Trigger modal if database missing
+    if (dbWarning === "table_missing") {
+      setShowSchemaModal(true);
+      return;
     }
 
-    updateSettings(updates);
-    triggerFeedback(`${configs[methodId].name} updated successfully!`);
+    try {
+      const response = await fetch('/api/admin/payment-methods/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method: {
+            id: methodId,
+            payment_type: 'personal',
+            payment_code: methodId,
+            payment_name: data.name,
+            account_number: data.number,
+            instruction: data.instruction,
+            logo_url: data.logo,
+            enabled: data.enabled,
+            gateway_link: (data as any).gatewayLink || ''
+          }
+        })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        toast.success(`${data.name || methodId.toUpperCase()} settings saved successfully.`);
+        
+        // Sync to legacy global state to maintain checkout compatibility
+        const updates: any = {};
+        if (methodId === 'cod') {
+          updates.codEnabled = data.enabled;
+          updates.codName = data.name;
+          updates.codLogo = data.logo;
+          updates.codInstruction = data.instruction;
+        } else if (methodId === 'bkash') {
+          updates.bkashEnabled = data.enabled;
+          updates.bkashName = data.name;
+          updates.bkashLogo = data.logo;
+          updates.bkashNumber = data.number;
+          updates.bkashInstruction = data.instruction;
+        } else if (methodId === 'nagad') {
+          updates.nagadEnabled = data.enabled;
+          updates.nagadName = data.name;
+          updates.nagadLogo = data.logo;
+          updates.nagadNumber = data.number;
+          updates.nagadInstruction = data.instruction;
+        } else if (methodId === 'rocket') {
+          updates.rocketEnabled = data.enabled;
+          updates.rocketName = data.name;
+          updates.rocketLogo = data.logo;
+          updates.rocketNumber = data.number;
+          updates.rocketInstruction = data.instruction;
+        } else if (methodId === 'card') {
+          updates.cardEnabled = data.enabled;
+          updates.cardName = data.name;
+          updates.cardLogo = data.logo;
+          updates.cardNumber = data.number;
+          updates.cardInstruction = data.instruction;
+          updates.cardGatewayLink = (data as any).gatewayLink;
+        }
+        updateSettings(updates);
+      } else {
+        toast.error(result.error || "Failed to save settings");
+      }
+    } catch (err: any) {
+      toast.error("Network error: " + err.message);
+    }
   };
 
-  // Global Save All
-  const handleSaveAll = () => {
+  // Global Save All Settings
+  const handleSaveAll = async () => {
+    if (dbWarning === "table_missing") {
+      setShowSchemaModal(true);
+      return;
+    }
+
+    let successCount = 0;
+    const methods = ['cod', 'bkash', 'nagad', 'rocket', 'card'] as const;
+
+    for (const mId of methods) {
+      const data = configs[mId];
+      try {
+        const response = await fetch('/api/admin/payment-methods/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            method: {
+              id: mId,
+              payment_type: 'personal',
+              payment_code: mId,
+              payment_name: data.name,
+              account_number: data.number,
+              instruction: data.instruction,
+              logo_url: data.logo,
+              enabled: data.enabled,
+              gateway_link: (data as any).gatewayLink || ''
+            }
+          })
+        });
+        if (response.ok) {
+          const resJson = await response.json();
+          if (resJson.status === 'success') successCount++;
+        }
+      } catch (err) {}
+    }
+
+    // Sync to global memory fallback
     const updates: any = {
       codEnabled: configs.cod.enabled,
       codName: configs.cod.name,
@@ -186,19 +305,15 @@ export default function AdminPaymentMethods() {
       cardInstruction: configs.card.instruction,
       cardGatewayLink: configs.card.gatewayLink,
     };
-
     updateSettings(updates);
-    triggerFeedback("All payment gateways saved successfully!");
+
+    if (successCount === 5) {
+      toast.success("All personal payment settings saved successfully to Supabase!");
+    } else {
+      toast.error(`Saved ${successCount}/5 payment settings to Supabase. Please check database connectivity.`);
+    }
   };
 
-  const triggerFeedback = (message: string) => {
-    setSaveFeedback(message);
-    setTimeout(() => {
-      setSaveFeedback(null);
-    }, 4000);
-  };
-
-  // Helper render for method cards
   const renderCard = (id: 'cod' | 'bkash' | 'nagad' | 'rocket' | 'card', title: string, hasNumber: boolean, hasGatewayLink = false) => {
     const data = configs[id];
     let icon = <DollarSign className="w-5 h-5 text-neutral-900" />;
@@ -211,7 +326,6 @@ export default function AdminPaymentMethods() {
 
     return (
       <div className={`bg-white border ${data.enabled ? 'border-neutral-900' : 'border-neutral-200'} p-5 font-sans relative`}>
-        {/* Border strip to indicate active state */}
         {data.enabled && (
           <div className="absolute top-0 left-0 right-0 h-[3px] bg-neutral-900" />
         )}
@@ -229,11 +343,10 @@ export default function AdminPaymentMethods() {
             </div>
           </div>
 
-          {/* Clean Rectangular Enable/Disable Toggle button */}
           <button
             type="button"
             onClick={() => handleInputChange(id, 'enabled', !data.enabled)}
-            className={`px-3 py-1.5 border text-[10px] font-black uppercase tracking-widest select-none transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 border text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer rounded-[4px] ${
               data.enabled 
                 ? 'bg-neutral-950 text-white border-neutral-950' 
                 : 'bg-white text-neutral-400 border-neutral-200 hover:text-neutral-700 hover:border-neutral-400'
@@ -260,7 +373,7 @@ export default function AdminPaymentMethods() {
                   <button
                     type="button"
                     onClick={() => handleRemoveLogo(id)}
-                    className="absolute top-1 right-1 p-1.5 bg-neutral-900 hover:bg-red-600 text-white transition-colors cursor-pointer select-none"
+                    className="absolute top-1 right-1 p-1.5 bg-neutral-900 hover:bg-red-600 text-white transition-colors cursor-pointer rounded-[4px]"
                     title="Remove Logo image"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -272,7 +385,7 @@ export default function AdminPaymentMethods() {
                   <button
                     type="button"
                     onClick={() => handleApplyPreset(id)}
-                    className="text-[9px] text-[#000000] font-bold uppercase underline hover:no-underline select-none cursor-pointer"
+                    className="text-[9px] text-neutral-900 font-bold uppercase underline hover:no-underline cursor-pointer"
                   >
                     Use Recommended Preset
                   </button>
@@ -281,7 +394,7 @@ export default function AdminPaymentMethods() {
             </div>
 
             <div className="flex gap-2">
-              <label className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 border border-neutral-300 text-[10px] font-bold uppercase tracking-wider bg-white hover:bg-neutral-50 cursor-pointer select-none text-neutral-700 text-center">
+              <label className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 border border-neutral-300 text-[10px] font-bold uppercase tracking-wider bg-white hover:bg-neutral-50 cursor-pointer text-neutral-700 text-center rounded-[4px]">
                 <Upload className="w-3.5 h-3.5" />
                 Upload File
                 <input 
@@ -296,16 +409,11 @@ export default function AdminPaymentMethods() {
                 <button
                   type="button"
                   onClick={() => handleApplyPreset(id)}
-                  className="px-2 py-2 border border-neutral-200 text-[10px] font-bold uppercase tracking-wider bg-slate-50 hover:bg-neutral-100 text-neutral-600 cursor-pointer select-none"
+                  className="px-2 py-2 border border-neutral-200 text-[10px] font-bold uppercase tracking-wider bg-slate-50 hover:bg-neutral-100 text-neutral-600 cursor-pointer rounded-[4px]"
                 >
                   Apply Preset
                 </button>
               )}
-            </div>
-            
-            {/* Displaying preset preview small text */}
-            <div className="bg-neutral-100 p-2 text-[9px] text-neutral-500 rounded-none leading-relaxed">
-              Accepts PNG/JPG file format. Logo is converted to Base64 to secure seamless real-time loading anywhere.
             </div>
           </div>
 
@@ -318,8 +426,8 @@ export default function AdminPaymentMethods() {
                   type="text"
                   value={data.name}
                   onChange={(e) => handleInputChange(id, 'name', e.target.value)}
-                  className="w-full h-10 border border-neutral-200 px-3 text-xs font-semibold focus:outline-none focus:border-neutral-900 rounded-none bg-white text-neutral-900"
-                  placeholder={`${title} Name`}
+                  className="w-full h-10 border border-neutral-200 px-3 text-xs font-semibold focus:outline-none focus:border-neutral-900 rounded-[4px] bg-white text-neutral-900"
+                  placeholder="Enter Payment Name"
                 />
               </div>
 
@@ -332,8 +440,8 @@ export default function AdminPaymentMethods() {
                     type="text"
                     value={data.number}
                     onChange={(e) => handleInputChange(id, 'number', e.target.value)}
-                    className="w-full h-10 border border-neutral-200 px-3 text-xs font-semibold focus:outline-none focus:border-neutral-900 rounded-none bg-white text-neutral-900 font-mono"
-                    placeholder={id === 'card' ? 'e.g. Sandbox Processor SSL' : 'e.g. 017XXXXXXXX'}
+                    className="w-full h-10 border border-neutral-200 px-3 text-xs font-semibold focus:outline-none focus:border-neutral-900 rounded-[4px] bg-white text-neutral-900 font-mono"
+                    placeholder="Enter Account Number"
                   />
                 </div>
               )}
@@ -344,10 +452,10 @@ export default function AdminPaymentMethods() {
                 <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">Payment Gateway Proxy Link (Optional)</label>
                 <input 
                   type="text"
-                  value={data.gatewayLink || ''}
+                  value={(data as any).gatewayLink || ''}
                   onChange={(e) => handleInputChange(id, 'gatewayLink', e.target.value)}
-                  className="w-full h-10 border border-neutral-200 px-3 text-xs font-semibold focus:outline-none focus:border-neutral-900 rounded-none bg-white text-neutral-900"
-                  placeholder="https://sandbox.payment-gateway.com/auth"
+                  className="w-full h-10 border border-neutral-200 px-3 text-xs font-semibold focus:outline-none focus:border-neutral-900 rounded-[4px] bg-white text-neutral-900"
+                  placeholder="e.g. https://sandbox.payment-gateway.com/auth"
                 />
               </div>
             )}
@@ -358,8 +466,8 @@ export default function AdminPaymentMethods() {
                 value={data.instruction}
                 onChange={(e) => handleInputChange(id, 'instruction', e.target.value)}
                 rows={3}
-                className="w-full border border-neutral-200 p-3 text-xs font-semibold focus:outline-none focus:border-neutral-900 rounded-none bg-white text-neutral-900 leading-relaxed resize-none"
-                placeholder="Step-by-step transaction instructions..."
+                className="w-full border border-neutral-200 p-3 text-xs font-semibold focus:outline-none focus:border-neutral-900 rounded-[4px] bg-white text-neutral-900 leading-relaxed resize-none"
+                placeholder="Enter Instructions"
               />
             </div>
 
@@ -367,13 +475,13 @@ export default function AdminPaymentMethods() {
               <div className="flex items-center gap-1.5 text-neutral-400 text-[10px] font-bold uppercase">
                 {data.enabled ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="text-emerald-600">Active on Checkout</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 block animate-pulse" />
+                    <span className="text-emerald-600 font-extrabold">Active on Checkout</span>
                   </>
                 ) : (
                   <>
-                    <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-                    <span className="text-red-500">Hidden from customers</span>
+                    <span className="w-2 h-2 rounded-full bg-red-500 block" />
+                    <span className="text-red-500 font-extrabold">Hidden from customers</span>
                   </>
                 )}
               </div>
@@ -381,7 +489,7 @@ export default function AdminPaymentMethods() {
               <button
                 type="button"
                 onClick={() => handleSaveMethod(id)}
-                className="flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer select-none rounded-none"
+                className="flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-colors cursor-pointer rounded-[4px]"
               >
                 <Save className="w-3.5 h-3.5" />
                 Save Changes
@@ -395,11 +503,25 @@ export default function AdminPaymentMethods() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16 font-sans text-neutral-900 text-left">
-      {/* Dynamic Save Notification */}
-      {saveFeedback && (
-        <div className="fixed top-20 right-6 z-[110] bg-neutral-900 text-white border border-neutral-801 px-4 py-3 shadow-xl flex items-center gap-2.5 max-w-sm">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-bold uppercase tracking-wider">{saveFeedback}</span>
+      
+      {/* DB Schema Missing Header Warning */}
+      {dbWarning === "table_missing" && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 font-mono text-xs text-red-900 uppercase space-y-2">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 font-black">
+              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+              <span>Database Table missing: public.payment_methods</span>
+            </div>
+            <button 
+              onClick={() => setShowSchemaModal(true)}
+              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-[10px] font-bold tracking-wider uppercase rounded-[4px]"
+            >
+              Configure Schema SQL
+            </button>
+          </div>
+          <p className="font-sans font-bold text-[11px] text-red-800">
+            Database storage is not prepared. Click 'Configure Schema SQL' to view and copy the initialization migration script for your Supabase backend.
+          </p>
         </div>
       )}
 
@@ -440,12 +562,11 @@ export default function AdminPaymentMethods() {
                 const newActive = !settings.paymentPersonalActive;
                 updateSettings({
                   paymentPersonalActive: newActive,
-                  // If enabling Personal, Merchant must be disabled automatically
                   paymentMerchantActive: newActive ? false : settings.paymentMerchantActive
                 });
-                triggerFeedback(newActive ? "Payment Personal ACTIVED & Merchant disabled" : "Payment Personal Deactived");
+                toast.success(newActive ? "Payment Personal ACTIVATED & Merchant disabled" : "Payment Personal Deactivated");
               }}
-              className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest ${
+              className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-[4px] ${
                 settings.paymentPersonalActive 
                   ? 'bg-emerald-600 text-white' 
                   : 'bg-zinc-200 text-zinc-550'
@@ -458,7 +579,7 @@ export default function AdminPaymentMethods() {
           <button
             type="button"
             onClick={handleSaveAll}
-            className="bg-neutral-900 hover:bg-black text-white border border-neutral-950 h-10 px-6 text-xs font-black uppercase tracking-widest transition-all cursor-pointer select-none flex items-center justify-center gap-2"
+            className="bg-neutral-900 hover:bg-black text-white border border-neutral-950 h-10 px-6 text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-2 rounded-[4px]"
           >
             <Save className="w-4 h-4 text-emerald-400" />
             <span>Save All Settings</span>
@@ -473,25 +594,65 @@ export default function AdminPaymentMethods() {
       )}
 
       {/* Gateway System Sections */}
-      <div className="space-y-6">
-        {renderCard('cod', '1. Cash On Delivery (COD)', false)}
-        
-        {renderCard('bkash', '2. bKash mobile banking', true)}
-        
-        {renderCard('nagad', '3. Nagad mobile banking', true)}
-        
-        {renderCard('rocket', '4. Rocket DBBL banking', true)}
-        
-        {renderCard('card', '5. Digital Card Gateway (PCI-Certified)', true, true)}
-      </div>
+      {loading ? (
+        <div className="text-center py-12 bg-white border border-neutral-200">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-900" />
+          <p className="text-xs font-black uppercase tracking-widest mt-4 text-neutral-500">Loading DB configurations...</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {renderCard('cod', '1. Cash On Delivery (COD)', false)}
+          {renderCard('bkash', '2. bKash mobile banking', true)}
+          {renderCard('nagad', '3. Nagad mobile banking', true)}
+          {renderCard('rocket', '4. Rocket DBBL banking', true)}
+          {renderCard('card', '5. Digital Card Gateway (PCI-Certified)', true, true)}
+        </div>
+      )}
 
-      {/* Bottom Legal bar */}
+      {/* Bottom info bar */}
       <div className="bg-neutral-50 border border-neutral-200 p-4 flex items-start gap-3">
         <Info className="w-5 h-5 text-neutral-500 shrink-0 mt-0.5" />
         <p className="text-[10.5px] text-neutral-500 leading-relaxed font-semibold uppercase tracking-wide">
           Notice: Verified checkout payment rules are completely automated. If a certain channel is marked "DISABLED" in this panel, its field will automatically disappear from the checkout screen option for customers without causing manual errors.
         </p>
       </div>
+
+      {/* Database Schema Migration Modal */}
+      {showSchemaModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-white p-8 max-w-2xl w-full border border-neutral-300 shadow-2xl rounded-none flex flex-col max-h-[90vh]">
+            <h2 className="text-lg font-black uppercase tracking-tight mb-2 flex items-center gap-2">
+              <Database className="w-5 h-5 text-red-600" />
+              <span>Supabase Schema Required</span>
+            </h2>
+            <p className="text-xs text-neutral-500 mb-4 uppercase font-bold leading-relaxed">
+              The <b>payment_methods</b> table and structured columns are required to run this database-driven system. Please run this script in your <b>Supabase SQL Editor</b>:
+            </p>
+
+            <div className="bg-neutral-950 p-4 font-mono text-[10.5px] text-neutral-300 overflow-y-auto max-h-[40vh] border border-neutral-800 relative select-text text-left whitespace-pre-wrap">
+              {sqlGuide}
+            </div>
+
+            <div className="flex justify-between items-center gap-3 mt-6 pt-4 border-t border-neutral-100">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(sqlGuide);
+                  toast.success("SQL script copied successfully!");
+                }}
+                className="bg-neutral-900 hover:bg-black text-white px-5 h-10 text-[10px] font-black uppercase tracking-widest rounded-[4px]"
+              >
+                Copy SQL Script
+              </button>
+              <button 
+                onClick={() => setShowSchemaModal(false)}
+                className="px-6 h-10 border border-neutral-200 text-[10px] font-black uppercase tracking-widest hover:bg-neutral-50 rounded-[4px]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

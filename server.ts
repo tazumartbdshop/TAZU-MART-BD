@@ -1498,6 +1498,159 @@ Please ask me your query or select a quick question template below!`;
     }
   });
 
+  // --- Payment Methods Schema & Endpoints ---
+  const REQUIRED_PAYMENT_COLUMNS = [
+    'id', 'payment_type', 'payment_code', 'payment_name', 'account_name', 'account_number',
+    'merchant_id', 'api_key', 'secret_key', 'instruction', 'logo_url', 'enabled',
+    'gateway_link', 'username', 'password', 'callback_url', 'success_url', 'cancel_url',
+    'created_at', 'updated_at'
+  ];
+
+  const PAYMENT_FALLBACK_FILE = path.join(process.cwd(), 'payment_methods_fallback.json');
+
+  async function savePaymentFallback(methods: any[]) {
+    try {
+      await fs.writeFile(PAYMENT_FALLBACK_FILE, JSON.stringify(methods, null, 2), 'utf-8');
+      console.log("[Payment Fallback] Saved payment methods to local file.");
+    } catch (err) {
+      console.error("[Payment Fallback] Failed to save payment methods fallback:", err);
+    }
+  }
+
+  async function getPaymentFallback(): Promise<any[]> {
+    try {
+      const raw = await fs.readFile(PAYMENT_FALLBACK_FILE, 'utf-8');
+      return JSON.parse(raw);
+    } catch (err) {
+      return [];
+    }
+  }
+
+  app.get("/api/admin/payment-methods/schema-check", async (req, res) => {
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (!clientToUse) {
+        return res.json({ 
+          status: "success", 
+          schemaState: { 
+            payment_methods: { exists: false, missingColumns: REQUIRED_PAYMENT_COLUMNS, error: "Supabase client not initialized" } 
+          } 
+        });
+      }
+
+      const tableCheck = await checkTableSchema('payment_methods', REQUIRED_PAYMENT_COLUMNS);
+      let sqlGuide = "";
+      if (!tableCheck.exists || tableCheck.missingColumns.length > 0) {
+        sqlGuide = `-- 📂 Database Table: public.payment_methods\n-- ❌ Status: Table or columns missing!\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to create the table:\n\nCREATE TABLE IF NOT EXISTS public.payment_methods (\n  id TEXT PRIMARY KEY,\n  payment_type TEXT NOT NULL,\n  payment_code TEXT NOT NULL,\n  payment_name TEXT,\n  account_name TEXT,\n  account_number TEXT,\n  merchant_id TEXT,\n  api_key TEXT,\n  secret_key TEXT,\n  instruction TEXT,\n  logo_url TEXT,\n  enabled BOOLEAN DEFAULT false,\n  gateway_link TEXT,\n  username TEXT,\n  password TEXT,\n  callback_url TEXT,\n  success_url TEXT,\n  cancel_url TEXT,\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS disable to allow backend operations:\nALTER TABLE public.payment_methods DISABLE ROW LEVEL SECURITY;`;
+      }
+
+      res.json({ 
+        status: "success", 
+        schemaState: { 
+          payment_methods: { 
+            exists: tableCheck.exists, 
+            missingColumns: tableCheck.missingColumns,
+            sqlGuide
+          } 
+        } 
+      });
+    } catch (err: any) {
+      res.json({ status: "error", error: err.message });
+    }
+  });
+
+  app.get("/api/admin/payment-methods", async (req, res) => {
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      let methods: any[] = [];
+      let dbWarning = null;
+
+      if (clientToUse) {
+        const { data, error } = await clientToUse.from('payment_methods').select('*');
+        if (error) {
+          console.warn("[Get Payment Methods] Supabase error:", error.message);
+          dbWarning = "table_missing";
+          methods = await getPaymentFallback();
+        } else if (data) {
+          methods = data;
+        }
+      } else {
+        methods = await getPaymentFallback();
+      }
+
+      // Decrypt credentials
+      const decryptedMethods = methods.map((m: any) => ({
+        ...m,
+        api_key: m.api_key ? decryptMarketingToken(m.api_key) : '',
+        secret_key: m.secret_key ? decryptMarketingToken(m.secret_key) : '',
+        password: m.password ? decryptMarketingToken(m.password) : ''
+      }));
+
+      res.json({ status: "success", methods: decryptedMethods, dbWarning });
+    } catch (err: any) {
+      console.error("[Get Payment Methods] Error:", err);
+      res.status(500).json({ error: "Failed to load payment methods" });
+    }
+  });
+
+  app.post("/api/admin/payment-methods/save", async (req, res) => {
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      const { method } = req.body;
+      if (!method || !method.id) {
+        return res.status(400).json({ error: "Method payload with valid ID is required." });
+      }
+
+      const dbPayload = {
+        id: method.id,
+        payment_type: method.payment_type || method.paymentType || 'personal',
+        payment_code: method.payment_code || method.paymentCode || method.id,
+        payment_name: method.payment_name || method.paymentName || '',
+        account_name: method.account_name || method.accountName || '',
+        account_number: method.account_number || method.accountNumber || '',
+        merchant_id: method.merchant_id || method.merchantId || '',
+        api_key: (method.api_key || method.apiKey) ? encryptMarketingToken(method.api_key || method.apiKey) : '',
+        secret_key: (method.secret_key || method.secretKey) ? encryptMarketingToken(method.secret_key || method.secretKey) : '',
+        instruction: method.instruction || '',
+        logo_url: method.logo_url || method.logoUrl || '',
+        enabled: method.enabled ?? false,
+        gateway_link: method.gateway_link || method.gatewayLink || '',
+        username: method.username || '',
+        password: method.password ? encryptMarketingToken(method.password) : '',
+        callback_url: method.callback_url || method.callbackUrl || '',
+        success_url: method.success_url || method.successUrl || '',
+        cancel_url: method.cancel_url || method.cancelUrl || '',
+        updated_at: new Date().toISOString()
+      };
+
+      // Save to fallback first
+      const existingFallback = await getPaymentFallback();
+      const idx = existingFallback.findIndex((m: any) => m.id === method.id);
+      if (idx !== -1) {
+        existingFallback[idx] = dbPayload;
+      } else {
+        existingFallback.push(dbPayload);
+      }
+      await savePaymentFallback(existingFallback);
+
+      if (clientToUse) {
+        const { error } = await clientToUse.from('payment_methods').upsert([dbPayload]);
+        if (error) {
+          console.error("[Save Payment Method] DB Upsert error:", error.message);
+          return res.json({ 
+            status: "error", 
+            error: `Database write failed: ${error.message}. Fallback saved locally.` 
+          });
+        }
+      }
+
+      res.json({ status: "success", method: dbPayload });
+    } catch (err: any) {
+      console.error("[Save Payment Method] Error:", err);
+      res.status(500).json({ error: "Failed to save payment method" });
+    }
+  });
+
   app.post("/api/admin/delete-customer", async (req, res) => {
     try {
       if (!supabaseServiceRole) {
