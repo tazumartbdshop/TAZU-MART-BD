@@ -1224,7 +1224,7 @@ Please ask me your query or select a quick question template below!`;
             if (rawConfig) {
               const parsed = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
               // Ensure it has some real data (not just empty strings or nulls)
-              if (parsed && (parsed.pixelId || parsed.measurementId || parsed.ga4_measurement_id || parsed.endpointUrl)) {
+              if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
                 config = parsed;
                 loadedFromDb = true;
                 console.log(`[Config Fetch] Loaded platform '${moduleKey}' from marketing_tracking_settings by platform successfully.`);
@@ -1252,7 +1252,7 @@ Please ask me your query or select a quick question template below!`;
                   const parsed = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
                   if (parsed && parsed[moduleKey]) {
                     const candidateConfig = parsed[moduleKey];
-                    if (candidateConfig && (candidateConfig.pixelId || candidateConfig.measurementId || candidateConfig.ga4_measurement_id || candidateConfig.endpointUrl)) {
+                    if (candidateConfig && typeof candidateConfig === 'object' && Object.keys(candidateConfig).length > 0) {
                       config = candidateConfig;
                       loadedFromDb = true;
                       console.log(`[Config Fetch] Loaded module ${moduleKey} from consolidated table ${consolidatedTable} successfully.`);
@@ -1364,7 +1364,7 @@ Please ask me your query or select a quick question template below!`;
         const localConfig = await getLocalFallback();
         if (localConfig && localConfig[moduleKey]) {
           const candidateConfig = localConfig[moduleKey];
-          if (candidateConfig && (candidateConfig.pixelId || candidateConfig.measurementId || candidateConfig.ga4_measurement_id || candidateConfig.endpointUrl)) {
+          if (candidateConfig && typeof candidateConfig === 'object' && Object.keys(candidateConfig).length > 0) {
             config = candidateConfig;
             loadedFromDb = true;
             console.log(`[Config Fetch] Loaded module ${moduleKey} from local file fallback successfully.`);
@@ -1495,11 +1495,14 @@ Please ask me your query or select a quick question template below!`;
           const consolidatedTables = ['settings', 'marketing_tracking_settings'];
           for (const t of consolidatedTables) {
             try {
-              await clientToUse.from(t).upsert([{
+              const upsertRow: any = {
                 id: 'marketing_tracking_config',
-                value: JSON.stringify(existingFallback),
-                updated_at: new Date().toISOString()
-              }]);
+                value: JSON.stringify(existingFallback)
+              };
+              if (t !== 'settings') {
+                upsertRow.updated_at = new Date().toISOString();
+              }
+              await clientToUse.from(t).upsert([upsertRow]);
             } catch (e: any) {}
           }
         } else {
@@ -1534,11 +1537,14 @@ Please ask me your query or select a quick question template below!`;
           const consolidatedTables = ['settings', 'marketing_tracking_settings'];
           for (const consolidatedTable of consolidatedTables) {
             try {
-              await clientToUse.from(consolidatedTable).upsert([{
+              const upsertRow: any = {
                 id: 'marketing_tracking_config',
-                value: JSON.stringify(existingFallback),
-                updated_at: new Date().toISOString()
-              }]);
+                value: JSON.stringify(existingFallback)
+              };
+              if (consolidatedTable !== 'settings') {
+                upsertRow.updated_at = new Date().toISOString();
+              }
+              await clientToUse.from(consolidatedTable).upsert([upsertRow]);
             } catch (err: any) {
               console.warn(`[Save API] Consolidated upsert to ${consolidatedTable} failed:`, err.message);
             }

@@ -283,11 +283,14 @@ export async function safeFetchJSON<T = any>(url: string, options?: RequestInit)
         const consolidatedTables = ['settings', 'marketing_tracking_settings'];
         for (const ct of consolidatedTables) {
           try {
-            await supabase.from(ct).upsert([{
+            const upsertRow: any = {
               id: 'marketing_tracking_config',
-              value: JSON.stringify(existingFallback),
-              updated_at: new Date().toISOString()
-            }]);
+              value: JSON.stringify(existingFallback)
+            };
+            if (ct !== 'settings') {
+              upsertRow.updated_at = new Date().toISOString();
+            }
+            await supabase.from(ct).upsert([upsertRow]);
           } catch (e) {}
         }
 
