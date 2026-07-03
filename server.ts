@@ -1207,120 +1207,168 @@ Please ask me your query or select a quick question template below!`;
       else if (tableName === 'tracking_status') moduleKey = 'trackingOverview';
       else moduleKey = tableName;
 
-      let config: any = {};
+      let config: any = null;
       let loadedFromDb = false;
 
       if (clientToUse) {
-        // 1. Try fetching from the specific table first
+        // Method A: Query marketing_tracking_settings table by platform column first (primary requirement)
         try {
-          const { data, error } = await clientToUse.from(tableName).select('*').eq('id', rowId).single();
+          const { data, error } = await clientToUse
+            .from('marketing_tracking_settings')
+            .select('*')
+            .eq('platform', moduleKey)
+            .maybeSingle();
+
           if (!error && data) {
-            if (tableName === 'facebook_settings') {
-              config = {
-                pixelId: data.pixel_id || '',
-                accessToken: data.access_token || '',
-                datasetId: data.dataset_id || '',
-                testEventCode: data.test_event_code || '',
-                businessManagerId: data.business_manager_id || '',
-                adAccountId: data.ad_account_id || '',
-                systemUserToken: data.system_user_token || '',
-                browserTracking: data.browser_tracking ?? false,
-                serverSideTracking: data.server_side_tracking ?? false,
-                active: data.enabled ?? false
-              };
-              loadedFromDb = true;
-            } else if (tableName === 'tiktok_settings') {
-              config = {
-                pixelId: data.pixel_id || '',
-                accessToken: data.access_token || '',
-                datasetId: data.dataset_id || '',
-                eventApiToken: data.events_api_token || '',
-                advertiserId: data.advertiser_id || '',
-                businessCenterId: data.business_center_id || '',
-                browserTracking: data.browser_tracking ?? false,
-                serverSideTracking: data.server_side_tracking ?? false,
-                active: data.enabled ?? false
-              };
-              loadedFromDb = true;
-            } else if (tableName === 'google_settings') {
-              config = {
-                measurementId: data.ga4_measurement_id || '',
-                apiSecret: data.api_secret || '',
-                conversionId: data.conversion_id || '',
-                conversionLabel: data.conversion_label || '',
-                customerId: data.customer_id || '',
-                adsAccountId: data.ads_account_id || '',
-                gtmContainerId: data.gtm_container_id || '',
-                cloudProjectId: data.cloud_project_id || '',
-                oauthClientId: data.oauth_client_id || '',
-                oauthClientSecret: data.oauth_client_secret || '',
-                enhancedConversion: data.enhanced_conversion ?? false,
-                active: data.enabled ?? false
-              };
-              loadedFromDb = true;
-            } else if (tableName === 'server_side_settings') {
-              config = {
-                endpointUrl: data.endpoint_url || '',
-                apiSecret: data.api_secret || '',
-                webhookSecret: data.webhook_secret || '',
-                workerUrl: data.worker_url || '',
-                stapeUrl: data.stape_url || '',
-                gtmServerContainer: data.gtm_server_container || '',
-                region: data.region || '',
-                retryCount: data.retry_count ?? 3,
-                active: data.enabled ?? false
-              };
-              loadedFromDb = true;
-            } else if (tableName === 'tracking_status') {
-              config = {
-                facebook_connected: data.facebook_connected ?? false,
-                tiktok_connected: data.tiktok_connected ?? false,
-                google_connected: data.google_connected ?? false,
-                server_connected: data.server_connected ?? false,
-                last_sync: data.last_sync || ''
-              };
-              loadedFromDb = true;
-            } else {
-              const rawValue = data[columnName] || data['value'];
-              if (rawValue) {
-                config = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+            const rawConfig = data.configuration || data.config || data.value;
+            if (rawConfig) {
+              const parsed = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+              // Ensure it has some real data (not just empty strings or nulls)
+              if (parsed && (parsed.pixelId || parsed.measurementId || parsed.ga4_measurement_id || parsed.endpointUrl)) {
+                config = parsed;
                 loadedFromDb = true;
+                console.log(`[Config Fetch] Loaded platform '${moduleKey}' from marketing_tracking_settings by platform successfully.`);
               }
             }
           }
-        } catch (e) {
-          console.warn(`[Config Fetch] FAILED querying ${tableName}:`, e);
+        } catch (e: any) {
+          console.warn(`[Config Fetch] Method A (marketing_tracking_settings by platform) failed for ${moduleKey}:`, e.message);
         }
 
-        // 2. If not loaded from DB, try fetching from consolidated settings tables
+        // Method B: If Method A failed, query consolidated settings tables using ID = 'marketing_tracking_config'
         if (!loadedFromDb) {
           const consolidatedTables = ['settings', 'marketing_tracking_settings'];
           for (const consolidatedTable of consolidatedTables) {
             try {
-              const { data, error } = await clientToUse.from(consolidatedTable).select('*').eq('id', 'marketing_tracking_config').single();
+              const { data, error } = await clientToUse
+                .from(consolidatedTable)
+                .select('*')
+                .eq('id', 'marketing_tracking_config')
+                .maybeSingle();
+
               if (!error && data) {
-                const rawVal = data.value || data.config || data.settings;
+                const rawVal = data.value || data.config || data.settings || data.configuration;
                 if (rawVal) {
                   const parsed = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
                   if (parsed && parsed[moduleKey]) {
-                    config = parsed[moduleKey];
-                    loadedFromDb = true;
-                    console.log(`[Config Fetch] Loaded module ${moduleKey} from consolidated table: ${consolidatedTable}`);
-                    break;
+                    const candidateConfig = parsed[moduleKey];
+                    if (candidateConfig && (candidateConfig.pixelId || candidateConfig.measurementId || candidateConfig.ga4_measurement_id || candidateConfig.endpointUrl)) {
+                      config = candidateConfig;
+                      loadedFromDb = true;
+                      console.log(`[Config Fetch] Loaded module ${moduleKey} from consolidated table ${consolidatedTable} successfully.`);
+                      break;
+                    }
                   }
                 }
               }
-            } catch (e) {}
+            } catch (e: any) {
+              console.warn(`[Config Fetch] Consolidated table query failed for ${consolidatedTable}:`, e.message);
+            }
+          }
+        }
+
+        // Method C: Query individual tables (facebook_settings, google_settings, tiktok_settings)
+        if (!loadedFromDb) {
+          try {
+            const { data, error } = await clientToUse.from(tableName).select('*').eq('id', rowId).maybeSingle();
+            if (!error && data) {
+              if (tableName === 'facebook_settings') {
+                if (data.pixel_id) {
+                  config = {
+                    pixelId: data.pixel_id || '',
+                    accessToken: data.access_token || '',
+                    datasetId: data.dataset_id || '',
+                    testEventCode: data.test_event_code || '',
+                    businessManagerId: data.business_manager_id || '',
+                    adAccountId: data.ad_account_id || '',
+                    systemUserToken: data.system_user_token || '',
+                    browserTracking: data.browser_tracking ?? false,
+                    serverSideTracking: data.server_side_tracking ?? false,
+                    active: data.enabled ?? false
+                  };
+                  loadedFromDb = true;
+                }
+              } else if (tableName === 'tiktok_settings') {
+                if (data.pixel_id) {
+                  config = {
+                    pixelId: data.pixel_id || '',
+                    accessToken: data.access_token || '',
+                    datasetId: data.dataset_id || '',
+                    eventApiToken: data.events_api_token || '',
+                    advertiserId: data.advertiser_id || '',
+                    businessCenterId: data.business_center_id || '',
+                    browserTracking: data.browser_tracking ?? false,
+                    serverSideTracking: data.server_side_tracking ?? false,
+                    active: data.enabled ?? false
+                  };
+                  loadedFromDb = true;
+                }
+              } else if (tableName === 'google_settings') {
+                if (data.ga4_measurement_id) {
+                  config = {
+                    measurementId: data.ga4_measurement_id || '',
+                    apiSecret: data.api_secret || '',
+                    conversionId: data.conversion_id || '',
+                    conversionLabel: data.conversion_label || '',
+                    customerId: data.customer_id || '',
+                    adsAccountId: data.ads_account_id || '',
+                    gtmContainerId: data.gtm_container_id || '',
+                    cloudProjectId: data.cloud_project_id || '',
+                    oauthClientId: data.oauth_client_id || '',
+                    oauthClientSecret: data.oauth_client_secret || '',
+                    enhancedConversion: data.enhanced_conversion ?? false,
+                    active: data.enabled ?? false
+                  };
+                  loadedFromDb = true;
+                }
+              } else if (tableName === 'server_side_settings') {
+                if (data.endpoint_url) {
+                  config = {
+                    endpointUrl: data.endpoint_url || '',
+                    apiSecret: data.api_secret || '',
+                    webhookSecret: data.webhook_secret || '',
+                    workerUrl: data.worker_url || '',
+                    stapeUrl: data.stape_url || '',
+                    gtmServerContainer: data.gtm_server_container || '',
+                    region: data.region || '',
+                    retryCount: data.retry_count ?? 3,
+                    active: data.enabled ?? false
+                  };
+                  loadedFromDb = true;
+                }
+              } else if (tableName === 'tracking_status') {
+                config = {
+                  facebook_connected: data.facebook_connected ?? false,
+                  tiktok_connected: data.tiktok_connected ?? false,
+                  google_connected: data.google_connected ?? false,
+                  server_connected: data.server_connected ?? false,
+                  last_sync: data.last_sync || ''
+                };
+                loadedFromDb = true;
+              } else {
+                const rawValue = data[columnName] || data['value'];
+                if (rawValue) {
+                  config = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+                  loadedFromDb = true;
+                }
+              }
+            }
+          } catch (e: any) {
+            console.warn(`[Config Fetch] Individual table query failed for ${tableName}:`, e.message);
           }
         }
       }
 
-      // 3. Fall back to local file fallback if not loaded from database
+      // Method D: Fall back to local file fallback
       if (!loadedFromDb) {
         const localConfig = await getLocalFallback();
         if (localConfig && localConfig[moduleKey]) {
-          config = localConfig[moduleKey];
-          console.log(`[Config Fetch] Loaded module ${moduleKey} from local file fallback.`);
+          const candidateConfig = localConfig[moduleKey];
+          if (candidateConfig && (candidateConfig.pixelId || candidateConfig.measurementId || candidateConfig.ga4_measurement_id || candidateConfig.endpointUrl)) {
+            config = candidateConfig;
+            loadedFromDb = true;
+            console.log(`[Config Fetch] Loaded module ${moduleKey} from local file fallback successfully.`);
+          }
         } else if (localConfig && !localConfig[moduleKey] && tableName === 'settings') {
           config = localConfig;
         }
@@ -1338,7 +1386,7 @@ Please ask me your query or select a quick question template below!`;
         if (config.webhookSecret) config.webhookSecret = decryptMarketingToken(config.webhookSecret);
       }
 
-      return res.json({ status: "success", config, dbWarning: null, sqlGuide: null });
+      return res.json({ status: "success", config: loadedFromDb ? config : null, dbWarning: null, sqlGuide: null });
     } catch (err: any) {
       console.error("[Get Marketing Config] Error:", err);
       res.status(500).json({ error: "Failed to load marketing config" });
@@ -1386,17 +1434,26 @@ Please ask me your query or select a quick question template below!`;
     try {
       const { config, rowId = 'workspace_default', module } = req.body;
       const payload = config || req.body;
+      const targetModule = module || 'facebook';
 
-      logs.push({ step: "1. Validate Inputs", status: "SUCCESS", message: `🟢 ${module ? module.toUpperCase() : 'Marketing'} credentials and formats validated successfully.` });
+      // Check if this is a DELETE / CLEAR operation
+      const isDelete = !payload || 
+                       (!payload.pixelId && !payload.measurementId && !payload.ga4_measurement_id && !payload.endpointUrl);
+
+      logs.push({ 
+        step: "1. Validate Inputs", 
+        status: "SUCCESS", 
+        message: `🟢 ${targetModule.toUpperCase()} inputs validated successfully.` 
+      });
       
-      // Update local fallback selectively if module is provided
+      // Update local fallback selectively
       const existingFallback = await getLocalFallback() || {};
-      if (module) {
-        existingFallback[module] = payload[module] || payload;
-        await saveLocalFallback(existingFallback);
+      if (isDelete) {
+        delete existingFallback[targetModule];
       } else {
-        await saveLocalFallback(payload);
+        existingFallback[targetModule] = payload;
       }
+      await saveLocalFallback(existingFallback);
 
       logs.push({ step: "2. Check Database Connection", status: "PENDING", message: "Connecting to database..." });
       const clientToUse = supabaseServiceRole || supabaseAdmin;
@@ -1411,126 +1468,162 @@ Please ask me your query or select a quick question template below!`;
 
       logs.push({ step: "3. Encrypt and Save Configurations", status: "PENDING", message: `Writing configuration to database and fallback storage...` });
       
-      const p = JSON.parse(JSON.stringify(payload));
-      const tables: Array<{ name: string; data: any }> = [];
-
-      // If module is provided, only prepare that module's data
-      if (!module || module === 'facebook') {
-        const fbData = {
-          id: rowId,
-          pixel_id: p.facebook?.pixelId || (module === 'facebook' ? p.pixelId : null) || null,
-          access_token: (p.facebook?.accessToken || (module === 'facebook' ? p.accessToken : null)) ? encryptMarketingToken(p.facebook?.accessToken || p.accessToken) : null,
-          dataset_id: p.facebook?.datasetId || (module === 'facebook' ? p.datasetId : null) || null,
-          test_event_code: p.facebook?.testEventCode || (module === 'facebook' ? p.testEventCode : null) || null,
-          business_manager_id: p.facebook?.businessManagerId || (module === 'facebook' ? p.businessManagerId : null) || null,
-          ad_account_id: p.facebook?.adAccountId || (module === 'facebook' ? p.adAccountId : null) || null,
-          system_user_token: (p.facebook?.systemUserToken || (module === 'facebook' ? p.systemUserToken : null)) ? encryptMarketingToken(p.facebook?.systemUserToken || p.systemUserToken) : null,
-          browser_tracking: p.facebook?.browserTracking ?? (module === 'facebook' ? p.browserTracking : false) ?? false,
-          server_side_tracking: p.facebook?.serverSideTracking ?? (module === 'facebook' ? p.serverSideTracking : false) ?? false,
-          enabled: p.facebook?.active ?? (module === 'facebook' ? p.active : false) ?? false,
-          updated_at: new Date().toISOString()
-        };
-        tables.push({ name: 'facebook_settings', data: fbData });
-      }
-
-      if (!module || module === 'tiktok') {
-        const ttData = {
-          id: rowId,
-          pixel_id: p.tiktok?.pixelId || (module === 'tiktok' ? p.pixelId : null) || null,
-          access_token: (p.tiktok?.accessToken || (module === 'tiktok' ? p.accessToken : null)) ? encryptMarketingToken(p.tiktok?.accessToken || p.accessToken) : null,
-          dataset_id: p.tiktok?.datasetId || (module === 'tiktok' ? p.datasetId : null) || null,
-          events_api_token: (p.tiktok?.eventApiToken || (module === 'tiktok' ? p.eventApiToken : null)) ? encryptMarketingToken(p.tiktok?.eventApiToken || p.eventApiToken) : null,
-          advertiser_id: p.tiktok?.advertiserId || (module === 'tiktok' ? p.advertiserId : null) || null,
-          business_center_id: p.tiktok?.businessCenterId || (module === 'tiktok' ? p.businessCenterId : null) || null,
-          browser_tracking: p.tiktok?.browserTracking ?? (module === 'tiktok' ? p.browserTracking : false) ?? false,
-          server_side_tracking: p.tiktok?.serverSideTracking ?? (module === 'tiktok' ? p.serverSideTracking : false) ?? false,
-          enabled: p.tiktok?.active ?? (module === 'tiktok' ? p.active : false) ?? false,
-          updated_at: new Date().toISOString()
-        };
-        tables.push({ name: 'tiktok_settings', data: ttData });
-      }
-
-      if (!module || module === 'google') {
-        const googleData = {
-          id: rowId,
-          ga4_measurement_id: p.google?.measurementId || (module === 'google' ? p.measurementId : null) || null,
-          api_secret: p.google?.apiSecret || (module === 'google' ? p.apiSecret : null) || null,
-          conversion_id: p.google?.conversionId || (module === 'google' ? p.conversionId : null) || null,
-          conversion_label: p.google?.conversionLabel || (module === 'google' ? p.conversionLabel : null) || null,
-          customer_id: p.google?.customerId || (module === 'google' ? p.customerId : null) || null,
-          ads_account_id: p.google?.adsAccountId || (module === 'google' ? p.adsAccountId : null) || null,
-          gtm_container_id: p.google?.gtmContainerId || (module === 'google' ? p.gtmContainerId : null) || null,
-          cloud_project_id: p.google?.cloudProjectId || (module === 'google' ? p.cloudProjectId : null) || null,
-          oauth_client_id: p.google?.oauthClientId || (module === 'google' ? p.oauthClientId : null) || null,
-          oauth_client_secret: (p.google?.oauthClientSecret || (module === 'google' ? p.oauthClientSecret : null)) ? encryptMarketingToken(p.google?.oauthClientSecret || p.oauthClientSecret) : null,
-          enhanced_conversion: p.google?.enhancedConversion ?? (module === 'google' ? p.enhancedConversion : false) ?? false,
-          enabled: p.google?.active ?? (module === 'google' ? p.active : false) ?? false,
-          updated_at: new Date().toISOString()
-        };
-        tables.push({ name: 'google_settings', data: googleData });
-      }
-
-      if (!module || module === 'serverSide') {
-        const serverSideData = {
-          id: rowId,
-          endpoint_url: p.serverSide?.endpointUrl || (module === 'serverSide' ? p.endpointUrl : null) || null,
-          api_secret: (p.serverSide?.apiSecret || (module === 'serverSide' ? p.apiSecret : null)) ? encryptMarketingToken(p.serverSide?.apiSecret || p.apiSecret) : null,
-          webhook_secret: (p.serverSide?.webhookSecret || (module === 'serverSide' ? p.webhookSecret : null)) ? encryptMarketingToken(p.serverSide?.webhookSecret || p.webhookSecret) : null,
-          worker_url: p.serverSide?.workerUrl || (module === 'serverSide' ? p.workerUrl : null) || null,
-          stape_url: p.serverSide?.stapeUrl || (module === 'serverSide' ? p.stapeUrl : null) || null,
-          gtm_server_container: p.serverSide?.gtmServerContainer || (module === 'serverSide' ? p.gtmServerContainer : null) || null,
-          region: p.serverSide?.region || (module === 'serverSide' ? p.region : null) || null,
-          retry_count: p.serverSide?.retryCount ?? (module === 'serverSide' ? p.retryCount : 3) ?? 3,
-          enabled: p.serverSide?.active ?? (module === 'serverSide' ? p.active : false) ?? false,
-          updated_at: new Date().toISOString()
-        };
-        tables.push({ name: 'server_side_settings', data: serverSideData });
-      }
-
-      if (!module || module === 'trackingOverview') {
-        const trackingStatusData = {
-          id: rowId,
-          facebook_connected: p.facebook?.active ?? (module === 'trackingOverview' ? p.facebook_connected : false) ?? false,
-          tiktok_connected: p.tiktok?.active ?? (module === 'trackingOverview' ? p.tiktok_connected : false) ?? false,
-          google_connected: p.google?.active ?? (module === 'trackingOverview' ? p.google_connected : false) ?? false,
-          server_connected: p.serverSide?.active ?? (module === 'trackingOverview' ? p.server_connected : false) ?? false,
-          last_sync: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        tables.push({ name: 'tracking_status', data: trackingStatusData });
-      }
-
       if (clientToUse) {
-        // 1. Try upserting to individual tables (non-fatal if they are missing)
-        for (const t of tables) {
+        if (isDelete) {
+          // ==================== DELETE ROUTINE ====================
+          
+          // A. Delete from marketing_tracking_settings by platform
           try {
-            const { error } = await clientToUse.from(t.name).upsert([t.data]);
-            if (error) {
-              console.warn(`[Save Marketing Config] Upsert error on individual table ${t.name} (will use consolidated backup):`, error.message);
-            }
-          } catch (err: any) {
-            console.warn(`[Save Marketing Config] Exception on individual table ${t.name}:`, err.message);
+            await clientToUse.from('marketing_tracking_settings').delete().eq('platform', targetModule);
+            console.log(`[Save API] Deleted ${targetModule} from marketing_tracking_settings`);
+          } catch (e: any) {
+            console.warn(`[Save API] Failed to delete from marketing_tracking_settings:`, e.message);
           }
-        }
 
-        // 2. Try upserting to consolidated tables ('settings' and 'marketing_tracking_settings')
-        const consolidatedTables = ['settings', 'marketing_tracking_settings'];
-        for (const consolidatedTable of consolidatedTables) {
+          // B. Delete from individual legacy tables
+          const targetTable = targetModule === 'facebook' ? 'facebook_settings' : 
+                              targetModule === 'tiktok' ? 'tiktok_settings' : 
+                              targetModule === 'google' ? 'google_settings' : 
+                              targetModule === 'serverSide' ? 'server_side_settings' : '';
+          if (targetTable) {
+            try {
+              await clientToUse.from(targetTable).delete().eq('id', rowId);
+            } catch (e: any) {}
+          }
+
+          // C. Update consolidated tables
+          const consolidatedTables = ['settings', 'marketing_tracking_settings'];
+          for (const t of consolidatedTables) {
+            try {
+              await clientToUse.from(t).upsert([{
+                id: 'marketing_tracking_config',
+                value: JSON.stringify(existingFallback),
+                updated_at: new Date().toISOString()
+              }]);
+            } catch (e: any) {}
+          }
+        } else {
+          // ==================== SAVE ROUTINE ====================
+          
+          // Encrypt sensitive fields
+          const encryptedPayload = { ...payload };
+          if (encryptedPayload.accessToken) encryptedPayload.accessToken = encryptMarketingToken(encryptedPayload.accessToken);
+          if (encryptedPayload.systemUserToken) encryptedPayload.systemUserToken = encryptMarketingToken(encryptedPayload.systemUserToken);
+          if (encryptedPayload.apiSecret) encryptedPayload.apiSecret = encryptMarketingToken(encryptedPayload.apiSecret);
+          if (encryptedPayload.oauthClientSecret) encryptedPayload.oauthClientSecret = encryptMarketingToken(encryptedPayload.oauthClientSecret);
+          if (encryptedPayload.eventApiToken) encryptedPayload.eventApiToken = encryptMarketingToken(encryptedPayload.eventApiToken);
+
+          // A. Save to marketing_tracking_settings table by platform
           try {
-            await clientToUse.from(consolidatedTable).upsert([{
-              id: 'marketing_tracking_config',
-              value: JSON.stringify(existingFallback),
+            const { error } = await clientToUse.from('marketing_tracking_settings').upsert([{
+              platform: targetModule,
+              configuration: encryptedPayload,
               updated_at: new Date().toISOString()
-            }]);
-            console.log(`[Consolidated Save] Successfully updated database table '${consolidatedTable}'`);
-          } catch (err: any) {
-            console.warn(`[Consolidated Save] Failed to write to database table '${consolidatedTable}':`, err.message);
+            }], { onConflict: 'platform' });
+            
+            if (error) {
+              console.warn(`[Save API] Upsert to marketing_tracking_settings platform failed:`, error.message);
+            } else {
+              console.log(`[Save API] Successfully saved ${targetModule} to marketing_tracking_settings platform column.`);
+            }
+          } catch (e: any) {
+            console.warn(`[Save API] Exception upserting to marketing_tracking_settings:`, e.message);
+          }
+
+          // B. Update consolidated backup tables
+          const consolidatedTables = ['settings', 'marketing_tracking_settings'];
+          for (const consolidatedTable of consolidatedTables) {
+            try {
+              await clientToUse.from(consolidatedTable).upsert([{
+                id: 'marketing_tracking_config',
+                value: JSON.stringify(existingFallback),
+                updated_at: new Date().toISOString()
+              }]);
+            } catch (err: any) {
+              console.warn(`[Save API] Consolidated upsert to ${consolidatedTable} failed:`, err.message);
+            }
+          }
+
+          // C. Update individual platform tables (backward compatibility)
+          const p = JSON.parse(JSON.stringify(payload));
+          if (targetModule === 'facebook') {
+            const fbData = {
+              id: rowId,
+              pixel_id: p.pixelId || null,
+              access_token: p.accessToken ? encryptMarketingToken(p.accessToken) : null,
+              dataset_id: p.datasetId || null,
+              test_event_code: p.testEventCode || null,
+              business_manager_id: p.businessManagerId || null,
+              ad_account_id: p.adAccountId || null,
+              system_user_token: p.systemUserToken ? encryptMarketingToken(p.systemUserToken) : null,
+              browser_tracking: p.browserTracking ?? false,
+              server_side_tracking: p.serverSideTracking ?? false,
+              enabled: p.active ?? false,
+              updated_at: new Date().toISOString()
+            };
+            try {
+              await clientToUse.from('facebook_settings').upsert([fbData]);
+            } catch (e: any) {}
+          } else if (targetModule === 'tiktok') {
+            const ttData = {
+              id: rowId,
+              pixel_id: p.pixelId || null,
+              access_token: p.accessToken ? encryptMarketingToken(p.accessToken) : null,
+              dataset_id: p.datasetId || null,
+              events_api_token: p.eventApiToken ? encryptMarketingToken(p.eventApiToken) : null,
+              advertiser_id: p.advertiserId || null,
+              business_center_id: p.businessCenterId || null,
+              browser_tracking: p.browserTracking ?? false,
+              server_side_tracking: p.serverSideTracking ?? false,
+              enabled: p.active ?? false,
+              updated_at: new Date().toISOString()
+            };
+            try {
+              await clientToUse.from('tiktok_settings').upsert([ttData]);
+            } catch (e: any) {}
+          } else if (targetModule === 'google') {
+            const googleData = {
+              id: rowId,
+              ga4_measurement_id: p.measurementId || null,
+              api_secret: p.apiSecret || null,
+              conversion_id: p.conversionId || null,
+              conversion_label: p.conversionLabel || null,
+              customer_id: p.customerId || null,
+              ads_account_id: p.adsAccountId || null,
+              gtm_container_id: p.gtmContainerId || null,
+              cloud_project_id: p.cloudProjectId || null,
+              oauth_client_id: p.oauthClientId || null,
+              oauth_client_secret: p.oauthClientSecret ? encryptMarketingToken(p.oauthClientSecret) : null,
+              enhanced_conversion: p.enhancedConversion ?? false,
+              enabled: p.active ?? false,
+              updated_at: new Date().toISOString()
+            };
+            try {
+              await clientToUse.from('google_settings').upsert([googleData]);
+            } catch (e: any) {}
+          } else if (targetModule === 'serverSide') {
+            const serverSideData = {
+              id: rowId,
+              endpoint_url: p.endpointUrl || null,
+              api_secret: p.apiSecret ? encryptMarketingToken(p.apiSecret) : null,
+              webhook_secret: p.webhookSecret ? encryptMarketingToken(p.webhookSecret) : null,
+              worker_url: p.workerUrl || null,
+              stape_url: p.stapeUrl || null,
+              gtm_server_container: p.gtmServerContainer || null,
+              region: p.region || null,
+              retry_count: p.retryCount ?? 3,
+              enabled: p.active ?? false,
+              updated_at: new Date().toISOString()
+            };
+            try {
+              await clientToUse.from('server_side_settings').upsert([serverSideData]);
+            } catch (e: any) {}
           }
         }
       }
 
-      logs[logs.length - 1].status = "SUCCESS";
-      logs[logs.length - 1].message = `🟢 ${module ? module.toUpperCase() : 'Configurations'} written and encrypted successfully.`;
+      logs[2].status = "SUCCESS";
+      logs[2].message = `🟢 ${targetModule.toUpperCase()} configuration saved and encrypted successfully.`;
 
       logs.push({ step: "4. Verify Active Channel API Handshake", status: "SUCCESS", message: "🟢 Active developer nodes verified." });
       logs.push({ step: "5. Connection Success Status Indicators", status: "SUCCESS", message: "🟢 All systems verified." });
@@ -1538,11 +1631,7 @@ Please ask me your query or select a quick question template below!`;
       return res.json({ status: "success", logs });
     } catch (err: any) {
       console.error("[Save Marketing Config] Fatal Error:", err);
-      res.json({ 
-        status: "error", 
-        error: `Save error: ${err.message}`, 
-        logs 
-      });
+      return res.status(500).json({ error: err.message || "Failed to save marketing config" });
     }
   });
 
