@@ -1,0 +1,14 @@
+{
+  "facebook": {
+    "pixelId": "907247645182923",
+    "accessToken": "EAAUnnZCFhyGIBR86TLl9OxZBZCHEE5bx7IW8hCmivOTv4vCrOfaPla1mWmayHHk6MnZAu4SEJfPVKnZCk2M0o4KP13av3jye3MzKDQgKEj9V9FECqEJbcvOLDNwllGlsT1Q08tCoU3zQ4LAcN2wEEyJ8ZAgcqcNRHqiCEsuwT7wuoqXSLF2JLj09Mizb9o8wZDZD",
+    "datasetId": "907247645182923",
+    "testEventCode": "TEST19054",
+    "businessManagerId": "975624028965879",
+    "adAccountId": "act_1347083816320283",
+    "systemUserToken": "EAAOKRVcpV9kBR9JGqmlVpvrtWwToYsBrZBmDDfSzR7EK72dZAfZA3Lif0NFqZB7ZAemiCYX6BG7UOTgzWRSfPSfXrcPT1UYWZAmmzF0isZCrFS4GOhjtfXVPKZAiZA5ZAkTBTXO7ZBMXZCeOMMdQWyN31DyuKCdaVZC4g8Oer1uttpl7Dzq4fez9K2kbJzDdffGTPABgzpHSXlhP12DeWNksZCOfLbOkZAFh8MgZC1jabYfRQxRhVXOo64n5vMIbcTMx9iOA7GZBS7KjNiHuIDRDYMKtVP134CrUYg1cWvZBVLNsSySFFaEPtVrswZCDUuXmfRgid6SJpZCw0QiZB8ZBe3PRM66jM9oJbmLgZDZD",
+    "browserTracking": true,
+    "serverSideTracking": true,
+    "active": true
+  }
+}
