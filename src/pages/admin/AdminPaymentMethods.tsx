@@ -13,6 +13,7 @@ import {
   Database
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { safeFetchJSON } from '../../lib/utils';
 
 export default function AdminPaymentMethods() {
   const { settings, updateSettings } = useSettingsStore();
@@ -79,8 +80,7 @@ export default function AdminPaymentMethods() {
       setLoading(true);
       try {
         // Run schema check first
-        const sCheck = await fetch('/api/admin/payment-methods/schema-check');
-        const sData = await sCheck.json();
+        const sData = await safeFetchJSON('/api/admin/payment-methods/schema-check');
         if (sData.status === 'success' && sData.schemaState?.payment_methods) {
           const pm = sData.schemaState.payment_methods;
           if (!pm.exists || pm.missingColumns?.length > 0) {
@@ -90,8 +90,7 @@ export default function AdminPaymentMethods() {
         }
 
         // Fetch actual values
-        const response = await fetch('/api/admin/payment-methods');
-        const data = await response.json();
+        const data = await safeFetchJSON('/api/admin/payment-methods');
         if (data.status === 'success' && data.methods) {
           const updated = {
             cod: { enabled: false, name: '', logo: '', number: '', instruction: '' },
@@ -172,7 +171,7 @@ export default function AdminPaymentMethods() {
     }
 
     try {
-      const response = await fetch('/api/admin/payment-methods/save', {
+      const result = await safeFetchJSON('/api/admin/payment-methods/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -190,7 +189,6 @@ export default function AdminPaymentMethods() {
         })
       });
 
-      const result = await response.json();
       if (result.status === 'success') {
         toast.success(`${data.name || methodId.toUpperCase()} settings saved successfully.`);
         
@@ -249,7 +247,7 @@ export default function AdminPaymentMethods() {
     for (const mId of methods) {
       const data = configs[mId];
       try {
-        const response = await fetch('/api/admin/payment-methods/save', {
+        const resJson = await safeFetchJSON('/api/admin/payment-methods/save', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -266,10 +264,7 @@ export default function AdminPaymentMethods() {
             }
           })
         });
-        if (response.ok) {
-          const resJson = await response.json();
-          if (resJson.status === 'success') successCount++;
-        }
+        if (resJson.status === 'success') successCount++;
       } catch (err) {}
     }
 

@@ -12,7 +12,7 @@ import { usePromoStore, PromoCode } from '../store/usePromoStore';
 import { useFakeOrderStore } from '../store/useFakeOrderStore';
 import { bdAddressData, divisions } from '../data/addressData';
 import { HomeDeliverySection } from '../components/checkout/HomeDeliverySection';
-import { formatPrice, cn } from '../lib/utils';
+import { formatPrice, cn, safeFetchJSON } from '../lib/utils';
 import { getSupabase } from '../lib/supabase';
 import { pixelService } from '../utils/pixelService';
 import { 
@@ -463,7 +463,7 @@ export default function Checkout() {
 
     setIsValidating(true);
     try {
-      const response = await fetch('/api/promo/validate', {
+      const data = await safeFetchJSON('/api/promo/validate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -473,7 +473,6 @@ export default function Checkout() {
           subtotal: subtotal
         })
       });
-      const data = await response.json();
       
       if (data.isValid) {
         if (isStackBlocked) {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, RefreshCw, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { safeFetchJSON } from '../../lib/utils';
 import MarketingInput from '../../components/MarketingInput';
 import MarketingCheckbox from '../../components/MarketingCheckbox';
 
@@ -26,8 +27,7 @@ export default function AdminMarketingTikTok() {
   const [schemaState, setSchemaState] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/admin/marketing/config?tableName=tiktok_settings&rowId=tiktok_config')
-      .then(res => res.json())
+    safeFetchJSON('/api/admin/marketing/config?tableName=tiktok_settings&rowId=tiktok_config')
       .then(data => {
         if (data.status === 'success' && data.config) {
           setConfig(prev => ({
@@ -120,8 +120,7 @@ export default function AdminMarketingTikTok() {
 
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/marketing/schema-check?tableName=tiktok_settings');
-      const data = await res.json();
+      const data = await safeFetchJSON('/api/admin/marketing/schema-check?tableName=tiktok_settings');
       if (data.status === 'success') {
         const isMissing = !data.schemaState.tiktok_settings?.exists || data.schemaState.tiktok_settings?.missingColumns.length > 0;
         if (isMissing) {
@@ -132,7 +131,7 @@ export default function AdminMarketingTikTok() {
         }
       }
 
-      const response = await fetch('/api/admin/marketing/save', {
+      const saveData = await safeFetchJSON('/api/admin/marketing/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -141,9 +140,8 @@ export default function AdminMarketingTikTok() {
           config
         })
       });
-      const saveData = await response.json();
 
-      if (response.ok && saveData.status === 'success') {
+      if (saveData.status === 'success') {
         toast.success("Configuration Saved Successfully");
       } else {
         toast.error(saveData.error || "Failed to save settings");

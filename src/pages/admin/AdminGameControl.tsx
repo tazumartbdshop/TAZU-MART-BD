@@ -6,7 +6,7 @@ import {
   Grid, Radio
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../../lib/utils';
+import { cn, safeFetchJSON } from '../../lib/utils';
 
 interface SnakeTheme {
   id: string;
@@ -65,8 +65,7 @@ export default function AdminGameControl() {
 
   const fetchConfig = async () => {
     try {
-      const response = await fetch('/api/game-config');
-      const data = await response.json();
+      const data = await safeFetchJSON('/api/game-config');
       setConfig(data);
     } catch (error) {
       console.error("Failed to fetch config:", error);
@@ -78,7 +77,7 @@ export default function AdminGameControl() {
   const saveConfig = async (newConfig: GameConfig) => {
     setSaving(true);
     try {
-      await fetch('/api/game-config', {
+      await safeFetchJSON('/api/game-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newConfig)

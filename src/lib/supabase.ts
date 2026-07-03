@@ -129,7 +129,7 @@ export const fetchSupabaseConfigFromServer = async (): Promise<boolean> => {
     
     clearTimeout(timeoutId);
 
-    if (res.ok) {
+    if (res.ok && res.headers.get("content-type")?.includes("application/json")) {
       const data = await res.json();
       if (data.supabaseUrl && data.supabaseKey) {
         const serverUrl = data.supabaseUrl;

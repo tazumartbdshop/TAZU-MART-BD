@@ -7,7 +7,7 @@ import {
   Play, X, RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '../lib/utils';
+import { cn, safeFetchJSON } from '../lib/utils';
 
 // --- GAME CONSTANTS ---
 const WORLD_SIZE = 4000;
@@ -119,8 +119,7 @@ export default function Games() {
   const [purchasedSkins, setPurchasedSkins] = useState<number[]>([0, 1, 2, 3, 4, 5]);
 
   useEffect(() => {
-    fetch('/api/game-config')
-      .then(res => res.json())
+    safeFetchJSON('/api/game-config')
       .then(data => {
         setConfig(data);
         setSoundEnabled(data.settings.soundEnabled);

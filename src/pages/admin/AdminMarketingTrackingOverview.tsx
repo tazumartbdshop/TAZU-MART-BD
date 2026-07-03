@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, RefreshCw, CheckCircle2, XCircle, Database } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { safeFetchJSON } from '../../lib/utils';
 import MarketingCheckbox from '../../components/MarketingCheckbox';
 
 export default function AdminMarketingTrackingOverview() {
@@ -18,8 +19,7 @@ export default function AdminMarketingTrackingOverview() {
   const [schemaState, setSchemaState] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/admin/marketing/config?tableName=tracking_status&rowId=overview_config')
-      .then(res => res.json())
+    safeFetchJSON('/api/admin/marketing/config?tableName=tracking_status&rowId=overview_config')
       .then(data => {
         if (data.status === 'success' && data.config) {
           setConfig({
@@ -46,8 +46,7 @@ export default function AdminMarketingTrackingOverview() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/marketing/schema-check?tableName=tracking_status');
-      const data = await res.json();
+      const data = await safeFetchJSON('/api/admin/marketing/schema-check?tableName=tracking_status');
       if (data.status === 'success') {
         const isMissing = !data.schemaState.tracking_status?.exists || data.schemaState.tracking_status?.missingColumns.length > 0;
         if (isMissing) {
@@ -58,7 +57,7 @@ export default function AdminMarketingTrackingOverview() {
         }
       }
 
-      const response = await fetch('/api/admin/marketing/save', {
+      const saveData = await safeFetchJSON('/api/admin/marketing/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -73,9 +72,8 @@ export default function AdminMarketingTrackingOverview() {
           }
         })
       });
-      const saveData = await response.json();
 
-      if (response.ok && saveData.status === 'success') {
+      if (saveData.status === 'success') {
         toast.success("Tracking Overview Saved Successfully");
         setLastSync(new Date().toLocaleString().toUpperCase());
       } else {

@@ -12,6 +12,7 @@ import {
   Database
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { safeFetchJSON } from '../../lib/utils';
 
 export default function AdminPaymentMerchant() {
   const { settings, updateSettings } = useSettingsStore();
@@ -42,8 +43,7 @@ export default function AdminPaymentMerchant() {
       setLoading(true);
       try {
         // Run schema check first
-        const sCheck = await fetch('/api/admin/payment-methods/schema-check');
-        const sData = await sCheck.json();
+        const sData = await safeFetchJSON('/api/admin/payment-methods/schema-check');
         if (sData.status === 'success' && sData.schemaState?.payment_methods) {
           const pm = sData.schemaState.payment_methods;
           if (!pm.exists || pm.missingColumns?.length > 0) {
@@ -53,8 +53,7 @@ export default function AdminPaymentMerchant() {
         }
 
         // Fetch actual values
-        const response = await fetch('/api/admin/payment-methods');
-        const data = await response.json();
+        const data = await safeFetchJSON('/api/admin/payment-methods');
         if (data.status === 'success' && data.methods) {
           const m = data.methods.find((x: any) => x.id === 'merchant' || x.payment_type === 'merchant');
           if (m) {
@@ -90,7 +89,7 @@ export default function AdminPaymentMerchant() {
     }
 
     try {
-      const response = await fetch('/api/admin/payment-methods/save', {
+      const result = await safeFetchJSON('/api/admin/payment-methods/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -113,7 +112,6 @@ export default function AdminPaymentMerchant() {
         })
       });
 
-      const result = await response.json();
       if (result.status === 'success') {
         toast.success("⚡ Merchant gateway parameters saved successfully to Supabase!");
         

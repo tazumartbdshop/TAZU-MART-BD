@@ -245,7 +245,8 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     try {
       console.log("[Customer Store] Fetching customers from API...");
       const response = await fetch('/api/admin/customers');
-      if (response.ok) {
+      const contentType = response.headers.get("content-type");
+      if (response.ok && contentType?.includes("application/json")) {
         const data = await response.json();
         console.log("[Customer Store] API Response:", data);
         if (Array.isArray(data)) {
