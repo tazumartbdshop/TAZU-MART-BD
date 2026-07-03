@@ -23,9 +23,6 @@ export default function AdminMarketingFacebook() {
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<{ status: 'success' | 'error' | null; message: string }>({ status: null, message: '' });
-  
-  const [showSchemaModal, setShowSchemaModal] = useState(false);
-  const [schemaState, setSchemaState] = useState<any>(null);
 
   useEffect(() => {
     safeFetchJSON('/api/admin/marketing/config?tableName=facebook_settings&rowId=facebook_config')
@@ -132,17 +129,6 @@ export default function AdminMarketingFacebook() {
 
     setSaving(true);
     try {
-      const data = await safeFetchJSON('/api/admin/marketing/schema-check?tableName=facebook_settings');
-      if (data.status === 'success') {
-        const isMissing = !data.schemaState.facebook_settings?.exists || data.schemaState.facebook_settings?.missingColumns.length > 0;
-        if (isMissing) {
-          setSchemaState(data.schemaState);
-          setShowSchemaModal(true);
-          setSaving(false);
-          return;
-        }
-      }
-
       const saveData = await safeFetchJSON('/api/admin/marketing/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -294,25 +280,6 @@ export default function AdminMarketingFacebook() {
         </div>
 
       </div>
-
-      {showSchemaModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white p-8 max-w-md w-full border border-zinc-200 shadow-2xl">
-            <h2 className="text-lg font-bold uppercase tracking-tight mb-4">Database Schema Required</h2>
-            <p className="text-sm text-zinc-600 mb-6">
-              The Facebook settings table or required columns are missing in your Supabase database. Please run the migration scripts to continue.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => setShowSchemaModal(false)}
-                className="px-6 h-10 border border-zinc-200 text-sm font-bold uppercase tracking-widest hover:bg-zinc-50"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

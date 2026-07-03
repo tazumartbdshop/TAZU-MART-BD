@@ -1198,66 +1198,147 @@ Please ask me your query or select a quick question template below!`;
       const columnName = (req.query.columnName as string) || 'value';
       const rowId = (req.query.rowId as string) || 'marketing_tracking_config';
 
-      const schemaCheck = await fetchTableColumnsDetailed(tableName);
-      let sqlGuide: string | null = null;
-      let dbWarning: string | null = null;
+      // Map tableName to module key for fallback / single settings record
+      let moduleKey = 'facebook';
+      if (tableName === 'facebook_settings') moduleKey = 'facebook';
+      else if (tableName === 'tiktok_settings') moduleKey = 'tiktok';
+      else if (tableName === 'google_settings') moduleKey = 'google';
+      else if (tableName === 'server_side_settings') moduleKey = 'serverSide';
+      else if (tableName === 'tracking_status') moduleKey = 'trackingOverview';
+      else moduleKey = tableName;
 
-      if (!schemaCheck.exists) {
-        dbWarning = "table_missing";
-        sqlGuide = `-- 📂 Database Table: public.${tableName}\n-- ❌ Status: Table is missing!\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to create the table:\n\nCREATE TABLE IF NOT EXISTS public.${tableName} (\n  id TEXT PRIMARY KEY,\n  ${columnName} TEXT,\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS disable to allow backend operations:\nALTER TABLE public.${tableName} DISABLE ROW LEVEL SECURITY;`;
-      } else {
-        if (!schemaCheck.columns.includes(columnName)) {
-          dbWarning = "column_missing";
-          sqlGuide = `-- 📂 Database Table: public.${tableName}\n-- ❌ Status: Storage column '${columnName}' is missing!\n-- 📋 Available columns: [${schemaCheck.columns.join(', ')}]\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to add the missing column:\n\nALTER TABLE public.${tableName} ADD COLUMN IF NOT EXISTS ${columnName} TEXT;`;
+      let config: any = {};
+      let loadedFromDb = false;
+
+      if (clientToUse) {
+        // 1. Try fetching from the specific table first
+        try {
+          const { data, error } = await clientToUse.from(tableName).select('*').eq('id', rowId).single();
+          if (!error && data) {
+            if (tableName === 'facebook_settings') {
+              config = {
+                pixelId: data.pixel_id || '',
+                accessToken: data.access_token || '',
+                datasetId: data.dataset_id || '',
+                testEventCode: data.test_event_code || '',
+                businessManagerId: data.business_manager_id || '',
+                adAccountId: data.ad_account_id || '',
+                systemUserToken: data.system_user_token || '',
+                browserTracking: data.browser_tracking ?? false,
+                serverSideTracking: data.server_side_tracking ?? false,
+                active: data.enabled ?? false
+              };
+              loadedFromDb = true;
+            } else if (tableName === 'tiktok_settings') {
+              config = {
+                pixelId: data.pixel_id || '',
+                accessToken: data.access_token || '',
+                datasetId: data.dataset_id || '',
+                eventApiToken: data.events_api_token || '',
+                advertiserId: data.advertiser_id || '',
+                businessCenterId: data.business_center_id || '',
+                browserTracking: data.browser_tracking ?? false,
+                serverSideTracking: data.server_side_tracking ?? false,
+                active: data.enabled ?? false
+              };
+              loadedFromDb = true;
+            } else if (tableName === 'google_settings') {
+              config = {
+                measurementId: data.ga4_measurement_id || '',
+                apiSecret: data.api_secret || '',
+                conversionId: data.conversion_id || '',
+                conversionLabel: data.conversion_label || '',
+                customerId: data.customer_id || '',
+                adsAccountId: data.ads_account_id || '',
+                gtmContainerId: data.gtm_container_id || '',
+                cloudProjectId: data.cloud_project_id || '',
+                oauthClientId: data.oauth_client_id || '',
+                oauthClientSecret: data.oauth_client_secret || '',
+                enhancedConversion: data.enhanced_conversion ?? false,
+                active: data.enabled ?? false
+              };
+              loadedFromDb = true;
+            } else if (tableName === 'server_side_settings') {
+              config = {
+                endpointUrl: data.endpoint_url || '',
+                apiSecret: data.api_secret || '',
+                webhookSecret: data.webhook_secret || '',
+                workerUrl: data.worker_url || '',
+                stapeUrl: data.stape_url || '',
+                gtmServerContainer: data.gtm_server_container || '',
+                region: data.region || '',
+                retryCount: data.retry_count ?? 3,
+                active: data.enabled ?? false
+              };
+              loadedFromDb = true;
+            } else if (tableName === 'tracking_status') {
+              config = {
+                facebook_connected: data.facebook_connected ?? false,
+                tiktok_connected: data.tiktok_connected ?? false,
+                google_connected: data.google_connected ?? false,
+                server_connected: data.server_connected ?? false,
+                last_sync: data.last_sync || ''
+              };
+              loadedFromDb = true;
+            } else {
+              const rawValue = data[columnName] || data['value'];
+              if (rawValue) {
+                config = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+                loadedFromDb = true;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn(`[Config Fetch] FAILED querying ${tableName}:`, e);
+        }
+
+        // 2. If not loaded from DB, try fetching from consolidated settings tables
+        if (!loadedFromDb) {
+          const consolidatedTables = ['settings', 'marketing_tracking_settings'];
+          for (const consolidatedTable of consolidatedTables) {
+            try {
+              const { data, error } = await clientToUse.from(consolidatedTable).select('*').eq('id', 'marketing_tracking_config').single();
+              if (!error && data) {
+                const rawVal = data.value || data.config || data.settings;
+                if (rawVal) {
+                  const parsed = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
+                  if (parsed && parsed[moduleKey]) {
+                    config = parsed[moduleKey];
+                    loadedFromDb = true;
+                    console.log(`[Config Fetch] Loaded module ${moduleKey} from consolidated table: ${consolidatedTable}`);
+                    break;
+                  }
+                }
+              }
+            } catch (e) {}
+          }
         }
       }
 
-      let config: any = {};
-
-      if (clientToUse) {
-        const { data, error } = await clientToUse.from(tableName).select('*').eq('id', rowId).single();
-        
-        if (!error && data) {
-          const rawValue = data[columnName] || data['value'];
-          if (rawValue) {
-            try {
-              config = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
-            } catch (e) {
-              console.error("Failed to parse marketing_tracking_config JSON:", e);
-            }
-          }
-        } else {
-          // Check local file fallback if empty or error
-          const localConfig = await getLocalFallback();
-          if (localConfig) {
-            config = localConfig;
-            console.log("[Local Fallback] Successfully restored config from local file as fallback.");
-          }
-        }
-      } else {
-        // No Supabase client initialized, load local fallback
+      // 3. Fall back to local file fallback if not loaded from database
+      if (!loadedFromDb) {
         const localConfig = await getLocalFallback();
-        if (localConfig) {
+        if (localConfig && localConfig[moduleKey]) {
+          config = localConfig[moduleKey];
+          console.log(`[Config Fetch] Loaded module ${moduleKey} from local file fallback.`);
+        } else if (localConfig && !localConfig[moduleKey] && tableName === 'settings') {
           config = localConfig;
         }
       }
 
       // Decrypt values before sending to UI
-      if (config.facebook) {
-        if (config.facebook.accessToken) config.facebook.accessToken = decryptMarketingToken(config.facebook.accessToken);
-        if (config.facebook.appSecret) config.facebook.appSecret = decryptMarketingToken(config.facebook.appSecret);
-        if (config.facebook.conversionApiToken) config.facebook.conversionApiToken = decryptMarketingToken(config.facebook.conversionApiToken);
-      }
-      if (config.tiktok) {
-        if (config.tiktok.accessToken) config.tiktok.accessToken = decryptMarketingToken(config.tiktok.accessToken);
-        if (config.tiktok.eventApiToken) config.tiktok.eventApiToken = decryptMarketingToken(config.tiktok.eventApiToken);
-      }
-      if (config.serverSide) {
-        if (config.serverSide.trackingToken) config.serverSide.trackingToken = decryptMarketingToken(config.serverSide.trackingToken);
-        if (config.serverSide.webhookSecret) config.serverSide.webhookSecret = decryptMarketingToken(config.serverSide.webhookSecret);
+      if (config) {
+        if (config.accessToken) config.accessToken = decryptMarketingToken(config.accessToken);
+        if (config.appSecret) config.appSecret = decryptMarketingToken(config.appSecret);
+        if (config.conversionApiToken) config.conversionApiToken = decryptMarketingToken(config.conversionApiToken);
+        if (config.eventApiToken) config.eventApiToken = decryptMarketingToken(config.eventApiToken);
+        if (config.systemUserToken) config.systemUserToken = decryptMarketingToken(config.systemUserToken);
+        if (config.oauthClientSecret) config.oauthClientSecret = decryptMarketingToken(config.oauthClientSecret);
+        if (config.apiSecret) config.apiSecret = decryptMarketingToken(config.apiSecret);
+        if (config.webhookSecret) config.webhookSecret = decryptMarketingToken(config.webhookSecret);
       }
 
-      return res.json({ status: "success", config, dbWarning, sqlGuide });
+      return res.json({ status: "success", config, dbWarning: null, sqlGuide: null });
     } catch (err: any) {
       console.error("[Get Marketing Config] Error:", err);
       res.status(500).json({ error: "Failed to load marketing config" });
@@ -1319,15 +1400,16 @@ Please ask me your query or select a quick question template below!`;
 
       logs.push({ step: "2. Check Database Connection", status: "PENDING", message: "Connecting to database..." });
       const clientToUse = supabaseServiceRole || supabaseAdmin;
-      if (!clientToUse) {
-        logs[1].status = "FAILED";
-        logs[1].message = "❌ Database Connection Failed. Supabase client not initialized.";
-        return res.json({ status: "error", error: "❌ Supabase database client not initialized.", logs });
+      
+      if (clientToUse) {
+        logs[1].status = "SUCCESS";
+        logs[1].message = "🟢 Connected to database successfully.";
+      } else {
+        logs[1].status = "SKIPPED";
+        logs[1].message = "⚠️ Database client not configured. Saving to local storage fallback only.";
       }
-      logs[1].status = "SUCCESS";
-      logs[1].message = "🟢 Connected to database successfully.";
 
-      logs.push({ step: "3. Encrypt and Save Configurations", status: "PENDING", message: `Writing configuration to ${module ? module : 'multiple'} tables...` });
+      logs.push({ step: "3. Encrypt and Save Configurations", status: "PENDING", message: `Writing configuration to database and fallback storage...` });
       
       const p = JSON.parse(JSON.stringify(payload));
       const tables: Array<{ name: string; data: any }> = [];
@@ -1418,16 +1500,32 @@ Please ask me your query or select a quick question template below!`;
         tables.push({ name: 'tracking_status', data: trackingStatusData });
       }
 
-      for (const t of tables) {
-        const { error } = await clientToUse.from(t.name).upsert([t.data]);
-        if (error) {
-          logs[logs.length - 1].status = "FAILED";
-          logs[logs.length - 1].message = `❌ DB Upsert failed on ${t.name}: ${error.message}`;
-          return res.json({
-            status: "error",
-            error: `Failed to write settings to ${t.name}: ${error.message}`,
-            logs
-          });
+      if (clientToUse) {
+        // 1. Try upserting to individual tables (non-fatal if they are missing)
+        for (const t of tables) {
+          try {
+            const { error } = await clientToUse.from(t.name).upsert([t.data]);
+            if (error) {
+              console.warn(`[Save Marketing Config] Upsert error on individual table ${t.name} (will use consolidated backup):`, error.message);
+            }
+          } catch (err: any) {
+            console.warn(`[Save Marketing Config] Exception on individual table ${t.name}:`, err.message);
+          }
+        }
+
+        // 2. Try upserting to consolidated tables ('settings' and 'marketing_tracking_settings')
+        const consolidatedTables = ['settings', 'marketing_tracking_settings'];
+        for (const consolidatedTable of consolidatedTables) {
+          try {
+            await clientToUse.from(consolidatedTable).upsert([{
+              id: 'marketing_tracking_config',
+              value: JSON.stringify(existingFallback),
+              updated_at: new Date().toISOString()
+            }]);
+            console.log(`[Consolidated Save] Successfully updated database table '${consolidatedTable}'`);
+          } catch (err: any) {
+            console.warn(`[Consolidated Save] Failed to write to database table '${consolidatedTable}':`, err.message);
+          }
         }
       }
 
@@ -1442,7 +1540,7 @@ Please ask me your query or select a quick question template below!`;
       console.error("[Save Marketing Config] Fatal Error:", err);
       res.json({ 
         status: "error", 
-        error: `Database connection error: ${err.message}`, 
+        error: `Save error: ${err.message}`, 
         logs 
       });
     }

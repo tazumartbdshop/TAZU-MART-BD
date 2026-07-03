@@ -19,9 +19,6 @@ export default function AdminPaymentMerchant() {
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
   // Database integration state
-  const [dbWarning, setDbWarning] = useState<string | null>(null);
-  const [sqlGuide, setSqlGuide] = useState<string>('');
-  const [showSchemaModal, setShowSchemaModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Local config fields - empty by default!
@@ -42,16 +39,6 @@ export default function AdminPaymentMerchant() {
     const fetchMerchant = async () => {
       setLoading(true);
       try {
-        // Run schema check first
-        const sData = await safeFetchJSON('/api/admin/payment-methods/schema-check');
-        if (sData.status === 'success' && sData.schemaState?.payment_methods) {
-          const pm = sData.schemaState.payment_methods;
-          if (!pm.exists || pm.missingColumns?.length > 0) {
-            setDbWarning("table_missing");
-            setSqlGuide(pm.sqlGuide || '');
-          }
-        }
-
         // Fetch actual values
         const data = await safeFetchJSON('/api/admin/payment-methods');
         if (data.status === 'success' && data.methods) {
@@ -82,11 +69,6 @@ export default function AdminPaymentMerchant() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (dbWarning === "table_missing") {
-      setShowSchemaModal(true);
-      return;
-    }
 
     try {
       const result = await safeFetchJSON('/api/admin/payment-methods/save', {
@@ -151,27 +133,6 @@ export default function AdminPaymentMerchant() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16 font-sans text-neutral-900 text-left">
       
-      {/* DB Schema Missing Header Warning */}
-      {dbWarning === "table_missing" && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 font-mono text-xs text-red-900 uppercase space-y-2">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 font-black">
-              <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
-              <span>Database Table missing: public.payment_methods</span>
-            </div>
-            <button 
-              onClick={() => setShowSchemaModal(true)}
-              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 text-[10px] font-bold tracking-wider uppercase rounded-[4px]"
-            >
-              Configure Schema SQL
-            </button>
-          </div>
-          <p className="font-sans font-bold text-[11px] text-red-800">
-            Database storage is not prepared. Click 'Configure Schema SQL' to view and copy the initialization migration script for your Supabase backend.
-          </p>
-        </div>
-      )}
-
       {/* Mutual Exclusive Warnings */}
       {settings.paymentPersonalActive && (
         <div className="bg-amber-50 border-l-4 border-amber-500 p-4 font-mono text-xs text-amber-900 uppercase space-y-1">
@@ -441,43 +402,6 @@ export default function AdminPaymentMerchant() {
           </div>
 
         </form>
-      )}
-
-      {/* Database Schema Migration Modal */}
-      {showSchemaModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white p-8 max-w-2xl w-full border border-neutral-300 shadow-2xl rounded-none flex flex-col max-h-[90vh]">
-            <h2 className="text-lg font-black uppercase tracking-tight mb-2 flex items-center gap-2">
-              <Database className="w-5 h-5 text-red-600" />
-              <span>Supabase Schema Required</span>
-            </h2>
-            <p className="text-xs text-neutral-500 mb-4 uppercase font-bold leading-relaxed">
-              The <b>payment_methods</b> table and structured columns are required to run this database-driven system. Please run this script in your <b>Supabase SQL Editor</b>:
-            </p>
-
-            <div className="bg-neutral-950 p-4 font-mono text-[10.5px] text-neutral-300 overflow-y-auto max-h-[40vh] border border-neutral-800 relative select-text text-left whitespace-pre-wrap">
-              {sqlGuide}
-            </div>
-
-            <div className="flex justify-between items-center gap-3 mt-6 pt-4 border-t border-neutral-100">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(sqlGuide);
-                  toast.success("SQL script copied successfully!");
-                }}
-                className="bg-neutral-900 hover:bg-black text-white px-5 h-10 text-[10px] font-black uppercase tracking-widest rounded-[4px]"
-              >
-                Copy SQL Script
-              </button>
-              <button 
-                onClick={() => setShowSchemaModal(false)}
-                className="px-6 h-10 border border-neutral-200 text-[10px] font-black uppercase tracking-widest hover:bg-neutral-50 rounded-[4px]"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

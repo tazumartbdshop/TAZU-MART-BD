@@ -14,9 +14,6 @@ export default function AdminMarketingTrackingOverview() {
 
   const [saving, setSaving] = useState(false);
   const [lastSync, setLastSync] = useState<string>('NEVER');
-  
-  const [showSchemaModal, setShowSchemaModal] = useState(false);
-  const [schemaState, setSchemaState] = useState<any>(null);
 
   useEffect(() => {
     safeFetchJSON('/api/admin/marketing/config?tableName=tracking_status&rowId=overview_config')
@@ -46,17 +43,6 @@ export default function AdminMarketingTrackingOverview() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const data = await safeFetchJSON('/api/admin/marketing/schema-check?tableName=tracking_status');
-      if (data.status === 'success') {
-        const isMissing = !data.schemaState.tracking_status?.exists || data.schemaState.tracking_status?.missingColumns.length > 0;
-        if (isMissing) {
-          setSchemaState(data.schemaState);
-          setShowSchemaModal(true);
-          setSaving(false);
-          return;
-        }
-      }
-
       const saveData = await safeFetchJSON('/api/admin/marketing/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,25 +134,6 @@ export default function AdminMarketingTrackingOverview() {
         </div>
 
       </div>
-
-      {showSchemaModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-          <div className="bg-white p-8 max-w-md w-full border border-zinc-200 shadow-2xl">
-            <h2 className="text-lg font-bold uppercase tracking-tight mb-4">Database Schema Required</h2>
-            <p className="text-sm text-zinc-600 mb-6">
-              The tracking status table or required columns are missing in your Supabase database.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button 
-                onClick={() => setShowSchemaModal(false)}
-                className="px-6 h-10 border border-zinc-200 text-sm font-bold uppercase tracking-widest hover:bg-zinc-50"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
