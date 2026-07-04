@@ -578,6 +578,8 @@ export default function Product() {
       price: currentPrice,
       originalPrice: originalTotal,
       image: product.imageUrl || product.image,
+      slug: product.slug,
+      sku: product.sku,
       quantity: quantity,
     });
 
@@ -602,6 +604,8 @@ export default function Product() {
       price: currentPrice,
       originalPrice: originalTotal,
       image: product.imageUrl || product.image,
+      slug: product.slug,
+      sku: product.sku,
       quantity: quantity,
     });
 

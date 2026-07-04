@@ -46,6 +46,8 @@ export default function ProductCard({ product }: ProductCardProps) {
       price: finalDiscountPrice || product.price,
       image: product.imageUrl || product.featured_image || product.image,
       quantity: 1,
+      slug: product.slug,
+      sku: product.sku,
     });
     toast.success("Product added to cart successfully");
   };

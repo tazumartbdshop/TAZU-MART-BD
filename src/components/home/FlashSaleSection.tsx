@@ -151,7 +151,9 @@ export default function FlashSaleSection({ products, isLoading }: FlashSaleSecti
                       name: product.name,
                       price: product.discountPrice || product.price,
                       image: product.featured_image || product.image,
-                      quantity: 1
+                      quantity: 1,
+                      slug: product.slug,
+                      sku: product.sku
                     });
                   }}
                   className="w-full mt-3 py-2 bg-neutral-950 text-white text-[8px] font-black uppercase tracking-[0.15em] rounded-lg hover:bg-red-600 transition-all flex items-center justify-center gap-1.5 group-active:scale-95 shadow-sm"

@@ -7,6 +7,8 @@ import { getProductDiscountDetails } from '../lib/offerUtils';
 
 export interface CartItem {
   id: string;
+  slug?: string;
+  sku?: string;
   name: string;
   price: number;
   image: string;

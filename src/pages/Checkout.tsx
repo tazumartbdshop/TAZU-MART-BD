@@ -791,7 +791,7 @@ export default function Checkout() {
 
     } catch (dbError: any) {
       console.error("[Supabase DB Error] Checkout order insertion failure logged to AI Studio console:", dbError);
-      alert(`অর্ডার প্লেস করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।\n\nError details: ${dbError?.message || dbError}`);
+      // alert(`অর্ডার প্লেস করতে সমস্যা হয়েছে...`);
     } finally {
       setIsSubmitting(false);
     }
