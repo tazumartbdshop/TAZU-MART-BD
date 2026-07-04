@@ -665,6 +665,121 @@ async function startServer() {
   });
 
   // --- Admin Category Management ---
+  app.get("/api/admin/categories/schema-status", async (req, res) => {
+    try {
+      // 1. Check if categories table exists
+      let tableExists = false;
+      try {
+        await db.execute("SELECT 1 FROM categories LIMIT 1");
+        tableExists = true;
+      } catch (err) {
+        tableExists = false;
+      }
+
+      if (!tableExists) {
+        return res.json({
+          tableExists: false,
+          columns: [],
+          message: "categories table does not exist in the database!"
+        });
+      }
+
+      // 2. Fetch current columns
+      const [columnsResult]: any = await db.execute("SHOW COLUMNS FROM categories");
+      const existingColumnNames = columnsResult.map((col: any) => col.Field.toLowerCase());
+
+      const requiredColumns = [
+        { name: 'id', type: 'VARCHAR(50) PRIMARY KEY' },
+        { name: 'name', type: 'VARCHAR(255) NOT NULL' },
+        { name: 'slug', type: 'VARCHAR(255) UNIQUE NOT NULL' },
+        { name: 'image_url', type: 'TEXT' },
+        { name: 'is_active', type: 'BOOLEAN DEFAULT TRUE' },
+        { name: 'description', type: 'TEXT' },
+        { name: 'icon_image', type: 'TEXT' },
+        { name: 'banner_image', type: 'TEXT' },
+        { name: 'banner_name', type: 'VARCHAR(255)' },
+        { name: 'wide_banner_image', type: 'TEXT' },
+        { name: 'button_text', type: 'VARCHAR(255)' },
+        { name: 'button_link', type: 'VARCHAR(255)' },
+        { name: 'featured_products', type: 'JSON' },
+        { name: 'meta_title', type: 'VARCHAR(255)' },
+        { name: 'meta_description', type: 'TEXT' },
+        { name: 'keywords', type: 'TEXT' },
+        { name: 'banner_images', type: 'JSON' },
+        { name: 'slider_settings', type: 'JSON' },
+        { name: 'display_order', type: 'INT DEFAULT 1' },
+        { name: 'status', type: "VARCHAR(50) DEFAULT 'ACTIVE'" },
+        { name: 'show_on_homepage', type: 'BOOLEAN DEFAULT TRUE' }
+      ];
+
+      const columnsStatus = requiredColumns.map(col => ({
+        name: col.name,
+        type: col.type,
+        exists: existingColumnNames.includes(col.name.toLowerCase())
+      }));
+
+      res.json({
+        tableExists: true,
+        columns: columnsStatus,
+        allColumnsExist: columnsStatus.every(col => col.exists)
+      });
+    } catch (error: any) {
+      console.error("Schema status check failed:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/categories/schema-fix", async (req, res) => {
+    try {
+      // 1. Ensure table exists
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS categories (
+          id VARCHAR(50) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          slug VARCHAR(255) UNIQUE NOT NULL,
+          image_url TEXT,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      const requiredColumns = [
+        { name: 'description', type: 'TEXT' },
+        { name: 'icon_image', type: 'TEXT' },
+        { name: 'banner_image', type: 'TEXT' },
+        { name: 'banner_name', type: 'VARCHAR(255)' },
+        { name: 'wide_banner_image', type: 'TEXT' },
+        { name: 'button_text', type: 'VARCHAR(255)' },
+        { name: 'button_link', type: 'VARCHAR(255)' },
+        { name: 'featured_products', type: 'JSON' },
+        { name: 'meta_title', type: 'VARCHAR(255)' },
+        { name: 'meta_description', type: 'TEXT' },
+        { name: 'keywords', type: 'TEXT' },
+        { name: 'banner_images', type: 'JSON' },
+        { name: 'slider_settings', type: 'JSON' },
+        { name: 'display_order', type: 'INT DEFAULT 1' },
+        { name: 'status', type: "VARCHAR(50) DEFAULT 'ACTIVE'" },
+        { name: 'show_on_homepage', type: 'BOOLEAN DEFAULT TRUE' }
+      ];
+
+      const results = [];
+      for (const col of requiredColumns) {
+        try {
+          await db.execute(`ALTER TABLE categories ADD COLUMN \`${col.name}\` ${col.type}`);
+          results.push({ name: col.name, status: "created" });
+        } catch (err: any) {
+          results.push({ name: col.name, status: "exists_or_failed", error: err.message });
+        }
+      }
+
+      res.json({ status: "success", results });
+    } catch (error: any) {
+      console.error("Schema fix failed:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // --- Admin Category Management ---
   app.post("/api/admin/categories", async (req, res) => {
     try {
       const data = req.body;
