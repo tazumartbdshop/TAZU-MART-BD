@@ -113,8 +113,22 @@ export default function OrderDetails() {
                       </div>
                     )}
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-sm font-bold text-black">৳{item.price.toLocaleString()}</span>
-                      <span className="text-[13px] font-medium text-gray-500">Qty: {item.quantity}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-black">৳{item.price.toLocaleString()}</span>
+                        <span className="text-[11px] font-medium text-gray-400 uppercase tracking-tighter">Qty: {item.quantity}</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const productSlugOrId = item.slug || item.productId;
+                          if (productSlugOrId) {
+                            navigate(`/product/${productSlugOrId}?buyAgain=true`);
+                          }
+                        }}
+                        className="text-[10px] font-black text-white bg-black px-3 py-1.5 rounded uppercase tracking-wider hover:bg-gray-800 transition-colors"
+                      >
+                        Buy Again
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -163,22 +177,12 @@ export default function OrderDetails() {
       )}
       {isCompleted && (
         <div className="bg-white border-t border-gray-100 p-3 md:p-4 sticky bottom-0 z-40">
-           <div className="max-w-2xl mx-auto flex gap-3">
+           <div className="max-w-2xl mx-auto ">
              <button
                 onClick={() => navigate('/support')}
-                className="flex-1 bg-white border border-black text-black py-3 rounded-md text-sm font-bold hover:bg-gray-50 transition-colors"
+                className="w-full bg-white border border-black text-black py-3 rounded-md text-sm font-bold hover:bg-gray-50 transition-colors"
               >
                 Return / Refund
-              </button>
-              <button
-                onClick={() => {
-                  const firstItem = order.items[0];
-                  const productSlugOrId = firstItem.slug || firstItem.productId;
-                  navigate(`/product/${productSlugOrId}?buyAgain=true`);
-                }}
-                className="flex-1 bg-black text-white py-3 rounded-md text-sm font-bold hover:bg-gray-900 transition-colors"
-              >
-                Buy Again
               </button>
            </div>
         </div>

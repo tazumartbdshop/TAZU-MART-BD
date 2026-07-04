@@ -49,6 +49,7 @@ export interface Order {
   dueAmount: number;
   total: number;
   date: string;
+  userId?: string;
   notes?: string;
   isRead?: boolean;
   isDemo?: boolean;
@@ -84,7 +85,7 @@ interface OrderState {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearDemoData: () => void;
-  subscribeOrders: () => () => void;
+  subscribeOrders: (userId?: string) => () => void;
   subscribeTrackingStatuses: () => () => void;
 }
 
@@ -147,7 +148,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         'customer_image', 'subtotal', 'delivery_charge', 'discount', 
         'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
         'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
-        'promo_code_used', 'type'
+        'promo_code_used', 'type', 'user_id'
       ];
 
       const cleanPayload: any = {};
@@ -240,7 +241,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         'customer_image', 'subtotal', 'delivery_charge', 'discount', 
         'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
         'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
-        'promo_code_used', 'type'
+        'promo_code_used', 'type', 'user_id'
       ];
 
       const cleanPayload: any = {};
@@ -363,7 +364,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         'customer_image', 'subtotal', 'delivery_charge', 'discount', 
         'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
         'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
-        'promo_code_used', 'type'
+        'promo_code_used', 'type', 'user_id'
       ];
 
       const cleanPayload: any = {};
@@ -482,18 +483,41 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   clearDemoData: () => set((state) => ({
     orders: state.orders.filter(o => !o.isDemo)
   })),
-  subscribeOrders: () => {
+  subscribeOrders: (userId?: string) => {
     const supabase = getSupabase();
     if (!supabase) return () => {};
+    console.log("[Supabase Sync] Subscribing to orders. Filter userId:", userId);
 
     const loadOrders = async () => {
-        const { data, error } = await supabase.from('orders').select('*').order('date', { ascending: false });
+        let query = supabase.from('orders').select('*');
         
-        // Also fetch order items to attach them
-        const { data: itemsData } = await supabase.from('order_items').select('*');
+        if (userId) {
+          query = query.eq('user_id', userId);
+        }
 
-        if (!error && data) {
-            set({ orders: (data as any[]).map(row => {
+        const { data, error } = await query.order('date', { ascending: false });
+        
+        if (error) {
+            if (error.code !== '42P01') console.error('Error fetching orders:', error);
+            set({ orders: [] });
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            set({ orders: [] });
+            return;
+        }
+
+        const orderIds = data.map(o => o.id);
+        const orderIdStrings = data.map(o => o.order_id);
+        
+        // Fetch order items only for the orders we just retrieved
+        const { data: itemsData } = await supabase
+            .from('order_items')
+            .select('*')
+            .or(`order_id.in.(${orderIds.join(',')}),order_id.in.(${orderIdStrings.join(',')})`);
+
+        set({ orders: (data as any[]).map(row => {
                const parsed = objectToCamel(row);
                if (Array.isArray(parsed.customerName)) {
                  parsed.customerName = parsed.customerName[0] || '';
@@ -534,12 +558,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
                return parsed;
             }) as Order[] });
-        } else {
-            if (error && error.code !== '42P01') {
-                console.error('Error fetching orders:', error);
-            }
-            set({ orders: [] });
-        }
     };
     
     loadOrders();

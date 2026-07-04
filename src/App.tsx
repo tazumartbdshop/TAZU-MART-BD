@@ -62,6 +62,7 @@ import { RuntimeDiagnostics } from './components/common/RuntimeDiagnostics';
 
 export default function App() {
   const { fetchSettings } = useSiteManagementStore();
+  const { user } = useAuthStore();
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
 
   useEffect(() => {
@@ -90,7 +91,14 @@ export default function App() {
     const unsubCategories = useCategoryStore.getState().subscribe();
     const unsubProducts = useProductStore.getState().subscribe();
     const unsubSearches = useSearchStore.getState().subscribe();
-    const unsubOrders = useOrderStore.getState().subscribeOrders();
+    
+    // Subscribe to orders filtered by user ID for security and performance
+    const currentUser = useAuthStore.getState().user;
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'moderator';
+    
+    // Admins see all, customers only their own
+    const unsubOrders = useOrderStore.getState().subscribeOrders(isAdmin ? undefined : currentUser?.id);
+    
     const unsubTrackingStatuses = useOrderStore.getState().subscribeTrackingStatuses();
     const unsubSettings = useSettingsStore.getState().subscribe();
     const unsubTheme = useThemeStore.getState().subscribe();
@@ -121,7 +129,7 @@ export default function App() {
       unsubMenuSort();
       unsubDelivery();
     };
-  }, [isConfigLoaded, fetchSettings]);
+  }, [isConfigLoaded, fetchSettings, user?.id]);
 
   useEffect(() => {
     if (!isConfigLoaded) return;

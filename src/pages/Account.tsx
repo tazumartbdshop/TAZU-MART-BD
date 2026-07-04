@@ -360,7 +360,13 @@ export default function Account() {
                           <div>
                             <span className="text-[11px] font-black text-gray-900">#{order.orderId || order.id}</span>
                             <span className="text-[8px] text-gray-400 font-bold uppercase ml-2 select-none">
-                              {new Date(order.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {new Date(order.date).toLocaleString('en-US', { 
+                                day: 'numeric', 
+                                month: 'short', 
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
                             </span>
                           </div>
                           <div className="flex gap-2 items-center">
@@ -413,7 +419,21 @@ export default function Account() {
                                   Unit Price: {formatPrice(item.price)}
                                 </p>
                               </div>
-                              <span className="text-[10px] font-bold text-gray-900">{formatPrice(item.price * item.quantity)}</span>
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="text-[10px] font-bold text-gray-900">{formatPrice(item.price * item.quantity)}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const productSlugOrId = item.slug || item.productId;
+                                    if (productSlugOrId) {
+                                      navigate(`/product/${productSlugOrId}?buyAgain=true`);
+                                    }
+                                  }}
+                                  className="text-[8px] font-black text-white bg-black px-2 py-0.5 rounded uppercase tracking-tighter hover:bg-gray-800 transition-colors cursor-pointer"
+                                >
+                                  Buy Again
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -424,12 +444,6 @@ export default function Account() {
                             Total: <span className="font-black text-black">{formatPrice(order.total)}</span>
                           </span>
                           <div className="flex gap-2">
-                            <button 
-                               onClick={() => handleBuyAgain(order)}
-                               className="text-[9px] font-black border border-gray-200 text-gray-800 px-3 py-1.5 uppercase tracking-wider hover:bg-gray-50 transition-colors cursor-pointer"
-                            >
-                              Buy Again
-                            </button>
                             <button 
                                onClick={() => setTrackingOrder(order)}
                                className="text-[9px] font-black bg-black text-white px-3 py-1.5 uppercase tracking-wider hover:bg-neutral-800 transition-colors cursor-pointer"

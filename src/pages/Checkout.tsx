@@ -634,6 +634,8 @@ export default function Checkout() {
         total: total,
         notes: formData.note || undefined,
         promoCodeUsed: activePromo ? activePromo.code : undefined,
+        email: formData.email || user?.email || '',
+        userId: user?.id || undefined,
       };
 
       console.log("[Checkout] Calling addOrderAsync with payload:", JSON.stringify(orderData, null, 2));
