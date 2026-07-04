@@ -172,12 +172,13 @@ export default function OrderDetails() {
               </button>
               <button
                 onClick={() => {
-                  /* handle review or buy again */
-                  navigate(`/product/${order.items[0].productId}`);
+                  const firstItem = order.items[0];
+                  const productSlugOrId = firstItem.slug || firstItem.productId || firstItem.id;
+                  navigate(`/product/${productSlugOrId}?buyAgain=true`);
                 }}
                 className="flex-1 bg-black text-white py-3 rounded-md text-sm font-bold hover:bg-gray-900 transition-colors"
               >
-                Write Review
+                Buy Again
               </button>
            </div>
         </div>

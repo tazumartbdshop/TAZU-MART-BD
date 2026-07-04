@@ -62,16 +62,14 @@ export default function ToReview() {
   }, [orders, user, searchQuery, activeTab]);
 
   const handleBuyAgain = (order: any) => {
-    order.items.forEach((item: any) => {
-      addItem({
-        id: item.productId,
-        name: item.name,
-        price: item.price,
-        image: item.image || '',
-        quantity: item.quantity
-      });
-    });
-    navigate('/cart');
+    if (!order.items || order.items.length === 0) return;
+    const firstItem = order.items[0];
+    const productSlugOrId = firstItem.slug || firstItem.productId || firstItem.id;
+    if (productSlugOrId) {
+      navigate(`/product/${productSlugOrId}?buyAgain=true`);
+    } else {
+      navigate('/products');
+    }
   };
 
   return (

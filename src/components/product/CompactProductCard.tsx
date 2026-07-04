@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Star, Heart, Coins, X, CheckCircle2 } from 'lucide-react';
+import { Star, Heart, Coins, X, CheckCircle2, Eye } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
+import { useWishlistStore } from '../../store/useWishlistStore';
 import { useReviewStore } from '../../store/useReviewStore';
 import { formatPrice } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -30,6 +31,8 @@ interface CompactProductCardProps {
 export function CompactProductCard({ product, rank }: any) {
   const navigate = useNavigate();
   const addItem = useCartStore(state => state.addItem);
+  const { toggleWishlist, isInWishlist } = useWishlistStore();
+  const isSavedInWishlist = product ? isInWishlist(product.id) : false;
   const { reviews } = useReviewStore();
   const [showCoinInfo, setShowCoinInfo] = useState(false);
 
@@ -82,7 +85,22 @@ export function CompactProductCard({ product, rank }: any) {
           </div>
         )}
         <div className="absolute top-2.5 right-2.5 z-10 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button className="bg-white/90 backdrop-blur p-1 rounded-full shadow-sm text-gray-400 hover:text-red-500"><Heart className="w-3.5 h-3.5" /></button>
+          <button 
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/product/${product.slug || product.id}`); }}
+            className="bg-white/90 backdrop-blur p-1.5 rounded-full shadow-sm text-gray-500 hover:text-black transition-colors"
+            title="Quick View"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(product); }}
+            className={`bg-white/90 backdrop-blur p-1.5 rounded-full shadow-sm transition-colors ${isSavedInWishlist ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
+            title="Wishlist"
+          >
+            <Heart className="w-3.5 h-3.5" fill={isSavedInWishlist ? "currentColor" : "none"} />
+          </button>
         </div>
         
         <Link 

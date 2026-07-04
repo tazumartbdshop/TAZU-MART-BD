@@ -110,6 +110,17 @@ export default function Account() {
     navigate('/login');
   };
 
+  const handleBuyAgain = (order: any) => {
+    if (!order.items || order.items.length === 0) return;
+    const firstItem = order.items[0];
+    const productSlugOrId = firstItem.slug || firstItem.productId || firstItem.id;
+    if (productSlugOrId) {
+      navigate(`/product/${productSlugOrId}?buyAgain=true`);
+    } else {
+      navigate('/products');
+    }
+  };
+
   // Map state filter based on active badge selection
   const filteredOrders = useMemo(() => {
     if (!activeFilter) return userOrders;

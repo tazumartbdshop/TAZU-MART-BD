@@ -34,6 +34,7 @@ import Orders from './pages/Orders';
 import OrderDetails from './pages/OrderDetails';
 import ToReview from './pages/ToReview';
 import CategoryPage from './pages/CategoryPage';
+import AllProducts from './pages/AllProducts';
 import Settings from './pages/Settings';
 import MyReviews from './pages/MyReviews';
 
@@ -292,6 +293,7 @@ export default function App() {
           <Route path="product/:slug/reviews" element={<ReviewDetails />} />
           <Route path="support" element={<Support />} />
           <Route path="offers" element={<Offers />} />
+          <Route path="products" element={<AllProducts />} />
           <Route path="offer-page" element={<OfferPage />} />
           <Route path="shop" element={<div className="container mx-auto py-24 text-center text-primary-900"><h1 className="text-4xl font-serif mb-4">All Products</h1><p className="text-gray-500">Shop all luxury items.</p></div>} />
           <Route path="categories" element={<Categories />} />
