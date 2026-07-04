@@ -438,7 +438,7 @@ async function startServer() {
 
   app.get("/api/categories", async (req, res) => {
     try {
-      const [rows]: any = await db.execute("SELECT * FROM categories WHERE is_active = TRUE ORDER BY display_order ASC");
+      const [rows]: any = await db.execute("SELECT * FROM categories ORDER BY display_order ASC, created_at DESC");
       const formatted = rows.map((c: any) => ({
         id: c.id,
         name: c.name,

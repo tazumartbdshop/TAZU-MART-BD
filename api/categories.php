@@ -115,15 +115,8 @@ function ensure_categories_schema($pdo) {
  * GET Handler - Retrieves all active categories or all categories for admin panel.
  */
 function handle_get($pdo) {
-    $isAdmin = isset($_GET['admin']) && ($_GET['admin'] === 'true' || $_GET['admin'] === '1');
-    
-    if ($isAdmin) {
-        // Fetch all categories for admin panel listing
-        $stmt = $pdo->query("SELECT * FROM categories ORDER BY display_order ASC, created_at DESC");
-    } else {
-        // Fetch only active categories
-        $stmt = $pdo->query("SELECT * FROM categories WHERE is_active = TRUE AND status = 'ACTIVE' ORDER BY display_order ASC");
-    }
+    // Fetch all categories so both admin and client list properly and client-side can filter active ones
+    $stmt = $pdo->query("SELECT * FROM categories ORDER BY display_order ASC, created_at DESC");
     
     $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
