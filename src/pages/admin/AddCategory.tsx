@@ -53,54 +53,6 @@ export default function AddCategory() {
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
   const wideBannerInputRef = useRef<HTMLInputElement>(null);
 
-  // Database schema health check states
-  const [schemaStatus, setSchemaStatus] = useState<{
-    tableExists: boolean;
-    columns: { name: string; type: string; exists: boolean }[];
-    allColumnsExist: boolean;
-  } | null>(null);
-  const [checkingSchema, setCheckingSchema] = useState(false);
-  const [fixingSchema, setFixingSchema] = useState(false);
-
-  const fetchSchemaStatus = async () => {
-    setCheckingSchema(true);
-    try {
-      const res = await fetch('/api/admin/categories/schema-status');
-      if (res.ok) {
-        const data = await res.json();
-        setSchemaStatus(data);
-      }
-    } catch (err) {
-      console.error("Failed to check database schema status:", err);
-    } finally {
-      setCheckingSchema(false);
-    }
-  };
-
-  const fixSchema = async () => {
-    setFixingSchema(true);
-    try {
-      const res = await fetch('/api/admin/categories/schema-fix', {
-        method: 'POST'
-      });
-      if (res.ok) {
-        toast.success("✅ হোস্টিনগার ডাটাবেজ কলামগুলো সফলভাবে ফিক্স করা হয়েছে!");
-        await fetchSchemaStatus();
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        toast.error(`❌ ডাটাবেজ কলাম ফিক্স করতে ব্যর্থ হয়েছে: ${errData.error || 'Unknown Error'}`);
-      }
-    } catch (err: any) {
-      toast.error(`❌ সার্ভার কানেকশন ত্রুটি: ${err.message || err}`);
-    } finally {
-      setFixingSchema(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSchemaStatus();
-  }, []);
-
   useEffect(() => {
     if (isEditing) {
       const category = categories.find(c => c.id === id);
@@ -246,15 +198,7 @@ export default function AddCategory() {
   const [isLoading, setIsLoading] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      toast.error("❌ ক্যাটেগরির নাম অবশ্যই দিতে হবে (Category Name is required)!");
-      return;
-    }
-
-    if (schemaStatus && !schemaStatus.allColumnsExist) {
-      toast.error("⚠️ ডাটাবেজে প্রয়োজনীয় কলামগুলো অনুপস্থিত! দয়া করে উপরে থাকা 'কলাম অটো-তৈরি/ফিক্স করুন' বাটনে ক্লিক করে প্রথমে কলামগুলো তৈরি করুন।");
-      return;
-    }
+    if (!formData.name.trim()) return;
     
     setIsLoading(true);
     console.log("handleSubmit started: Uploading images...");
@@ -380,86 +324,6 @@ export default function AddCategory() {
             >
               SEO Configuration
             </button>
-          </div>
-
-          {/* Hostinger MySQL Database Health & Self-Healing Panel */}
-          <div className="mb-8 p-5 border border-zinc-200 bg-zinc-50 rounded-none space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <h4 className="text-xs font-black text-black uppercase tracking-widest flex items-center gap-2">
-                  <AlertCircle className="w-4.5 h-4.5 text-zinc-800" />
-                  Hostinger MySQL ডাটাবেজ কলাম স্ট্যাটাস (Hostinger MySQL Database Columns)
-                </h4>
-                <p className="text-[10px] font-bold text-gray-500 leading-relaxed">
-                  ক্যাটেগরির অতিরিক্ত ও আধুনিক ফিচারগুলো ডাটাবেজে জমা হতে কলামগুলো সচল থাকা বাধ্যতামূলক।
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={fetchSchemaStatus}
-                disabled={checkingSchema}
-                className="px-4 py-2 border border-black bg-white hover:bg-black hover:text-white text-[10px] font-black uppercase tracking-wider text-black transition-colors disabled:opacity-50"
-              >
-                {checkingSchema ? 'চেক হচ্ছে...' : '[ ডাটাবেজ রি-চেক করুন ]'}
-              </button>
-            </div>
-
-            {schemaStatus ? (
-              <div className="space-y-4 pt-3 border-t border-zinc-200">
-                <div className="flex items-center gap-2 text-[10px] font-bold">
-                  <span className="text-gray-500">ডাটাবেজ টেবিল:</span>
-                  <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${schemaStatus.tableExists ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                    {schemaStatus.tableExists ? 'কানেক্টেড ও বিদ্যমান (OK)' : 'অনুপস্থিত (MISSING)'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                  {schemaStatus.columns.map((col) => (
-                    <div
-                      key={col.name}
-                      className={`p-2 border text-[9px] font-bold flex flex-col justify-between gap-1 ${
-                        col.exists
-                          ? 'bg-emerald-50/40 border-emerald-200 text-emerald-900'
-                          : 'bg-rose-50/50 border-rose-200 text-rose-900 animate-pulse'
-                      }`}
-                    >
-                      <span className="font-mono tracking-tight font-black break-all">{col.name}</span>
-                      <span className={`text-[8px] font-black uppercase ${col.exists ? 'text-emerald-700' : 'text-rose-600'}`}>
-                        {col.exists ? '● বিদ্যমান (OK)' : '○ অনুপস্থিত (MISSING)'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {schemaStatus.allColumnsExist ? (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-800">
-                    🎉 অভিনন্দন! আপনার হোস্টিনগার MySQL ডাটাবেজে ক্যাটেগরির সব কলাম একদম পারফেক্ট আছে। এখন আপনি নির্দ্বিধায় ক্যাটেগরি অ্যাড করতে পারেন।
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-[10px] font-bold text-rose-800">
-                      ⚠️ আপনার হোস্টিনগার ডাটাবেজে প্রয়োজনীয় কলামগুলো অনুপস্থিত! কলাম সম্পূর্ণ না করে ক্যাটেগরি সংরক্ষণ করা যাবে না। দয়া করে নিচের বাটনটি চেপে এখনই প্রয়োজনীয় সব কলাম তৈরি করে নিন।
-                    </div>
-                    <button
-                      type="button"
-                      onClick={fixSchema}
-                      disabled={fixingSchema}
-                      className="w-full py-3.5 bg-black hover:bg-zinc-900 text-white text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 shadow-sm border border-black cursor-pointer"
-                    >
-                      {fixingSchema ? (
-                        <>🛠️ হোস্টিংগার ডাটাবেজে কলাম তৈরি হচ্ছে...</>
-                      ) : (
-                        <>[ ক্লিক করুন: হোস্টিনগার ডাটাবেজে সব কলাম তৈরি/ফিক্স করুন ]</>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-[10px] text-zinc-500 font-bold animate-pulse">
-                হোস্টিনগার MySQL ডাটাবেজ হেলথ স্ট্যাটাস চেক করা হচ্ছে... দয়া করে অপেক্ষা করুন...
-              </div>
-            )}
           </div>
 
           <div className="space-y-8">

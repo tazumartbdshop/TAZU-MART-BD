@@ -57,11 +57,18 @@ function get_db_connection() {
         // Log the exact error internally
         log_db_error("Connection failed: " . $e->getMessage(), $e);
         
-        // Return a clean, user-safe error response to the client
+        // Return a verbose, informative error response to the client
         http_response_code(500);
         echo json_encode([
             "status" => "error",
-            "message" => "Database connection error. Please try again later."
+            "message" => "Database Connection Failed!",
+            "details" => [
+                "host" => DB_HOST,
+                "port" => DB_PORT,
+                "database_name" => DB_NAME,
+                "username" => DB_USER,
+                "mysql_error" => $e->getMessage()
+            ]
         ]);
         exit();
     }

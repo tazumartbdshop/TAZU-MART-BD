@@ -215,6 +215,34 @@ function handle_post($pdo) {
         $slug = $slug . '-' . rand(100, 999);
     }
 
+    // Verify the table existence and columns before inserting
+    try {
+        $tableCheck = $pdo->query("SHOW TABLES LIKE 'categories'")->fetchAll();
+        if (empty($tableCheck)) {
+            // Table is missing! Try to auto-create
+            log_db_error("categories table does not exist in database '" . DB_NAME . "', trying to auto-create.");
+            ensure_categories_schema($pdo);
+            
+            // Re-check
+            $tableCheck = $pdo->query("SHOW TABLES LIKE 'categories'")->fetchAll();
+            if (empty($tableCheck)) {
+                throw new PDOException("Table 'categories' is missing and auto-creation failed in database '" . DB_NAME . "'.");
+            }
+        }
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode([
+            "status" => "error",
+            "message" => "Database Structure Error: " . $e->getMessage(),
+            "details" => [
+                "database_name" => DB_NAME,
+                "table_name" => "categories",
+                "reason" => "Table verification or schema creation failed."
+            ]
+        ]);
+        return;
+    }
+
     try {
         $sql = "INSERT INTO categories (
                     id, name, slug, description, image_url, icon_image, banner_image, 
@@ -229,17 +257,40 @@ function handle_post($pdo) {
                 )";
 
         $stmt = $pdo->prepare($sql);
-        $stmt->execute([
+        $executed = $stmt->execute([
             $id, $name, $slug, $description, $imageUrl, $iconImage, $bannerImage,
             $bannerName, $wideBannerImage, $buttonText, $buttonLink, $featuredProducts,
             $metaTitle, $metaDescription, $keywords, $bannerImages, $sliderSettings,
             $displayOrder, $status, $showOnHomepage, $isActive
         ]);
 
+        if (!$executed) {
+            throw new PDOException("PDO Statement execute returned false without throwing exception.");
+        }
+
+        // --- IMMEDIATE PERSISTENCE VERIFICATION ---
+        $verifyStmt = $pdo->prepare("SELECT id, name, slug FROM categories WHERE id = ?");
+        $verifyStmt->execute([$id]);
+        $verifiedRow = $verifyStmt->fetch();
+
+        if (!$verifiedRow) {
+            throw new PDOException("Transaction failure or silent write loss. The newly inserted category with ID '{$id}' was NOT found in table 'categories' of database '" . DB_NAME . "' immediately after insertion.");
+        }
+
+        if (trim($verifiedRow['name']) !== $name) {
+            throw new PDOException("Data integrity mismatch. Inserted name '{$name}' but verified name is '{$verifiedRow['name']}'.");
+        }
+
         http_response_code(201);
         echo json_encode([
             "status" => "success",
-            "message" => "Category added successfully.",
+            "message" => "Category was successfully saved and verified in Hostinger MySQL Database!",
+            "database_details" => [
+                "database_name" => DB_NAME,
+                "table_name" => "categories",
+                "verified_row" => $verifiedRow,
+                "connection_status" => "Active and Persistent"
+            ],
             "id" => $id,
             "slug" => $slug
         ]);
@@ -249,7 +300,12 @@ function handle_post($pdo) {
         http_response_code(500);
         echo json_encode([
             "status" => "error",
-            "message" => "Database INSERT operation failed: " . $e->getMessage()
+            "message" => "Database INSERT or Verification failure! No record was saved.",
+            "details" => [
+                "database_name" => DB_NAME,
+                "table_name" => "categories",
+                "mysql_error" => $e->getMessage()
+            ]
         ]);
     }
 }
@@ -352,18 +408,42 @@ function handle_patch($pdo) {
 
     try {
         $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        $executed = $stmt->execute($params);
+
+        if (!$executed) {
+            throw new PDOException("PDO Statement execute returned false on update.");
+        }
+
+        // --- IMMEDIATE PERSISTENCE VERIFICATION ---
+        $verifyStmt = $pdo->prepare("SELECT id, name, slug, status, image_url FROM categories WHERE id = ?");
+        $verifyStmt->execute([$id]);
+        $verifiedRow = $verifyStmt->fetch();
+
+        if (!$verifiedRow) {
+            throw new PDOException("Category record was deleted or lost immediately after update. Verification failed on table 'categories' in database '" . DB_NAME . "'.");
+        }
 
         echo json_encode([
             "status" => "success",
-            "message" => "Category updated successfully."
+            "message" => "Category updated and verified successfully in Hostinger MySQL Database!",
+            "database_details" => [
+                "database_name" => DB_NAME,
+                "table_name" => "categories",
+                "verified_row" => $verifiedRow,
+                "connection_status" => "Active and Persistent"
+            ]
         ]);
     } catch (PDOException $e) {
         log_db_error("Failed to update category: " . $e->getMessage(), $e);
         http_response_code(500);
         echo json_encode([
             "status" => "error",
-            "message" => "Database UPDATE operation failed: " . $e->getMessage()
+            "message" => "Database UPDATE or Verification failure! No changes saved.",
+            "details" => [
+                "database_name" => DB_NAME,
+                "table_name" => "categories",
+                "mysql_error" => $e->getMessage()
+            ]
         ]);
     }
 }

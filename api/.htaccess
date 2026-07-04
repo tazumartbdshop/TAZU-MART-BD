@@ -1,0 +1,21 @@
+# Enable URL Rewriting
+RewriteEngine On
+
+# Allow CORS preflight OPTIONS request to pass through directly
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ - [R=204,L]
+
+# Route GET /api/categories -> categories.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^categories$ categories.php [L,QSA]
+
+# Route POST /api/admin/categories -> categories.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^admin/categories$ categories.php [L,QSA]
+
+# Route PATCH/DELETE /api/admin/categories/:id -> categories.php?id=:id
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^admin/categories/([^/]+)$ categories.php?id=$1 [L,QSA]
