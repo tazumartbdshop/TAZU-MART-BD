@@ -1,0 +1,3 @@
+# Prevent any public web requests from accessing logs
+Order Deny,Allow
+Deny from all
