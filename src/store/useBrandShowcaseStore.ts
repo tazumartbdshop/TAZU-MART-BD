@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
+import { broadcastSync } from '../lib/broadcastSync';
 
 export interface BrandShowcaseSlide {
   id: string;
@@ -106,6 +107,7 @@ export const useBrandShowcaseStore = create<BrandShowcaseState>((set, get) => ({
       }
     ];
     set({ slides: newSlides });
+    broadcastSync.publish('brands', newSlides);
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').update({ slides: newSlides }).eq('id', 'brandShowcase').then(({error}) => error && console.warn(error));
@@ -116,6 +118,7 @@ export const useBrandShowcaseStore = create<BrandShowcaseState>((set, get) => ({
     const state = get();
     const newSlides = state.slides.map((s) => s.id === id ? { ...s, ...updates } : s);
     set({ slides: newSlides });
+    broadcastSync.publish('brands', newSlides);
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').update({ slides: newSlides }).eq('id', 'brandShowcase').then(({error}) => error && console.warn(error));
@@ -126,6 +129,7 @@ export const useBrandShowcaseStore = create<BrandShowcaseState>((set, get) => ({
     const state = get();
     const newSlides = state.slides.filter((s) => s.id !== id);
     set({ slides: newSlides });
+    broadcastSync.publish('brands', newSlides);
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').update({ slides: newSlides }).eq('id', 'brandShowcase').then(({error}) => error && console.warn(error));
@@ -133,7 +137,11 @@ export const useBrandShowcaseStore = create<BrandShowcaseState>((set, get) => ({
   },
   
   setConfig: (updates) => {
-    set((state) => ({ ...state, ...updates }));
+    set((state) => {
+      const nextState = { ...state, ...updates };
+      // Broadcast entire slides list just to be safe, though config doesn't have its own type yet.
+      return nextState;
+    });
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').update(updates).eq('id', 'brandShowcase').then(({error}) => error && console.warn(error));

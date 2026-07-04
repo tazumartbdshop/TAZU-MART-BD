@@ -78,12 +78,12 @@ export const DEFAULT_BRANDING_SETTINGS: BrandingSettings = {
   signup_logo: '',
   
   // Branding Images
-  default_profile_image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=200&auto=format&fit=crop',
-  default_store_banner: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200&auto=format&fit=crop',
-  default_category_banner: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?q=80&w=800&auto=format&fit=crop',
-  default_product_image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=600&auto=format&fit=crop',
-  default_blog_banner: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?q=80&w=1200&auto=format&fit=crop',
-  og_image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200&auto=format&fit=crop',
+  default_profile_image: '',
+  default_store_banner: '',
+  default_category_banner: '',
+  default_product_image: '',
+  default_blog_banner: '',
+  og_image: '',
   
   // Theme Branding
   primary_color: '#000000',

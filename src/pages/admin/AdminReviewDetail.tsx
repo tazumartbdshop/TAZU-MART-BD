@@ -282,7 +282,7 @@ export default function AdminReviewDetail() {
             {product ? (
               <div className="space-y-4">
                 <Link 
-                  to={`/product/${product.id}`}
+                  to={`/product/${product.slug || product.id}`}
                   className="block aspect-square rounded-lg overflow-hidden border border-zinc-100 bg-zinc-50 relative group"
                 >
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
@@ -291,7 +291,7 @@ export default function AdminReviewDetail() {
                   </div>
                 </Link>
                 <div>
-                  <Link to={`/product/${product.id}`} className="text-sm font-bold text-zinc-950 uppercase tracking-tight hover:text-purple-600 transition-colors line-clamp-2">
+                  <Link to={`/product/${product.slug || product.id}`} className="text-sm font-bold text-zinc-950 uppercase tracking-tight hover:text-purple-600 transition-colors line-clamp-2">
                     {product.name}
                   </Link>
                   <div className="flex items-center gap-2 mt-2">

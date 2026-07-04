@@ -2,9 +2,12 @@ import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
 import { deleteImage } from '../lib/imageUtils';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
+import { broadcastSync } from '../lib/broadcastSync';
+import { generateSlug } from '../lib/utils';
 
 export interface Product {
   id: string;
+  slug?: string;
   name: string;
   sku: string;
   sku_code?: string; // New field for consistency
@@ -361,10 +364,18 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const supabase = getSupabase();
     const id = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const keywords = generateKeywords(payload.name, payload.category, payload.brand, payload.description);
+    let baseSlug = payload.slug || generateSlug(payload.name);
+    if (!baseSlug) baseSlug = "product-" + Date.now();
+    let slug = baseSlug;
+    const existingSlugs = new Set(get().products.map(p => p.slug));
+    while (existingSlugs.has(slug)) {
+      slug = baseSlug + "-" + Math.random().toString(36).substring(2, 6);
+    }
     const newProduct: Product = {
       ...payload,
       id,
       keywords,
+      slug,
       createdAt: Date.now(),
     };
     
@@ -373,6 +384,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const nextProducts = [...currentProducts, newProduct];
     set({ products: nextProducts });
     saveCachedProducts(nextProducts);
+    broadcastSync.publish('products', nextProducts);
     
     if (supabase) {
       const dbPayload = objectToSnake(newProduct);
@@ -381,6 +393,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
         // Rollback on error
         set({ products: currentProducts });
         saveCachedProducts(currentProducts);
+        broadcastSync.publish('products', currentProducts);
         console.error("%c[Supabase Product Sync] INSERT ERROR:", "color: #ef4444; font-weight: bold;", {
           code: error.code,
           message: error.message,
@@ -424,6 +437,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const updatedProducts = currentProducts.map(p => p.id === id ? { ...p, ...finalPayload } : p);
     set({ products: updatedProducts });
     saveCachedProducts(updatedProducts);
+    broadcastSync.publish('products', updatedProducts);
     
     if (supabase) {
       const dbPayload = objectToSnake(finalPayload);
@@ -432,6 +446,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
         // Rollback on error
         set({ products: currentProducts });
         saveCachedProducts(currentProducts);
+        broadcastSync.publish('products', currentProducts);
         console.error("Supabase update error:", error);
         throw new Error(error.message || "Failed to update product in database");
       }
@@ -469,6 +484,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const newProducts = currentProducts.filter(p => p.id !== id);
     set({ products: newProducts });
     saveCachedProducts(newProducts);
+    broadcastSync.publish('products', newProducts);
     
     if (supabase) {
       const { error } = await supabase.from('products').delete().eq('id', id);
@@ -476,6 +492,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
         // Rollback on error
         set({ products: currentProducts });
         saveCachedProducts(currentProducts);
+        broadcastSync.publish('products', currentProducts);
         console.error("Supabase delete error:", error);
         throw new Error(error.message || "Failed to delete product from database");
       }
@@ -539,6 +556,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
                 const mapped = data.map(mapDbToProduct);
                 set({ products: mapped });
                 saveCachedProducts(mapped);
+                broadcastSync.publish('products', mapped);
             }
         });
       })

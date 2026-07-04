@@ -13,7 +13,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 type FilterType = 'Latest' | 'Highest Rating' | 'Lowest Rating' | 'With Photos' | 'Verified Reviews';
 
 export default function ProductReviews() {
-  const { id } = useParams<{ id: string }>();
+  const { slug: urlParam } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   
   // Dynamic Stores
@@ -25,7 +25,7 @@ export default function ProductReviews() {
     fetchReviews();
   }, []);
   
-  const product = products.find(p => String(p.id) === String(id));
+  const product = products.find(p => String(p.id) === String(urlParam) || (p.slug && p.slug === urlParam));
 
   // Filter & Form States
   const [activeFilter, setActiveFilter] = useState<FilterType>('Latest');
@@ -86,7 +86,7 @@ export default function ProductReviews() {
   const [viewingImage, setViewingImage] = useState<string | null>(null);
 
   // Fetch reviews specific to this product & only approved
-  const productReviews = reviews.filter(rev => rev.productId === id && rev.status === 'approved');
+  const productReviews = reviews.filter(rev => rev.productId === product?.id && rev.status === 'approved');
 
   // Compute stats on the fly for absolute live sync
   const totalReviews = productReviews.length;
@@ -247,7 +247,7 @@ export default function ProductReviews() {
 
     try {
       await addReview({
-        productId: id || 'f1',
+        productId: product?.id || 'f1',
         customerId: user?.id || 'guest',
         customerName: finalName,
         rating,
@@ -436,7 +436,7 @@ export default function ProductReviews() {
                   key={review.reviewId} 
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  onClick={() => navigate(`/product/${id}/reviews`)}
+                  onClick={() => navigate(`/product/${urlParam}/reviews`)}
                   className="bg-white p-6 rounded-xl border border-zinc-200 shadow-[0_2px_12px_rgb(0,0,0,0.01)] hover:shadow-lg hover:border-zinc-400 transition-all cursor-pointer relative"
                 >
                   {/* Pin status badge */}
@@ -540,7 +540,7 @@ export default function ProductReviews() {
         {productReviews.length > 3 && (
           <div className="mt-12 flex justify-center">
             <button 
-              onClick={() => navigate(`/product/${id}/reviews`)}
+              onClick={() => navigate(`/product/${urlParam}/reviews`)}
               className="px-8 py-4 bg-white border border-zinc-300 text-zinc-950 rounded-none text-xs font-bold uppercase tracking-widest hover:border-zinc-900 transition-all flex items-center gap-2 group"
             >
               See Detailed Review Page

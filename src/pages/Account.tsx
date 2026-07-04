@@ -485,7 +485,7 @@ export default function Account() {
                 return (
                   <div 
                     key={item.id}
-                    onClick={() => navigate(`/product/${item.id}`)}
+                    onClick={() => navigate(`/product/${item.slug || item.id}`)}
                     className="min-w-[130px] max-w-[130px] bg-white group cursor-pointer flex flex-col snap-start shrink-0"
                   >
                     <div className="aspect-square w-full overflow-hidden mb-2 rounded bg-gray-50 border border-gray-100 flex items-center justify-center relative">

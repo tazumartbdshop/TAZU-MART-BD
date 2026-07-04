@@ -241,7 +241,7 @@ const ALL_FALLBACK_PRODUCTS = [
 ];
 
 export default function Product() {
-  const { id } = useParams();
+  const { slug: urlParam } = useParams();
   const navigate = useNavigate();
   const { addItem, clearCart } = useCartStore();
   const { products } = useProductStore();
@@ -250,10 +250,10 @@ export default function Product() {
   const { reviews } = useReviewStore();
 
   const product = useMemo(() => {
-    if (!id) return null;
-    const found = products.find(p => String(p.id) === String(id)) || ALL_FALLBACK_PRODUCTS.find(p => String(p.id) === String(id));
+    if (!urlParam) return null;
+    const found = products.find(p => String(p.id) === String(urlParam) || (p.slug && p.slug === urlParam)) || ALL_FALLBACK_PRODUCTS.find((p: any) => String(p.id) === String(urlParam) || (p.slug && p.slug === urlParam));
     return found || null;
-  }, [products, id]);
+  }, [products, urlParam]);
 
   const approvedReviewsForProduct = useMemo(() => {
     if (!product) return [];

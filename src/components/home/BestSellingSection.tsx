@@ -84,7 +84,7 @@ export default function BestSellingSection({ products, isLoading }: BestSellingS
                 viewport={{ once: true }}
                 transition={{ delay: idx * 0.05 }}
                 whileHover={{ y: -3 }}
-                onClick={() => navigate(`/product/${product.id}`)}
+                onClick={() => navigate(`/product/${product.slug || product.id}`)}
                 className="bg-white border border-neutral-100 rounded-2xl p-2 sm:p-3 shadow-[0_4px_12px_rgba(0,0,0,0.01)] hover:shadow-[0_15px_30px_rgba(0,0,0,0.05)] transition-all group relative cursor-pointer"
               >
                 <div className="relative aspect-square rounded-xl overflow-hidden bg-neutral-50 mb-3">
@@ -133,7 +133,7 @@ export default function BestSellingSection({ products, isLoading }: BestSellingS
                       {formatPrice(product.price)}
                     </span>
                     <Link 
-                      to={`/product/${product.id}`}
+                      to={`/product/${product.slug || product.id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="w-8 h-8 bg-neutral-950 text-white rounded-lg flex items-center justify-center hover:bg-amber-500 transition-all active:scale-90 shadow-md shadow-neutral-900/10"
                     >

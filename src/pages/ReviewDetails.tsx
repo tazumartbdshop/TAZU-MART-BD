@@ -8,14 +8,14 @@ import { useReviewStore } from '../store/useReviewStore';
 import { useProductStore } from '../store/useProductStore';
 
 export default function ReviewDetails() {
-  const { id } = useParams<{ id: string }>();
+  const { slug: urlParam } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
   const { reviews } = useReviewStore();
   const { products } = useProductStore();
 
-  const product = products.find(p => p.id === id);
-  const productReviews = reviews.filter(rev => rev.productId === id && rev.status === 'approved');
+  const product = products.find(p => p.id === urlParam || (p.slug && p.slug === urlParam));
+  const productReviews = reviews.filter(rev => rev.productId === product?.id && rev.status === 'approved');
 
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(
     productReviews.length > 0 ? productReviews[0].reviewId : null
@@ -41,7 +41,7 @@ export default function ReviewDetails() {
         
         {/* Back Link */}
         <button 
-          onClick={() => navigate(`/product/${id}`)}
+          onClick={() => navigate(`/product/${urlParam}`)}
           className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-zinc-500 hover:text-zinc-950 transition-colors"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Product Details

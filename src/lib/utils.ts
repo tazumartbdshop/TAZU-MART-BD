@@ -313,3 +313,13 @@ export async function safeFetchJSON<T = any>(url: string, options?: RequestInit)
   }
 }
 
+
+export function generateSlug(text: string) {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-');
+}

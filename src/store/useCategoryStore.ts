@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
 import { deleteImage } from '../lib/imageUtils';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
+import { broadcastSync } from '../lib/broadcastSync';
 
 export interface Category {
   id: string;
@@ -197,6 +198,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const nextCats = [...currentCats, newCategory];
     set({ categories: nextCats, isLoaded: true });
     saveCachedCategories(nextCats);
+    broadcastSync.publish('categories', nextCats);
     
     if (supabase) {
       try {
@@ -213,6 +215,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         if (error) {
           // Rollback on error
           set({ categories: currentCats });
+          broadcastSync.publish('categories', currentCats);
           console.error("%c[Supabase DB Insert Fail Error Details]:", "color: #ef4444; font-weight: bold;", {
             message: error.message,
             details: error.details,
@@ -234,12 +237,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
+        broadcastSync.publish('categories', currentCats);
         console.error("%c[Supabase DB Insert Exception]:", "color: #f43f5e; font-weight: bold;", err);
         throw new Error(err?.message || err || "Database connection failure during insert");
       }
     } else {
       // Rollback
       set({ categories: currentCats });
+      broadcastSync.publish('categories', currentCats);
       console.error("%c[Supabase Client Missing] Cannot write category: Supabase Client not initialized.", "color: #ef4444; font-weight: bold;");
       throw new Error("Database client is not initialized");
     }
@@ -267,6 +272,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const updatedCats = currentCats.map(c => c.id === id ? { ...c, ...mergedPayload } : c);
     set({ categories: updatedCats as Category[], isLoaded: true });
     saveCachedCategories(updatedCats as Category[]);
+    broadcastSync.publish('categories', updatedCats as Category[]);
     
     if (supabase) {
       try {
@@ -283,6 +289,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         if (error) {
           // Rollback on error
           set({ categories: currentCats });
+          broadcastSync.publish('categories', currentCats);
           console.error("%c[Supabase DB Update Fail Error Details]:", "color: #ef4444; font-weight: bold;", {
             message: error.message,
             details: error.details,
@@ -298,12 +305,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
+        broadcastSync.publish('categories', currentCats);
         console.error("%c[Supabase DB Update Exception]:", "color: #f43f5e; font-weight: bold;", err);
         throw new Error(err?.message || err || "Database connection failure during update");
       }
     } else {
       // Rollback
       set({ categories: currentCats });
+      broadcastSync.publish('categories', currentCats);
       console.error("%c[Supabase Client Missing] Cannot update category: Supabase Client not initialized.", "color: #ef4444; font-weight: bold;");
       throw new Error("Database client is not initialized");
     }
@@ -338,6 +347,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const newCats = currentCats.filter(c => c.id !== id);
     set({ categories: newCats, isLoaded: true });
     saveCachedCategories(newCats);
+    broadcastSync.publish('categories', newCats);
     
     if (supabase) {
       try {
@@ -345,18 +355,21 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         if (error) {
           // Rollback on error
           set({ categories: currentCats });
+          broadcastSync.publish('categories', currentCats);
           console.error("Supabase category delete error:", error);
           throw new Error(error.message || "Failed to delete category from database");
         }
       } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
+        broadcastSync.publish('categories', currentCats);
         console.error("Supabase delete catch exception:", err);
         throw new Error(err?.message || err || "Database connection failure");
       }
     } else {
       // Rollback
       set({ categories: currentCats });
+      broadcastSync.publish('categories', currentCats);
       throw new Error("Database client is not initialized");
     }
   },
@@ -432,6 +445,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
                 }).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
                 set({ categories: mappedData, isLoaded: true });
                 saveCachedCategories(mappedData);
+                broadcastSync.publish('categories', mappedData);
               } catch (err) {
                 console.error("[Supabase Categories] Critical processing error:", err);
                 set({ isLoaded: true });

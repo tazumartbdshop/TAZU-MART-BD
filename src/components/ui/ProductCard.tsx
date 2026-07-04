@@ -130,7 +130,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       {/* Image Container with optional blur */}
       <Link 
-        to={`/product/${product.id}`} 
+        to={`/product/${product.slug || product.id}`} 
         className={`block relative pt-[115%] overflow-hidden bg-zinc-50 ${
           isOutOfStock ? 'filter blur-[1px]' : ''
         }`}
@@ -147,7 +147,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
       {/* Content */}
       <div className="p-4 flex flex-col flex-grow">
-        <Link to={`/product/${product.id}`}>
+        <Link to={`/product/${product.slug || product.id}`}>
           <h3 className="font-extrabold text-black line-clamp-1 group-hover:text-zinc-600 transition-colors text-xs uppercase tracking-tight mb-2">
             {product.name || 'Product'}
           </h3>

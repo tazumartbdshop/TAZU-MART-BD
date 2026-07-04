@@ -15,6 +15,7 @@ import { useModeratorStore } from './store/useModeratorStore';
 import { useBannerStore } from './store/useBannerStore';
 import { useMenuSortStore } from './store/useMenuSortStore';
 import { useDeliveryStore } from './store/useDeliveryStore';
+import { broadcastSync } from './lib/broadcastSync';
 import Home from './pages/Home';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -74,6 +75,7 @@ export default function App() {
       }
     };
     initConfig();
+    broadcastSync.init();
   }, []);
 
   useEffect(() => {
@@ -286,8 +288,8 @@ export default function App() {
           <Route index element={<Home />} />
           <Route path="category/:id" element={<CategoryPage />} />
           <Route path="wishlist" element={<Wishlist />} />
-          <Route path="product/:id" element={<Product />} />
-          <Route path="product/:id/reviews" element={<ReviewDetails />} />
+          <Route path="product/:slug" element={<Product />} />
+          <Route path="product/:slug/reviews" element={<ReviewDetails />} />
           <Route path="support" element={<Support />} />
           <Route path="offers" element={<Offers />} />
           <Route path="offer-page" element={<OfferPage />} />

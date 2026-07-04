@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
+import { broadcastSync } from '../lib/broadcastSync';
 
 export interface Banner {
   id: string;
@@ -143,6 +144,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
               const mapped = (data as any[]).map(row => objectToCamel(row)) as Banner[];
               set({ banners: mapped, isLoaded: true });
               saveCachedBanners(mapped);
+              broadcastSync.publish('banners', mapped);
             }
           });
       })
@@ -180,6 +182,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     const nextBanners = get().banners.map((b) => b.id === id ? { ...b, ...updates } : b);
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
+    broadcastSync.publish('banners', nextBanners);
     const supabase = getSupabase();
     if (supabase) {
       const dbPayload = objectToSnake(updates);
@@ -226,6 +229,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     const nextBanners = [...get().banners, newBanner];
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
+    broadcastSync.publish('banners', nextBanners);
     const supabase = getSupabase();
     if (supabase) {
       const dbPayload = objectToSnake(newBanner);
@@ -291,6 +295,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     const nextBanners = get().banners.filter((b) => b.id !== id);
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
+    broadcastSync.publish('banners', nextBanners);
     const supabase = getSupabase();
     if (supabase) supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
   },
@@ -326,6 +331,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       draftBanners: get().draftBanners.filter((b) => b.id !== id)
     });
     saveCachedBanners(nextBanners);
+    broadcastSync.publish('banners', nextBanners);
 
     try {
       // Delete from banners table
@@ -356,6 +362,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     const reordered = result.map((b, idx) => ({ ...b, order: idx }));
     set({ banners: reordered });
     saveCachedBanners(reordered);
+    broadcastSync.publish('banners', reordered);
 
     const supabase = getSupabase();
     if (supabase) {
@@ -396,6 +403,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
         hasUnsavedChanges: false 
       });
       saveCachedBanners(draftBanners);
+      broadcastSync.publish('banners', draftBanners);
       console.log("Both Draft and Live Banners collections persisted successfully.");
     } catch (error) {
       console.error("Error saving banners:", error);
@@ -425,6 +433,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       console.log("Banners published successfully.");
       set({ banners: updatedDraftBanners, draftBanners: updatedDraftBanners, hasUnsavedChanges: false });
       saveCachedBanners(updatedDraftBanners);
+      broadcastSync.publish('banners', updatedDraftBanners);
     } catch (error) {
       console.error("Error publishing banners:", error);
       throw error;

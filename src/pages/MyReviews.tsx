@@ -180,7 +180,7 @@ export default function MyReviews() {
                 >
                   <div className="flex gap-4">
                     {/* Product Image */}
-                    <Link to={`/product/${product.id}`} className="shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-zinc-100 bg-zinc-50">
+                    <Link to={`/product/${product.slug || product.id}`} className="shrink-0 w-20 h-20 rounded-xl overflow-hidden border border-zinc-100 bg-zinc-50">
                       <img 
                         src={product.image} 
                         alt={product.name}
@@ -191,7 +191,7 @@ export default function MyReviews() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <Link to={`/product/${product.id}`} className="text-[11px] font-black text-zinc-950 uppercase tracking-tight hover:text-red-600 transition-colors line-clamp-1">
+                          <Link to={`/product/${product.slug || product.id}`} className="text-[11px] font-black text-zinc-950 uppercase tracking-tight hover:text-red-600 transition-colors line-clamp-1">
                             {product.name}
                           </Link>
                           <div className="flex items-center gap-1 mt-1">
@@ -267,7 +267,7 @@ export default function MyReviews() {
                       {/* Actions */}
                       <div className="mt-5 pt-4 border-t border-zinc-50 flex items-center justify-between">
                         <Link 
-                          to={`/product/${product.id}`}
+                          to={`/product/${product.slug || product.id}`}
                           className="flex items-center gap-1.5 text-[9px] font-black uppercase text-zinc-400 hover:text-zinc-950 transition-colors tracking-widest"
                         >
                           View Product <ArrowRight className="w-3 h-3" />

@@ -85,7 +85,7 @@ export default function FlashSaleSection({ products, isLoading }: FlashSaleSecti
               <motion.div 
                 key={product.id}
                 whileHover={{ y: -4 }}
-                onClick={() => navigate(`/product/${product.id}`)}
+                onClick={() => navigate(`/product/${product.slug || product.id}`)}
                 className="w-[145px] sm:w-[170px] shrink-0 bg-white border border-neutral-100 rounded-xl p-2 shadow-[0_4px_12px_rgba(0,0,0,0.01)] hover:shadow-[0_12px_24px_rgba(220,38,38,0.06)] transition-all group snap-start cursor-pointer"
               >
                 <div className="relative aspect-square rounded-lg overflow-hidden bg-neutral-50 mb-2">

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
+import { broadcastSync } from '../lib/broadcastSync';
 
 export interface MenuSortState {
   mainMenuOrder: string[] | null;
@@ -84,6 +85,7 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
       deletedMenus: deleted
     };
     set(updates);
+    broadcastSync.publish('menuSort', get());
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').update(updates).eq('id', 'menuSort').then(({error}) => error && console.warn(error));
@@ -97,6 +99,7 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
       memberOrder: members,
     };
     set(updates);
+    broadcastSync.publish('menuSort', get());
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').update(updates).eq('id', 'menuSort').then(({error}) => error && console.warn(error));
@@ -109,6 +112,7 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
       [originalName]: newName,
     };
     set({ renamedMenus: updatedRenamed });
+    broadcastSync.publish('menuSort', get());
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').update({ renamedMenus: updatedRenamed }).eq('id', 'menuSort').then(({error}) => error && console.warn(error));
@@ -121,6 +125,7 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
       ? currentDeleted.filter((n) => n !== menuName)
       : [...currentDeleted, menuName];
     set({ deletedMenus: updatedDeleted });
+    broadcastSync.publish('menuSort', get());
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').update({ deletedMenus: updatedDeleted }).eq('id', 'menuSort').then(({error}) => error && console.warn(error));
@@ -129,6 +134,7 @@ export const useMenuSortStore = create<MenuSortState>((set, get) => ({
 
   resetToDefault: () => {
     set(defaultState);
+    broadcastSync.publish('menuSort', get());
     const supabase = getSupabase();
     if (supabase) {
         supabase.from('settings').upsert([{ id: 'menuSort', ...defaultState }]).then(({error}) => error && console.warn(error));

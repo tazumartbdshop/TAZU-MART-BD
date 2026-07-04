@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 import { useBrandingStore } from './useBrandingStore';
+import { broadcastSync } from '../lib/broadcastSync';
 
 export interface AppSettings {
   // 1. Store Identity
@@ -473,9 +474,21 @@ const saveLogoToSiteSettings = async (logoUrl: string) => {
   }
 };
 
+const getInitialSettings = (): AppSettings => {
+  try {
+    const saved = localStorage.getItem('tazu_settings_cache');
+    if (saved) {
+      return { ...defaultSettings, ...JSON.parse(saved) };
+    }
+  } catch (e) {
+    console.warn("Could not read settings cache", e);
+  }
+  return defaultSettings;
+};
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
-  settings: defaultSettings,
-  draftSettings: defaultSettings,
+  settings: getInitialSettings(),
+  draftSettings: getInitialSettings(),
   isLoaded: false,
   fetchLatestLogo: async () => {
     const supabase = getSupabase();
@@ -578,6 +591,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     
     // 4. Update the local states only after DB confirmation and verification
     set({ settings: newSettings, draftSettings: newSettings });
+    try { localStorage.setItem('tazu_settings_cache', JSON.stringify(newSettings)); } catch(e) {}
+    broadcastSync.publish('settings', newSettings);
     
     // 5. Propagate to branding if logo changed
     if (updates.storeLogo) {
@@ -756,6 +771,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       }
 
       set({ settings: draft });
+      try { localStorage.setItem('tazu_settings_cache', JSON.stringify(draft)); } catch(e) {}
+      broadcastSync.publish('settings', draft);
       console.log("Settings published to Supabase");
     } catch (error) {
       console.error("Supabase publishSettings error:", error);
@@ -819,6 +836,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       }
 
       set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
+      try { localStorage.setItem('tazu_settings_cache', JSON.stringify(mergedSettings)); } catch(e) {}
+      broadcastSync.publish('settings', mergedSettings);
       get().fetchLatestLogo();
     };
 

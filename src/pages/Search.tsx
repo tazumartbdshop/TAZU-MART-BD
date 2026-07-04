@@ -39,7 +39,7 @@ export default function Search() {
   useEffect(() => {
     if (filteredProducts.length === 1 && query.trim()) {
       const match = filteredProducts[0];
-      navigate(`/product/${match.id}`, { replace: true });
+      navigate(`/product/${match.slug || match.id}`, { replace: true });
       toast.success(`Direct Match: "${match.name}"`);
     }
   }, [filteredProducts, query, navigate]);
@@ -99,7 +99,7 @@ export default function Search() {
               return (
                 <Link 
                   key={product.id} 
-                  to={`/product/${product.id}`}
+                  to={`/product/${product.slug || product.id}`}
                   className="bg-white border border-neutral-100 group transition-all duration-300 hover:shadow-lg flex flex-col justify-between"
                 >
                   {/* Photo area */}

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
+import { broadcastSync } from '../lib/broadcastSync';
 
 export interface Offer {
   id: string;
@@ -168,7 +169,11 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     const supabase = getSupabase();
     if (supabase) supabase.from('offers').insert([newOffer]).then(({error}) => error && console.warn(error));
       
-    set((state) => ({ offers: [newOffer, ...state.offers] }));
+    set((state) => {
+      const nextOffers = [newOffer, ...state.offers];
+      broadcastSync.publish('offers', nextOffers);
+      return { offers: nextOffers };
+    });
   },
 
   updateOffer: (id, updatedFields) => {
@@ -191,14 +196,17 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     }
     
     set({ offers: updatedOffers });
+    broadcastSync.publish('offers', updatedOffers);
   },
 
   deleteOffer: (id) => {
     const supabase = getSupabase();
     if (supabase) supabase.from('offers').delete().eq('id', id).then(({error}) => error && console.warn(error));
       
-    set((state) => ({
-      offers: state.offers.filter((o) => o.id !== id),
-    }));
+    set((state) => {
+      const nextOffers = state.offers.filter((o) => o.id !== id);
+      broadcastSync.publish('offers', nextOffers);
+      return { offers: nextOffers };
+    });
   },
 }));

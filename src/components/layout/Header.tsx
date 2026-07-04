@@ -148,7 +148,7 @@ export function Header() {
                  ) : isLoadingLogo ? (
                    null
                  ) : (
-                   (branding.site_name || 'T')[0]
+                   null
                  )}
               </div>
               {settings.storeName && settings.storeName.trim() !== '' && (
@@ -237,7 +237,7 @@ export function Header() {
                     ) : isLoadingLogo ? (
                       null
                     ) : (
-                      (settings.storeName || 'T')[0]
+                      null
                     )}
                   </div>
                   {settings.storeName && settings.storeName.trim() !== '' && (

@@ -86,7 +86,7 @@ export function CompactProductCard({ product, rank }: any) {
         </div>
         
         <Link 
-          to={`/product/${product.id}`} 
+          to={`/product/${product.slug || product.id}`} 
           className={`block relative aspect-square overflow-hidden rounded-lg bg-gray-50 mb-2 ${
             isOutOfStock ? 'filter blur-[1px]' : ''
           }`}
@@ -124,7 +124,7 @@ export function CompactProductCard({ product, rank }: any) {
         
         <div className="flex flex-col flex-grow justify-between pl-3">
           <div>
-            <Link to={`/product/${product.id}`} className="text-[11px] font-bold text-neutral-800 line-clamp-2 hover:opacity-80 leading-tight mb-1 uppercase tracking-tight">
+            <Link to={`/product/${product.slug || product.id}`} className="text-[11px] font-bold text-neutral-800 line-clamp-2 hover:opacity-80 leading-tight mb-1 uppercase tracking-tight">
               {product.name}
             </Link>
 
