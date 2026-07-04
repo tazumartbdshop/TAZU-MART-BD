@@ -71,46 +71,40 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   },
 
   addCategory: async (payload) => {
-    try {
-      const res = await fetch('/api/admin/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        get().fetchCategories();
-      }
-    } catch (err) {
-      console.error("Failed to add category:", err);
+    const res = await fetch('/api/admin/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || errData.message || `Server error (${res.status})`);
     }
+    await get().fetchCategories();
   },
 
   updateCategory: async (id, updates) => {
-    try {
-      const res = await fetch(`/api/admin/categories/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-      if (res.ok) {
-        get().fetchCategories();
-      }
-    } catch (err) {
-      console.error("Failed to update category:", err);
+    const res = await fetch(`/api/admin/categories/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || errData.message || `Server error (${res.status})`);
     }
+    await get().fetchCategories();
   },
 
   deleteCategory: async (id) => {
-    try {
-      const res = await fetch(`/api/admin/categories/${id}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        get().fetchCategories();
-      }
-    } catch (err) {
-      console.error("Failed to delete category:", err);
+    const res = await fetch(`/api/admin/categories/${id}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || errData.message || `Server error (${res.status})`);
     }
+    await get().fetchCategories();
   },
 
   subscribe: () => {

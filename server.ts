@@ -157,6 +157,33 @@ async function initDB() {
       )
     `);
 
+    const cols = [
+      { name: 'description', type: 'TEXT' },
+      { name: 'icon_image', type: 'TEXT' },
+      { name: 'banner_image', type: 'TEXT' },
+      { name: 'banner_name', type: 'VARCHAR(255)' },
+      { name: 'wide_banner_image', type: 'TEXT' },
+      { name: 'button_text', type: 'VARCHAR(255)' },
+      { name: 'button_link', type: 'VARCHAR(255)' },
+      { name: 'featured_products', type: 'JSON' },
+      { name: 'meta_title', type: 'VARCHAR(255)' },
+      { name: 'meta_description', type: 'TEXT' },
+      { name: 'keywords', type: 'TEXT' },
+      { name: 'banner_images', type: 'JSON' },
+      { name: 'slider_settings', type: 'JSON' },
+      { name: 'display_order', type: 'INT DEFAULT 1' },
+      { name: 'status', type: "VARCHAR(50) DEFAULT 'ACTIVE'" },
+      { name: 'show_on_homepage', type: 'BOOLEAN DEFAULT TRUE' }
+    ];
+
+    for (const col of cols) {
+      try {
+        await db.execute(`ALTER TABLE categories ADD COLUMN \`${col.name}\` ${col.type}`);
+      } catch (err) {
+        // Column already exists, ignore error
+      }
+    }
+
     await db.execute(`
       CREATE TABLE IF NOT EXISTS banners (
         id VARCHAR(50) PRIMARY KEY,
@@ -411,8 +438,33 @@ async function startServer() {
 
   app.get("/api/categories", async (req, res) => {
     try {
-      const [categories]: any = await db.execute("SELECT * FROM categories WHERE is_active = TRUE");
-      res.json(categories);
+      const [rows]: any = await db.execute("SELECT * FROM categories WHERE is_active = TRUE ORDER BY display_order ASC");
+      const formatted = rows.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        description: c.description || '',
+        image_url: c.image_url || '',
+        image: c.image_url || '', // compatibility
+        iconImage: c.icon_image || '',
+        bannerImage: c.banner_image || '',
+        bannerName: c.banner_name || '',
+        wideBannerImage: c.wide_banner_image || '',
+        buttonText: c.button_text || '',
+        buttonLink: c.button_link || '',
+        featuredProducts: typeof c.featured_products === 'string' ? JSON.parse(c.featured_products) : (c.featured_products || []),
+        metaTitle: c.meta_title || '',
+        metaDescription: c.meta_description || '',
+        keywords: c.keywords || '',
+        bannerImages: typeof c.banner_images === 'string' ? JSON.parse(c.banner_images) : (c.banner_images || []),
+        sliderSettings: typeof c.slider_settings === 'string' ? JSON.parse(c.slider_settings) : (c.slider_settings || null),
+        displayOrder: Number(c.display_order) || 1,
+        status: c.status || 'ACTIVE',
+        showOnHomepage: !!c.show_on_homepage,
+        is_active: !!c.is_active,
+        created_at: c.created_at
+      }));
+      res.json(formatted);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -615,10 +667,122 @@ async function startServer() {
   // --- Admin Category Management ---
   app.post("/api/admin/categories", async (req, res) => {
     try {
-      const { name, image } = req.body;
-      await db.execute("INSERT INTO categories (name, image) VALUES (?, ?)", [name, image]);
+      const data = req.body;
+      if (!data.name) {
+        return res.status(400).json({ error: "Category name is required" });
+      }
+
+      const id = data.id || `cat_${Date.now()}`;
+      const name = data.name.trim();
+      const slug = data.slug ? data.slug.trim() : name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const description = data.description || null;
+      const imageUrl = data.imageUrl || data.image_url || data.image || null;
+      const iconImage = data.iconImage || imageUrl;
+      const bannerImage = data.bannerImage || null;
+      const bannerName = data.bannerName || null;
+      const wideBannerImage = data.wideBannerImage || null;
+      const buttonText = data.buttonText || null;
+      const buttonLink = data.buttonLink || null;
+      const featuredProducts = data.featuredProducts ? JSON.stringify(data.featuredProducts) : null;
+      const metaTitle = data.metaTitle || null;
+      const metaDescription = data.metaDescription || null;
+      const keywords = data.keywords || null;
+      const bannerImages = data.bannerImages ? JSON.stringify(data.bannerImages) : null;
+      const sliderSettings = data.sliderSettings ? JSON.stringify(data.sliderSettings) : null;
+      const displayOrder = Number(data.displayOrder) || 1;
+      const status = data.status || 'ACTIVE';
+      const showOnHomepage = data.showOnHomepage !== false ? 1 : 0;
+      const isActive = data.isActive !== false ? 1 : 0;
+
+      await db.execute(
+        `INSERT INTO categories (
+          id, name, slug, description, image_url, icon_image, banner_image, 
+          banner_name, wide_banner_image, button_text, button_link, featured_products, 
+          meta_title, meta_description, keywords, banner_images, slider_settings, 
+          display_order, status, show_on_homepage, is_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id, name, slug, description, imageUrl, iconImage, bannerImage,
+          bannerName, wideBannerImage, buttonText, buttonLink, featuredProducts,
+          metaTitle, metaDescription, keywords, bannerImages, sliderSettings,
+          displayOrder, status, showOnHomepage, isActive
+        ]
+      );
+
+      res.json({ status: "success", id, slug });
+    } catch (error: any) {
+      console.error("Failed to add category:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/admin/categories/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+
+      // Fetch existing
+      const [existingRows]: any = await db.execute("SELECT * FROM categories WHERE id = ?", [id]);
+      if (existingRows.length === 0) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+
+      const fields: string[] = [];
+      const values: any[] = [];
+
+      const mapping: { [key: string]: string } = {
+        name: 'name',
+        slug: 'slug',
+        description: 'description',
+        imageUrl: 'image_url',
+        image_url: 'image_url',
+        image: 'image_url',
+        iconImage: 'icon_image',
+        bannerImage: 'banner_image',
+        bannerName: 'banner_name',
+        wideBannerImage: 'wide_banner_image',
+        buttonText: 'button_text',
+        buttonLink: 'button_link',
+        featuredProducts: 'featured_products',
+        metaTitle: 'meta_title',
+        metaDescription: 'meta_description',
+        keywords: 'keywords',
+        bannerImages: 'banner_images',
+        sliderSettings: 'slider_settings',
+        displayOrder: 'display_order',
+        status: 'status',
+        showOnHomepage: 'show_on_homepage',
+        isActive: 'is_active',
+        is_active: 'is_active'
+      };
+
+      const columnsUpdated = new Set<string>();
+
+      for (const [key, dbCol] of Object.entries(mapping)) {
+        if (data[key] !== undefined) {
+          if (columnsUpdated.has(dbCol)) continue;
+          columnsUpdated.add(dbCol);
+
+          fields.push(`\`${dbCol}\` = ?`);
+          let val = data[key];
+          if (Array.isArray(val) || (val !== null && typeof val === 'object')) {
+            val = JSON.stringify(val);
+          } else if (typeof val === 'boolean') {
+            val = val ? 1 : 0;
+          }
+          values.push(val);
+        }
+      }
+
+      if (fields.length === 0) {
+        return res.json({ status: "success", message: "No fields to update" });
+      }
+
+      values.push(id);
+      await db.execute(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`, values);
       res.json({ status: "success" });
     } catch (error: any) {
+      console.error("Failed to update category:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -628,6 +792,7 @@ async function startServer() {
       await db.execute("DELETE FROM categories WHERE id = ?", [req.params.id]);
       res.json({ status: "success" });
     } catch (error: any) {
+      console.error("Failed to delete category:", error);
       res.status(500).json({ error: error.message });
     }
   });
