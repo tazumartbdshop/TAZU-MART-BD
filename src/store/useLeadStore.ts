@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { getSupabase } from '../lib/supabase';
 
 export interface Lead {
   id: string;
@@ -31,102 +30,91 @@ export const useLeadStore = create<LeadState>()((set, get) => ({
   loading: false,
 
   fetchLeads: async () => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-
     set({ loading: true });
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .order('last_updated', { ascending: false });
-
-    if (!error && data) {
-      set({ leads: data, loading: false });
-    } else {
+    try {
+      const response = await fetch('/api/admin/leads');
+      if (response.ok) {
+        const data = await response.json();
+        set({ leads: data, loading: false });
+      } else {
+        set({ loading: false });
+      }
+    } catch (err) {
+      console.error("[Lead Store] fetchLeads failed:", err);
       set({ loading: false });
     }
   },
 
   addOrUpdateLead: async (data) => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-
-    const now = new Date().toISOString();
-    const leadData = {
-      ...data,
-      last_updated: now,
-      status: 'Abandoned',
-      is_read: false
-    };
-
-    const { error } = await supabase
-      .from('leads')
-      .upsert(leadData, { onConflict: 'id' });
-
-    if (!error) {
-      await get().fetchLeads();
+    try {
+      const response = await fetch('/api/admin/leads/upsert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) {
+        await get().fetchLeads();
+      }
+    } catch (err) {
+      console.error("[Lead Store] addOrUpdateLead failed:", err);
     }
   },
 
   deleteLead: async (id) => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('leads')
-      .delete()
-      .eq('id', id);
-
-    if (!error) {
-      set((state) => ({
-        leads: state.leads.filter(l => l.id !== id)
-      }));
+    try {
+      const response = await fetch(`/api/admin/leads/${id}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        set((state) => ({
+          leads: state.leads.filter(l => l.id !== id)
+        }));
+      }
+    } catch (err) {
+      console.error("[Lead Store] deleteLead failed:", err);
     }
   },
 
   clearLeads: async () => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('leads')
-      .delete()
-      .neq('id', '');
-
-    if (!error) {
-      set({ leads: [] });
+    try {
+      const response = await fetch('/api/admin/leads', {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        set({ leads: [] });
+      }
+    } catch (err) {
+      console.error("[Lead Store] clearLeads failed:", err);
     }
   },
 
   markAsRead: async (id) => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('leads')
-      .update({ is_read: true })
-      .eq('id', id);
-
-    if (!error) {
-      set((state) => ({
-        leads: state.leads.map(l => l.id === id ? { ...l, is_read: true } : l)
-      }));
+    try {
+      const response = await fetch(`/api/admin/leads/${id}/read`, {
+        method: 'PATCH'
+      });
+      if (response.ok) {
+        set((state) => ({
+          leads: state.leads.map(l => l.id === id ? { ...l, is_read: true } : l)
+        }));
+      }
+    } catch (err) {
+      console.error("[Lead Store] markAsRead failed:", err);
     }
   },
 
   markAllAsRead: async () => {
-    const supabase = getSupabase();
-    if (!supabase) return;
-
-    const { error } = await supabase
-      .from('leads')
-      .update({ is_read: true })
-      .neq('id', '');
-
-    if (!error) {
-      set((state) => ({
-        leads: state.leads.map(l => ({ ...l, is_read: true }))
-      }));
+    try {
+      const response = await fetch('/api/admin/leads/read-all', {
+        method: 'PATCH'
+      });
+      if (response.ok) {
+        set((state) => ({
+          leads: state.leads.map(l => ({ ...l, is_read: true }))
+        }));
+      }
+    } catch (err) {
+      console.error("[Lead Store] markAllAsRead failed:", err);
     }
   },
 }));

@@ -296,7 +296,7 @@ function AdminOrderList() {
                     <div className="bg-white border border-gray-150 p-3 rounded-lg space-y-1.5 text-xs">
                       <div className="flex justify-between items-center text-gray-500">
                         <span>Subtotal</span>
-                        <span className="font-semibold text-black">{formatPrice(order.subtotal || (order.total - (order.deliveryCharge || 0) + (order.discount?.amount || 0)))}</span>
+                        <span className="font-semibold text-black">{formatPrice(order.subtotal || (order.total - (order.deliveryCharge || 0) + ((order.discount as any)?.amount || 0)))}</span>
                       </div>
                       {order.promoCodeUsed && (
                         <div className="flex justify-between items-center text-emerald-600">
@@ -304,10 +304,10 @@ function AdminOrderList() {
                           <span className="font-extrabold uppercase tracking-widest text-[10px] bg-emerald-50 px-2 py-0.5 border border-emerald-200">{order.promoCodeUsed}</span>
                         </div>
                       )}
-                      {order.discount?.amount > 0 && (
+                      {(order.discount as any)?.amount > 0 && (
                         <div className="flex justify-between items-center text-emerald-600">
                           <span>Discount Applied</span>
-                          <span className="font-extrabold font-mono">-{formatPrice(order.discount.amount)}</span>
+                          <span className="font-extrabold font-mono">-{formatPrice((order.discount as any).amount)}</span>
                         </div>
                       )}
                       <div className="flex justify-between items-center text-gray-500">

@@ -1,5 +1,3 @@
-import { getSupabase } from './supabase';
-
 // Helper to add timeout to promise
 const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
   let finished = false;
@@ -60,68 +58,33 @@ export const blobToBase64 = (blob: Blob | File): Promise<string> => {
 
 export const uploadImage = async (
   file: File | Blob, 
-  folder: string, 
+  folder: string = 'media', 
   originalName?: string,
-  bucketName: string = 'media'
+  _bucket?: string
 ): Promise<string> => {
-  const extension = originalName?.split('.').pop() || 'jpg';
-  const cleanName = originalName ? originalName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50) : `img-${Date.now()}`;
-  const fileName = `${Date.now()}-${cleanName}.${extension}`;
-  // If bucket is 'categories', let's place the image in the root directory or categories/ as requested
-  const path = folder ? `${folder}/${fileName}` : fileName;
-  
-  console.log(`Starting upload to Supabase: Bucket: ${bucketName}, Path: ${path}`);
-  const supabase = getSupabase();
-  
-  if (!supabase) {
-    console.warn("Supabase not configured, falling back to local base64");
-    return fallbackToBase64(file);
-  }
-  
+  const formData = new FormData();
+  formData.append('image', file, originalName || 'upload.jpg');
+
   try {
-    const uploadPromise = supabase.storage
-      .from(bucketName)
-      .upload(path, file, { cacheControl: '3600', upsert: true });
-
-    const { data, error } = await withTimeout(
-      uploadPromise,
-      30000,
-      "Supabase Storage upload timed out"
-    );
-
-    if (error) {
-       // Attempt to create bucket if it doesn't exist, though usually you create this via dashboard
-       if (error.message.includes('bucket not found')) {
-           console.warn(`Bucket '${bucketName}' not found. Attempting to fall back...`);
-           throw error;
-       }
-       throw error;
-    }
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    });
     
-    console.log(`Upload complete:`, data);
+    if (!res.ok) throw new Error('Upload failed');
     
-    const { data: publicData } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(path);
-      
-    if (!publicData || !publicData.publicUrl) {
-        throw new Error("Could not retrieve public URL");
-    }
-    
-    console.log(`Download URL: ${publicData.publicUrl}`);
-    return publicData.publicUrl;
+    const data = await res.json();
+    return data.url;
   } catch (err: any) {
-    console.warn(`Supabase Storage failed, falling back to compressed local Base64 storage: ${err.message || err}`, err);
+    console.warn(`Upload failed, falling back to compressed local Base64 storage: ${err.message || err}`, err);
     return fallbackToBase64(file);
   }
 };
 
 async function fallbackToBase64(file: File | Blob): Promise<string> {
     try {
-      // Compress to a highly efficient 500px width jpeg for rapid saving
       const bToUse = await resizeImage(file, 500);
       const b64 = await blobToBase64(bToUse);
-      console.log(`Base64 fallback complete. Size: ${Math.round(b64.length / 1024)} KB.`);
       return b64;
     } catch (fallbackErr: any) {
       console.error("Base64 fallback failed inside uploadImage:", fallbackErr);
@@ -130,29 +93,6 @@ async function fallbackToBase64(file: File | Blob): Promise<string> {
 }
 
 export const deleteImage = async (url: string): Promise<void> => {
-  if (!url) {
-    return;
-  }
-  try {
-    const supabase = getSupabase();
-    if (!supabase) return;
-    
-    // Match any Supabase storage public URL structure automatically
-    const match = url.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
-    if (match) {
-       const bucketName = match[1];
-       const path = match[2];
-       await supabase.storage.from(bucketName).remove([path]);
-       console.log(`Successfully deleted storage image from bucket '${bucketName}': ${path}`);
-    } else if (url.includes('supabase.co/storage/v1/object/public/media/')) {
-       const urlParts = url.split('supabase.co/storage/v1/object/public/media/');
-       if (urlParts.length > 1) {
-          const path = urlParts[1];
-          await supabase.storage.from('media').remove([path]);
-          console.log(`Successfully deleted storage image: ${path}`);
-       }
-    }
-  } catch (err) {
-    console.warn(`Failed to delete image from storage (non-blocking):`, err);
-  }
+  // Local deletion would require an API endpoint too if we want to remove files from public/uploads
+  console.log("Delete image requested for URL:", url);
 };

@@ -89,45 +89,41 @@ export const OrderActionSheet: React.FC<OrderActionSheetProps> = ({
   const publicLink = `${window.location.origin}/checkout/invoice/${order.orderId}`;
 
   // 1. DUPLICATE ORDER CLONE FUNCTION
-  const handleDuplicate = () => {
-    const rawClonedItems = order.items.map(item => ({
-      productId: item.productId,
-      name: item.name + ' (Copy)',
-      price: item.price,
-      quantity: item.quantity,
-      variant: item.variant,
-      variantDetails: item.variantDetails ? { ...item.variantDetails } : undefined,
-      image: item.image
-    }));
+    const handleDuplicate = async () => {
+      const rawClonedItems = order.items.map(item => ({
+        productId: item.productId,
+        name: item.name + ' (Copy)',
+        price: item.price,
+        quantity: item.quantity,
+        variant: item.variant,
+        image: item.image
+      }));
 
-    const clonedPayload = {
-      customerName: order.customerName,
-      mobileNumber: order.mobileNumber,
-      email: order.email,
-      fullAddress: order.fullAddress,
-      cityArea: order.cityArea,
-      postalCode: order.postalCode,
-      deliveryMode: order.deliveryMode,
-      paymentMethod: order.paymentMethod,
-      status: 'Placed' as const,
-      paymentStatus: 'Unpaid' as const,
-      type: order.type,
-      items: rawClonedItems,
-      subtotal: order.subtotal,
-      discount: { ...order.discount },
-      tax: { ...order.tax },
-      deliveryCharge: order.deliveryCharge,
-      paidAmount: 0,
-      dueAmount: order.total,
-      total: order.total,
-      notes: order.notes ? `[Cloned] ${order.notes}` : '[Cloned Order]',
-      isRead: false
+      const clonedPayload = {
+        customerName: order.customerName,
+        mobileNumber: order.mobileNumber,
+        email: order.email,
+        fullAddress: order.fullAddress,
+        cityArea: order.cityArea,
+        paymentMethod: order.paymentMethod,
+        status: 'Placed' as const,
+        paymentStatus: 'Unpaid' as const,
+        items: rawClonedItems,
+        subtotal: order.subtotal,
+        deliveryCharge: order.deliveryCharge,
+        total: order.total,
+        notes: order.notes ? `[Cloned] ${order.notes}` : '[Cloned Order]',
+        isRead: false
+      };
+
+      try {
+        const result = await addOrder(clonedPayload);
+        triggerToast(`Order Duplicated Successfully!`);
+        onClose();
+      } catch (err) {
+        triggerToast('Failed to duplicate order');
+      }
     };
-
-    const newOrd = addOrder(clonedPayload);
-    triggerToast(`Order Duplicated Successfully as ${newOrd.orderId}!`);
-    onClose();
-  };
 
   // 2. SAVE INTERNAL PRIVATE NOTE
   const handleSaveNotes = () => {

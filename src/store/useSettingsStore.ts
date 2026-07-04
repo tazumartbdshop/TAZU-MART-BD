@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { getSupabase } from '../lib/supabase';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 import { useBrandingStore } from './useBrandingStore';
 import { broadcastSync } from '../lib/broadcastSync';
@@ -428,52 +427,6 @@ interface SettingsState {
   fetchLatestLogo: () => Promise<string | null>;
 }
 
-// Robust helper to write logo to site_settings with fallback schemas
-const saveLogoToSiteSettings = async (logoUrl: string) => {
-  const supabase = getSupabase();
-  if (!supabase || !logoUrl) return;
-
-  console.log("Upserting logo to site_settings table:", logoUrl);
-  const cleanUrl = logoUrl.split('?')[0];
-
-  try {
-    const dbPayload = objectToSnake({ 
-      id: 'logo', 
-      logoUrl: cleanUrl, 
-      logo: cleanUrl,
-      url: cleanUrl,
-      value: cleanUrl,
-      updatedAt: new Date().toISOString()
-    });
-    // Attempt 1: ID-column oriented row
-    const { error: err1 } = await supabase.from('site_settings').upsert([dbPayload]);
-    
-    if (err1) {
-      console.warn("site_settings upsert format 1 failed, trying format 2...", err1.message);
-      // Attempt 2: Key-value oriented row
-      const dbPayload2 = objectToSnake({ 
-        key: 'logo_url', 
-        value: cleanUrl,
-        logoUrl: cleanUrl,
-        updatedAt: new Date().toISOString()
-      });
-      const { error: err2 } = await supabase.from('site_settings').upsert([dbPayload2]);
-      
-      if (err2) {
-        console.warn("site_settings upsert format 2 failed, trying format 3...", err2.message);
-        // Attempt 3: Key-value alternative row
-        await supabase.from('site_settings').upsert([objectToSnake({ 
-          key: 'logo', 
-          value: cleanUrl, 
-          updatedAt: new Date().toISOString() 
-        })]);
-      }
-    }
-  } catch (e) {
-    console.warn("site_settings upsert caught error:", e);
-  }
-};
-
 const getInitialSettings = (): AppSettings => {
   try {
     const saved = localStorage.getItem('tazu_settings_cache');
@@ -491,46 +444,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   draftSettings: getInitialSettings(),
   isLoaded: false,
   fetchLatestLogo: async () => {
-    const supabase = getSupabase();
-    if (!supabase) return null;
     try {
-      const { data, error } = await supabase.from('site_settings').select('*');
-      if (error) {
-        console.warn("Could not query 'site_settings' table (may not exist or is loading):", error.message);
-        return null;
-      }
-      
-      if (data && data.length > 0) {
-        let foundUrl = '';
-        let updatedAt = '';
-        const keysToSearch = ['logo_url', 'logoUrl', 'value', 'url', 'storeLogo', 'logo'];
-        for (const row of data) {
-          const camelRow = objectToCamel(row);
-          for (const k of keysToSearch) {
-            if (camelRow[k] && typeof camelRow[k] === 'string' && camelRow[k].startsWith('http')) {
-              foundUrl = camelRow[k];
-              updatedAt = row.updated_at || camelRow.updatedAt || '';
-              break;
-            }
-          }
-          if (foundUrl) break;
-        }
-
-        if (foundUrl) {
-          const cleanUrl = foundUrl.split('?')[0];
-          // Use stable database updatedAt as a cache-buster instead of Date.now() to allow perfect browser caching
-          const cacheBuster = updatedAt ? `t=${encodeURIComponent(updatedAt)}` : 'v=1';
-          const bustedUrl = `${cleanUrl}?${cacheBuster}`;
-          
+      const response = await fetch('/api/settings/logo');
+      if (response.ok) {
+        const logoUrl = await response.json();
+        if (logoUrl && typeof logoUrl === 'string') {
           set((state) => ({
-            settings: { ...state.settings, storeLogo: bustedUrl },
-            draftSettings: { ...state.draftSettings, storeLogo: bustedUrl }
+            settings: { ...state.settings, storeLogo: logoUrl },
+            draftSettings: { ...state.draftSettings, storeLogo: logoUrl }
           }));
-          return bustedUrl;
+          return logoUrl;
         }
       }
     } catch (err) {
-      console.error("Error fetching logo from site_settings:", err);
+      console.error("Error fetching logo:", err);
     }
     return null;
   },
@@ -538,129 +465,31 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const { settings } = get();
     const newSettings = { ...settings, ...updates };
 
-    const supabase = getSupabase();
-    if (!supabase) {
-      throw new Error("Supabase is not initialized. Please connect your database first.");
-    }
+    try {
+      const response = await fetch('/api/settings/global', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      });
 
-    // 1. Sync to store_identity table (Master Source of Truth)
-    const identityPayload = objectToSnake({
-      id: 'global',
-      store_name: newSettings.storeName,
-      store_slug: newSettings.storeSlug,
-      store_description: newSettings.storeDescription,
-      store_tagline: newSettings.storeTagline,
-      support_email: newSettings.supportEmail || newSettings.storeEmail,
-      contact_number: newSettings.contactNumber,
-      website_url: newSettings.websiteUrl,
-      timezone: newSettings.timezone,
-      industry: newSettings.businessType,
-      business_type: newSettings.businessType,
-      country: newSettings.country,
-      primary_logo: newSettings.storeLogo,
-      updated_at: new Date().toISOString()
-    });
-
-    const { error: identityError } = await supabase.from('store_identity').upsert([identityPayload]);
-    if (identityError) {
-      console.error("Supabase store_identity update fail:", identityError);
-      throw new Error(`[Database Table: store_identity] Save failed: ${identityError.message}. Please execute the schema script to add columns: store_tagline, country, business_type.`);
-    }
-
-    // 2. Double-check persistence by querying back the master record immediately
-    const { data: verifyData, error: verifyError } = await supabase
-      .from('store_identity')
-      .select('store_name, store_slug, store_tagline, country, business_type')
-      .eq('id', 'global')
-      .single();
-
-    if (verifyError || !verifyData) {
-      throw new Error(`Database verification failed: Could not read back the saved record from the 'store_identity' table. Details: ${verifyError?.message || 'Empty record'}`);
-    }
-
-    // 3. Update main settings table (as JSON in 'value' column to avoid schema issues)
-    const dbPayload = { 
-        id: 'global', 
-        value: JSON.stringify(objectToSnake(newSettings)),
-        updated_at: new Date().toISOString()
-    };
-    const { error: settingsError } = await supabase.from('settings').upsert([dbPayload]);
-    if (settingsError && settingsError.code !== '42P01') {
-      console.error("Supabase settings update fail:", settingsError);
-    }
-    
-    // 4. Update the local states only after DB confirmation and verification
-    set({ settings: newSettings, draftSettings: newSettings });
-    try { localStorage.setItem('tazu_settings_cache', JSON.stringify(newSettings)); } catch(e) {}
-    broadcastSync.publish('settings', newSettings);
-    
-    // 5. Propagate to branding if logo changed
-    if (updates.storeLogo) {
-      await saveLogoToSiteSettings(updates.storeLogo);
-      
-      const logoUrl = updates.storeLogo;
-      const brandingUpdates = {
-        primary_logo: logoUrl,
-        secondary_logo: logoUrl,
-        favicon: logoUrl,
-        apple_touch_icon: logoUrl,
-        mobile_logo: logoUrl,
-        desktop_logo: logoUrl,
-        dark_logo: logoUrl,
-        light_logo: logoUrl,
-        footer_logo: logoUrl,
-        invoice_logo: logoUrl,
-        email_logo: logoUrl,
-        loading_logo: logoUrl,
-        watermark_logo: logoUrl,
-        share_logo: logoUrl,
-        login_logo: logoUrl,
-        signup_logo: logoUrl,
-        updated_at: new Date().toISOString()
-      };
-      
-      const { error: brandingError } = await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
-      if (brandingError) {
-        console.warn("Failed to update branding_settings:", brandingError.message);
-      }
-      useBrandingStore.getState().fetchBranding();
-
-      // Sync companion Flutter app config logo and name if available
-      try {
-        const { data: flutterData } = await supabase.from('settings').select('*').eq('id', 'flutter_config').single();
-        if (flutterData && flutterData.config) {
-          const config = flutterData.config;
-          let changed = false;
-          if (updates.storeLogo && config.brand.logoUrl !== updates.storeLogo) {
-            config.brand.logoUrl = updates.storeLogo;
-            changed = true;
-          }
-          if (updates.storeName && config.brand.name !== updates.storeName) {
-            config.brand.name = updates.storeName;
-            changed = true;
-          }
-          if (updates.contactNumber && config.contact) {
-            if (config.contact.phone !== updates.contactNumber) {
-              config.contact.phone = updates.contactNumber;
-              changed = true;
-            }
-            const cleanNum = updates.contactNumber.replace(/[^0-9]/g, '');
-            const waLink = `https://wa.me/${cleanNum}`;
-            if (config.socialLinks && Array.isArray(config.socialLinks)) {
-              const waIdx = config.socialLinks.findIndex((l: any) => l.platform === 'WhatsApp');
-              if (waIdx !== -1 && config.socialLinks[waIdx].url !== waLink) {
-                config.socialLinks[waIdx].url = waLink;
-                changed = true;
-              }
-            }
-          }
-          if (changed) {
-            await supabase.from('settings').upsert([{ id: 'flutter_config', config }]);
-          }
+      if (response.ok) {
+        set({ settings: newSettings, draftSettings: newSettings });
+        try { localStorage.setItem('tazu_settings_cache', JSON.stringify(newSettings)); } catch(e) {}
+        broadcastSync.publish('settings', newSettings);
+        
+        if (updates.storeLogo) {
+          await fetch('/api/settings/logo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates.storeLogo)
+          });
         }
-      } catch (fErr) {
-        console.warn("Could not sync details to flutter_config during saveSettings:", fErr);
+      } else {
+        throw new Error("Failed to save settings to server");
       }
+    } catch (err: any) {
+      console.error("updateSettings error:", err);
+      throw err;
     }
   },
   updateDraftSettings: (updates) => {
@@ -669,208 +498,39 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   publishSettings: async () => {
     try {
       const draft = get().draftSettings;
-
-      const supabase = getSupabase();
-      if (!supabase) {
-        throw new Error("Supabase is not initialized.");
-      }
-
-      // 1. Sync to store_identity table
-      const identityPayload = objectToSnake({
-        id: 'global',
-        store_name: draft.storeName,
-        store_slug: draft.storeSlug,
-        store_description: draft.storeDescription,
-        store_tagline: draft.storeTagline,
-        support_email: draft.supportEmail || draft.storeEmail,
-        contact_number: draft.contactNumber,
-        website_url: draft.websiteUrl,
-        timezone: draft.timezone,
-        industry: draft.businessType,
-        business_type: draft.businessType,
-        country: draft.country,
-        primary_logo: draft.storeLogo,
-        updated_at: new Date().toISOString()
-      });
-      const { error: identityError } = await supabase.from('store_identity').upsert([identityPayload]);
-      if (identityError) {
-        throw new Error(`[Database Table: store_identity] Publish failed: ${identityError.message}`);
-      }
-
-      // 2. Update settings table
-      const dbPayload = { 
-        id: 'global', 
-        value: JSON.stringify(objectToSnake(draft)),
-        updated_at: new Date().toISOString()
-      };
-      const { error: settingsError } = await supabase.from('settings').upsert([dbPayload]);
-      if (settingsError && settingsError.code !== '42P01') throw settingsError;
-      
-      // 3. Branding propagation
-      if (draft.storeLogo) {
-        await saveLogoToSiteSettings(draft.storeLogo);
-        const logoUrl = draft.storeLogo;
-        const brandingUpdates = {
-          primary_logo: logoUrl,
-          secondary_logo: logoUrl,
-          favicon: logoUrl,
-          apple_touch_icon: logoUrl,
-          mobile_logo: logoUrl,
-          desktop_logo: logoUrl,
-          dark_logo: logoUrl,
-          light_logo: logoUrl,
-          footer_logo: logoUrl,
-          invoice_logo: logoUrl,
-          email_logo: logoUrl,
-          loading_logo: logoUrl,
-          watermark_logo: logoUrl,
-          share_logo: logoUrl,
-          login_logo: logoUrl,
-          signup_logo: logoUrl,
-          updated_at: new Date().toISOString()
-        };
-        await supabase.from('branding_settings').upsert([{ id: 'global', ...brandingUpdates }]);
-        useBrandingStore.getState().fetchBranding();
-
-        // Sync companion Flutter app config logo and name if available
-        try {
-          const { data: flutterData } = await supabase.from('settings').select('*').eq('id', 'flutter_config').single();
-          if (flutterData && flutterData.config) {
-            const config = flutterData.config;
-            let changed = false;
-            if (draft.storeLogo && config.brand.logoUrl !== draft.storeLogo) {
-              config.brand.logoUrl = draft.storeLogo;
-              changed = true;
-            }
-            if (draft.storeName && config.brand.name !== draft.storeName) {
-              config.brand.name = draft.storeName;
-              changed = true;
-            }
-            if (draft.contactNumber && config.contact) {
-              if (config.contact.phone !== draft.contactNumber) {
-                config.contact.phone = draft.contactNumber;
-                changed = true;
-              }
-              const cleanNum = draft.contactNumber.replace(/[^0-9]/g, '');
-              const waLink = `https://wa.me/${cleanNum}`;
-              if (config.socialLinks && Array.isArray(config.socialLinks)) {
-                const waIdx = config.socialLinks.findIndex((l: any) => l.platform === 'WhatsApp');
-                if (waIdx !== -1 && config.socialLinks[waIdx].url !== waLink) {
-                  config.socialLinks[waIdx].url = waLink;
-                  changed = true;
-                }
-              }
-            }
-            if (changed) {
-              await supabase.from('settings').upsert([{ id: 'flutter_config', config }]);
-            }
-          }
-        } catch (fErr) {
-          console.warn("Could not sync details to flutter_config during publishSettings:", fErr);
-        }
-      }
-
-      set({ settings: draft });
-      try { localStorage.setItem('tazu_settings_cache', JSON.stringify(draft)); } catch(e) {}
-      broadcastSync.publish('settings', draft);
-      console.log("Settings published to Supabase");
+      await get().updateSettings(draft);
+      console.log("Settings published to server");
     } catch (error) {
-      console.error("Supabase publishSettings error:", error);
+      console.error("publishSettings error:", error);
       throw error;
     }
   },
   resetDraftSettings: () => set((state) => ({ draftSettings: state.settings })),
   subscribe: () => {
-    const supabase = getSupabase();
-    
-    // Always fall back to local if no supabase
-    if (!supabase) {
-        set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
-        return () => {};
-    }
-    
-    // Load setting collections
     const loadData = async () => {
-      const supabase = getSupabase();
-      if (!supabase) return;
-
-      // 1. Load from main settings
-      const { data: settingsData, error: settingsError } = await supabase.from('settings').select('*').eq('id', 'global').limit(1);
-      
-      // 2. Load from store_identity (Priority Source of Truth for identity fields)
-      const { data: identityData, error: identityError } = await supabase.from('store_identity').select('*').eq('id', 'global').limit(1);
-
-      let mergedSettings = { ...defaultSettings };
-
-      if (!settingsError && settingsData && settingsData.length > 0) {
-          const row = settingsData[0];
-          // Support both flat columns and JSON wrapper
-          if (row.value) {
-            try {
-              const parsedValue = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
-              mergedSettings = { ...mergedSettings, ...objectToCamel(parsedValue) };
-            } catch (e) {
-              mergedSettings = { ...mergedSettings, ...objectToCamel(row) };
-            }
+      try {
+        const response = await fetch('/api/settings/global');
+        if (response.ok) {
+          const data = await response.json();
+          if (data && typeof data === 'object') {
+            const mergedSettings = { ...defaultSettings, ...data };
+            set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
+            try { localStorage.setItem('tazu_settings_cache', JSON.stringify(mergedSettings)); } catch(e) {}
+            broadcastSync.publish('settings', mergedSettings);
           } else {
-            mergedSettings = { ...mergedSettings, ...objectToCamel(row) };
+            set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
           }
+        } else {
+          set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
+        }
+      } catch (err) {
+        console.error("loadData error:", err);
+        set({ settings: defaultSettings, draftSettings: defaultSettings, isLoaded: true });
       }
-
-      if (!identityError && identityData && identityData.length > 0) {
-          const idData = objectToCamel(identityData[0]);
-          mergedSettings = {
-            ...mergedSettings,
-            storeName: idData.storeName || mergedSettings.storeName,
-            storeSlug: idData.storeSlug || mergedSettings.storeSlug,
-            storeDescription: idData.storeDescription || mergedSettings.storeDescription,
-            storeTagline: idData.storeTagline || mergedSettings.storeTagline,
-            country: idData.country || mergedSettings.country,
-            supportEmail: idData.supportEmail || idData.storeEmail || mergedSettings.supportEmail,
-            contactNumber: idData.contactNumber || mergedSettings.contactNumber,
-            websiteUrl: idData.websiteUrl || mergedSettings.websiteUrl,
-            timezone: idData.timezone || mergedSettings.timezone,
-            businessType: idData.businessType || idData.industry || mergedSettings.businessType,
-            storeLogo: idData.primaryLogo || idData.storeLogo || mergedSettings.storeLogo
-          };
-      }
-
-      set({ settings: mergedSettings, draftSettings: mergedSettings, isLoaded: true });
-      try { localStorage.setItem('tazu_settings_cache', JSON.stringify(mergedSettings)); } catch(e) {}
-      broadcastSync.publish('settings', mergedSettings);
-      get().fetchLatestLogo();
     };
 
     loadData();
-
-    const channel = supabase
-      .channel('public:settings:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, (payload) => {
-        loadData();
-      })
-      .subscribe();
-
-    // Setup listener on store_identity
-    const channelIdentity = supabase
-      .channel('public:store_identity:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_identity' }, (payload) => {
-        loadData();
-      })
-      .subscribe();
-      
-    // Setup listener on specialized site_settings table as well
-    const channelLogo = supabase
-      .channel('public:site_settings:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, (payload) => {
-        console.log("Real-time site_settings update received!");
-        get().fetchLatestLogo();
-      })
-      .subscribe();
-      
-    return () => {
-        supabase.removeChannel(channel);
-        supabase.removeChannel(channelLogo);
-        supabase.removeChannel(channelIdentity);
-    }
+    const interval = setInterval(loadData, 10000);
+    return () => clearInterval(interval);
   }
 }));

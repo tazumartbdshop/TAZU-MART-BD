@@ -27,18 +27,18 @@ export const broadcastSync = {
       
       switch (type) {
         case 'products':
-          useProductStore.setState({ products: data, isLoaded: true });
-          try { localStorage.setItem('supabase_cached_products', JSON.stringify(data)); } catch(e) {}
+          useProductStore.setState({ products: data });
+          try { localStorage.setItem('tazu_cached_products', JSON.stringify(data)); } catch(e) {}
           break;
           
         case 'categories':
-          useCategoryStore.setState({ categories: data, isLoaded: true });
-          try { localStorage.setItem('supabase_cached_categories', JSON.stringify(data)); } catch(e) {}
+          useCategoryStore.setState({ categories: data });
+          try { localStorage.setItem('tazu_cached_categories', JSON.stringify(data)); } catch(e) {}
           break;
           
         case 'banners':
-          useBannerStore.setState({ banners: data, isLoaded: true });
-          try { localStorage.setItem('supabase_cached_banners', JSON.stringify(data)); } catch(e) {}
+          useBannerStore.setState({ banners: data });
+          try { localStorage.setItem('tazu_cached_banners', JSON.stringify(data)); } catch(e) {}
           break;
           
         case 'settings':
@@ -59,25 +59,24 @@ export const broadcastSync = {
       }
     };
 
-    // Listen to StorageEvent as a redundant fallback
     window.addEventListener('storage', (e) => {
       if (!e.key) return;
-      if (e.key === 'supabase_cached_products' && e.newValue) {
+      if (e.key === 'tazu_cached_products' && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          useProductStore.setState({ products: parsed, isLoaded: true });
+          useProductStore.setState({ products: parsed });
         } catch(err) {}
       }
-      if (e.key === 'supabase_cached_categories' && e.newValue) {
+      if (e.key === 'tazu_cached_categories' && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          useCategoryStore.setState({ categories: parsed, isLoaded: true });
+          useCategoryStore.setState({ categories: parsed });
         } catch(err) {}
       }
-      if (e.key === 'supabase_cached_banners' && e.newValue) {
+      if (e.key === 'tazu_cached_banners' && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          useBannerStore.setState({ banners: parsed, isLoaded: true });
+          useBannerStore.setState({ banners: parsed });
         } catch(err) {}
       }
     });

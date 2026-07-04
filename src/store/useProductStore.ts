@@ -1,569 +1,144 @@
 import { create } from 'zustand';
-import { getSupabase } from '../lib/supabase';
-import { deleteImage } from '../lib/imageUtils';
-import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
-import { broadcastSync } from '../lib/broadcastSync';
-import { generateSlug } from '../lib/utils';
 
 export interface Product {
   id: string;
   slug?: string;
   name: string;
   sku: string;
-  sku_code?: string; // New field for consistency
-  category: string;
+  sku_code?: string; // mapping
+  category_id?: number;
+  category?: string;
   price: number;
   discountPrice?: number;
   stock: number;
-  image: string;
-  imageUrl?: string;
-  featured_image?: string;
-  banner_image?: string;
+  image?: string;
+  imageUrl?: string; // mapping
+  featured_image?: string; // mapping
   images?: string[];
-  videoUrl?: string;
-  mediaUrl?: string;
-  rating: number;
-  reviews: number;
-  isNew: boolean;
-  brand?: string;
-  status: 'active' | 'draft';
   description?: string;
-  createdAt: number;
-  buyingPrice?: number;
-  warranty?: string;
-  unitName?: string;
-  soldCount?: number;
-  productCode?: string;
-  seoPoints?: string[];
-  variants?: { name: string; price: number }[];
-  shippingZones?: { zone: string; charge: string }[];
+  status?: string;
+  is_active?: boolean;
   is_flash_sale?: boolean;
   is_trending?: boolean;
   is_best_selling?: boolean;
-  is_regular?: boolean;
   is_offer?: boolean;
+  isNew?: boolean;
+  is_regular?: boolean;
+  banner_image?: string;
+  videoUrl?: string;
+  soldCount?: number;
+  rating?: number;
+  reviews?: any[];
+  brand?: string;
+  warranty?: string;
+  seoPoints?: number;
+  keywords?: string;
   reward_coins?: number;
   coin_enabled?: boolean;
+  variants?: any[];
+  shippingZones?: any[];
+  buyingPrice?: number;
+  unitName?: string;
+  created_at?: string;
+  createdAt?: string; // mapping
   isDemo?: boolean;
-  keywords?: string[];
 }
 
 interface ProductState {
   products: Product[];
   isLoading: boolean;
   isLoaded: boolean;
-  addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => Promise<void>;
-  updateProduct: (id: string, updatedFields: Partial<Product>) => Promise<void>;
+  fetchProducts: () => Promise<void>;
+  addProduct: (product: any) => Promise<void>;
+  updateProduct: (id: string, updates: any) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   subscribe: () => () => void;
-  autoRankTrending: () => void;
-  autoRankBestSellers: () => void;
   clearDemoData: () => void;
+  autoRankTrending?: () => void;
+  autoRankBestSellers?: () => void;
 }
 
-// Global helper for spelling tolerance & auto keyword mapping
-export function generateKeywords(name: string, category: string, brand?: string, description?: string): string[] {
-  const keywords = new Set<string>();
-
-  const addPhrases = (text: string) => {
-    if (!text) return;
-    const clean = text.toLowerCase().replace(/[^\s\w\u00C0-\uFFFF-]/g, '').trim();
-    if (!clean) return;
-    
-    keywords.add(clean);
-
-    const words = clean.split(/\s+/);
-    // Add individual words if >= 3 characters (or any Bangla character representing words)
-    words.forEach(w => {
-      if (w.length >= 2) {
-        keywords.add(w);
-      }
-    });
-
-    // Add 2-word sequences (combination tags)
-    for (let i = 0; i < words.length - 1; i++) {
-      keywords.add(`${words[i]} ${words[i + 1]}`);
-    }
-    // Add 3-word sequences
-    for (let i = 0; i < words.length - 2; i++) {
-      keywords.add(`${words[i]} ${words[i + 1]} ${words[i + 2]}`);
-    }
-  };
-
-  addPhrases(name);
-  addPhrases(category);
-  if (brand) addPhrases(brand);
-  if (description) addPhrases(description);
-
-  const lowerName = name.toLowerCase();
-  const lowerCategory = category.toLowerCase();
-  const lowerDesc = (description || '').toLowerCase();
-
-  // Bidirectional Bilingual mappings
-  // 1. WATCHES
-  if (
-    lowerName.includes('watch') || lowerCategory.includes('watch') || lowerDesc.includes('watch') ||
-    lowerName.includes('ঘড়ি') || lowerName.includes('হাত ঘড়ি') || lowerName.includes('হাতঘড়ি')
-  ) {
-    ['watch', 'wrist watch', 'smart watch', 'premium watch', 'luxury watch', 'men watch', 'women watch', 'ghori', 'clock', 'timepiece', 'ঘড়ি', 'হাত ঘড়ি', 'হাতঘড়ি', 'ছেলেদের ঘড়ি', 'সস্তা ঘড়ি', 'ভালো ঘড়ি'].forEach(k => keywords.add(k));
-  }
-
-  // 2. PERFUMES
-  if (
-    lowerName.includes('perfume') || lowerCategory.includes('perfume') || lowerName.includes('fragrance') || lowerDesc.includes('scent') ||
-    lowerName.includes('সুগন্ধি') || lowerName.includes('সুগন্ধী') || lowerName.includes('পারফিউম') || lowerName.includes('আতর')
-  ) {
-    ['perfume', 'fragrance', 'scent', 'cologne', 'body spray', 'attar', 'sugondhi', 'সুগন্ধি', 'সুগন্ধী', 'পারফিউম', 'আতর', 'ভালো পারফিউম', 'সস্তা পারফিউম', 'ছেলেদের পারফিউম'].forEach(k => keywords.add(k));
-  }
-
-  // 3. WALLETS
-  if (
-    lowerName.includes('wallet') || lowerCategory.includes('wallet') || lowerName.includes('card holder') ||
-    lowerName.includes('ওয়ালেট') || lowerName.includes('মানিব্যাগ') || lowerName.includes('মানি ব্যাগ')
-  ) {
-    ['wallet', 'leather wallet', 'money bag', 'pocket book', 'card holder', 'ওয়ালেট', 'মানিব্যাগ', 'মানি ব্যাগ', 'ভার্সোটাইল ওয়ালেট'].forEach(k => keywords.add(k));
-  }
-
-  // 4. EARBUDS & HEADPHONES
-  if (
-    lowerName.includes('earbud') || lowerName.includes('headphone') || lowerCategory.includes('audio') || lowerCategory.includes('electronics') ||
-    lowerName.includes('হেডফোন') || lowerName.includes('ইয়ারবাড') || lowerName.includes('ইয়ারফোন')
-  ) {
-    ['earbud', 'earphone', 'wireless earbuds', 'bluetooth headphone', 'sound buds', 'হেডফোন', 'ইয়ারবাড', 'ইয়ারফোন', 'ভালো হেডফোন'].forEach(k => keywords.add(k));
-  }
-
-  // 5. PHONES & MOBILE
-  if (
-    lowerName.includes('phone') || lowerName.includes('mobile') || lowerCategory.includes('mobile') ||
-    lowerName.includes('মোবাইল') || lowerName.includes('ফোন') || lowerName.includes('স্মার্টফোন')
-  ) {
-    ['phone', 'mobile', 'smartphone', 'smart phone', 'cellphone', 'মোবাইল', 'ফোন', 'স্মার্টফোন', 'সস্তা মোবাইল'].forEach(k => keywords.add(k));
-  }
-
-  // 6. SHOES
-  if (
-    lowerName.includes('shoe') || lowerName.includes('sneaker') || lowerCategory.includes('shoe') ||
-    lowerName.includes('জুতা') || lowerName.includes('জুতো') || lowerName.includes('স্যান্ডেল')
-  ) {
-    ['shoe', 'shoes', 'sneakers', 'sandals', 'boots', 'জুতা', 'জুতো', 'স্যান্ডেল', 'ছেলেদের জুতা'].forEach(k => keywords.add(k));
-  }
-
-  // 7. SHIRTS & CLOTHING
-  if (
-    lowerName.includes('shirt') || lowerCategory.includes('clothing') ||
-    lowerName.includes('শার্ট') || lowerName.includes('টি-শার্ট') || lowerName.includes('টি শার্ট')
-  ) {
-    ['shirt', 'shirts', 'tshirt', 't-shirt', 'শার্ট', 'টি-শার্ট', 'টি শার্ট', 'ছেলেদের শার্ট'].forEach(k => keywords.add(k));
-  }
-
-  // 8. PANTS
-  if (
-    lowerName.includes('pant') || lowerName.includes('jeans') ||
-    lowerName.includes('প্যান্ট') || lowerName.includes('প্যান্টস')
-  ) {
-    ['pant', 'pants', 'jeans', 'trouser', 'trousers', 'প্যান্ট', 'প্যান্টস'].forEach(k => keywords.add(k));
-  }
-
-  return Array.from(keywords);
-}
-
-// Robust mapper for Product table to handle both snake_case and camelCase variants
-const mapDbToProduct = (row: any): Product => {
-  const camelRow: any = objectToCamel(row);
-
-  let parsedImages: string[] = [];
-  if (Array.isArray(camelRow.images)) {
-    parsedImages = camelRow.images;
-  } else if (typeof camelRow.images === 'string') {
-    const trimmed = camelRow.images.trim();
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          parsedImages = parsed;
-        } else {
-          parsedImages = [trimmed];
-        }
-      } catch {
-        parsedImages = trimmed.split(',').map((img: string) => img.trim()).filter(Boolean);
-      }
-    } else {
-      parsedImages = trimmed.split(',').map((img: string) => img.trim()).filter(Boolean);
-    }
-  } else if (camelRow.images) {
-    parsedImages = [String(camelRow.images)];
-  }
-
-  let parsedSeoPoints: string[] = [];
-  if (Array.isArray(camelRow.seoPoints)) {
-    parsedSeoPoints = camelRow.seoPoints;
-  } else if (typeof camelRow.seoPoints === 'string') {
-    const trimmed = camelRow.seoPoints.trim();
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          parsedSeoPoints = parsed;
-        } else {
-          parsedSeoPoints = [trimmed];
-        }
-      } catch {
-        parsedSeoPoints = trimmed.split(',').map((p: string) => p.trim()).filter(Boolean);
-      }
-    } else {
-      parsedSeoPoints = trimmed.split(',').map((p: string) => p.trim()).filter(Boolean);
-    }
-  } else if (camelRow.seoPoints) {
-    parsedSeoPoints = [String(camelRow.seoPoints)];
-  }
-
-  let parsedVariants: any[] = [];
-  if (Array.isArray(camelRow.variants)) {
-    parsedVariants = camelRow.variants;
-  } else if (typeof camelRow.variants === 'string') {
-    const trimmed = camelRow.variants.trim();
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      try {
-        parsedVariants = JSON.parse(trimmed);
-      } catch {}
-    }
-  }
-
-  let parsedShippingZones: any[] = [];
-  if (Array.isArray(camelRow.shippingZones)) {
-    parsedShippingZones = camelRow.shippingZones;
-  } else if (typeof camelRow.shippingZones === 'string') {
-    const trimmed = camelRow.shippingZones.trim();
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      try {
-        parsedShippingZones = JSON.parse(trimmed);
-      } catch {}
-    }
-  }
-
-  let parsedKeywords: string[] = [];
-  if (Array.isArray(camelRow.keywords)) {
-    parsedKeywords = camelRow.keywords;
-  } else if (typeof camelRow.keywords === 'string') {
-    const trimmed = camelRow.keywords.trim();
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          parsedKeywords = parsed;
-        } else {
-          parsedKeywords = [trimmed];
-        }
-      } catch {
-        parsedKeywords = trimmed.split(',').map((p: string) => p.trim()).filter(Boolean);
-      }
-    } else {
-      parsedKeywords = trimmed.split(',').map((p: string) => p.trim()).filter(Boolean);
-    }
-  } else if (camelRow.keywords) {
-    parsedKeywords = [String(camelRow.keywords)];
-  }
-
-  return {
-    ...camelRow,
-    id: camelRow.id || '',
-    name: camelRow.name || '',
-    sku: camelRow.sku || camelRow.skuCode || '',
-    sku_code: camelRow.skuCode || camelRow.sku || '',
-    category: camelRow.category || '',
-    price: Number(camelRow.price || 0),
-    discountPrice: camelRow.discountPrice,
-    stock: Number(camelRow.stock || 0),
-    image: camelRow.image || camelRow.imageUrl || camelRow.featuredImage || '',
-    imageUrl: camelRow.imageUrl || camelRow.image || '',
-    featured_image: camelRow.featuredImage || camelRow.image || '',
-    banner_image: camelRow.bannerImage || '',
-    images: parsedImages,
-    videoUrl: camelRow.videoUrl || camelRow.mediaUrl || '',
-    mediaUrl: camelRow.mediaUrl || camelRow.videoUrl || '',
-    rating: Number(camelRow.rating || 4.5),
-    reviews: Number(camelRow.reviews || 0),
-    isNew: camelRow.isNew !== undefined ? camelRow.isNew : true,
-    brand: camelRow.brand || '',
-    status: (camelRow.status || 'active').toLowerCase(),
-    description: camelRow.description || '',
-    createdAt: camelRow.createdAt || Date.now(),
-    buyingPrice: camelRow.buyingPrice,
-    warranty: camelRow.warranty || '',
-    unitName: camelRow.unitName,
-    soldCount: Number(camelRow.soldCount || 0),
-    productCode: camelRow.productCode || '',
-    seoPoints: parsedSeoPoints,
-    variants: parsedVariants,
-    shippingZones: parsedShippingZones,
-    is_flash_sale: camelRow.isFlashSale,
-    is_trending: camelRow.isTrending,
-    is_best_selling: camelRow.isBestSelling,
-    is_regular: camelRow.isRegular,
-    is_offer: camelRow.isOffer,
-    reward_coins: camelRow.rewardCoins,
-    coin_enabled: camelRow.coinEnabled,
-    isDemo: !!camelRow.isDemo,
-    keywords: parsedKeywords
-  };
-};
-
-// Initial state helper to read from localStorage synchronous cache
-const getCachedProducts = (): Product[] => {
-  try {
-    const cached = localStorage.getItem('supabase_cached_products');
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.warn("Failed to parse cached products from localStorage:", e);
-  }
-  return [];
-};
-
-const saveCachedProducts = (products: Product[]) => {
-  try {
-    localStorage.setItem('supabase_cached_products', JSON.stringify(products));
-  } catch (e) {
-    console.warn("Failed to save products to localStorage cache:", e);
-  }
+export const generateKeywords = (...args: string[]) => {
+  return args.filter(Boolean).map(s => s.toLowerCase()).join(', ');
 };
 
 export const useProductStore = create<ProductState>((set, get) => ({
-  products: getCachedProducts(),
+  products: [],
   isLoading: false,
-  isLoaded: getCachedProducts().length > 0,
-  autoRankTrending: () => {
-    const products = get().products;
-    const sorted = [...products].sort((a, b) => (b.reviews || 0) * (b.rating || 0) - (a.reviews || 0) * (a.rating || 0));
-    sorted.slice(0, 5).forEach(p => {
-      get().updateProduct(p.id, { is_trending: true }).catch(err => {
-        console.warn(`Auto-rank trending failed for ${p.id}`, err);
-      });
-    });
-  },
-  autoRankBestSellers: () => {
-    const products = get().products;
-    const sorted = [...products].sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
-    sorted.slice(0, 5).forEach(p => {
-      get().updateProduct(p.id, { is_best_selling: true }).catch(err => {
-        console.warn(`Auto-rank best sellers failed for ${p.id}`, err);
-      });
-    });
-  },
-  clearDemoData: () => {
-    const nonDemo = get().products.filter(p => !p.isDemo);
-    set({ products: nonDemo });
-    saveCachedProducts(nonDemo);
-  },
-  
-  addProduct: async (payload) => {
-    const supabase = getSupabase();
-    const id = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    const keywords = generateKeywords(payload.name, payload.category, payload.brand, payload.description);
-    let baseSlug = payload.slug || generateSlug(payload.name);
-    if (!baseSlug) baseSlug = "product-" + Date.now();
-    let slug = baseSlug;
-    const existingSlugs = new Set(get().products.map(p => p.slug));
-    while (existingSlugs.has(slug)) {
-      slug = baseSlug + "-" + Math.random().toString(36).substring(2, 6);
-    }
-    const newProduct: Product = {
-      ...payload,
-      id,
-      keywords,
-      slug,
-      createdAt: Date.now(),
-    };
-    
-    // Optimistic Update
-    const currentProducts = get().products;
-    const nextProducts = [...currentProducts, newProduct];
-    set({ products: nextProducts });
-    saveCachedProducts(nextProducts);
-    broadcastSync.publish('products', nextProducts);
-    
-    if (supabase) {
-      const dbPayload = objectToSnake(newProduct);
-      const { error, status, statusText } = await supabase.from('products').insert([dbPayload]);
-      if (error) {
-        // Rollback on error
-        set({ products: currentProducts });
-        saveCachedProducts(currentProducts);
-        broadcastSync.publish('products', currentProducts);
-        console.error("%c[Supabase Product Sync] INSERT ERROR:", "color: #ef4444; font-weight: bold;", {
-          code: error.code,
-          message: error.message,
-          hint: (error as any).hint,
-          details: (error as any).details,
-          httpStatus: status,
-          httpStatusText: statusText
-        });
-        
-        if (error.code === 'PGRST205') {
-          throw new Error(`Database Table Not Found [Code: ${error.code}]: The 'products' table was not found. Please ensure you have run the provisioning SQL script and clicked 'Reload Schema' in Supabase Settings.`);
-        }
-        
-        throw new Error(error.message || "Failed to add product to database");
-      }
-    }
-  },
-  
-  updateProduct: async (id, payload) => {
-    const supabase = getSupabase();
-    console.log(`[Supabase Log] Preparing to update product document: products/${id}`);
-    
-    const currentProducts = get().products;
-    const currentProduct = currentProducts.find(p => p.id === id);
-    const finalPayload = { ...payload };
+  isLoaded: false,
 
-    if (
-      payload.name !== undefined ||
-      payload.category !== undefined ||
-      payload.brand !== undefined ||
-      payload.description !== undefined
-    ) {
-      const name = payload.name !== undefined ? payload.name : (currentProduct?.name || '');
-      const category = payload.category !== undefined ? payload.category : (currentProduct?.category || '');
-      const brand = payload.brand !== undefined ? payload.brand : (currentProduct?.brand || '');
-      const description = payload.description !== undefined ? payload.description : (currentProduct?.description || '');
-      finalPayload.keywords = generateKeywords(name, category, brand, description);
-    }
-    
-    // Optimistic Update
-    const updatedProducts = currentProducts.map(p => p.id === id ? { ...p, ...finalPayload } : p);
-    set({ products: updatedProducts });
-    saveCachedProducts(updatedProducts);
-    broadcastSync.publish('products', updatedProducts);
-    
-    if (supabase) {
-      const dbPayload = objectToSnake(finalPayload);
-      const { error } = await supabase.from('products').update(dbPayload).eq('id', id);
-      if (error) {
-        // Rollback on error
-        set({ products: currentProducts });
-        saveCachedProducts(currentProducts);
-        broadcastSync.publish('products', currentProducts);
-        console.error("Supabase update error:", error);
-        throw new Error(error.message || "Failed to update product in database");
-      }
+  fetchProducts: async () => {
+    set({ isLoading: true });
+    try {
+      const res = await fetch('/api/products');
+      const data = await res.json();
+      const mapped = data.map((p: any) => ({
+        ...p,
+        id: String(p.id),
+        discountPrice: p.discount_price,
+        imageUrl: p.image,
+        featured_image: p.image,
+        createdAt: p.created_at,
+        sku_code: p.sku,
+        images: p.images || (p.image ? [p.image] : [])
+      }));
+      set({ products: mapped, isLoaded: true });
+    } catch (err) {
+      console.error("Failed to fetch products:", err);
+    } finally {
+      set({ isLoading: false });
     }
   },
-  
+
+  addProduct: async (payload) => {
+    try {
+      const res = await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        get().fetchProducts();
+      }
+    } catch (err) {
+      console.error("Failed to add product:", err);
+    }
+  },
+
+  updateProduct: async (id, updates) => {
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        get().fetchProducts();
+      }
+    } catch (err) {
+      console.error("Failed to update product:", err);
+    }
+  },
+
   deleteProduct: async (id) => {
-    const supabase = getSupabase();
-    console.log(`[Supabase Log] Preparing to delete product document: products/${id}`);
-    
-    const currentProducts = get().products;
-    const product = currentProducts.find(p => p.id === id);
-    if (product) {
-      try {
-        const urlsToDelete = new Set<string>();
-        if (product.image) urlsToDelete.add(product.image);
-        if (product.imageUrl) urlsToDelete.add(product.imageUrl);
-        if (product.featured_image) urlsToDelete.add(product.featured_image);
-        if (product.banner_image) urlsToDelete.add(product.banner_image);
-        if (product.images && Array.isArray(product.images)) {
-          product.images.forEach(img => {
-            if (img) urlsToDelete.add(img);
-          });
-        }
-        
-        // Execute background deletions securely
-        Promise.all(Array.from(urlsToDelete).map(url => deleteImage(url)))
-          .catch(err => console.warn("Failed to delete some product storage files:", err));
-      } catch (importErr) {
-        console.error("Failed to import imageUtils during deleteProduct:", importErr);
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        get().fetchProducts();
       }
-    }
-    
-    // Optimistic Update
-    const newProducts = currentProducts.filter(p => p.id !== id);
-    set({ products: newProducts });
-    saveCachedProducts(newProducts);
-    broadcastSync.publish('products', newProducts);
-    
-    if (supabase) {
-      const { error } = await supabase.from('products').delete().eq('id', id);
-      if (error) {
-        // Rollback on error
-        set({ products: currentProducts });
-        saveCachedProducts(currentProducts);
-        broadcastSync.publish('products', currentProducts);
-        console.error("Supabase delete error:", error);
-        throw new Error(error.message || "Failed to delete product from database");
-      }
+    } catch (err) {
+      console.error("Failed to delete product:", err);
     }
   },
-  
+
   subscribe: () => {
-    // Start non-blocking directly from cache
-    set({ isLoading: false });
-    const supabase = getSupabase();
-    
-    if (!supabase) {
-        set({ isLoaded: true });
-        return () => {}; // No-op if not configured
-    }
-    
-    const { url } = (window as any).getSupabaseCredentials?.() || {};
-    console.log(`[Supabase Product Sync] Querying 'products' from: ${url || 'Injected Key'}`);
-    
-    // Direct, fast asynchronous fetch from the live database
-    supabase.from('products').select('*').then(({ data, error, status, statusText }) => {
-        if (!error && data) {
-            console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products. (HTTP ${status})`, "color: #10b981; font-weight: bold;");
-            try {
-              const mapped = data.map((row, index) => {
-                try {
-                  return mapDbToProduct(row);
-                } catch (err) {
-                  console.error(`[Supabase Product Sync] Mapping failed for row index ${index}:`, row, err);
-                  throw err;
-                }
-              });
-              
-              set({ products: mapped, isLoading: false, isLoaded: true });
-              saveCachedProducts(mapped);
-            } catch (mapErr) {
-              console.error("[Supabase Product Sync] Critical mapping error:", mapErr);
-              set({ isLoaded: true });
-            }
-        } else if (error) {
-            console.error("%c[Supabase Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
-              code: error.code,
-              message: error.message,
-              hint: (error as any).hint,
-              details: (error as any).details,
-              httpStatus: status,
-              httpStatusText: statusText
-            });
-            set({ isLoaded: true });
-        }
-    }, (pErr) => {
-        console.error("[Supabase Product Sync] CONNECTION ERROR:", pErr);
-    });
- 
-    const channel = supabase
-      .channel('public:products:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
-        // Real-time synchronization
-        supabase.from('products').select('*').then(({ data, error }) => {
-            if (!error && data) {
-                const mapped = data.map(mapDbToProduct);
-                set({ products: mapped });
-                saveCachedProducts(mapped);
-                broadcastSync.publish('products', mapped);
-            }
-        });
-      })
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }
+    get().fetchProducts();
+    return () => {};
+  },
+
+  clearDemoData: () => set({ products: [] }),
+  autoRankTrending: () => {},
+  autoRankBestSellers: () => {}
 }));

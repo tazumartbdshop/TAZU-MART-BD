@@ -39,7 +39,7 @@ export default function CategoryList() {
 
   const filteredCategories = categories.filter(category => {
     const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          category.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          String(category.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
                           category.slug.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesChip = activeTab === 'All' || category.name === activeTab;
     return matchesSearch && matchesChip;
@@ -163,13 +163,13 @@ export default function CategoryList() {
                     <div>
                       <div className="flex justify-between items-start gap-2 mb-1">
                         <span className="text-[9px] font-black text-black bg-zinc-50 px-2 py-0.5 border border-black truncate">
-                          ID: {category.id.slice(0, 5)}
+                          ID: {String(category.id).slice(0, 5)}
                         </span>
                         
                         {/* Option Actions */}
                         <div className="relative">
                           <button 
-                            onClick={(e) => toggleMenu(category.id, e)}
+                            onClick={(e) => toggleMenu(String(category.id), e)}
                             className="p-1 px-1.5 text-zinc-400 hover:text-black hover:bg-zinc-50 transition-colors cursor-pointer shrink-0"
                             title="Options"
                           >

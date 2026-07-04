@@ -170,7 +170,7 @@ export default function BannerListing() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDeleteBanner(banner.id)}
+                    onClick={() => handleDeleteBanner(String(banner.id))}
                     className="px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-red-600 text-white hover:bg-red-700 transition-colors rounded-none select-none cursor-pointer"
                   >
                     Delete

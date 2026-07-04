@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { getSupabase } from '../lib/supabase';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface PaymentMethod {
@@ -52,10 +51,11 @@ export interface Customer {
 
 interface CustomerState {
   customers: Customer[];
+  isLoading: boolean;
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'isRead'> & { id?: string }) => Promise<void>;
   syncCustomerFromAuth: (user: any) => void;
   updateCustomer: (id: string, updates: Partial<Customer>) => Promise<void>;
-  deleteCustomer: (id: string) => void;
+  deleteCustomer: (id: string) => Promise<void>;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearDemoData: () => void;
@@ -64,10 +64,10 @@ interface CustomerState {
   subscribe: () => () => void;
 }
 
-export const initialDemoCustomers: Customer[] = [];
-
 export const useCustomerStore = create<CustomerState>((set, get) => ({
-  customers: initialDemoCustomers,
+  customers: [],
+  isLoading: false,
+
   addCustomer: async (customerData) => {
     try {
       const response = await fetch('/api/admin/create-customer', {
@@ -91,15 +91,15 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       throw err;
     }
   },
+
   syncCustomerFromAuth: async (user) => {
     if (!user || user.role !== 'customer') return;
     
-    // Refresh customers first to have latest state
     await get().fetchCustomers();
     
     const customers = get().customers;
     const existing = customers.find(c => 
-      c.id === user.id || 
+      c.id === String(user.id) || 
       c.email === user.email || 
       (user.phone && c.phone === user.phone)
     );
@@ -113,53 +113,34 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
         deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop'
       });
     } else {
-      // If not in customer table, create the record (Auth user already exists here)
       await get().checkAndCreateCustomerRecord(user);
     }
   },
+
   checkAndCreateCustomerRecord: async (user) => {
-    const supabase = getSupabase();
-    if (!supabase) return;
+    try {
+      const customerRecord = {
+        id: user.id,
+        name: user.name || 'New Customer',
+        email: user.email,
+        phone: user.phone || '',
+        status: 'Active',
+        customer_type: 'New',
+        created_at: new Date().toISOString()
+      };
 
-    const customerRecord = {
-      id: user.id,
-      name: user.name || 'New Customer',
-      email: user.email,
-      phone: user.phone || '',
-      address: {
-        country: user.country || 'Bangladesh',
-        city: user.city || user.district || '',
-        area: user.area || user.upazila || '',
-        street: user.address || user.street || '',
-        division: user.division || '',
-        district: user.district || '',
-        upazila: user.upazila || '',
-        zipCode: user.zipCode || ''
-      },
-      profileImage: user.profileImage,
-      gender: user.gender,
-      occasionName: user.occasionName,
-      specialDate: user.specialDate,
-      status: 'Active',
-      customerType: 'New',
-      loginProvider: user.app_metadata?.provider === 'google' ? 'Google' : 
-                     user.app_metadata?.provider === 'facebook' ? 'Facebook' : 'Email',
-      totalOrders: 0,
-      totalSpend: 0,
-      lastLogin: Date.now(),
-      lastLoginAt: new Date().toISOString(),
-      totalLogins: 1,
-      createdAt: Date.now(),
-      socialLinks: []
-    };
-
-    const { error } = await supabase.from('customers').upsert([objectToSnake(customerRecord)]);
-    if (error) {
-      console.error("[checkAndCreateCustomerRecord] Error:", error);
-    } else {
+      await fetch('/api/admin/create-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customerRecord)
+      });
+      
       await get().fetchCustomers();
+    } catch (err) {
+      console.error("[checkAndCreateCustomerRecord] Error:", err);
     }
   },
+
   updateCustomer: async (id, updates) => {
     try {
       const response = await fetch('/api/admin/update-customer', {
@@ -173,8 +154,6 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
 
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("[Store Update Customer] Non-JSON response:", text);
         throw new Error("Server returned an invalid response (HTML). Please check server logs.");
       }
 
@@ -189,6 +168,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       throw error;
     }
   },
+
   deleteCustomer: async (id) => {
     try {
       const response = await fetch('/api/admin/delete-customer', {
@@ -199,8 +179,6 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
 
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("[Store Delete Customer] Non-JSON response:", text);
         throw new Error("Server returned an invalid response (HTML). Please check server logs.");
       }
 
@@ -217,78 +195,51 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       throw error;
     }
   },
+
   markAsRead: (id) => {
-    const supabase = getSupabase();
-    if (supabase) supabase.from('customers').update({ isRead: true }).eq('id', id).then(({error}) => error && console.warn(error));
-      
     set((state) => ({
       customers: state.customers.map(c => c.id === id ? { ...c, isRead: true } : c)
     }));
   },
+
   markAllAsRead: () => {
-    const supabase = getSupabase();
-    if (supabase) {
-        get().customers.forEach((c) => {
-          if (!c.isRead) {
-            supabase.from('customers').update({ isRead: true }).eq('id', c.id).then(({error}) => error && console.warn(error));
-          }
-        });
-    }
     set((state) => ({
       customers: state.customers.map(c => ({ ...c, isRead: true }))
     }));
   },
+
   clearDemoData: () => set((state) => ({
     customers: state.customers.filter(c => !c.isDemo)
   })),
+
   fetchCustomers: async () => {
+    set({ isLoading: true });
     try {
-      console.log("[Customer Store] Fetching customers from API...");
       const response = await fetch('/api/admin/customers');
-      const contentType = response.headers.get("content-type");
-      if (response.ok && contentType?.includes("application/json")) {
+      if (response.ok) {
         const data = await response.json();
-        console.log("[Customer Store] API Response:", data);
-        if (Array.isArray(data)) {
-          set({ customers: data });
-          return;
-        } else if (data && data.customers && Array.isArray(data.customers)) {
-          set({ customers: data.customers });
-          return;
-        }
-      } else {
-        console.warn("[Customer Store] API response not OK:", response.status);
+        const customers = Array.isArray(data) ? data : (data.customers || []);
+        set({ 
+          customers: customers.map((c: any) => ({
+            ...objectToCamel(c),
+            id: String(c.id),
+            address: typeof c.address === 'string' ? JSON.parse(c.address) : (c.address || {})
+          })) 
+        });
       }
     } catch (err) {
-      console.error("[Customer Store] fetchCustomers API failed, falling back to Supabase:", err);
-    }
-
-    console.log("[Customer Store] Falling back to Supabase fetch...");
-    const supabase = getSupabase();
-    if (!supabase) {
-      console.warn("[Customer Store] Supabase client not available for fallback");
-      return;
-    }
-    
-    const { data, error } = await supabase.from('customers').select('*');
-    if (error) {
-      console.error("[Customer Store] Supabase fallback error:", error);
-    } else if (data) {
-      console.log("[Customer Store] Supabase fallback data:", data);
-      set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
+      console.error("[Customer Store] fetchCustomers failed:", err);
+    } finally {
+      set({ isLoading: false });
     }
   },
-  subscribe: () => {
-    // Initial fetch
-    get().fetchCustomers();
 
-    // Setup active polling every 5 seconds for robust real-time updates across Auth/Admin
+  subscribe: () => {
+    get().fetchCustomers();
     const interval = setInterval(() => {
       get().fetchCustomers();
-    }, 5000);
+    }, 10000); // Poll every 10s instead of 5s
       
-    return () => {
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }
 }));
