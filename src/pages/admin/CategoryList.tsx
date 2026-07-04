@@ -6,11 +6,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CategoryList() {
   const navigate = useNavigate();
-  const { categories, deleteCategory, updateCategory } = useCategoryStore();
+  const { categories, fetchCategories, deleteCategory, updateCategory } = useCategoryStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('All');
   const [openMenuCategoryId, setOpenMenuCategoryId] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   // Close dropdown menu on outside click
   useEffect(() => {
