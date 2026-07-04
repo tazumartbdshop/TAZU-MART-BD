@@ -207,7 +207,12 @@ export function CompactProductCard({ product, rank }: any) {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  addItem({ ...product, image: product.featured_image || product.image, quantity: 1 } as any);
+                  addItem({ 
+                    ...product, 
+                    slug: product.slug,
+                    image: product.imageUrl || product.featured_image || product.image, 
+                    quantity: 1 
+                  } as any);
                   toast.success("Product added to cart successfully");
                 }}
                 className="w-full py-2 bg-black hover:bg-neutral-800 text-white border border-black text-[10px] font-black uppercase tracking-wider text-center cursor-pointer transition-all"

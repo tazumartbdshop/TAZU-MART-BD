@@ -553,7 +553,7 @@ export default function Product() {
             name: cartItemName,
             price: (product.discountPrice || product.price) + extraPrice,
             originalPrice: (product.price || 0) + extraPrice,
-            image: product.imageUrl || product.image,
+            image: product.imageUrl || product.featured_image || product.image,
             slug: product.slug,
             sku: product.sku,
             quantity: 1,
@@ -607,7 +607,7 @@ export default function Product() {
       name: cartItemName,
       price: currentPrice,
       originalPrice: originalTotal,
-      image: product.imageUrl || product.image,
+      image: product.imageUrl || product.featured_image || product.image,
       slug: product.slug,
       sku: product.sku,
       quantity: quantity,
@@ -633,7 +633,7 @@ export default function Product() {
       name: cartItemName,
       price: currentPrice,
       originalPrice: originalTotal,
-      image: product.imageUrl || product.image,
+      image: product.imageUrl || product.featured_image || product.image,
       slug: product.slug,
       sku: product.sku,
       quantity: quantity,
@@ -693,8 +693,8 @@ export default function Product() {
       <div className="min-h-screen pt-24 pb-16 flex justify-center items-center text-center">
         <div className="flex flex-col items-center gap-4 text-neutral-400">
            <Box className="w-12 h-12 mb-2 opacity-50" />
-           <h2 className="text-xl font-black uppercase tracking-widest text-[#1a1a1a]">Product Not Found</h2>
-           <p className="text-sm font-medium">This product is unavailable right now.</p>
+           <h2 className="text-xl font-black uppercase tracking-widest text-[#1a1a1a]">This product is no longer available.</h2>
+           <p className="text-sm font-medium">The item you're looking for might have been removed or is temporarily unavailable.</p>
            <button onClick={() => navigate('/')} className="mt-4 bg-black text-white px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-neutral-800 transition-colors">Back to Home</button>
         </div>
       </div>

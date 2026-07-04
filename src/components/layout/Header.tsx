@@ -4,7 +4,7 @@ import {
   Search, ShoppingCart, Heart, User, Menu, X, 
   ChevronRight, Grid, ClipboardList, Bell, Tag, 
   HelpCircle, Info, Globe, Moon, Sun, LogOut, 
-  MapPin, Eye, Package, LogIn
+  MapPin, Eye, Package, LogIn, ShoppingBag
 } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
 import { useWishlistStore } from '../../store/useWishlistStore';

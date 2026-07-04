@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Package, MapPin, Truck, Phone, User, Calendar, CreditCard, CheckCircle2, Clock, AlertCircle, FileText, ChevronRight, Hash, Eye, ArrowLeft } from 'lucide-react';
 import { formatPrice, cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useOrderStore } from '../store/useOrderStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../lib/loyalty';
 
@@ -20,6 +21,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function Orders() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const { orders: storeOrders } = useOrderStore();
 
   const [searchMethod, setSearchMethod] = useState<'id' | 'phone'>('id');
@@ -56,6 +58,7 @@ export default function Orders() {
       payment: {
         method: o.paymentMethod,
         total: o.total,
+        status: o.paymentStatus
       },
       courier: {
         name: o.courier?.name || 'Pathao',
@@ -67,10 +70,21 @@ export default function Orders() {
     };
   };
 
-  // Merge dynamic state order and our initial mock orders
-  const getMergedOrders = () => {
-    return storeOrders.map(mapDynamicOrder);
-  };
+  const userOrders = useMemo(() => {
+    if (!user) return [];
+    return storeOrders
+      .filter(o => 
+        (user.phone && o.mobileNumber === user.phone) || 
+        (user.email && o.email === user.email)
+      )
+      .map(mapDynamicOrder);
+  }, [storeOrders, user]);
+
+  useEffect(() => {
+    if (user && userOrders.length > 0) {
+      setMatchingOrders(userOrders);
+    }
+  }, [user, userOrders.length]);
 
   const handleTrack = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +96,7 @@ export default function Orders() {
     setMatchingOrders([]);
 
     setTimeout(() => {
-      const allOrders = getMergedOrders();
+      const allOrders = storeOrders.map(mapDynamicOrder);
       const term = searchValue.trim().toUpperCase();
 
       if (searchMethod === 'id') {
@@ -237,10 +251,10 @@ export default function Orders() {
             >
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">
-                  Matched Account Orders ({matchingOrders.length})
+                  {user ? 'My Order History' : 'Matched Account Orders'} ({matchingOrders.length})
                 </h3>
                 <span className="text-[10px] bg-neutral-900 text-white px-2 py-0.5 rounded font-bold uppercase">
-                  Connected via key phone
+                  {user ? 'Authenticated' : 'Connected via key phone'}
                 </span>
               </div>
               
@@ -260,6 +274,12 @@ export default function Orders() {
                       <div className="flex flex-wrap gap-4 text-xs text-neutral-400 font-semibold items-center">
                         <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {ord.date}</span>
                         <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5" /> {ord.payment.method}</span>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wide border",
+                          ord.payment.status === 'Paid' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-700 border-gray-200'
+                        )}>
+                          {ord.payment.status}
+                        </span>
                         <span className="font-extrabold text-neutral-900">{formatPrice(ord.payment.total)}</span>
                       </div>
                     </div>

@@ -42,7 +42,7 @@ export default function OrderDetails() {
 
   const closeDialog = () => {
     setShowSuccessDialog(false);
-    navigate('/orders/to-review?tab=To Review');
+    navigate('/account/dashboard');
   };
 
   const closeErrorDialog = () => {
@@ -173,7 +173,7 @@ export default function OrderDetails() {
               <button
                 onClick={() => {
                   const firstItem = order.items[0];
-                  const productSlugOrId = firstItem.slug || firstItem.productId || firstItem.id;
+                  const productSlugOrId = firstItem.slug || firstItem.productId;
                   navigate(`/product/${productSlugOrId}?buyAgain=true`);
                 }}
                 className="flex-1 bg-black text-white py-3 rounded-md text-sm font-bold hover:bg-gray-900 transition-colors"

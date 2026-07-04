@@ -49,11 +49,6 @@ const darazStatusItems = [
     icon: Truck,
   },
   {
-    label: 'To Review',
-    backendStatuses: ['confirmed'],
-    icon: MessageSquare,
-  },
-  {
     label: 'Returns & Cancellations',
     backendStatuses: ['cancelled', 'returned'],
     icon: RefreshCcw,
@@ -113,7 +108,7 @@ export default function Account() {
   const handleBuyAgain = (order: any) => {
     if (!order.items || order.items.length === 0) return;
     const firstItem = order.items[0];
-    const productSlugOrId = firstItem.slug || firstItem.productId || firstItem.id;
+    const productSlugOrId = firstItem.slug || firstItem.productId;
     if (productSlugOrId) {
       navigate(`/product/${productSlugOrId}?buyAgain=true`);
     } else {
@@ -286,11 +281,7 @@ export default function Account() {
                 <button
                   key={i}
                   onClick={() => {
-                    if (item.label === 'To Review') {
-                      navigate('/orders/to-review');
-                    } else {
-                      setActiveFilter(prev => prev === item.label ? null : item.label);
-                    }
+                    setActiveFilter(prev => prev === item.label ? null : item.label);
                   }}
                   className={cn(
                     "flex flex-col items-center justify-center gap-2 px-4 py-3 border rounded-xl cursor-pointer transition-all shrink-0 min-w-[95px] relative",
@@ -369,33 +360,57 @@ export default function Account() {
                           <div>
                             <span className="text-[11px] font-black text-gray-900">#{order.orderId || order.id}</span>
                             <span className="text-[8px] text-gray-400 font-bold uppercase ml-2 select-none">
-                              {new Date(order.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                              {new Date(order.date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </div>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border",
-                            STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'
-                          )}>
-                            {order.status}
-                          </span>
+                          <div className="flex gap-2 items-center">
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wide border",
+                              order.paymentStatus === 'Paid' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-700 border-gray-200'
+                            )}>
+                              {order.paymentStatus}
+                            </span>
+                            <span className={cn(
+                              "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border",
+                              STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-800'
+                            )}>
+                              {order.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-2 rounded-lg mb-1">
+                          <div className="text-[8px] font-bold uppercase text-gray-400">
+                            Payment: <span className="text-gray-900">{order.paymentMethod}</span>
+                          </div>
+                          <div className="text-[8px] font-bold uppercase text-gray-400 text-right">
+                            Delivery: <span className="text-gray-900">{order.deliveryMode}</span>
+                          </div>
                         </div>
 
                         {/* Items list detail preview */}
                         <div className="space-y-2">
                           {order.items?.map((item, idx) => (
                             <div key={idx} className="flex items-center gap-3">
-                              {item.image && (
-                                <img 
-                                  src={item.image} 
-                                  alt={item.name} 
-                                  className="w-10 h-10 object-cover border border-gray-100"
-                                  referrerPolicy="no-referrer"
-                                />
-                              )}
+                              <div className="w-10 h-10 bg-gray-50 flex items-center justify-center border border-gray-100 overflow-hidden shrink-0">
+                                {item.image ? (
+                                  <img 
+                                    src={item.image} 
+                                    alt={item.name} 
+                                    className="w-full h-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <Package className="w-4 h-4 text-gray-300" />
+                                )}
+                              </div>
                               <div className="flex-1 min-w-0">
                                 <h5 className="text-[10px] font-bold text-gray-850 truncate">{item.name}</h5>
                                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-tight">
-                                  Qty: {item.quantity} {item.variant !== 'Default' && `• ${item.variant}`}
+                                  Qty: {item.quantity} {item.variant && item.variant !== 'Default' && `• ${item.variant}`}
+                                </p>
+                                <p className="text-[8px] font-bold text-gray-500 uppercase">
+                                  Unit Price: {formatPrice(item.price)}
                                 </p>
                               </div>
                               <span className="text-[10px] font-bold text-gray-900">{formatPrice(item.price * item.quantity)}</span>
@@ -410,8 +425,14 @@ export default function Account() {
                           </span>
                           <div className="flex gap-2">
                             <button 
-                              onClick={() => setTrackingOrder(order)}
-                              className="text-[9px] font-black bg-black text-white px-3 py-1.5 uppercase tracking-wider hover:bg-neutral-800 transition-colors cursor-pointer"
+                               onClick={() => handleBuyAgain(order)}
+                               className="text-[9px] font-black border border-gray-200 text-gray-800 px-3 py-1.5 uppercase tracking-wider hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                              Buy Again
+                            </button>
+                            <button 
+                               onClick={() => setTrackingOrder(order)}
+                               className="text-[9px] font-black bg-black text-white px-3 py-1.5 uppercase tracking-wider hover:bg-neutral-800 transition-colors cursor-pointer"
                             >
                               Track Order
                             </button>
