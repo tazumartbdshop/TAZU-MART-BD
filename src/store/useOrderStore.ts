@@ -5,6 +5,7 @@ import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface OrderItem {
   productId: string;
+  slug?: string;
   name: string;
   price: number;
   quantity: number;
@@ -428,14 +429,15 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       });
 
       console.log("[Supabase Sync] addOrderAsync cleanPayload to Supabase:", cleanPayload);
-      const { data, error } = await supabase.from('orders').insert([cleanPayload]).select();
+      // Insert without select to speed up response time
+      const { error } = await supabase.from('orders').insert([cleanPayload]);
       
       if (error) {
         console.error("[Supabase Sync] Failed to insert order into Supabase:", error);
         // throw error; // Bypassed to allow local order placement if DB is down
       }
       
-      console.log("[Supabase Sync] Order inserted successfully into orders table:", data);
+      console.log("[Supabase Sync] Order inserted successfully into orders table.");
 
       // Now attempt order items table insertion (Redundant if the on_order_sync trigger is active in Supabase, but kept for compatibility)
       try {
@@ -448,16 +450,19 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           quantity: item.quantity,
           variant: item.variant || 'Default',
           image: item.image || '',
+          slug: item.slug || '',
           created_at: now
         }));
         
         console.log("[Supabase Sync] Attempting insertion into order_items table:", orderItemsPayload);
-        const { error: itemsError } = await supabase.from('order_items').insert(orderItemsPayload);
-        if (itemsError) {
-          console.error("[Supabase Sync] Failed to insert items into order_items (Manual fallback):", itemsError);
-        } else {
-          console.log("[Supabase Sync] Order items inserted successfully into order_items table.");
-        }
+        // Fire and forget items insertion
+        supabase.from('order_items').insert(orderItemsPayload).then(({ error: itemsError }) => {
+          if (itemsError) {
+            console.error("[Supabase Sync] Failed to insert items into order_items (Manual fallback):", itemsError);
+          } else {
+            console.log("[Supabase Sync] Order items inserted successfully into order_items table.");
+          }
+        });
 
         // Update sold_count and stock for each item in Supabase
         newOrder.items.forEach(async (item) => {
@@ -684,15 +689,16 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
                // Attach actual items from order_items table
                if (itemsData) {
-                 const orderItems = itemsData.filter(item => item.order_id === parsed.orderId);
+                 const orderItems = itemsData.filter(item => item.order_id === parsed.orderId || item.order_id === parsed.id);
                  if (orderItems.length > 0) {
                    parsed.items = orderItems.map(item => ({
-                     productId: item.product_id,
-                     name: item.product_name,
-                     price: item.product_price,
-                     quantity: item.quantity,
-                     image: item.product_image,
-                     variant: 'Default'
+                     productId: item.product_id || item.productId,
+                     name: item.name || item.product_name || 'Unknown',
+                     price: item.price || item.product_price || 0,
+                     quantity: item.quantity || 1,
+                     image: item.image || item.product_image || '',
+                     variant: item.variant || 'Default',
+                     slug: item.slug || item.productId
                    }));
                  }
                }

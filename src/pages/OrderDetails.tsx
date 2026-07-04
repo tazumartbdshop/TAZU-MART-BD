@@ -98,7 +98,7 @@ export default function OrderDetails() {
                 <div key={idx} className="flex gap-3.5">
                   <div className="w-20 h-20 rounded-md bg-gray-50 flex-shrink-0 overflow-hidden border border-gray-100 flex items-center justify-center">
                     {item.image ? (
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     ) : (
                       <Package className="w-6 h-6 text-gray-300" />
                     )}

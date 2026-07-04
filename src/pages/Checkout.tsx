@@ -613,12 +613,13 @@ export default function Checkout() {
         paymentStatus: paymentS,
         type: 'Online' as 'Online',
         items: items.map(item => ({
-          productId: item.id,
+          productId: item.id.split('-')[0], // Extract base product ID
+          slug: item.slug,
           name: item.name,
           price: item.price,
           quantity: item.quantity,
-          variant: 'Default',
-          image: item.image
+          variant: item.id.includes('-') ? item.id.substring(item.id.indexOf('-') + 1) : 'Default',
+          image: item.image || ''
         })),
         subtotal: subtotal,
         discount: activePromo ? { 
