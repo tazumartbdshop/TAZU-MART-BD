@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useOrderStore } from '../store/useOrderStore';
 import { useCartStore } from '../store/useCartStore';
-import { useSettingsStore } from '../store/useSettingsStore';
-import { CheckCircle2, Package, Truck, Calendar, ShoppingBag, ArrowRight, Printer, Share2, Star, MessageCircle, Heart, Home, Receipt } from 'lucide-react';
-import { motion } from 'motion/react';
+import { useProductStore } from '../store/useProductStore';
+import { CheckCircle2, Printer, Home, HelpCircle, Package } from 'lucide-react';
+import { formatPrice } from '../lib/utils';
 
 export default function OrderSuccess() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -12,24 +12,20 @@ export default function OrderSuccess() {
   const location = useLocation();
   const { orders } = useOrderStore();
   const { clearCart } = useCartStore();
-  const { settings } = useSettingsStore();
+  const { products } = useProductStore();
 
   const stateOrder = location.state?.order;
   const order = stateOrder || orders.find(o => o.orderId === orderId);
 
   useEffect(() => {
-    // Activate dynamic live order subscriptions
     clearCart();
-    
     window.scrollTo(0, 0);
-
-    // Prevent going back to checkout page
+    // Prevent going back to checkout
     window.history.pushState(null, '', window.location.href);
     const handlePopState = () => {
       window.history.pushState(null, '', window.location.href);
       navigate('/', { replace: true });
     };
-
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
@@ -38,117 +34,231 @@ export default function OrderSuccess() {
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-6 font-sans">
-        <div className="text-center space-y-6 max-w-sm w-full">
-          <div className="w-20 h-20 bg-neutral-50 rounded-full flex items-center justify-center mx-auto">
-            <div className="w-8 h-8 border-3 border-neutral-900 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <div className="space-y-2">
-            <h2 className="text-xl font-black uppercase tracking-tight text-neutral-900">Finding Your Order</h2>
-            <p className="text-sm text-neutral-500 font-medium">Retrieving your secure checkout details. Please wait a moment.</p>
-          </div>
+      <div className="min-h-screen bg-white flex items-center justify-center p-6">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <h2 className="text-[16px] font-bold text-black uppercase tracking-widest">Finding Order</h2>
           <button 
             onClick={() => navigate('/')}
-            className="w-full h-14 bg-neutral-900 text-white rounded-2xl font-black uppercase text-[11px] tracking-widest hover:bg-neutral-800 transition-all active:scale-95 shadow-lg shadow-neutral-200"
+            className="mt-6 px-8 py-3 bg-black text-white font-bold text-[14px] rounded-[6px]"
           >
-            Go to Homepage
+            Go Home
           </button>
         </div>
       </div>
     );
   }
 
-  const formatPrice = (price: number) => `৳${price.toLocaleString()}`;
-  
+  // Related products
+  const recommendedProducts = products.filter(p => p.status === 'active').slice(0, 4);
+  const discountAmount = typeof order.discount === 'number' ? order.discount : (order.discount?.amount || 0);
+
   return (
-    <div className="min-h-screen bg-[#FDFDFD] flex items-center justify-center p-4 md:p-8 font-sans selection:bg-neutral-900 selection:text-white text-neutral-900">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-lg w-full bg-white rounded-[40px] border border-neutral-100 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.08)] overflow-hidden"
-      >
-        {/* Success Header */}
-        <div className="p-8 md:p-10 text-center space-y-6">
-          <motion.div 
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.1 }}
-            className="w-20 h-20 bg-emerald-500 rounded-[28px] flex items-center justify-center mx-auto shadow-2xl shadow-emerald-200"
-          >
-            <CheckCircle2 className="w-10 h-10 text-white" />
-          </motion.div>
+    <div className="min-h-screen bg-white font-sans text-black pb-24">
+      {/* Top Section */}
+      <div className="container mx-auto max-w-4xl px-4 pt-16 pb-12 text-center border-b border-[#E5E5E5]">
+        <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-6" />
+        <h1 className="text-[32px] md:text-[40px] font-bold uppercase tracking-tight mb-4">Order Confirmed</h1>
+        <p className="text-[14px] text-[#666666] max-w-lg mx-auto">
+          Your order has been placed successfully. We have received your order and it is now being processed.
+        </p>
+      </div>
 
-          <div className="space-y-2">
-            <motion.h1 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="text-2xl md:text-3xl font-black text-neutral-950 uppercase tracking-tighter"
-            >
-              Order Placed Successfully!
-            </motion.h1>
-            <motion.p 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="text-neutral-500 text-sm md:text-base max-w-xs mx-auto leading-relaxed font-medium"
-            >
-              Thank you for your purchase. Your order has been received and is being processed.
-            </motion.p>
-          </div>
-
-          {/* Order Summary Card */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.5 }}
-            className="bg-neutral-50 border border-neutral-200 rounded-3xl p-6 text-left space-y-4"
-          >
-            <div className="flex justify-between items-center pb-3 border-b border-neutral-200/60">
-              <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Order ID</span>
-              <span className="text-sm font-black text-neutral-900">#{order.orderId}</span>
+      <div className="container mx-auto max-w-4xl px-4 py-12 space-y-12">
+        {/* Order Information Section - Two Column Table */}
+        <div className="space-y-4">
+          <h2 className="text-[18px] font-bold uppercase tracking-wider mb-6">Order Information</h2>
+          <div className="border border-[#E5E5E5] rounded-[6px] overflow-hidden">
+            <div className="grid grid-cols-1 md:grid-cols-2">
+              <div className="flex border-b md:border-b-0 md:border-r border-[#E5E5E5]">
+                <div className="w-1/3 bg-[#F9F9F9] p-4 text-[13px] font-bold text-[#666666] border-r border-[#E5E5E5]">Order ID</div>
+                <div className="w-2/3 p-4 text-[14px] font-medium">{order.orderId}</div>
+              </div>
+              <div className="flex border-b border-[#E5E5E5]">
+                <div className="w-1/3 bg-[#F9F9F9] p-4 text-[13px] font-bold text-[#666666] border-r border-[#E5E5E5]">Order Date</div>
+                <div className="w-2/3 p-4 text-[14px] font-medium">
+                  {new Date(order.date).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
+              </div>
+              <div className="flex border-b md:border-b-0 md:border-r border-[#E5E5E5]">
+                <div className="w-1/3 bg-[#F9F9F9] p-4 text-[13px] font-bold text-[#666666] border-r border-[#E5E5E5]">Customer</div>
+                <div className="w-2/3 p-4 text-[14px] font-medium">{order.customerName}</div>
+              </div>
+              <div className="flex border-b border-[#E5E5E5]">
+                <div className="w-1/3 bg-[#F9F9F9] p-4 text-[13px] font-bold text-[#666666] border-r border-[#E5E5E5]">Phone</div>
+                <div className="w-2/3 p-4 text-[14px] font-medium">{order.mobileNumber}</div>
+              </div>
+              <div className="flex border-b md:border-b-0 md:border-r border-[#E5E5E5]">
+                <div className="w-1/3 bg-[#F9F9F9] p-4 text-[13px] font-bold text-[#666666] border-r border-[#E5E5E5]">Address</div>
+                <div className="w-2/3 p-4 text-[14px] font-medium">{order.fullAddress}</div>
+              </div>
+              <div className="flex border-b border-[#E5E5E5]">
+                <div className="w-1/3 bg-[#F9F9F9] p-4 text-[13px] font-bold text-[#666666] border-r border-[#E5E5E5]">Payment Method</div>
+                <div className="w-2/3 p-4 text-[14px] font-medium uppercase">{order.paymentMethod}</div>
+              </div>
+              <div className="flex border-b md:border-b-0 md:border-r border-[#E5E5E5]">
+                <div className="w-1/3 bg-[#F9F9F9] p-4 text-[13px] font-bold text-[#666666] border-r border-[#E5E5E5]">Payment Status</div>
+                <div className="w-2/3 p-4 text-[14px] font-medium">{order.paymentStatus}</div>
+              </div>
+              <div className="flex border-b border-[#E5E5E5]">
+                <div className="w-1/3 bg-[#F9F9F9] p-4 text-[13px] font-bold text-[#666666] border-r border-[#E5E5E5]">Order Status</div>
+                <div className="w-2/3 p-4 text-[14px] font-medium">{order.status}</div>
+              </div>
+              <div className="flex border-b-0 md:border-r border-[#E5E5E5] md:col-span-2">
+                <div className="w-1/3 md:w-1/6 bg-[#F9F9F9] p-4 text-[13px] font-bold text-[#666666] border-r border-[#E5E5E5]">Est. Delivery</div>
+                <div className="w-2/3 md:w-5/6 p-4 text-[14px] font-medium">3 - 5 Business Days</div>
+              </div>
             </div>
-            <div className="flex justify-between items-center pb-3 border-b border-neutral-200/60">
-              <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Customer</span>
-              <span className="text-sm font-bold text-neutral-900 uppercase truncate max-w-[180px]">{order.customerName}</span>
-            </div>
-            <div className="flex justify-between items-center pb-3 border-b border-neutral-200/60">
-              <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Date</span>
-              <span className="text-sm font-bold text-neutral-900">{new Date(order.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-            </div>
-            <div className="flex justify-between items-center pb-3 border-b border-neutral-200/60">
-              <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Payment</span>
-              <span className="text-sm font-bold text-neutral-900 uppercase">{order.paymentMethod}</span>
-            </div>
-            <div className="flex justify-between items-center pb-3 border-b border-neutral-200/60">
-              <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Status</span>
-              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase rounded">{order.status}</span>
-            </div>
-            <div className="flex justify-between items-center pt-2">
-              <span className="text-[11px] font-black text-neutral-950 uppercase tracking-widest">Total Amount</span>
-              <span className="text-xl font-black text-neutral-950">{formatPrice(order.total)}</span>
-            </div>
-          </motion.div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-row items-center justify-center gap-3 pt-2">
-            <button 
-              onClick={() => navigate('/')}
-              className="flex-1 h-14 bg-neutral-100 hover:bg-neutral-200 text-neutral-900 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
-            >
-              <Home className="w-4 h-4" />
-              Home
-            </button>
-            <button 
-              onClick={() => navigate(`/checkout/invoice/${order.orderId}`)}
-              className="flex-1 h-14 bg-neutral-900 hover:bg-neutral-800 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 shadow-xl shadow-neutral-200 flex items-center justify-center gap-2"
-            >
-              <Receipt className="w-4 h-4" />
-              View Invoice
-            </button>
           </div>
         </div>
-      </motion.div>
+
+        {/* Order Timeline */}
+        <div className="space-y-6 hidden sm:block">
+          <h2 className="text-[18px] font-bold uppercase tracking-wider">Order Timeline</h2>
+          <div className="border border-[#E5E5E5] rounded-[6px] p-8 flex justify-between relative">
+            <div className="absolute top-[45px] left-[10%] right-[10%] h-[2px] bg-[#E5E5E5] -z-10"></div>
+            
+            <div className="flex flex-col items-center gap-3 bg-white px-2">
+              <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <span className="text-[12px] font-bold text-center">Confirmed</span>
+            </div>
+            
+            <div className="flex flex-col items-center gap-3 bg-white px-2">
+              <div className="w-8 h-8 rounded-full border-2 border-[#E5E5E5] bg-white flex items-center justify-center text-[#E5E5E5]">
+                <Package className="w-4 h-4" />
+              </div>
+              <span className="text-[12px] font-bold text-[#666666] text-center">Preparing</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 bg-white px-2">
+              <div className="w-8 h-8 rounded-full border-2 border-[#E5E5E5] bg-white flex items-center justify-center text-[#E5E5E5]">
+                <Package className="w-4 h-4" />
+              </div>
+              <span className="text-[12px] font-bold text-[#666666] text-center">Ready</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 bg-white px-2">
+              <div className="w-8 h-8 rounded-full border-2 border-[#E5E5E5] bg-white flex items-center justify-center text-[#E5E5E5]">
+                <Package className="w-4 h-4" />
+              </div>
+              <span className="text-[12px] font-bold text-[#666666] text-center">Out for Delivery</span>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 bg-white px-2">
+              <div className="w-8 h-8 rounded-full border-2 border-[#E5E5E5] bg-white flex items-center justify-center text-[#E5E5E5]">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <span className="text-[12px] font-bold text-[#666666] text-center">Delivered</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Product Summary */}
+        <div className="space-y-6">
+          <h2 className="text-[18px] font-bold uppercase tracking-wider">Product Summary</h2>
+          <div className="space-y-4">
+            {order.items.map((item: any, index: number) => (
+              <div key={index} className="border border-[#E5E5E5] rounded-[6px] p-4 flex flex-col sm:flex-row items-center gap-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                <div className="w-24 h-24 shrink-0 bg-[#F9F9F9] rounded-[4px] border border-[#E5E5E5] overflow-hidden flex items-center justify-center">
+                  <img src={item.image} alt={item.name} className="w-full h-full object-contain" />
+                </div>
+                <div className="flex-1 space-y-1 w-full text-center sm:text-left">
+                  <h3 className="text-[16px] font-bold leading-tight">{item.name}</h3>
+                  {item.variant && item.variant !== 'Default' && (
+                     <p className="text-[13px] text-[#666666]">Variant: {item.variant}</p>
+                  )}
+                  <p className="text-[13px] text-[#666666]">Unit Price: {formatPrice(item.price)}</p>
+                </div>
+                <div className="flex flex-col items-center sm:items-end w-full sm:w-auto border-t sm:border-t-0 pt-4 sm:pt-0 border-[#E5E5E5]">
+                  <p className="text-[12px] text-[#666666] mb-1">Quantity: {item.quantity}</p>
+                  <p className="text-[18px] font-bold">{formatPrice(item.price * item.quantity)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Pricing Summary */}
+        <div className="border border-[#E5E5E5] rounded-[6px] p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] max-w-md ml-auto">
+           <h3 className="text-[16px] font-bold uppercase tracking-wider mb-4 border-b border-[#E5E5E5] pb-2">Order Summary</h3>
+           <div className="space-y-3 text-[14px]">
+             <div className="flex justify-between">
+               <span className="text-[#666666]">Subtotal</span>
+               <span className="font-bold">{formatPrice(order.subtotal || (order.total - (order.deliveryCharge || 0) + discountAmount))}</span>
+             </div>
+             <div className="flex justify-between">
+               <span className="text-[#666666]">Shipping Charge</span>
+               <span className="font-bold">{formatPrice(order.deliveryCharge || 0)}</span>
+             </div>
+             {discountAmount > 0 && (
+               <div className="flex justify-between text-black">
+                 <span className="text-[#666666]">Discount</span>
+                 <span className="font-bold">- {formatPrice(discountAmount)}</span>
+               </div>
+             )}
+             {order.promoCodeUsed && (
+               <div className="flex justify-between text-black">
+                 <span className="text-[#666666]">Coupon Discount ({order.promoCodeUsed})</span>
+                 <span className="font-bold">- {formatPrice(discountAmount)}</span>
+               </div>
+             )}
+             <div className="flex justify-between text-[18px] font-bold pt-4 border-t border-[#E5E5E5] mt-2">
+               <span>Grand Total</span>
+               <span>{formatPrice(order.total)}</span>
+             </div>
+           </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap justify-center gap-4 pt-8 border-t border-[#E5E5E5]">
+          <button 
+            onClick={() => navigate(`/checkout/invoice/${order.orderId}`)}
+            className="flex items-center gap-2 px-6 py-3 bg-black text-white text-[13px] font-bold uppercase tracking-wider rounded-[6px] hover:bg-[#222222] transition-colors"
+          >
+            <Printer className="w-4 h-4" /> Download Invoice
+          </button>
+          <button 
+            onClick={() => navigate('/orders')}
+            className="flex items-center gap-2 px-6 py-3 bg-white text-black border border-[#E5E5E5] text-[13px] font-bold uppercase tracking-wider rounded-[6px] hover:bg-[#F9F9F9] transition-colors"
+          >
+            <Package className="w-4 h-4" /> Track Order
+          </button>
+          <button 
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 px-6 py-3 bg-white text-black border border-[#E5E5E5] text-[13px] font-bold uppercase tracking-wider rounded-[6px] hover:bg-[#F9F9F9] transition-colors"
+          >
+            <Home className="w-4 h-4" /> Go to Home
+          </button>
+          <button 
+            onClick={() => navigate('/support')}
+            className="flex items-center gap-2 px-6 py-3 bg-white text-black border border-[#E5E5E5] text-[13px] font-bold uppercase tracking-wider rounded-[6px] hover:bg-[#F9F9F9] transition-colors"
+          >
+            <HelpCircle className="w-4 h-4" /> Contact Support
+          </button>
+        </div>
+
+        {/* Recommended Products */}
+        {recommendedProducts.length > 0 && (
+          <div className="pt-16">
+            <h2 className="text-[20px] font-bold uppercase tracking-wider text-center mb-8">Recommended for you</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {recommendedProducts.map(product => (
+                <Link key={product.id} to={`/product/${product.slug || product.id}`} className="group block border border-[#E5E5E5] rounded-[6px] p-4 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)] transition-all bg-white">
+                  <div className="w-full aspect-square bg-[#F9F9F9] rounded-[4px] border border-[#E5E5E5] mb-4 flex items-center justify-center overflow-hidden">
+                    <img src={product.image} alt={product.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
+                  </div>
+                  <h3 className="text-[14px] font-bold line-clamp-1 mb-1">{product.name}</h3>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="text-[14px] font-bold">{formatPrice(product.price)}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
