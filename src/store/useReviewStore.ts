@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../supabaseClient';
 import { toast } from 'react-hot-toast';
 
 export interface ProductReview {
@@ -6,13 +7,15 @@ export interface ProductReview {
   productId: string;
   customerId: string;
   customerName: string;
-  rating: number;
+  rating: number; // 1 to 5
   reviewText: string;
-  mediaUrls: string[];
+  mediaUrls: string[]; // JPG, PNG, WEBP, MP4
   adminReply?: string;
   status: 'pending' | 'approved' | 'hidden' | 'rejected';
   verified: boolean;
-  createdAt: string;
+  createdAt: string; // ISO String
+  
+  // Extra detailed metadata requested
   phone?: string;
   email?: string;
   orderId?: string;
@@ -34,9 +37,11 @@ interface ReviewState {
   reviews: ProductReview[];
   notifications: ReviewNotification[];
   isLoading: boolean;
+  
+  // Actions
   fetchReviews: (silent?: boolean) => Promise<void>;
-  addReview: (review: any) => Promise<void>;
-  updateReview: (reviewId: string, updates: any) => Promise<void>;
+  addReview: (review: Omit<ProductReview, 'reviewId' | 'createdAt' | 'status'> & { status?: 'pending' | 'approved' | 'hidden' | 'rejected', createdAt?: string }) => Promise<void>;
+  updateReview: (reviewId: string, updates: Partial<Omit<ProductReview, 'reviewId' | 'productId' | 'customerId' | 'createdAt'>>) => Promise<void>;
   approveReview: (reviewId: string) => Promise<void>;
   hideReview: (reviewId: string) => Promise<void>;
   rejectReview: (reviewId: string, reason?: string) => Promise<void>;
@@ -56,16 +61,21 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   fetchReviews: async (silent = false) => {
     if (!silent) set({ isLoading: true });
     try {
-      const res = await fetch('/api/reviews');
-      const data = await res.json();
-      const mapped = data.map((r: any) => ({
-        reviewId: String(r.id),
-        productId: String(r.product_id),
-        customerId: String(r.user_id),
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedReviews: ProductReview[] = (data || []).map(r => ({
+        reviewId: r.id,
+        productId: r.product_id,
+        customerId: r.user_id,
         customerName: r.customer_name,
         rating: r.rating,
         reviewText: r.review_text,
-        mediaUrls: typeof r.media_urls === 'string' ? JSON.parse(r.media_urls) : (r.media_urls || []),
+        mediaUrls: r.media_urls || [],
         adminReply: r.admin_reply,
         status: r.status,
         verified: r.verified,
@@ -74,91 +84,153 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         email: r.email,
         orderId: r.order_id,
         deviceIP: r.device_ip,
-        anonymous: !!r.anonymous,
-        isPinned: !!r.is_pinned,
+        anonymous: r.anonymous,
+        isPinned: r.is_pinned,
         rejectionReason: r.rejection_reason
       }));
-      set({ reviews: mapped, isLoading: false });
-    } catch (error) {
+
+      set({ reviews: formattedReviews, isLoading: false });
+    } catch (error: any) {
       console.error('Error fetching reviews:', error);
+      if (!silent) toast.error('Failed to load reviews');
       set({ isLoading: false });
     }
   },
 
   addReview: async (newRev) => {
     try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productId: newRev.productId,
-          userId: newRev.customerId,
-          customerName: newRev.customerName,
-          rating: newRev.rating,
-          reviewText: newRev.reviewText,
-          mediaUrls: newRev.mediaUrls,
-          status: newRev.status || 'pending',
-          verified: newRev.verified
-        })
-      });
-      if (res.ok) {
-        get().fetchReviews(true);
-        toast.success('Review submitted successfully');
+      // 1. Basic Validation
+      if (!newRev.rating) {
+        throw new Error('Rating is required.');
       }
-    } catch (error) {
+
+      if (!newRev.reviewText || newRev.reviewText.trim().length === 0) {
+        throw new Error('Review text is required.');
+      }
+
+      // 2. Direct Supabase Insertion
+      const { data, error: insertError } = await supabase
+        .from('reviews')
+        .insert([{
+          product_id: newRev.productId,
+          user_id: String(newRev.customerId || 'anonymous'),
+          customer_name: String(newRev.customerName || 'Anonymous'),
+          rating: Number(newRev.rating),
+          review_text: String(newRev.reviewText),
+          status: newRev.status || 'approved',
+          media_urls: Array.isArray(newRev.mediaUrls) ? newRev.mediaUrls : [],
+          verified: newRev.verified ?? true,
+          phone: newRev.phone ? String(newRev.phone) : null,
+          email: newRev.email ? String(newRev.email) : null,
+          order_id: newRev.orderId ? String(newRev.orderId) : null,
+          device_ip: newRev.deviceIP,
+          anonymous: !!newRev.anonymous,
+          is_pinned: false,
+          created_at: newRev.createdAt || new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("Supabase insert error:", insertError);
+        throw new Error(`Database Error: ${insertError.message}`);
+      }
+
+      const insertedData = data;
+
+      // 3. Update local state
+      const addedReview: ProductReview = {
+        reviewId: insertedData.id,
+        productId: newRev.productId,
+        customerId: newRev.customerId || 'anonymous',
+        customerName: newRev.customerName || 'Anonymous',
+        rating: newRev.rating,
+        reviewText: newRev.reviewText,
+        mediaUrls: newRev.mediaUrls || [],
+        status: newRev.status || 'approved',
+        verified: newRev.verified ?? true,
+        createdAt: newRev.createdAt || new Date().toISOString(),
+        phone: newRev.phone,
+        email: newRev.email,
+        orderId: newRev.orderId,
+        deviceIP: newRev.deviceIP,
+        anonymous: newRev.anonymous,
+        isPinned: false
+      };
+
+      set((state) => ({
+        reviews: [addedReview, ...state.reviews]
+      }));
+
+    } catch (error: any) {
       console.error('addReview error:', error);
-      toast.error('Failed to submit review');
+      throw error;
     }
   },
 
   updateReview: async (id, updates) => {
     try {
-      const res = await fetch(`/api/admin/reviews/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      });
-      if (res.ok) {
-        get().fetchReviews(true);
-      }
-    } catch (error) {
+      const dbUpdates: any = {};
+      if (updates.status) dbUpdates.status = updates.status;
+      if (updates.adminReply !== undefined) dbUpdates.admin_reply = updates.adminReply;
+      if (updates.isPinned !== undefined) dbUpdates.is_pinned = updates.isPinned;
+      if (updates.verified !== undefined) dbUpdates.verified = updates.verified;
+      if (updates.rejectionReason !== undefined) dbUpdates.rejection_reason = updates.rejectionReason;
+      if (updates.customerName) dbUpdates.customer_name = updates.customerName;
+      if (updates.reviewText) dbUpdates.review_text = updates.reviewText;
+      if (updates.rating) dbUpdates.rating = updates.rating;
+
+      const { error } = await supabase
+        .from('reviews')
+        .update(dbUpdates)
+        .eq('id', id);
+
+      if (error) throw error;
+      await get().fetchReviews();
+    } catch (error: any) {
       console.error('Error updating review:', error);
+      toast.error('Failed to update review');
     }
   },
 
   approveReview: async (id) => {
     await get().updateReview(id, { status: 'approved' });
-    toast.success('Review approved');
+    toast.success('Review approved and published');
   },
 
   hideReview: async (id) => {
     await get().updateReview(id, { status: 'hidden' });
-    toast.success('Review hidden');
+    toast.success('Review hidden from public');
   },
 
   rejectReview: async (id, reason) => {
-    await get().updateReview(id, { status: 'rejected', rejection_reason: reason });
+    await get().updateReview(id, { status: 'rejected', rejectionReason: reason });
     toast.success('Review rejected');
   },
 
   deleteReview: async (id) => {
     try {
-      const res = await fetch(`/api/admin/reviews/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        set((state) => ({
-          reviews: state.reviews.filter((r) => r.reviewId !== id)
-        }));
-        toast.success('Review deleted');
-      }
-    } catch (error) {
+      const { error } = await supabase
+        .from('reviews')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      set((state) => ({
+        reviews: state.reviews.filter((r) => r.reviewId !== id)
+      }));
+      toast.success('Review deleted permanently');
+    } catch (error: any) {
       console.error('Error deleting review:', error);
+      toast.error('Failed to delete review');
     }
   },
 
   pinReview: async (id) => {
     const review = get().reviews.find(r => r.reviewId === id);
     if (review) {
-      await get().updateReview(id, { is_pinned: !review.isPinned });
+      await get().updateReview(id, { isPinned: !review.isPinned });
+      toast.success(review.isPinned ? 'Review unpinned' : 'Review pinned');
     }
   },
 
@@ -167,13 +239,18 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   },
 
   replyToReview: async (id, reply) => {
-    await get().updateReview(id, { admin_reply: reply });
+    await get().updateReview(id, { adminReply: reply });
+    toast.success('Reply saved');
   },
 
-  clearNotifications: () => set({ notifications: [] }),
+  clearNotifications: () => {
+    set({ notifications: [] });
+  },
+
   markNotificationsAsRead: () => {
     set((state) => ({
       notifications: state.notifications.map(n => ({ ...n, read: true }))
     }));
   }
 }));
+

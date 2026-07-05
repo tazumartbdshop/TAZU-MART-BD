@@ -8,6 +8,7 @@ import { useBrandingStore } from '../store/useBrandingStore';
 import { useWebsitesStore } from '../store/useWebsitesStore';
 import { useModeratorStore } from '../store/useModeratorStore';
 import { useLoginHistoryStore } from '../store/useLoginHistoryStore';
+import { getSupabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { pixelService } from '../utils/pixelService';
 import { getProviderIcon } from '../components/ProviderIcon';
@@ -55,8 +56,18 @@ export default function Login() {
     try {
       setOauthLoading(providerId);
       setError('');
-      // Standard message informing user to login via email/phone
-      throw new Error("Social login is currently disabled. Please sign in using your Email or Mobile Number.");
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Database connection not ready.");
+
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: providerId as any,
+        options: {
+          redirectTo: `${window.location.origin}/account/dashboard`,
+        }
+      });
+
+      if (authError) throw new Error(authError.message);
+      
     } catch (err: any) {
       console.error(`${providerId} login error:`, err);
       setError(err.message || `Failed to sign in with ${providerId}`);
@@ -77,52 +88,140 @@ export default function Login() {
 
     try {
       const normalizedIdentifier = identifier.toLowerCase().trim();
-      
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: normalizedIdentifier,
-          password: password
-        })
-      });
+      const isEmail = normalizedIdentifier.includes('@');
+      const supabase = getSupabase();
 
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed. Please check your credentials.');
+      if (!supabase) {
+        throw new Error("Database connection not ready.");
       }
 
-      if (data.status === 'success' && data.user) {
-        const loggedUser = data.user;
-        const userData = {
-          id: String(loggedUser.id),
-          uuid: loggedUser.uuid,
-          name: loggedUser.name || 'User',
-          email: loggedUser.email || '',
-          role: (loggedUser.role || 'customer') as any,
-          phone: loggedUser.phone || '',
-          profileImage: loggedUser.profile_image || '',
-          status: loggedUser.status || 'Active'
-        };
+      // 1. Check Dynamic Website Admin
+      if (isEmail) {
+        const websites = useWebsitesStore.getState().websites;
+        const matchedSite = websites.find(w => w.admin_email.toLowerCase().trim() === normalizedIdentifier && w.admin_password === password);
+        
+        if (matchedSite) {
+           useLoginHistoryStore.getState().addLoginEvent({
+              name: matchedSite.website_name + ' Admin',
+              email: matchedSite.admin_email,
+              method: 'Manual Login',
+              password: password,
+            });
 
-        login(userData, data.token);
+            login({
+              id: `site_admin_${matchedSite.domain}`,
+              name: matchedSite.website_name + ' Admin',
+              email: matchedSite.admin_email,
+              role: 'admin',
+              permissions: ['all']
+            });
 
-        useLoginHistoryStore.getState().addLoginEvent({
-          name: userData.name,
-          email: userData.email,
-          method: 'Manual Login',
-          password: '••••••••',
+            navigate(`/site-admin/${matchedSite.domain}`);
+            return;
+        }
+
+        // 2. Check Super Admin
+        if (normalizedIdentifier === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+            useLoginHistoryStore.getState().addLoginEvent({
+              name: 'Super Admin',
+              email: ADMIN_EMAIL,
+              method: 'Manual Login',
+              password: password,
+            });
+
+            login({
+              id: 'super_admin_id',
+              name: 'Super Admin',
+              email: ADMIN_EMAIL,
+              role: 'admin',
+              permissions: ['all']
+            });
+
+            navigate('/admin');
+            return;
+        }
+
+        // 3. Check Moderator
+        const moderator = useModeratorStore.getState().getModeratorByEmail(normalizedIdentifier);
+        if (moderator && moderator.password === password && moderator.status === 'Active') {
+            useLoginHistoryStore.getState().addLoginEvent({
+              name: moderator.name,
+              email: moderator.email,
+              method: 'Manual Login',
+              password: password,
+            });
+
+            login({
+              id: `moderator_${moderator.id}`,
+              name: moderator.name,
+              email: moderator.email,
+              role: 'admin',
+              permissions: moderator.permissions
+            });
+
+            navigate('/admin');
+            return;
+        }
+      }
+
+      // 4. Regular Customer Login via Supabase Auth
+      if (isEmail) {
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+          email: normalizedIdentifier,
+          password: password,
         });
 
-        if (userData.role === 'admin') {
-          navigate(adminFrom, { replace: true });
-        } else {
-          navigate(from, { replace: true });
+        if (authError) {
+          throw new Error(authError.message);
         }
-        return;
+
+        if (data.user) {
+          // Fetch user details from 'users' table
+          const { data: dbUser } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+          
+          const userData = {
+            id: data.user.id,
+            name: dbUser?.name || data.user.user_metadata?.name || 'Customer',
+            email: data.user.email!,
+            role: 'customer' as const,
+            phone: dbUser?.phone || data.user.user_metadata?.phone || '',
+            profileImage: dbUser?.profileImage || data.user.user_metadata?.profileImage || '',
+          };
+
+          login(userData);
+          pixelService.trackLogin(data.user.id);
+          navigate('/account/dashboard');
+          return;
+        }
       } else {
-        throw new Error('Invalid login response from server');
+        // Phone number based login (Check database manually as Supabase Auth usually requires email)
+        const { data: phoneUser, error: phoneError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('phone', normalizedIdentifier)
+          .eq('password', password)
+          .limit(1)
+          .single();
+
+        if (phoneError || !phoneUser) {
+          throw new Error("Invalid phone number or password");
+        }
+
+        const userData = {
+          id: phoneUser.id,
+          name: phoneUser.name,
+          email: phoneUser.email || '',
+          role: 'customer' as const,
+          phone: phoneUser.phone,
+          profileImage: phoneUser.profileImage || '',
+        };
+
+        login(userData);
+        pixelService.trackLogin(phoneUser.id);
+        navigate('/account/dashboard');
+        return;
       }
+
     } catch (err: any) {
       console.error("Login Error:", err);
       setError(err.message || 'Login failed. Please check your credentials.');

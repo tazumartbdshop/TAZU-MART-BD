@@ -13,25 +13,9 @@ export const useWishlistStore = create<WishlistState>()(
     (set, get) => ({
       wishlistIds: [],
 
-      toggleWishlist: async (productId) => {
-        const { user } = (await import('./useAuthStore')).useAuthStore.getState();
-        const exists = get().wishlistIds.includes(productId);
-
-        if (user) {
-          if (exists) {
-            await fetch(`/api/wishlist?userId=${user.id}&productId=${productId}`, {
-              method: 'DELETE'
-            });
-          } else {
-            await fetch('/api/wishlist', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ userId: user.id, productId })
-            });
-          }
-        }
-
+      toggleWishlist: (productId) => {
         set((state) => {
+          const exists = state.wishlistIds.includes(productId);
           const updated = exists
             ? state.wishlistIds.filter((id) => id !== productId)
             : [...state.wishlistIds, productId];

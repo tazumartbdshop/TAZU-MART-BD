@@ -6,6 +6,7 @@ import {
   User, CheckCircle, AlertCircle, Loader2, Sparkles,
   Map, Hash, Activity
 } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 import { useSupportStore } from '../../store/useSupportStore';
 import { useCustomerStore } from '../../store/useCustomerStore';
 import { toast } from 'react-hot-toast';
@@ -54,28 +55,91 @@ export default function AdminCustomerProfile() {
     if (id) {
       fetchCustomerData();
     }
-  }, [id]);
+  }, [id, customers]);
 
   const fetchCustomerData = async () => {
     try {
-      setLoading(true);
+      if (!customer) setLoading(true);
       setError(null);
 
-      const res = await fetch(`/api/admin/customers/${id}`);
-      if (!res.ok) throw new Error('Customer not found');
-      const customerData = await res.json();
+      // 1. Fetch customer identity
+      let data = null;
+      try {
+        const { data: dbData, error: fetchError } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', id)
+          .maybeSingle();
+        if (!fetchError && dbData) {
+          data = dbData;
+        }
+      } catch (err) {
+        console.warn('Could not fetch from customers table, falling back to store:', err);
+      }
+      
+      const storeCustomer = customers.find(c => c.id === id);
+      const customerData = data || storeCustomer;
+
+      if (!customerData) {
+        setError('Customer not found');
+        return;
+      }
+
+      // 2. Fetch total reviews count
+      const { count: reviewCount } = await supabase
+        .from('reviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', id);
+
+      // 3. Fetch last order date (querying by email or phone if user_id link is weak)
+      let lastOrderDate = null;
+      try {
+        const orConditions = [];
+        const email = customerData.email || customerData.emails?.[0];
+        const phone = customerData.phone || customerData.phones?.[0];
+        
+        if (email) orConditions.push(`email.eq.${email}`);
+        if (phone) orConditions.push(`mobile_number.eq.${phone}`);
+        
+        if (orConditions.length > 0) {
+          const { data: ordersData, error: ordersError } = await supabase
+            .from('orders')
+            .select('date')
+            .or(orConditions.join(','))
+            .order('date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+            
+          if (!ordersError && ordersData) {
+            lastOrderDate = ordersData.date;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch last order date', e);
+      }
 
       // Map to camelCase if necessary (matching the DB structure)
       const mappedCustomer: CustomerProfile = {
-        ...customerData,
-        id: String(customerData.id),
+        id: customerData.id,
         name: customerData.name || 'Anonymous User',
-        email: customerData.email || '',
-        phone: customerData.phone || '',
+        email: customerData.email || (customerData.emails?.[0] || ''),
+        phone: customerData.phone || (customerData.phones?.[0] || ''),
+        gender: customerData.gender,
         status: customerData.status || 'Active',
-        customer_type: customerData.customer_type || 'Regular',
-        created_at: customerData.created_at,
-        address: typeof customerData.address === 'string' ? JSON.parse(customerData.address) : (customerData.address || {})
+        customer_type: customerData.customer_type || customerData.customerType || 'Regular',
+        profile_image: customerData.profile_image || customerData.profileImage,
+        created_at: customerData.created_at || customerData.createdAt,
+        last_login: customerData.last_login,
+        last_login_at: customerData.last_login_at,
+        total_orders: customerData.total_orders || customerData.totalOrders,
+        total_spend: customerData.total_spend || customerData.totalSpend,
+        total_reviews: reviewCount || 0,
+        last_order_date: lastOrderDate,
+        total_logins: customerData.total_logins,
+        occasion_name: customerData.occasion_name,
+        special_date: customerData.special_date,
+        note: customerData.note,
+        address: customerData.address || {}
       };
 
       setCustomer(mappedCustomer);

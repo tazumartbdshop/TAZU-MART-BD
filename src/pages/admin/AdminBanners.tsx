@@ -662,7 +662,7 @@ export default function AdminBanners() {
                 key={banner.id}
                 banner={banner}
                 index={index}
-                onDelete={() => handleDeleteBanner(String(banner.id))}
+                onDelete={() => handleDeleteBanner(banner.id)}
                 onDragStart={(e) => handleSeqDragStart(e, index)}
                 onDrop={(e) => handleSeqDrop(e, index)}
                 onDragOver={handleSeqDragOver}

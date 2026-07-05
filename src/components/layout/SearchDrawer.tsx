@@ -137,8 +137,7 @@ export default function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
         }
         
         // Match custom store keywords
-        const kws = typeof p.keywords === 'string' ? p.keywords.split(',').map(k => k.trim()) : [];
-        kws.forEach(keyword => {
+        (p.keywords || []).forEach(keyword => {
           if (keyword.toLowerCase().includes(q)) {
             collectedKeywords.add(keyword);
           }

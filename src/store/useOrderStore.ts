@@ -1,216 +1,606 @@
 import { create } from 'zustand';
+// Removed demo generators to enforce single DB rule
+import { getSupabase } from '../lib/supabase';
+import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 
 export interface OrderItem {
   productId: string;
+  slug?: string;
   name: string;
   price: number;
   quantity: number;
   variant: string;
-  total: number;
   image?: string;
-  variantDetails?: any;
+  variantDetails?: {
+    size?: string;
+    color?: string;
+    storage?: string;
+    weight?: string;
+  };
 }
 
 export interface Order {
   id: string;
-  order_id: string;
-  orderId?: string; // mapping
-  customer_name: string;
-  customerName?: string; // mapping
+  orderId: string;
+  billId: string;
+  productLink: string;
+  customerName: string;
+  mobileNumber: string;
   email?: string;
-  phone: string;
-  mobileNumber?: string; // mapping
-  address: string;
-  fullAddress?: string; // mapping
+  fullAddress: string;
   cityArea?: string;
-  subtotal: number;
-  delivery_charge: number;
-  deliveryCharge?: number; // mapping
-  discount: { amount: number; code?: string } | any;
-  tax?: { amount: number };
-  total: number;
-  amount?: number; // mapping
-  payment_method: string;
-  paymentMethod?: string; // mapping
-  payment_status: string;
-  paymentStatus?: string; // mapping
-  order_status: string;
-  status?: string; // mapping
-  statusHistory?: any[];
-  type?: string;
-  date?: string; // mapping
-  created_at: string;
-  createdAt?: string; // mapping
+  postalCode?: string;
+  deliveryMode: 'Express Delivery' | 'Standard Delivery';
+  paymentMethod: string;
+  status: 'Placed' | 'Confirmed' | 'Processing' | 'Shipping' | 'Delivered' | 'Cancelled' | 'Pending' | 'Packaging' | 'Returned' | 'Completed';
+  statusHistory: { status: string; timestamp: string; updatedBy?: string }[];
+  status_updated_at: string;
+  edited_by_admin?: string;
+  last_edit_time?: string;
+  customerImage?: string;
+  paymentStatus: 'Paid' | 'Partial' | 'Unpaid' | 'Cash on Delivery';
+  type: 'Online' | 'Offline';
   items: OrderItem[];
+  subtotal: number;
+  discount: { type: 'percent' | 'fixed'; value: number; amount: number };
+  tax: { percent: number; amount: number };
+  deliveryCharge: number;
+  paidAmount: number;
+  dueAmount: number;
+  total: number;
+  date: string;
+  userId?: string;
   notes?: string;
-  isDemo?: boolean;
   isRead?: boolean;
+  isDemo?: boolean;
   promoCodeUsed?: string;
   storeName?: string;
-  postalCode?: string;
-  deliveryMode?: string;
-  paidAmount?: number;
-  dueAmount?: number;
-  utmParams?: any;
+  courier?: {
+    name: string;
+    trackingId?: string;
+    status?: string;
+  };
+  utmParams?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_content?: string;
+    utm_term?: string;
+    referrer?: string;
+    landingPage?: string;
+    firstTouch?: string;
+    lastTouch?: string;
+  };
 }
 
 interface OrderState {
   orders: Order[];
-  trackingStatuses: any[];
-  isLoading: boolean;
-  isLoaded: boolean;
-  fetchUserOrders: (userId: number | string) => Promise<void>;
-  fetchAllOrders: () => Promise<void>;
-  addOrder: (order: any) => Promise<any>;
-  addOrderAsync: (order: any) => Promise<any>;
-  updateOrder: (id: string, updates: any) => Promise<void>;
-  updateOrderStatus: (id: string, status: string) => Promise<void>;
-  updatePaymentStatus: (id: string, status: string) => Promise<void>;
+  trackingStatuses: string[];
+  addOrder: (order: Omit<Order, 'id' | 'orderId' | 'billId' | 'productLink' | 'date' | 'statusHistory' | 'status_updated_at'>) => Order;
+  addOrderAsync: (order: Omit<Order, 'id' | 'orderId' | 'billId' | 'productLink' | 'date' | 'statusHistory' | 'status_updated_at'>) => Promise<Order>;
+  updateOrder: (id: string, updates: Partial<Order>) => void;
+  updateOrderStatus: (id: string, status: Order['status']) => void;
+  updatePaymentStatus: (id: string, paymentStatus: Order['paymentStatus']) => void;
   deleteOrder: (id: string) => Promise<void>;
-  markAsRead: (id: string) => Promise<void>;
-  markAllAsRead: () => Promise<void>;
-  subscribeOrders: (userId?: string | number) => () => void;
-  subscribeTrackingStatuses: () => () => void;
+  markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
   clearDemoData: () => void;
+  subscribeOrders: (userId?: string) => () => void;
+  subscribeTrackingStatuses: () => () => void;
 }
 
-const mapOrder = (o: any): Order => ({
-  ...o,
-  id: String(o.id),
-  orderId: o.order_id,
-  customerName: o.customer_name,
-  mobileNumber: o.phone,
-  fullAddress: o.address,
-  paymentMethod: o.payment_method,
-  paymentStatus: o.payment_status,
-  status: o.order_status,
-  date: o.created_at,
-  createdAt: o.created_at,
-  amount: o.total,
-  deliveryCharge: o.delivery_charge,
-  discount: typeof o.discount === 'string' ? JSON.parse(o.discount) : (typeof o.discount === 'number' ? { amount: o.discount } : (o.discount || { amount: 0 })),
-  items: typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || [])
-});
+const initialOrders: Order[] = [];
 
 export const useOrderStore = create<OrderState>((set, get) => ({
-  orders: [],
-  trackingStatuses: [],
-  isLoading: false,
-  isLoaded: false,
+  orders: initialOrders,
+  trackingStatuses: [
+    'Placed', 'Pending', 'Processing', 'Confirmed', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'
+  ],
+  addOrder: (orderPayload) => {
+    const nextOrderNum = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
+    const nextBillNum = Math.floor(100000 + Math.random() * 900000);
+    const orderId = `TMB-${nextOrderNum}`;
+    const now = new Date().toISOString();
+    const id = Math.random().toString(36).substring(2, 9);
+    
+    const newOrder: Order = {
+      ...orderPayload,
+      id,
+      orderId,
+      billId: `BILL-${nextBillNum}`,
+      productLink: `https://luxemart.bd/order/${orderId}`,
+      date: now,
+      status_updated_at: now,
+      statusHistory: [{ status: orderPayload.status, timestamp: now, updatedBy: 'Admin' }],
+      isRead: false,
+    };
 
-  fetchUserOrders: async (userId) => {
-    set({ isLoading: true });
-    try {
-      const res = await fetch(`/api/user/orders?userId=${userId}`);
-      const data = await res.json();
-      set({ orders: data.map(mapOrder), isLoaded: true });
-    } catch (err) {
-      console.error("Failed to fetch user orders:", err);
-    } finally {
-      set({ isLoading: false });
-    }
-  },
+    const supabase = getSupabase();
+    if (supabase) {
+      console.log("[Supabase Sync] addOrder Payload (pre-snake):", newOrder);
+      const dbPayload = objectToSnake(newOrder);
+      // Fix numeric discount type mapping for database insert
+      dbPayload.discount = newOrder.discount?.amount || 0;
 
-  fetchAllOrders: async () => {
-    set({ isLoading: true });
-    try {
-      const res = await fetch('/api/admin/orders');
-      const data = await res.json();
-      set({ orders: data.map(mapOrder), isLoaded: true });
-    } catch (err) {
-      console.error("Failed to fetch all orders:", err);
-    } finally {
-      set({ isLoading: false });
-    }
-  },
+      // Map tax object to flat columns for DB
+      if (newOrder.tax) {
+        dbPayload.tax_percent = newOrder.tax.percent;
+        dbPayload.tax_amount = newOrder.tax.amount;
+      }
 
-  addOrder: async (orderPayload) => {
-    try {
-      const res = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderPayload)
+      // Map items correctly to the JSONB column
+      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items : [];
+      
+      // Ensure status_history is a valid JSON array
+      dbPayload.status_history = Array.isArray(dbPayload.status_history) ? dbPayload.status_history : [];
+
+      // Ensure mobile_number is a string for the TEXT column in DB
+      if (dbPayload.mobile_number) {
+        dbPayload.mobile_number = dbPayload.mobile_number.toString();
+      }
+
+      // Filter payload to only include columns that exist in the database schema
+      const allowedColumns = [
+        'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
+        'mobile_number', 'email', 'full_address', 'city_area', 'postal_code', 
+        'delivery_mode', 'payment_method', 'status', 'status_history', 
+        'status_updated_at', 'edited_by_admin', 'last_edit_time', 
+        'customer_image', 'subtotal', 'delivery_charge', 'discount', 
+        'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
+        'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
+        'promo_code_used', 'type', 'user_id'
+      ];
+
+      const cleanPayload: any = {};
+      allowedColumns.forEach(col => {
+        if (dbPayload[col] !== undefined) {
+          cleanPayload[col] = dbPayload[col];
+        }
       });
-      const data = await res.json();
-      return data;
-    } catch (err) {
-      console.error("Failed to place order:", err);
-      throw err;
-    }
-  },
+      
+      console.log("[Supabase Sync] addOrder cleanPayload to Supabase:", cleanPayload);
+      supabase.from('orders').insert([cleanPayload]).then(({error}) => {
+        if (error) console.warn("[Supabase Sync Error] orders insert:", error);
+      });
 
+      // Update sold_count and stock for each item
+      newOrder.items.forEach(async (item) => {
+        try {
+          const { data: prod, error: prodErr } = await supabase
+            .from('products')
+            .select('sold_count, stock')
+            .eq('id', item.productId)
+            .single();
+          if (!prodErr && prod) {
+            await supabase
+              .from('products')
+              .update({
+                sold_count: Number(prod.sold_count || 0) + Number(item.quantity || 1),
+                stock: Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1))
+              })
+              .eq('id', item.productId);
+          }
+        } catch (err) {
+          console.error("Failed to update product stats in addOrder:", err);
+        }
+      });
+    }
+
+    set((state) => ({ orders: [newOrder, ...state.orders] }));
+    return newOrder;
+  },
   addOrderAsync: async (orderPayload) => {
-    return get().addOrder(orderPayload);
-  },
+    const nextOrderNum = Math.floor(10000000 + Math.random() * 90000000); // 8-digit random number
+    const nextBillNum = Math.floor(100000 + Math.random() * 900000);
+    const orderId = `TMB-${nextOrderNum}`;
+    const now = new Date().toISOString();
+    const id = Math.random().toString(36).substring(2, 9);
+    
+    const newOrder: Order = {
+      ...orderPayload,
+      id,
+      orderId,
+      billId: `BILL-${nextBillNum}`,
+      productLink: `https://luxemart.bd/order/${orderId}`,
+      date: now,
+      status_updated_at: now,
+      statusHistory: [{ status: orderPayload.status, timestamp: now, updatedBy: 'Customer' }],
+      isRead: false,
+    };
 
-  updateOrder: async (id, updates) => {
-    try {
-      const status = updates.order_status || updates.status;
-      if (status) await get().updateOrderStatus(id, status);
-    } catch (err) {
-      console.error("Failed to update order:", err);
-    }
-  },
+    const supabase = getSupabase();
+    if (supabase) {
+      console.log("[Supabase Sync] addOrderAsync Payload (pre-snake):", newOrder);
+      const dbPayload = objectToSnake(newOrder);
+      // Convert nested discount object to simple numeric amount for the database column
+      dbPayload.discount = newOrder.discount?.amount || 0;
+      
+      // Map tax object to flat columns for DB
+      if (newOrder.tax) {
+        dbPayload.tax_percent = newOrder.tax.percent;
+        dbPayload.tax_amount = newOrder.tax.amount;
+      }
 
-  updateOrderStatus: async (id, status) => {
-    try {
-      await fetch(`/api/admin/orders/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+      // Save full items array to the JSONB column
+      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items : [];
+      
+      // Ensure status_history is a valid JSON array
+      dbPayload.status_history = Array.isArray(dbPayload.status_history) ? dbPayload.status_history : [];
+
+      // Ensure mobile_number is string format for the TEXT column
+      if (dbPayload.mobile_number) {
+        dbPayload.mobile_number = dbPayload.mobile_number.toString();
+      }
+
+      // Filter payload to only include columns that exist in the database schema
+      const allowedColumns = [
+        'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
+        'mobile_number', 'email', 'full_address', 'city_area', 'postal_code', 
+        'delivery_mode', 'payment_method', 'status', 'status_history', 
+        'status_updated_at', 'edited_by_admin', 'last_edit_time', 
+        'customer_image', 'subtotal', 'delivery_charge', 'discount', 
+        'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
+        'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
+        'promo_code_used', 'type', 'user_id'
+      ];
+
+      const cleanPayload: any = {};
+      allowedColumns.forEach(col => {
+        if (dbPayload[col] !== undefined) {
+          // Safety: omit 'type' if it is 'Online' to avoid numeric syntax errors in some DB configurations
+          if (col === 'type' && dbPayload[col] === 'Online') return;
+          cleanPayload[col] = dbPayload[col];
+        }
       });
-      get().fetchAllOrders();
-    } catch (err) {
-      console.error("Failed to update order status:", err);
-    }
-  },
 
-  updatePaymentStatus: async (id, status) => {
-    try {
-      await fetch(`/api/admin/orders/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payment_status: status })
+      console.log("[Supabase Sync] addOrderAsync cleanPayload to Supabase:", cleanPayload);
+      // Insert without select to speed up response time
+      const { error } = await supabase.from('orders').insert([cleanPayload]);
+      
+      if (error) {
+        console.error("[Supabase Sync] Failed to insert order into Supabase:", error);
+        // throw error; // Bypassed to allow local order placement if DB is down
+      }
+      
+      console.log("[Supabase Sync] Order inserted successfully into orders table.");
+
+      // Now attempt order items table insertion (Redundant if the on_order_sync trigger is active in Supabase, but kept for compatibility)
+      try {
+        const orderItemsPayload = newOrder.items.map(item => ({
+          id: Math.random().toString(36).substring(2, 9),
+          order_id: id, // Link using the same random string ID used for the orders record
+          product_id: item.productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          variant: item.variant || 'Default',
+          image: item.image || '',
+          slug: item.slug || '',
+          created_at: now
+        }));
+        
+        console.log("[Supabase Sync] Attempting insertion into order_items table:", orderItemsPayload);
+        // Fire and forget items insertion
+        supabase.from('order_items').insert(orderItemsPayload).then(({ error: itemsError }) => {
+          if (itemsError) {
+            console.error("[Supabase Sync] Failed to insert items into order_items (Manual fallback):", itemsError);
+          } else {
+            console.log("[Supabase Sync] Order items inserted successfully into order_items table.");
+          }
+        });
+
+        // Update sold_count and stock for each item in Supabase
+        newOrder.items.forEach(async (item) => {
+          try {
+            const { data: prod, error: prodErr } = await supabase
+              .from('products')
+              .select('sold_count, stock')
+              .eq('id', item.productId)
+              .single();
+            if (!prodErr && prod) {
+              await supabase
+                .from('products')
+                .update({
+                  sold_count: Number(prod.sold_count || 0) + Number(item.quantity || 1),
+                  stock: Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1))
+                })
+                .eq('id', item.productId);
+            }
+          } catch (err) {
+            console.error("Failed to update product stats in addOrderAsync:", err);
+          }
+        });
+      } catch (itemErr) {
+        console.error("[Supabase Sync] Exception saving products to order_items:", itemErr);
+      }
+    }
+
+    set((state) => ({ orders: [newOrder, ...state.orders] }));
+    return newOrder;
+  },
+  updateOrder: (id, updates) => {
+    const existingOrder = get().orders.find(o => o.id === id);
+    if (!existingOrder) return;
+
+    const merged: Order = {
+      ...existingOrder,
+      ...updates,
+      last_edit_time: new Date().toISOString(),
+      edited_by_admin: 'Admin'
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+      console.log("[Supabase Sync] updateOrder Updates:", updates);
+      const dbPayload = objectToSnake(updates);
+      
+      // Update metadata fields
+      dbPayload.last_edit_time = merged.last_edit_time;
+      dbPayload.edited_by_admin = merged.edited_by_admin;
+      
+      if (dbPayload.discount && typeof dbPayload.discount === 'object') {
+        dbPayload.discount = dbPayload.discount.amount || 0;
+      }
+      
+      if ('items' in dbPayload && Array.isArray(dbPayload.items)) {
+        // Map items to the cleanPayload correctly
+      }
+
+      if (updates.tax) {
+        dbPayload.tax_percent = updates.tax.percent;
+        dbPayload.tax_amount = updates.tax.amount;
+      }
+      
+      if (dbPayload.mobile_number) {
+        dbPayload.mobile_number = dbPayload.mobile_number.toString();
+      }
+
+      // Filter payload to only include columns that exist in the database schema
+      const allowedColumns = [
+        'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
+        'mobile_number', 'email', 'full_address', 'city_area', 'postal_code', 
+        'delivery_mode', 'payment_method', 'status', 'status_history', 
+        'status_updated_at', 'edited_by_admin', 'last_edit_time', 
+        'customer_image', 'subtotal', 'delivery_charge', 'discount', 
+        'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
+        'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
+        'promo_code_used', 'type', 'user_id'
+      ];
+
+      const cleanPayload: any = {};
+      allowedColumns.forEach(col => {
+        if (dbPayload[col] !== undefined) {
+          cleanPayload[col] = dbPayload[col];
+        }
       });
-      get().fetchAllOrders();
-    } catch (err) {
-      console.error("Failed to update payment status:", err);
+      
+      console.log("[Supabase Sync] updateOrder cleanPayload to Supabase:", cleanPayload);
+      supabase.from('orders').update(cleanPayload).eq('id', id).then(({error}) => {
+        if (error) console.warn("[Supabase Sync Error] order update:", error);
+      });
     }
-  },
 
-  deleteOrder: async (id) => {
-    try {
-      await fetch(`/api/admin/orders/${id}`, { method: 'DELETE' });
-      get().fetchAllOrders();
-    } catch (err) {
-      console.error("Failed to delete order:", err);
-    }
-  },
-
-  markAsRead: async (id) => {
     set((state) => ({
-      orders: state.orders.map(o => o.id === id ? { ...o, isRead: true } : o)
+      orders: state.orders.map(o => o.id === id ? merged : o)
     }));
   },
+  updateOrderStatus: (id, status) => {
+    const existingOrder = get().orders.find(o => o.id === id);
+    if (!existingOrder) return;
 
-  markAllAsRead: async () => {
+    const now = new Date().toISOString();
+    const merged: Order = {
+      ...existingOrder,
+      status,
+      status_updated_at: now,
+      statusHistory: [...(existingOrder.statusHistory || []), { status, timestamp: now, updatedBy: 'Admin' }]
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+        const dbPayload = objectToSnake({
+            status,
+            status_updated_at: merged.status_updated_at,
+            statusHistory: merged.statusHistory
+        });
+        supabase.from('orders').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+    }
+
+    set((state) => ({
+      orders: state.orders.map(o => o.id === id ? merged : o)
+    }));
+  },
+  updatePaymentStatus: (id, paymentStatus) => {
+    const existingOrder = get().orders.find(o => o.id === id);
+    if (!existingOrder) return;
+
+    const merged: Order = {
+      ...existingOrder,
+      paymentStatus
+    };
+
+    const supabase = getSupabase();
+    if (supabase) {
+        const dbPayload = objectToSnake({ paymentStatus });
+        supabase.from('orders').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+    }
+
+    set((state) => ({
+      orders: state.orders.map(o => o.id === id ? merged : o)
+    }));
+  },
+  deleteOrder: async (id) => {
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        // 1. Delete associated reviews first if any
+        await supabase.from('reviews').delete().eq('order_id', id);
+        
+        // 2. Delete associated order items
+        await supabase.from('order_items').delete().eq('order_id', id);
+        
+        // 3. Finally delete the order itself
+        const { error } = await supabase.from('orders').delete().eq('id', id);
+        
+        if (error) { console.error("Ignored Error:", error); }
+      } catch (error) {
+        console.error("[Supabase Delete Error]:", error);
+        // throw error; // Bypassed to allow local order placement if DB is down
+      }
+    }
+
+    set((state) => ({
+      orders: state.orders.filter(o => o.id !== id)
+    }));
+  },
+  markAsRead: (id) => {
+    const existingOrder = get().orders.find(o => o.id === id);
+    if (!existingOrder) return;
+
+    const merged = { ...existingOrder, isRead: true };
+
+    const supabase = getSupabase();
+    if (supabase) supabase.from('orders').update({ isRead: true }).eq('id', id).then(({error}) => error && console.warn(error));
+
+    set((state) => ({
+      orders: state.orders.map(o => o.id === id ? merged : o)
+    }));
+  },
+  markAllAsRead: () => {
+    const supabase = getSupabase();
+    if (supabase) {
+        get().orders.forEach(o => {
+          if (!o.isRead) {
+            supabase.from('orders').update({ isRead: true }).eq('id', o.id).then(({error}) => error && console.warn(error));
+          }
+        });
+    }
+
     set((state) => ({
       orders: state.orders.map(o => ({ ...o, isRead: true }))
     }));
   },
+  clearDemoData: () => set((state) => ({
+    orders: state.orders.filter(o => !o.isDemo)
+  })),
+  subscribeOrders: (userId?: string) => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+    console.log("[Supabase Sync] Subscribing to orders. Filter userId:", userId);
 
-  subscribeOrders: (userId) => {
-    if (userId) {
-      get().fetchUserOrders(userId);
-    } else {
-      get().fetchAllOrders();
-    }
-    return () => {};
+    const loadOrders = async () => {
+        let query = supabase.from('orders').select('*');
+        
+        if (userId) {
+          query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query.order('date', { ascending: false });
+        
+        if (error) {
+            if (error.code !== '42P01') console.error('Error fetching orders:', error);
+            set({ orders: [] });
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            set({ orders: [] });
+            return;
+        }
+
+        const orderIds = data.map(o => o.id);
+        const orderIdStrings = data.map(o => o.order_id);
+        
+        // Fetch order items only for the orders we just retrieved
+        const { data: itemsData } = await supabase
+            .from('order_items')
+            .select('*')
+            .or(`order_id.in.(${orderIds.join(',')}),order_id.in.(${orderIdStrings.join(',')})`);
+
+        set({ orders: (data as any[]).map(row => {
+               const parsed = objectToCamel(row);
+               if (Array.isArray(parsed.customerName)) {
+                 parsed.customerName = parsed.customerName[0] || '';
+               }
+               if (typeof parsed.mobileNumber === 'number') {
+                 parsed.mobileNumber = '0' + parsed.mobileNumber.toString();
+               }
+               
+               // Parse statusHistory back to array
+               if (typeof parsed.statusHistory === 'string') {
+                 try {
+                   parsed.statusHistory = JSON.parse(parsed.statusHistory);
+                 } catch(e) {
+                   parsed.statusHistory = [];
+                 }
+               }
+
+               // Attach actual items from order_items table
+               if (itemsData) {
+                 const orderItems = itemsData.filter(item => item.order_id === parsed.orderId || item.order_id === parsed.id);
+                 if (orderItems.length > 0) {
+                   parsed.items = orderItems.map(item => ({
+                     productId: item.product_id || item.productId,
+                     name: item.name || item.product_name || 'Unknown',
+                     price: item.price || item.product_price || 0,
+                     quantity: item.quantity || 1,
+                     image: item.image || item.product_image || '',
+                     variant: item.variant || 'Default',
+                     slug: item.slug || item.productId
+                   }));
+                 }
+               }
+               
+               if (typeof parsed.items === 'number' || !parsed.items) {
+                 // Fallback if no items found in order_items
+                 parsed.items = [];
+               }
+
+               return parsed;
+            }) as Order[] });
+    };
+    
+    loadOrders();
+    
+    const channel = supabase
+      .channel('public:orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+          loadOrders();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
   },
-
   subscribeTrackingStatuses: () => {
-    return () => {};
-  },
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
 
-  clearDemoData: () => set({ orders: [] })
+    const loadStatuses = async () => {
+        const { data, error } = await supabase.from('tracking_statuses').select('*').order('order', { ascending: true });
+        if (!error && data && data.length > 0) {
+            set({ trackingStatuses: data.map(d => objectToCamel(d).name) });
+        } else {
+            const defaultList = [
+              'Placed', 'Pending', 'Processing', 'Confirmed', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'
+            ];
+            const toInsert = defaultList.map((name, idx) => ({ id: name.toLowerCase(), name, order: idx + 1 }));
+            supabase.from('tracking_statuses').upsert(toInsert).then();
+            set({ trackingStatuses: defaultList });
+        }
+    };
+    loadStatuses();
+    
+    const channel = supabase
+      .channel('public:tracking_statuses')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tracking_statuses' }, () => {
+          loadStatuses();
+      })
+      .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  },
 }));

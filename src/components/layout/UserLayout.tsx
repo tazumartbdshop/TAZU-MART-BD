@@ -4,11 +4,13 @@ import { Footer } from './Footer';
 import { BrandShowcase } from './BrandShowcase';
 import { MobileBottomNav } from './MobileBottomNav';
 import { MessageCircle } from 'lucide-react';
+import useScrollToTop from '../../utils/supabase/hooks/useScrollToTop';
 import { StorefrontPopup } from '../ui/StorefrontPopup';
 import { useEffect } from 'react';
 import { pixelService } from '../../utils/pixelService';
 
 export function UserLayout() {
+  useScrollToTop();
   const location = useLocation();
   const isGameRoute = location.pathname === '/games';
   

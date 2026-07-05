@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getSupabase } from '../lib/supabase';
 
 export interface PopupConfig {
   id: string;
@@ -179,7 +180,7 @@ interface PopupStore {
   subscribe: () => () => void;
 }
 
-export const usePopupStore = create<PopupStore>()((set, get) => ({
+export const usePopupStore = create<PopupStore>()((set) => ({
   popupCampaigns: [],
   config: defaultCampaigns[0],
 
@@ -190,61 +191,46 @@ export const usePopupStore = create<PopupStore>()((set, get) => ({
         ...popup,
         id: docId,
       };
-      const response = await fetch('/api/admin/popups/upsert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newPopup)
-      });
-      if (response.ok) {
-        // Refresh local state if needed or rely on polling
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('popup_campaigns').upsert([newPopup]);
       }
     } catch (err) {
-      console.error('Error adding popup campaign:', err);
+      console.error('Error adding popup campaign to Supabase:', err);
     }
   },
 
   updatePopupCampaign: async (id, updates) => {
     try {
-      const existing = get().popupCampaigns.find(p => p.id === id);
-      if (!existing) return;
-      const updated = { ...existing, ...updates };
-      const response = await fetch('/api/admin/popups/upsert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('popup_campaigns').update(updates).eq('id', id);
+      }
     } catch (err) {
-      console.error('Error updating popup campaign:', err);
+      console.error('Error updating popup campaign in Supabase:', err);
     }
   },
 
   deletePopupCampaign: async (id) => {
     try {
-      const response = await fetch(`/api/admin/popups/${id}`, {
-        method: 'DELETE'
-      });
-      if (response.ok) {
-        set((state) => ({
-          popupCampaigns: state.popupCampaigns.filter(p => p.id !== id)
-        }));
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('popup_campaigns').delete().eq('id', id);
       }
     } catch (err) {
-      console.error('Error deleting popup campaign:', err);
+      console.error('Error deleting popup campaign from Supabase:', err);
     }
   },
 
   resetPopupCampaigns: async () => {
     try {
-      const response = await fetch('/api/admin/popups/reset', {
-        method: 'POST'
-      });
-      if (response.ok) {
-        for (const campaign of defaultCampaigns) {
-          await get().addPopupCampaign(campaign);
-        }
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('popup_campaigns').delete().neq('id', '0');
+        await supabase.from('popup_campaigns').upsert(defaultCampaigns);
       }
     } catch (err) {
-      console.error('Error resetting popup campaigns:', err);
+      console.error('Error resetting popup campaigns in Supabase:', err);
     }
   },
 
@@ -256,60 +242,32 @@ export const usePopupStore = create<PopupStore>()((set, get) => ({
   }),
 
   subscribe: () => {
+    const supabase = getSupabase();
+    if (!supabase) return () => {};
+
     const loadPopups = async () => {
-      try {
-        const response = await fetch('/api/admin/popups');
-        if (response.ok) {
-          const data = await response.json();
-          const popups = data.map((p: any) => ({
-            ...p,
-            startDate: p.start_date,
-            startTime: p.start_time,
-            endDate: p.end_date,
-            endTime: p.end_time,
-            campaignType: p.campaign_type,
-            campaignValue: p.campaign_value,
-            templateId: p.template_id,
-            bannerUrl: p.banner_url,
-            titleFontSize: p.title_font_size,
-            discountLabel: p.discount_label,
-            discountPercentage: p.discount_percentage,
-            subtitleFontSize: p.subtitle_font_size,
-            buttonText: p.button_text,
-            buttonUrl: p.button_url,
-            buttonStyle: p.button_style,
-            secondaryButtonText: p.secondary_button_text,
-            secondaryButtonUrl: p.secondary_button_url,
-            selectedProducts: typeof p.selected_products === 'string' ? JSON.parse(p.selected_products) : (p.selected_products || []),
-            selectedCategories: typeof p.selected_categories === 'string' ? JSON.parse(p.selected_categories) : (p.selected_categories || []),
-            displayDuration: p.display_duration,
-            displayOrder: p.display_order,
-            showOncePerUser: !!p.show_once_per_user,
-            showEveryVisit: !!p.show_every_visit,
-            showAfter3Seconds: !!p.show_after_3_seconds,
-            showAfterScroll: !!p.show_after_scroll,
-            showOnlyHomepage: !!p.show_only_homepage,
-            closeButtonVisible: !!p.close_button_visible,
-            backgroundDarkOverlay: !!p.background_dark_overlay,
-            clickOutsideToClose: !!p.click_outside_to_close,
-            autoCloseAfterXSeconds: !!p.auto_close_after_x_seconds,
-            entranceAnimation: p.entrance_animation
-          }));
-          
-          if (popups.length > 0) {
-            set({ popupCampaigns: popups, config: popups[0] });
-          } else {
-             // If empty, maybe reset to defaults (handled by UI or manual reset)
-          }
-        }
-      } catch (err) {
-        console.error('Error loading popups:', err);
+      const { data, error } = await supabase.from('popup_campaigns').select('*').order('displayOrder', { ascending: true });
+      if (!error && data && data.length > 0) {
+        set({ popupCampaigns: data as PopupConfig[], config: data[0] as PopupConfig });
+      } else if (!error && data && data.length === 0) {
+        // Seed default campaigns if completely empty to give an initially populated database list
+        await supabase.from('popup_campaigns').upsert(defaultCampaigns);
+        set({ popupCampaigns: defaultCampaigns, config: defaultCampaigns[0] });
       }
     };
     
     loadPopups();
-    const interval = setInterval(loadPopups, 5000);
-    return () => clearInterval(interval);
+
+    const channel = supabase
+      .channel('public:popup_campaigns')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'popup_campaigns' }, () => {
+         loadPopups();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 }));
 

@@ -448,7 +448,7 @@ export default function AdminPopupManagement() {
                           
                           {/* Selected targeting value names snippet */}
                           <p className="text-[10px] text-neutral-500 font-medium line-clamp-1 tracking-tight">
-                            {targetsCategories > 0 && categories.filter(c => popup.selectedCategories.includes(String(c.id))).map(c => c.name).join(', ')}
+                            {targetsCategories > 0 && categories.filter(c => popup.selectedCategories.includes(c.id)).map(c => c.name).join(', ')}
                             {targetsProducts > 0 && targetsCategories > 0 && ' | '}
                             {targetsProducts > 0 && products.filter(p => popup.selectedProducts.includes(p.id)).map(p => p.name).join(', ')}
                           </p>
@@ -720,7 +720,7 @@ export default function AdminPopupManagement() {
                         return (
                           <div
                             key={c.id}
-                            onClick={() => handleCategoryToggle(String(c.id))}
+                            onClick={() => handleCategoryToggle(c.id)}
                             className="flex items-center gap-2.5 py-2 px-1 text-xs cursor-pointer hover:bg-white select-none transition-all"
                           >
                             {isChecked ? (

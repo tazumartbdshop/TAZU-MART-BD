@@ -35,31 +35,47 @@ export const useCartStore = create<CartStore>()(
   persist(
     (set, get) => ({
       items: [],
-      addItem: async (item) => {
-        const { user } = (await import('./useAuthStore')).useAuthStore.getState();
-        
-        if (user) {
-          await fetch('/api/cart', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.id, productId: item.id, quantity: item.quantity || 1, variant: '' })
-          });
-        }
-
+      addItem: (item) => {
         set((state) => {
-          // ... (keep local optimistic update)
+          let originalPrice = item.originalPrice;
+          let price = item.price;
+          const baseId = item.id.split('-')[0];
+          
+          try {
+            const products = useProductStore.getState().products;
+            const product = products.find((p) => p.id === baseId);
+            if (product) {
+              if (originalPrice === undefined) {
+                originalPrice = product.price;
+              }
+              // If the added price matches standard product price or static product discountPrice,
+              // let's verify if there is an active offer boosting it further
+              if (price === product.price || price === product.discountPrice) {
+                const offers = useOfferStore.getState().offers;
+                const discountDetails = getProductDiscountDetails(product, offers);
+                price = discountDetails.discountPrice;
+              }
+            }
+          } catch (e) {
+            // Ignore lazy load error
+          }
+
+          if (originalPrice === undefined) {
+            originalPrice = price;
+          }
+
+          const quantity = item.quantity || 1;
           const existing = state.items.find((i) => i.id === item.id);
           if (existing) {
             return {
               items: state.items.map((i) =>
-                i.id === item.id ? { ...i, quantity: i.quantity + (item.quantity || 1) } : i
+                i.id === item.id ? { ...i, quantity: i.quantity + quantity } : i
               ),
             };
           }
-          return { items: [...state.items, { ...item, quantity: item.quantity || 1 }] };
+          return { items: [...state.items, { ...item, price, originalPrice, quantity }] };
         });
       },
-      // ... (add fetchCartItems if needed)
       removeItem: (id) => {
         set((state) => ({
           items: state.items.filter((i) => i.id !== id),
