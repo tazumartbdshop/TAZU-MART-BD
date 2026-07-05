@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   MapPin, 
@@ -6,241 +6,276 @@ import {
   Mail, 
   Facebook, 
   Instagram, 
-  Twitter, 
-  Youtube, 
-  Music2, 
-  MessageCircle,
   ChevronRight,
   Clock,
   Send,
-  Linkedin,
-  MessageSquare
+  MessageCircle,
+  PhoneCall,
+  Youtube,
+  Music2
 } from 'lucide-react';
-import { getFlutterConfig, FlutterConfig } from '../../services/flutterService';
-import { useSettingsStore } from '../../store/useSettingsStore';
-import { useBrandingStore } from '../../store/useBrandingStore';
+import { useFooterSettingsStore } from '../../store/useFooterSettingsStore';
 
 export function Footer() {
-  const [config, setConfig] = useState<FlutterConfig | null>(null);
-  const { settings } = useSettingsStore();
-  const { settings: branding } = useBrandingStore();
+  const { settings, fetchFooterSettings } = useFooterSettingsStore();
 
   useEffect(() => {
-    async function load() {
-      const data = await getFlutterConfig();
-      setConfig(data);
-    }
-    load();
+    fetchFooterSettings();
+
+    // Listen to live update event dispatched when admin saves settings
+    const handleLiveUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        useFooterSettingsStore.setState({ settings: customEvent.detail });
+      }
+    };
+
+    window.addEventListener('tazu-footer-updated', handleLiveUpdate);
+    return () => {
+      window.removeEventListener('tazu-footer-updated', handleLiveUpdate);
+    };
   }, []);
-
-  if (!config) return null;
-
-  const { brand, description, socialLinks, quickLinks, contact, design } = config;
-
-  const isBgDark = (color: string) => {
-    if (!color) return true;
-    const hex = color.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness < 128;
-  };
-
-  const getStyleColor = (key: keyof typeof brand, defaultVal: string) => {
-    if (brand.autoContrast && isBgDark(brand.footerBgColor)) {
-      return defaultVal;
-    }
-    return (brand as any)[key] || brand.footerContentColor || brand.textColor;
-  };
-
-  const socialIconColor = getStyleColor('footerIconColor', brand.footerIconColor || '#DADADA');
-  const headingColor = getStyleColor('footerHeadingColor', brand.footerHeadingColor || '#FFFFFF');
-  const mutedColor = getStyleColor('footerMutedColor', brand.footerMutedColor || '#B8B8B8');
-  const smallTextColor = getStyleColor('footerSmallTextColor', brand.footerSmallTextColor || '#B8B8B8');
-  const copyrightColor = getStyleColor('footerCopyrightColor', brand.footerCopyrightColor || '#888888');
-  const globalContentColor = brand.footerContentColor || brand.textColor;
 
   const SocialIcon = ({ platform, className }: { platform: string, className?: string }) => {
     switch (platform.toLowerCase()) {
       case 'facebook': return <Facebook className={className} />;
-      case 'facebookpage': return <Facebook className={className} />;
-      case 'messenger': return <MessageSquare className={className} />;
+      case 'messenger': return <Send className={className} />; // clean representation
+      case 'whatsapp': return <MessageCircle className={className} />;
       case 'instagram': return <Instagram className={className} />;
-      case 'twitter': return <Twitter className={className} />;
+      case 'telegram': return <Send className={className} />;
       case 'youtube': return <Youtube className={className} />;
       case 'tiktok': return <Music2 className={className} />;
-      case 'whatsapp': return <MessageCircle className={className} />;
-      case 'telegram': return <Send className={className} />;
-      case 'linkedin': return <Linkedin className={className} />;
       default: return null;
     }
   };
 
+  // Build list of active, enabled social links from dynamic settings
+  const activeSocials = [];
+  if (settings.social_facebook_enabled && settings.social_facebook) {
+    activeSocials.push({ name: 'facebook', url: settings.social_facebook });
+  }
+  if (settings.social_messenger_enabled && settings.social_messenger) {
+    activeSocials.push({ name: 'messenger', url: settings.social_messenger });
+  }
+  if (settings.social_whatsapp_enabled && settings.social_whatsapp) {
+    activeSocials.push({ name: 'whatsapp', url: settings.social_whatsapp });
+  }
+  if (settings.social_instagram_enabled && settings.social_instagram) {
+    activeSocials.push({ name: 'instagram', url: settings.social_instagram });
+  }
+  if (settings.social_telegram_enabled && settings.social_telegram) {
+    activeSocials.push({ name: 'telegram', url: settings.social_telegram });
+  }
+  if (settings.social_youtube_enabled && settings.social_youtube) {
+    activeSocials.push({ name: 'youtube', url: settings.social_youtube });
+  }
+  if (settings.social_tiktok_enabled && settings.social_tiktok) {
+    activeSocials.push({ name: 'tiktok', url: settings.social_tiktok });
+  }
+
   return (
-    <footer 
-      className="border-t pt-8 pb-20 md:pb-8 transition-all duration-500"
-      style={{ 
-        backgroundColor: brand.footerBgColor,
-        color: globalContentColor,
-        borderTopColor: design.divider ? 'rgba(0,0,0,0.05)' : 'transparent',
-        boxShadow: design.shadow ? '0 -10px 30px rgba(0,0,0,0.02)' : 'none'
-      }}
-    >
-      <div className="container mx-auto px-3" style={{ padding: `${design.padding}px` }}>
+    <footer className="bg-zinc-950 text-zinc-300 border-t border-zinc-900 pt-16 pb-24 md:pb-12 transition-all duration-300">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        
+        {/* Four Column Responsive Grid Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-          {/* Brand */}
-          <div className="space-y-4">
-            <Link to="/" className="flex items-center gap-2">
-              {settings.storeLogo || branding.footer_logo || branding.primary_logo || brand.logoUrl ? (
-                <img 
-                  src={settings.storeLogo || branding.footer_logo || branding.primary_logo || brand.logoUrl} 
-                  alt={settings.storeName || branding.site_name || brand.name} 
-                  className="h-8 max-w-[150px] object-contain" 
-                  referrerPolicy="no-referrer" 
-                />
-              ) : (
-                <span className="font-sans font-black text-xl tracking-wide uppercase" style={{ color: brand.brandColor || '#000000' }}>
-                  {settings.storeName || branding.site_name || brand.name || 'Tazu Mart'}
-                </span>
-              )}
-            </Link>
-            <p className="text-sm leading-relaxed max-w-xs" style={{ color: mutedColor }}>
-              {branding.meta_description || description.short}
-            </p>
-            <div className="flex flex-wrap gap-4 pt-2">
-              {(() => {
-                const activeSocialLinks = [];
-                if (settings.facebookEnabled && settings.facebookUrl) {
-                  activeSocialLinks.push({ platform: 'facebook', url: settings.facebookUrl });
-                }
-                if (settings.facebookPageEnabled && settings.facebookPageUrl) {
-                  activeSocialLinks.push({ platform: 'facebookpage', url: settings.facebookPageUrl });
-                }
-                if (settings.messengerEnabled && settings.messengerUrl) {
-                  activeSocialLinks.push({ platform: 'messenger', url: settings.messengerUrl });
-                }
-                if (settings.whatsappEnabled && settings.whatsappNumber) {
-                  const num = settings.whatsappNumber.replace(/\+/g, '').replace(/\s/g, '');
-                  const url = num.startsWith('http') ? num : `https://wa.me/${num}`;
-                  activeSocialLinks.push({ platform: 'whatsapp', url });
-                }
-                if (settings.instagramEnabled && settings.instagramUrl) {
-                  activeSocialLinks.push({ platform: 'instagram', url: settings.instagramUrl });
-                }
-                if (settings.youtubeEnabled && settings.youtubeUrl) {
-                  activeSocialLinks.push({ platform: 'youtube', url: settings.youtubeUrl });
-                }
-                if (settings.tiktokEnabled && settings.tiktokUrl) {
-                  activeSocialLinks.push({ platform: 'tiktok', url: settings.tiktokUrl });
-                }
-                const telLink = settings.telegramUrl || settings.telegramLink;
-                if (settings.telegramEnabled && telLink) {
-                  activeSocialLinks.push({ platform: 'telegram', url: telLink });
-                }
-                if (settings.twitterEnabled && settings.twitterUrl) {
-                  activeSocialLinks.push({ platform: 'twitter', url: settings.twitterUrl });
-                }
-                if (settings.linkedinEnabled && settings.linkedinUrl) {
-                  activeSocialLinks.push({ platform: 'linkedin', url: settings.linkedinUrl });
-                }
+          
+          {/* Column 1: Branding & About */}
+          <div className="space-y-5">
+            {settings.show_footer_logo && (
+              <Link to="/" className="inline-block">
+                {settings.footer_logo ? (
+                  <img 
+                    src={settings.footer_logo} 
+                    alt="Footer Logo" 
+                    style={{ 
+                      width: settings.footer_logo_width ? `${settings.footer_logo_width}px` : '150px',
+                      height: settings.footer_logo_height ? `${settings.footer_logo_height}px` : '40px'
+                    }}
+                    className="object-contain" 
+                    referrerPolicy="no-referrer" 
+                  />
+                ) : (
+                  <span className="font-sans font-black text-lg tracking-widest text-white uppercase">
+                    TAZU MART BD
+                  </span>
+                )}
+              </Link>
+            )}
 
-                return activeSocialLinks.map((link, idx) => (
+            {settings.show_about_section && (
+              <div className="space-y-2">
+                {settings.about_title && (
+                  <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">
+                    {settings.about_title}
+                  </h5>
+                )}
+                <p className="text-xs text-zinc-400 leading-relaxed max-w-xs">
+                  {settings.about_description}
+                </p>
+              </div>
+            )}
+
+            {settings.show_social_icons && activeSocials.length > 0 && (
+              <div className="flex flex-wrap gap-3 pt-2">
+                {activeSocials.map((social) => (
                   <a 
-                    key={link.platform + idx}
-                    href={link.url} 
-                    target="_blank" 
+                    key={social.name}
+                    href={social.url}
+                    target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: socialIconColor }}
-                    className="w-9 h-9 rounded-none border border-current flex items-center justify-center opacity-60 hover:opacity-100 transition-all hover:-translate-y-1"
+                    className="w-9 h-9 border border-zinc-800 hover:border-white hover:text-white flex items-center justify-center transition-all bg-zinc-900/40 text-zinc-400"
+                    title={`Follow us on ${social.name}`}
                   >
-                    <SocialIcon platform={link.platform} className="w-[18px] h-[18px]" />
+                    <SocialIcon platform={social.name} className="w-4 h-4" />
                   </a>
-                ));
-              })()}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Quick Links */}
+          {/* Column 2: Quick Links */}
           <div>
-            <h4 className="font-black uppercase tracking-widest text-xs mb-6 opacity-40" style={{ color: headingColor }}>Quick Links</h4>
-            <ul className="space-y-3">
-              {quickLinks.sort((a, b) => a.order - b.order).map((item) => (
-                <li key={item.name}>
-                  <Link 
-                    to={item.url} 
-                    style={{ color: globalContentColor }}
-                    className="hover:opacity-100 opacity-60 transition-all text-sm flex items-center gap-1 group"
+            {settings.show_quick_links && (
+              <>
+                <h4 className="font-black uppercase tracking-[0.25em] text-[10px] text-white mb-6 border-l-2 border-white pl-2">
+                  Quick Navigation
+                </h4>
+                <ul className="space-y-3.5">
+                  {(settings.quick_links || []).map((link, idx) => (
+                    <li key={idx}>
+                      <Link 
+                        to={link.url} 
+                        className="text-xs text-zinc-400 hover:text-white transition-all flex items-center gap-1 group w-max"
+                      >
+                        <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:translate-x-1 transition-transform shrink-0" />
+                        <span className="font-semibold">{link.name}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+
+          {/* Column 3: Contact Info */}
+          <div>
+            {settings.show_contact_info && (
+              <>
+                <h4 className="font-black uppercase tracking-[0.25em] text-[10px] text-white mb-6 border-l-2 border-white pl-2">
+                  Contact Support
+                </h4>
+                <div className="space-y-4">
+                  {settings.contact_address && (
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <span className="block text-[8px] font-black uppercase tracking-widest text-zinc-500">Store Address</span>
+                        <p className="text-xs text-zinc-300 font-medium leading-relaxed">{settings.contact_address}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {settings.contact_support_time && (
+                    <div className="flex items-start gap-3">
+                      <Clock className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <span className="block text-[8px] font-black uppercase tracking-widest text-zinc-500">Service Hours</span>
+                        <p className="text-xs text-zinc-300 font-semibold">{settings.contact_support_time}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {settings.contact_phone && (
+                    <div className="flex items-start gap-3">
+                      <Phone className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <span className="block text-[8px] font-black uppercase tracking-widest text-zinc-500">Direct Phone</span>
+                        <p className="text-xs text-white font-bold tracking-tight">{settings.contact_phone}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {settings.contact_email && (
+                    <div className="flex items-start gap-3">
+                      <Mail className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <span className="block text-[8px] font-black uppercase tracking-widest text-zinc-500">Email Address</span>
+                        <p className="text-xs text-zinc-300 font-bold">{settings.contact_email}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Column 4: Customer Support Card Widget */}
+          <div>
+            {settings.show_support_card && (
+              <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-4 shadow-xl">
+                <div className="space-y-1">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-white">
+                    {settings.card_title || 'Customer Support'}
+                  </h4>
+                  <p className="text-[10px] font-medium text-zinc-400">
+                    {settings.card_description || settings.card_subtitle || 'Need help? Contact us now!'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  {settings.card_whatsapp_link && (
+                    <a 
+                      href={settings.card_whatsapp_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-9 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-colors w-full"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      {settings.card_whatsapp_text || 'Chat on WhatsApp'}
+                    </a>
+                  )}
+
+                  {settings.card_call_phone && (
+                    <a 
+                      href={`tel:${settings.card_call_phone}`}
+                      className="h-9 px-4 border border-zinc-700 hover:bg-zinc-800 text-white font-bold uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-all w-full"
+                    >
+                      <PhoneCall className="w-3.5 h-3.5 text-zinc-400" />
+                      {settings.card_call_text || 'Call Support'}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Bottom copyright & payment stickers */}
+        {(settings.show_copyright || (settings.show_payment_badges && (settings.payment_badges || []).length > 0)) && (
+          <div className="border-t border-zinc-900 pt-8 mt-12 flex flex-col md:flex-row items-center justify-between gap-6">
+            {settings.show_copyright && (
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 text-center md:text-left">
+                {settings.copyright_text || '© 2026 TAZU MART BD. All Rights Reserved.'}
+              </p>
+            )}
+
+            {settings.show_payment_badges && (settings.payment_badges || []).length > 0 && (
+              <div className="flex flex-wrap gap-2 justify-center">
+                {settings.payment_badges.map((badge, idx) => (
+                  <div 
+                    key={idx} 
+                    className="px-3 py-1 bg-zinc-900 border border-zinc-800 text-[8px] font-black tracking-widest text-zinc-400 uppercase"
                   >
-                    <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                    {item.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Contact Details */}
-          <div className="lg:col-span-2">
-            <h4 className="font-black uppercase tracking-widest text-xs mb-6 opacity-40" style={{ color: headingColor }}>Contact Information</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                    <MapPin className="w-4 h-4 opacity-60" style={{ color: socialIconColor }} />
+                    {badge}
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-40" style={{ color: smallTextColor }}>Store Location</span>
-                    <p className="text-sm font-medium leading-relaxed" style={{ color: globalContentColor }}>{contact.address}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                    <Clock className="w-4 h-4 opacity-60" style={{ color: socialIconColor }} />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-40" style={{ color: smallTextColor }}>Support Time</span>
-                    <p className="text-sm font-medium uppercase" style={{ color: globalContentColor }}>{contact.officeTime}</p>
-                  </div>
-                </div>
+                ))}
               </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-4 group">
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shrink-0 group-hover:bg-white group-hover:text-black transition-colors">
-                    <Phone className="w-4 h-4 opacity-60 group-hover:opacity-100" style={{ color: socialIconColor }} />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-40" style={{ color: smallTextColor }}>Phone Number</span>
-                    <p className="text-sm font-bold tracking-tight" style={{ color: globalContentColor }}>{contact.phone}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 group">
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center shrink-0 group-hover:bg-white group-hover:text-black transition-colors">
-                    <Mail className="w-4 h-4 opacity-60 group-hover:opacity-100" style={{ color: socialIconColor }} />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest opacity-40" style={{ color: smallTextColor }}>Email Support</span>
-                    <p className="text-sm font-bold" style={{ color: globalContentColor }}>{contact.email}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
-        </div>
+        )}
 
-        <div className="border-t border-current/10 pt-8 flex flex-col md:flex-row items-center justify-between gap-6 opacity-60">
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: copyrightColor }}>
-            {description.copyright}
-          </p>
-          <div className="flex gap-3">
-             {['COD', 'SECURE PAY', 'SSL'].map(badge => (
-                <div key={badge} className="px-3 py-1 border border-current/20 text-[9px] font-black tracking-widest uppercase">
-                  {badge}
-                </div>
-             ))}
-          </div>
-        </div>
       </div>
     </footer>
   );

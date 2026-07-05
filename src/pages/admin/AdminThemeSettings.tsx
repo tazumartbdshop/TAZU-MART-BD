@@ -84,7 +84,6 @@ export default function AdminThemeSettings() {
     { id: 'banner', name: 'Banners', icon: ImageIcon, preview: 'home' },
     { id: 'cards', name: 'Product Cards', icon: Square, preview: 'home' },
     { id: 'product', name: 'Product Page', icon: Smartphone, preview: 'product' },
-    { id: 'footer', name: 'Footer', icon: Layers, preview: 'footer' },
     { id: 'typography', name: 'Typography', icon: Type, preview: 'home' },
     { id: 'modes', name: 'Dark/Light', icon: Moon, preview: 'home' },
     { id: 'effects', name: 'Effects', icon: Zap, preview: 'home' },

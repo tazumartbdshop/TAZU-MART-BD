@@ -244,6 +244,344 @@ async function startServer() {
     }
   });
 
+  // Combined endpoint to preload all homepage data in a single request
+  app.get("/api/homepage-data", async (req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=600');
+      
+      let adminClient = supabaseAdmin;
+      if (!adminClient) {
+        let fileUrl = "";
+        let fileKey = "";
+        try {
+          const data = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
+          const parsed = JSON.parse(data);
+          fileUrl = parsed.supabaseUrl || "";
+          fileKey = parsed.supabaseKey || "";
+        } catch (e) {}
+
+        let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
+        let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
+
+        if (!supabaseUrl || !supabaseKey) {
+          const firestoreConfig = await getSupabaseCredentialsFromFirestore();
+          if (firestoreConfig) {
+            supabaseUrl = supabaseUrl || firestoreConfig.supabaseUrl || "";
+            supabaseKey = supabaseKey || firestoreConfig.supabaseKey || "";
+          }
+        }
+
+        if (supabaseUrl && supabaseKey) {
+          adminClient = createClient(supabaseUrl, supabaseKey);
+          supabaseAdmin = adminClient;
+        }
+      }
+
+      if (!adminClient) {
+        return res.status(500).json({ error: "Supabase not initialized on backend" });
+      }
+
+      const [bannersRes, categoriesRes, productsRes, settingsRes, reviewsRes] = await Promise.all([
+        adminClient.from('banners').select('*').order('order', { ascending: true }),
+        adminClient.from('categories').select('*'),
+        adminClient.from('products').select('*'),
+        adminClient.from('settings').select('*').eq('id', 'global').limit(1),
+        adminClient.from('reviews').select('*').eq('status', 'approved').order('created_at', { ascending: false })
+      ]);
+
+      res.json({
+        banners: bannersRes.data || [],
+        categories: categoriesRes.data || [],
+        products: productsRes.data || [],
+        settings: settingsRes.data || [],
+        reviews: reviewsRes.data || []
+      });
+    } catch (err: any) {
+      console.error("Homepage data combined fetch error:", err);
+      res.status(500).json({ error: "Failed to fetch homepage data" });
+    }
+  });
+
+  // Footer Settings API Endpoints
+  const FOOTER_FALLBACK_FILE = path.join(process.cwd(), 'footer_settings.json');
+
+  app.get("/api/footer-settings", async (req, res) => {
+    try {
+      const client = supabaseServiceRole || supabaseAdmin;
+      let footerData: any = null;
+
+      if (client) {
+        // Try getting from dedicated table
+        const { data, error } = await client
+          .from('footer_settings')
+          .select('*')
+          .eq('id', 'global')
+          .limit(1);
+        
+        if (!error && data && data.length > 0) {
+          footerData = data[0];
+        } else {
+          // Try getting from settings table with id = 'footer_settings'
+          const { data: settingsData, error: settingsError } = await client
+            .from('settings')
+            .select('value')
+            .eq('id', 'footer_settings')
+            .limit(1);
+          
+          if (!settingsError && settingsData && settingsData.length > 0) {
+            const val = settingsData[0].value;
+            footerData = typeof val === 'string' ? JSON.parse(val) : val;
+          }
+        }
+      }
+
+      // If database fetch failed or returned nothing, try local fallback file
+      if (!footerData) {
+        try {
+          const fileRaw = await fs.readFile(FOOTER_FALLBACK_FILE, 'utf-8');
+          footerData = JSON.parse(fileRaw);
+        } catch (e) {
+          // If no local file, return default config (blank by default on fresh installation)
+          footerData = {
+            id: 'global',
+            footer_logo: '',
+            footer_logo_width: 150,
+            footer_logo_height: 40,
+            about_title: '',
+            about_description: '',
+            social_facebook: '',
+            social_messenger: '',
+            social_whatsapp: '',
+            social_instagram: '',
+            social_telegram: '',
+            social_youtube: '',
+            social_tiktok: '',
+            social_facebook_enabled: false,
+            social_messenger_enabled: false,
+            social_whatsapp_enabled: false,
+            social_instagram_enabled: false,
+            social_telegram_enabled: false,
+            social_youtube_enabled: false,
+            social_tiktok_enabled: false,
+            quick_links: [],
+            contact_address: '',
+            contact_support_time: '',
+            contact_phone: '',
+            contact_email: '',
+            card_title: '',
+            card_subtitle: '',
+            card_description: '',
+            card_whatsapp_text: '',
+            card_whatsapp_link: '',
+            card_call_text: '',
+            card_call_phone: '',
+            copyright_text: '',
+            payment_badges: [],
+            show_footer_logo: false,
+            show_about_section: false,
+            show_social_icons: false,
+            show_quick_links: false,
+            show_contact_info: false,
+            show_support_card: false,
+            show_copyright: false,
+            show_payment_badges: false
+          };
+        }
+      }
+
+      res.json(footerData);
+    } catch (err: any) {
+      console.error("Failed to GET footer settings:", err);
+      res.status(500).json({ error: "Failed to retrieve footer settings" });
+    }
+  });
+
+  app.get("/api/footer-settings/check", async (req, res) => {
+    try {
+      const client = supabaseServiceRole || supabaseAdmin;
+      if (!client) {
+        return res.json({
+          connected: false,
+          error: "Database configuration is missing. Connection failed.",
+          missingTable: "footer_settings",
+          missingColumns: []
+        });
+      }
+
+      // 1. Validate connectivity
+      const { error: connError } = await client.from('settings').select('id').limit(1);
+      if (connError && connError.message && connError.message.includes("fetch failed")) {
+        return res.json({
+          connected: false,
+          error: `Database connection failed: ${connError.message}`,
+          missingTable: "footer_settings",
+          missingColumns: []
+        });
+      }
+
+      // 2. Validate table existence
+      const { error: tableError } = await client.from('footer_settings').select('id').limit(1);
+      if (tableError) {
+        const msg = tableError.message || '';
+        if (msg.includes("does not exist") || tableError.code === '42P01' || tableError.code === 'PGRST116') {
+          return res.json({
+            connected: true,
+            error: "Database schema is incomplete. Missing table: footer_settings",
+            missingTable: "footer_settings",
+            missingColumns: []
+          });
+        }
+      }
+
+      // 3. Validate columns
+      const columnsToCheck = [
+        'id', 'footer_logo', 'footer_logo_width', 'footer_logo_height', 'about_title',
+        'about_description', 'social_facebook', 'social_messenger', 'social_whatsapp',
+        'social_instagram', 'social_telegram', 'social_youtube', 'social_tiktok',
+        'social_facebook_enabled', 'social_messenger_enabled', 'social_whatsapp_enabled',
+        'social_instagram_enabled', 'social_telegram_enabled', 'social_youtube_enabled',
+        'social_tiktok_enabled', 'quick_links', 'contact_address', 'contact_support_time',
+        'contact_phone', 'contact_email', 'card_title', 'card_subtitle', 'card_description',
+        'card_whatsapp_text', 'card_whatsapp_link', 'card_call_text', 'card_call_phone',
+        'copyright_text', 'payment_badges', 'show_footer_logo', 'show_about_section',
+        'show_social_icons', 'show_quick_links', 'show_contact_info', 'show_support_card',
+        'show_copyright', 'show_payment_badges'
+      ];
+
+      const missingColumns: string[] = [];
+      for (const col of columnsToCheck) {
+        const { error: colError } = await client
+          .from('footer_settings')
+          .select(col)
+          .limit(1);
+        
+        if (colError && (colError.code === '42703' || colError.message.includes("does not exist") || colError.message.includes("column"))) {
+          missingColumns.push(col);
+        }
+      }
+
+      if (missingColumns.length > 0) {
+        return res.json({
+          connected: true,
+          error: `Database schema is incomplete. Missing columns in table footer_settings: ${missingColumns.join(', ')}`,
+          missingTable: null,
+          missingColumns
+        });
+      }
+
+      return res.json({
+        connected: true,
+        error: null,
+        missingTable: null,
+        missingColumns: []
+      });
+    } catch (err: any) {
+      console.error("Schema check error:", err);
+      res.status(500).json({ error: err.message || "Failed to check schema" });
+    }
+  });
+
+  app.post("/api/footer-settings", async (req, res) => {
+    try {
+      const footerSettings = req.body;
+      const client = supabaseServiceRole || supabaseAdmin;
+
+      if (!client) {
+        return res.status(500).json({ error: "Database client is not initialized." });
+      }
+
+      // Check table existence before saving
+      const { error: tableError } = await client.from('footer_settings').select('id').limit(1);
+      if (tableError) {
+        const msg = tableError.message || '';
+        if (msg.includes("does not exist") || tableError.code === '42P01') {
+          return res.status(400).json({
+            error: "Database schema is incomplete. Missing table: footer_settings",
+            missingTable: "footer_settings"
+          });
+        }
+      }
+
+      // Check columns before saving
+      const columnsToCheck = [
+        'id', 'footer_logo', 'footer_logo_width', 'footer_logo_height', 'about_title',
+        'about_description', 'social_facebook', 'social_messenger', 'social_whatsapp',
+        'social_instagram', 'social_telegram', 'social_youtube', 'social_tiktok',
+        'social_facebook_enabled', 'social_messenger_enabled', 'social_whatsapp_enabled',
+        'social_instagram_enabled', 'social_telegram_enabled', 'social_youtube_enabled',
+        'social_tiktok_enabled', 'quick_links', 'contact_address', 'contact_support_time',
+        'contact_phone', 'contact_email', 'card_title', 'card_subtitle', 'card_description',
+        'card_whatsapp_text', 'card_whatsapp_link', 'card_call_text', 'card_call_phone',
+        'copyright_text', 'payment_badges', 'show_footer_logo', 'show_about_section',
+        'show_social_icons', 'show_quick_links', 'show_contact_info', 'show_support_card',
+        'show_copyright', 'show_payment_badges'
+      ];
+
+      const missingColumns: string[] = [];
+      for (const col of columnsToCheck) {
+        const { error: colError } = await client
+          .from('footer_settings')
+          .select(col)
+          .limit(1);
+        
+        if (colError && (colError.code === '42703' || colError.message.includes("does not exist") || colError.message.includes("column"))) {
+          missingColumns.push(col);
+        }
+      }
+
+      if (missingColumns.length > 0) {
+        return res.status(400).json({
+          error: `Database schema is incomplete. Missing table/column: footer_settings.${missingColumns[0]}`,
+          missingColumns
+        });
+      }
+
+      // Ensure id is global
+      footerSettings.id = 'global';
+      footerSettings.updated_at = new Date().toISOString();
+
+      // Ensure all numbers/booleans are strictly formatted
+      footerSettings.footer_logo_width = Number(footerSettings.footer_logo_width) || 150;
+      footerSettings.footer_logo_height = Number(footerSettings.footer_logo_height) || 40;
+
+      // Upsert into public.footer_settings
+      const { error: saveError } = await client
+        .from('footer_settings')
+        .upsert(footerSettings);
+      
+      if (saveError) {
+        console.error("[POST footer-settings] DB save error:", saveError);
+        return res.status(400).json({
+          error: `Database write failed: ${saveError.message}`,
+          code: saveError.code,
+          details: saveError.details,
+          hint: saveError.hint
+        });
+      }
+
+      // Save locally as fallback/cache
+      await fs.writeFile(FOOTER_FALLBACK_FILE, JSON.stringify(footerSettings, null, 2), 'utf-8');
+
+      // Strict validation: Reload saved values from the database and check match
+      const { data: verifiedData, error: verifyError } = await client
+        .from('footer_settings')
+        .select('*')
+        .eq('id', 'global')
+        .limit(1);
+
+      if (verifyError || !verifiedData || verifiedData.length === 0) {
+        return res.status(500).json({
+          error: "Verification failed. Saved settings could not be loaded/verified in the database."
+        });
+      }
+
+      res.json({ success: true, savedToDb: true, data: verifiedData[0] });
+    } catch (err: any) {
+      console.error("Failed to POST footer settings:", err);
+      res.status(500).json({ error: `Internal server error: ${err.message || err}` });
+    }
+  });
+
   // Secure Server-Side Promo Code Validation API Endpoint (Backend Calculation mandatory)
   app.post("/api/promo/validate", async (req, res) => {
     try {

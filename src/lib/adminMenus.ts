@@ -111,6 +111,12 @@ export const defaultNavItems: NavItem[] = [
     ]
   },
   {
+    name: 'Footer Management',
+    path: '/admin/management/footer',
+    icon: SlidersHorizontal,
+    moduleId: 'dashboard'
+  },
+  {
     name: 'Offers',
     path: '/admin/offers',
     icon: Ticket,
@@ -263,7 +269,6 @@ export const defaultNavItems: NavItem[] = [
     subItems: [
       { name: 'General Settings', path: '/admin/settings', icon: Settings },
       { name: 'Theme Settings', path: '/admin/theme-settings', icon: Palette },
-      { name: 'Flutter Manager', path: '/admin/flutter-manager', icon: Smartphone },
       { name: 'Automation', path: '/admin/automation', icon: Zap }
     ]
   },

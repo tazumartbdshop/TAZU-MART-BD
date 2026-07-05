@@ -1,19 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  ArrowRight, Star, Heart, ShoppingCart, Eye, 
-  MessageCircle, Phone, Sparkles, ChevronLeft, ChevronRight, CheckCircle2, ShieldCheck, Zap
+  ArrowRight, Heart, ShoppingCart, Eye, 
+  Sparkles, ChevronLeft, ChevronRight, Zap
 } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { useCategoryStore, resolveCategoryThumbnail } from '../store/useCategoryStore';
 import { useProductStore } from '../store/useProductStore';
 import { useBannerStore } from '../store/useBannerStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { useReviewStore } from '../store/useReviewStore';
 import { formatPrice } from '../lib/utils';
 import { CompactProductCard } from '../components/product/CompactProductCard';
 import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
 import { motion, AnimatePresence } from 'motion/react';
+import { preloadHomepageDataAndAssets } from '../utils/preloadHelper';
 
 // Helper to optimize banner image URLs to WebP with responsive fit and width
 function getOptimizedImageUrl(url: string, width = 1200): string {
@@ -39,10 +39,28 @@ export default function Home() {
   const { products, isLoading: productsLoading } = useProductStore();
   const { banners: storeBanners, isLoaded: isBannerStoreLoaded } = useBannerStore();
   const { settings } = useSettingsStore();
-  const { reviews, fetchReviews, isLoading: reviewsLoading } = useReviewStore();
+
+  const [isPreloaded, setIsPreloaded] = useState(() => {
+    return useCategoryStore.getState().categories.length > 0 &&
+           useProductStore.getState().products.length > 0 &&
+           useBannerStore.getState().banners.length > 0;
+  });
+
+  useEffect(() => {
+    let active = true;
+    async function startPreload() {
+      await preloadHomepageDataAndAssets();
+      if (active) {
+        setIsPreloaded(true);
+      }
+    }
+    startPreload();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [activeSlide, setActiveSlide] = useState(0);
-  const [activeReview, setActiveReview] = useState(0);
   const [isBannerImageLoaded, setIsBannerImageLoaded] = useState(false);
 
   // Dynamic active database categories mapped inside the exact home format
@@ -99,23 +117,6 @@ export default function Home() {
     }, 6000);
     return () => clearInterval(interval);
   }, [sliderBanners.length]);
-
-  // Fetch reviews on mount
-  useEffect(() => {
-    fetchReviews(true); // silent fetch
-  }, [fetchReviews]);
-
-  // Dynamic Approved Reviews for Testimonials
-  const approvedReviews = (reviews || []).filter(r => r.status === 'approved');
-
-  // Auto-play for testimonials
-  useEffect(() => {
-    if (approvedReviews.length <= 1) return;
-    const interval = setInterval(() => {
-      setActiveReview((prev) => (prev + 1) % approvedReviews.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [approvedReviews.length]);
 
   // Helper to matching database Category IDs
   const getCategoryRoute = (term: string) => {
@@ -178,13 +179,8 @@ export default function Home() {
     );
   };
 
-  // Only show skeleton if we have absolutely no data to show and stores are not loaded yet
-  const hasData = homeCategories.length > 0 || activeProducts.length > 0 || sliderBanners.length > 0;
-  const isActuallyLoading = (!categoriesLoaded && homeCategories.length === 0) || 
-                            (!isBannerStoreLoaded && sliderBanners.length === 0);
-
-  if (isActuallyLoading && !hasData) {
-    return <HomeSkeleton />;
+  if (!isPreloaded) {
+    return <div className="bg-neutral-50/50 min-h-screen" />;
   }
 
   const whatsappNumber = (settings.contactNumber || "8801314541738").replace(/[^0-9]/g, '');
@@ -472,163 +468,6 @@ export default function Home() {
         });
       })()}
 
-      {/* 8. CUSTOMER REVIEW SECTION (Dynamic, based on approved reviews) */}
-      {approvedReviews.length > 0 && (
-        <section className="py-8 bg-neutral-900 text-white select-none overflow-hidden">
-          <div className="container mx-auto px-3 max-w-xl">
-            <div className="text-center mb-6">
-              <span className="text-[8px] font-black uppercase tracking-[0.3em] text-amber-400 opacity-90">Trusted By Thousands</span>
-              <h2 className="text-sm md:text-lg font-black uppercase tracking-widest mt-1 font-display">Customer Feedback</h2>
-            </div>
-
-            <div className="relative h-[160px] md:h-[140px] flex flex-col justify-center">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={activeReview}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                  drag="x"
-                  dragConstraints={{ left: 0, right: 0 }}
-                  onDragEnd={(_, info) => {
-                    if (info.offset.x > 50) {
-                      setActiveReview((prev) => (prev - 1 + approvedReviews.length) % approvedReviews.length);
-                    } else if (info.offset.x < -50) {
-                      setActiveReview((prev) => (prev + 1) % approvedReviews.length);
-                    }
-                  }}
-                  className="w-full text-center px-4 cursor-grab active:cursor-grabbing"
-                >
-                  {/* Rating Feedback */}
-                  <div className="flex justify-center items-center gap-1 mb-3">
-                    {[...Array(5)].map((_, i) => (
-                      <Star 
-                        key={i} 
-                        className={`w-3.5 h-3.5 ${i < (approvedReviews[activeReview]?.rating || 5) ? 'fill-amber-400 text-amber-400' : 'fill-neutral-700 text-neutral-700'}`} 
-                      />
-                    ))}
-                  </div>
-                  
-                  <p className="text-[12px] md:text-[13px] font-medium text-neutral-100 italic leading-relaxed line-clamp-3 px-2 mb-4">
-                    " {approvedReviews[activeReview]?.reviewText} "
-                  </p>
-
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="text-[10px] md:text-[11px] font-black uppercase tracking-widest text-white">
-                        {approvedReviews[activeReview]?.customerName}
-                      </h4>
-                      {approvedReviews[activeReview]?.verified && (
-                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                          <CheckCircle2 className="w-2 h-2 text-emerald-400" />
-                          <span className="text-[7px] font-bold text-emerald-400 uppercase tracking-tighter">Verified</span>
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-[8px] font-bold text-neutral-500 uppercase tracking-[0.1em]">
-                      {new Date(approvedReviews[activeReview]?.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Testimonial Select Dots */}
-            {approvedReviews.length > 1 && (
-              <div className="flex justify-center items-center gap-1.5 mt-6">
-                {approvedReviews.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setActiveReview(i)}
-                    className={`h-1 rounded-full transition-all duration-500 ${i === activeReview ? 'w-6 bg-amber-400' : 'w-1.5 bg-neutral-700 hover:bg-neutral-600'}`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* 9. CONTACT SECTION (WhatsApp + Call Actions) */}
-      <section className="py-4 mb-2 container mx-auto px-3 max-w-sm">
-        <div className="bg-white rounded-xl border border-neutral-150 p-4 shadow-sm text-center">
-          <div className="flex justify-center mb-2">
-            <div className="w-8 h-8 rounded-full bg-neutral-50 border border-neutral-100 flex items-center justify-center text-neutral-900 shadow-sm shrink-0">
-               <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            </div>
-          </div>
-          <h3 className="font-black text-xs md:text-sm uppercase tracking-wider text-neutral-900 leading-tight">Authentic Customer Support</h3>
-          <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider mt-1 mb-3">Have queries? Talk directly with our team</p>
-          
-          <div className="grid grid-cols-2 gap-2">
-            <a 
-              href={`https://wa.me/${whatsappNumber}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 h-9 px-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 text-center"
-            >
-              <MessageCircle className="w-3.5 h-3.5 shrink-0 fill-white" /> WhatsApp
-            </a>
-            <a 
-              href={`tel:${hotlineNumber}`}
-              className="flex items-center justify-center gap-1.5 h-9 px-3 bg-black hover:bg-neutral-800 text-white rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95 text-center"
-            >
-              <Phone className="w-3.5 h-3.5 shrink-0 fill-white" /> Direct Call
-            </a>
-          </div>
-        </div>
-      </section>
-
-    </div>
-  );
-}
-
-function HomeSkeleton() {
-  return (
-    <div className="bg-neutral-50/50 min-h-screen pb-12 overflow-x-hidden font-sans animate-pulse">
-      {/* Banner Skeleton (16:9 aspect ratio) */}
-      <div className="w-full aspect-[16/9] bg-neutral-200" />
-
-      {/* Category List Skeleton */}
-      <div className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
-        <div className="container mx-auto px-3">
-          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-7 mx-auto max-w-2xl">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex flex-col items-center">
-                <div className="w-[16vw] h-[16vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full bg-neutral-200" />
-                <div className="h-3 w-12 bg-neutral-200 mt-2.5 rounded" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Products Skeletons - repeated for 2-3 sections */}
-      {[...Array(2)].map((_, sectionIdx) => (
-        <section key={sectionIdx} className="py-6 container mx-auto px-3 border-b border-neutral-100 animate-pulse">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-neutral-200 animate-pulse" />
-              <div className="h-5 w-32 bg-neutral-200 rounded" />
-            </div>
-            <div className="h-4 w-16 bg-neutral-200 rounded" />
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white border border-neutral-150 p-2.5 rounded-lg flex flex-col gap-3 h-full">
-                <div className="w-full aspect-square bg-neutral-200 rounded-lg" />
-                <div className="h-4 w-3/4 bg-neutral-200 rounded" />
-                <div className="h-3 w-1/2 bg-neutral-200 rounded" />
-                <div className="mt-auto pt-2 flex items-center justify-between">
-                  <div className="h-4 w-1/3 bg-neutral-200 rounded" />
-                  <div className="h-7 w-12 bg-neutral-200 rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
     </div>
   );
 }

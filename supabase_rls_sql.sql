@@ -356,6 +356,54 @@ CREATE TABLE IF NOT EXISTS public.banners_draft (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.footer_settings (
+  id TEXT PRIMARY KEY,
+  footer_logo TEXT,
+  footer_logo_width INT DEFAULT 150,
+  footer_logo_height INT DEFAULT 40,
+  about_title TEXT,
+  about_description TEXT,
+  social_facebook TEXT,
+  social_messenger TEXT,
+  social_whatsapp TEXT,
+  social_instagram TEXT,
+  social_telegram TEXT,
+  social_facebook_enabled BOOLEAN DEFAULT true,
+  social_messenger_enabled BOOLEAN DEFAULT true,
+  social_whatsapp_enabled BOOLEAN DEFAULT true,
+  social_instagram_enabled BOOLEAN DEFAULT true,
+  social_telegram_enabled BOOLEAN DEFAULT true,
+  quick_links JSONB DEFAULT '[]'::jsonb,
+  contact_address TEXT,
+  contact_support_time TEXT,
+  contact_phone TEXT,
+  contact_email TEXT,
+  card_title TEXT,
+  card_subtitle TEXT,
+  card_whatsapp_text TEXT,
+  card_whatsapp_link TEXT,
+  card_call_text TEXT,
+  card_call_phone TEXT,
+  copyright_text TEXT,
+  payment_badges JSONB DEFAULT '[]'::jsonb,
+  show_footer_logo BOOLEAN DEFAULT true,
+  show_about_section BOOLEAN DEFAULT true,
+  show_social_icons BOOLEAN DEFAULT true,
+  show_quick_links BOOLEAN DEFAULT true,
+  show_contact_info BOOLEAN DEFAULT true,
+  show_support_card BOOLEAN DEFAULT true,
+  show_copyright BOOLEAN DEFAULT true,
+  show_payment_badges BOOLEAN DEFAULT true,
+  updated_at TEXT
+);
+
+-- Enable RLS and add basic policies for footer_settings
+ALTER TABLE public.footer_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Footer settings read access" ON public.footer_settings;
+CREATE POLICY "Footer settings read access" ON public.footer_settings FOR SELECT TO public USING (true);
+DROP POLICY IF EXISTS "Footer settings write access" ON public.footer_settings;
+CREATE POLICY "Footer settings write access" ON public.footer_settings FOR ALL TO public USING (true) WITH CHECK (true);
+
 -- 2. UTILITY FUNCTION (ADMIN CHECK)
 -- ---------------------------------------------------------------------
 

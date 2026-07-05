@@ -59,7 +59,6 @@ import AdminIncompleteOrders from './AdminIncompleteOrders';
 import AdminCategories from './AdminCategories';
 import AdminStock from './AdminStock';
 import AdminCalculation from './AdminCalculation';
-import FlutterManager from './FlutterManager';
 import AdminPaymentMethods from './AdminPaymentMethods';
 import AdminPaymentMerchant from './AdminPaymentMerchant';
 import AdminPaymentList from './AdminPaymentList';
@@ -103,6 +102,7 @@ import AdminSiteManagement from './AdminSiteManagement';
 import AdminStoreIdentity from './AdminStoreIdentity';
 import AdminBusinessAddress from './AdminBusinessAddress';
 import AdminSocialLinks from './AdminSocialLinks';
+import AdminFooterSettings from './AdminFooterSettings';
 import AdminMarketingFacebook from './AdminMarketingFacebook';
 import AdminMarketingTikTok from './AdminMarketingTikTok';
 import AdminMarketingGoogle from './AdminMarketingGoogle';
@@ -605,7 +605,6 @@ export default function AdminDashboard() {
               <Route path="/automation" element={<PermissionGate moduleId="settings"><AdminAutomation /></PermissionGate>} />
               <Route path="/settings" element={<PermissionGate moduleId="settings"><AdminSettings /></PermissionGate>} />
               <Route path="/theme-settings" element={<PermissionGate moduleId="settings"><AdminThemeSettings /></PermissionGate>} />
-              <Route path="/flutter-manager" element={<PermissionGate moduleId="settings"><FlutterManager /></PermissionGate>} />
               <Route path="/activity-logs" element={<PermissionGate moduleId="logs"><ComingSoon title="Activity Logs" /></PermissionGate>} />
               <Route path="/marketing/facebook" element={<PermissionGate moduleId="dashboard"><AdminMarketingFacebook /></PermissionGate>} />
               <Route path="/marketing/tiktok" element={<PermissionGate moduleId="dashboard"><AdminMarketingTikTok /></PermissionGate>} />
@@ -620,6 +619,7 @@ export default function AdminDashboard() {
               <Route path="/management/store-identity" element={<PermissionGate moduleId="dashboard"><AdminStoreIdentity /></PermissionGate>} />
               <Route path="/management/business-address" element={<PermissionGate moduleId="dashboard"><AdminBusinessAddress /></PermissionGate>} />
               <Route path="/management/social-links" element={<PermissionGate moduleId="dashboard"><AdminSocialLinks /></PermissionGate>} />
+              <Route path="/management/footer" element={<PermissionGate moduleId="dashboard"><AdminFooterSettings /></PermissionGate>} />
               <Route path="/management/support-banner" element={<PermissionGate moduleId="dashboard"><AdminSupportBanner /></PermissionGate>} />
               <Route path="/support" element={<PermissionGate moduleId="support"><AdminSupport /></PermissionGate>} />
               <Route path="/ai-control-center" element={<PermissionGate moduleId="settings"><AdminAIControlCenter /></PermissionGate>} />
