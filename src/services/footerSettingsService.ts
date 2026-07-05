@@ -99,12 +99,41 @@ export const DEFAULT_FOOTER_SETTINGS: FooterSettings = {
 
 const LOCAL_STORAGE_KEY = 'tazu_footer_settings_fallback';
 
+export function sanitizeFooterSettings(settings: any): FooterSettings {
+  if (!settings) return { ...DEFAULT_FOOTER_SETTINGS };
+  const sanitized = { ...DEFAULT_FOOTER_SETTINGS, ...settings };
+  
+  if (typeof sanitized.quick_links === 'string') {
+    try {
+      sanitized.quick_links = JSON.parse(sanitized.quick_links);
+    } catch (e) {
+      sanitized.quick_links = [];
+    }
+  }
+  if (!Array.isArray(sanitized.quick_links)) {
+    sanitized.quick_links = [];
+  }
+  
+  if (typeof sanitized.payment_badges === 'string') {
+    try {
+      sanitized.payment_badges = JSON.parse(sanitized.payment_badges);
+    } catch (e) {
+      sanitized.payment_badges = [];
+    }
+  }
+  if (!Array.isArray(sanitized.payment_badges)) {
+    sanitized.payment_badges = [];
+  }
+  
+  return sanitized;
+}
+
 export const footerSettingsService = {
   getFallbackSettings(): FooterSettings {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
-        return { ...DEFAULT_FOOTER_SETTINGS, ...JSON.parse(saved) };
+        return sanitizeFooterSettings(JSON.parse(saved));
       }
     } catch (e) {
       console.warn("localStorage fallback parse failed:", e);
@@ -130,8 +159,9 @@ export const footerSettingsService = {
       if (response.ok) {
         const data = await response.json();
         if (data && data.id === 'global') {
-          this.saveFallbackSettings(data);
-          return data;
+          const sanitized = sanitizeFooterSettings(data);
+          this.saveFallbackSettings(sanitized);
+          return sanitized;
         }
       }
     } catch (e) {
@@ -156,15 +186,17 @@ export const footerSettingsService = {
           .limit(1);
         
         if (settingsData && settingsData.length > 0) {
-          const parsed = typeof settingsData[0].value === 'string' ? JSON.parse(settingsData[0].value) : settingsData[0].value;
-          this.saveFallbackSettings(parsed);
-          return parsed;
+          const val = settingsData[0].value;
+          const parsed = typeof val === 'string' ? JSON.parse(val) : val;
+          const sanitized = sanitizeFooterSettings(parsed);
+          this.saveFallbackSettings(sanitized);
+          return sanitized;
         }
         throw error;
       }
 
       if (data && data.length > 0) {
-        const settings = data[0] as FooterSettings;
+        const settings = sanitizeFooterSettings(data[0]);
         this.saveFallbackSettings(settings);
         return settings;
       } else {

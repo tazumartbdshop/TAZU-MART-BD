@@ -51,26 +51,52 @@ export function Footer() {
 
   // Build list of active, enabled social links from dynamic settings
   const activeSocials = [];
-  if (settings.social_facebook_enabled && settings.social_facebook) {
+  if (settings?.social_facebook_enabled && settings?.social_facebook) {
     activeSocials.push({ name: 'facebook', url: settings.social_facebook });
   }
-  if (settings.social_messenger_enabled && settings.social_messenger) {
+  if (settings?.social_messenger_enabled && settings?.social_messenger) {
     activeSocials.push({ name: 'messenger', url: settings.social_messenger });
   }
-  if (settings.social_whatsapp_enabled && settings.social_whatsapp) {
+  if (settings?.social_whatsapp_enabled && settings?.social_whatsapp) {
     activeSocials.push({ name: 'whatsapp', url: settings.social_whatsapp });
   }
-  if (settings.social_instagram_enabled && settings.social_instagram) {
+  if (settings?.social_instagram_enabled && settings?.social_instagram) {
     activeSocials.push({ name: 'instagram', url: settings.social_instagram });
   }
-  if (settings.social_telegram_enabled && settings.social_telegram) {
+  if (settings?.social_telegram_enabled && settings?.social_telegram) {
     activeSocials.push({ name: 'telegram', url: settings.social_telegram });
   }
-  if (settings.social_youtube_enabled && settings.social_youtube) {
+  if (settings?.social_youtube_enabled && settings?.social_youtube) {
     activeSocials.push({ name: 'youtube', url: settings.social_youtube });
   }
-  if (settings.social_tiktok_enabled && settings.social_tiktok) {
+  if (settings?.social_tiktok_enabled && settings?.social_tiktok) {
     activeSocials.push({ name: 'tiktok', url: settings.social_tiktok });
+  }
+
+  // Safely parse quick_links
+  let quickLinks: any[] = [];
+  if (Array.isArray(settings?.quick_links)) {
+    quickLinks = settings.quick_links;
+  } else if (typeof settings?.quick_links === 'string') {
+    try {
+      quickLinks = JSON.parse(settings.quick_links);
+    } catch (e) {}
+  }
+  if (!Array.isArray(quickLinks)) {
+    quickLinks = [];
+  }
+
+  // Safely parse payment_badges
+  let paymentBadges: string[] = [];
+  if (Array.isArray(settings?.payment_badges)) {
+    paymentBadges = settings.payment_badges;
+  } else if (typeof settings?.payment_badges === 'string') {
+    try {
+      paymentBadges = JSON.parse(settings.payment_badges);
+    } catch (e) {}
+  }
+  if (!Array.isArray(paymentBadges)) {
+    paymentBadges = [];
   }
 
   return (
@@ -142,7 +168,7 @@ export function Footer() {
                   Quick Navigation
                 </h4>
                 <ul className="space-y-3.5">
-                  {(settings.quick_links || []).map((link, idx) => (
+                  {quickLinks.map((link, idx) => (
                     <li key={idx}>
                       <Link 
                         to={link.url} 
@@ -253,7 +279,7 @@ export function Footer() {
         </div>
 
         {/* Bottom copyright & payment stickers */}
-        {(settings.show_copyright || (settings.show_payment_badges && (settings.payment_badges || []).length > 0)) && (
+        {(settings.show_copyright || (settings.show_payment_badges && paymentBadges.length > 0)) && (
           <div className="border-t border-zinc-900 pt-8 mt-12 flex flex-col md:flex-row items-center justify-between gap-6">
             {settings.show_copyright && (
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 text-center md:text-left">
@@ -261,9 +287,9 @@ export function Footer() {
               </p>
             )}
 
-            {settings.show_payment_badges && (settings.payment_badges || []).length > 0 && (
+            {settings.show_payment_badges && paymentBadges.length > 0 && (
               <div className="flex flex-wrap gap-2 justify-center">
-                {settings.payment_badges.map((badge, idx) => (
+                {paymentBadges.map((badge, idx) => (
                   <div 
                     key={idx} 
                     className="px-3 py-1 bg-zinc-900 border border-zinc-800 text-[8px] font-black tracking-widest text-zinc-400 uppercase"
