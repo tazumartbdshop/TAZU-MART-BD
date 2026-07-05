@@ -8,7 +8,6 @@ import { useBrandingStore } from '../store/useBrandingStore';
 import { useWebsitesStore } from '../store/useWebsitesStore';
 import { useModeratorStore } from '../store/useModeratorStore';
 import { useLoginHistoryStore } from '../store/useLoginHistoryStore';
-import { getSupabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { pixelService } from '../utils/pixelService';
 import { getProviderIcon } from '../components/ProviderIcon';
@@ -56,18 +55,8 @@ export default function Login() {
     try {
       setOauthLoading(providerId);
       setError('');
-      const supabase = getSupabase();
-      if (!supabase) throw new Error("Database connection not ready.");
-
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider: providerId as any,
-        options: {
-          redirectTo: `${window.location.origin}/account/dashboard`,
-        }
-      });
-
-      if (authError) throw new Error(authError.message);
-      
+      // Standard message informing user to login via email/phone
+      throw new Error("Social login is currently disabled. Please sign in using your Email or Mobile Number.");
     } catch (err: any) {
       console.error(`${providerId} login error:`, err);
       setError(err.message || `Failed to sign in with ${providerId}`);
