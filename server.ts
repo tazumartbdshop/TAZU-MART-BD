@@ -211,6 +211,26 @@ async function initDB() {
       )
     `);
 
+    try {
+      const [rows]: any = await db.execute("SELECT * FROM users WHERE role = 'admin' LIMIT 1");
+      if (rows.length === 0) {
+        const email = "admin.tazumartbd@gmail.com";
+        const password = "8963885522";
+        const name = "Super Admin";
+        const phone = "01700000000";
+        const uuid = crypto.randomUUID();
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        await db.execute(
+          "INSERT INTO users (uuid, email, password, name, phone, role, status) VALUES (?, ?, ?, ?, ?, 'admin', 'Active')",
+          [uuid, email, hashedPassword, name, phone]
+        );
+        console.log("Seeded default admin user:", email);
+      }
+    } catch (e) {
+      console.error("Failed to seed admin user:", e);
+    }
+
     console.log("Database initialized successfully");
   } catch (error) {
     console.error("Database initialization failed:", error);
@@ -381,15 +401,45 @@ async function startServer() {
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { email, password, name, phone } = req.body;
+      const cleanEmail = (email || "").toLowerCase().trim();
+      const cleanPhone = (phone || "").trim();
+
+      if (!cleanEmail) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      if (!password) {
+        return res.status(400).json({ error: "Password is required" });
+      }
+
+      // Check if email already exists
+      const [emailCheck]: any = await db.execute("SELECT id FROM users WHERE LOWER(email) = ?", [cleanEmail]);
+      if (emailCheck.length > 0) {
+        return res.status(400).json({ error: "Email is already registered" });
+      }
+
+      // Check if phone already exists if provided
+      if (cleanPhone) {
+        const [phoneCheck]: any = await db.execute("SELECT id FROM users WHERE phone = ?", [cleanPhone]);
+        if (phoneCheck.length > 0) {
+          return res.status(400).json({ error: "Phone number is already registered" });
+        }
+      }
+
       const hashedPassword = await bcrypt.hash(password, 10);
       const uuid = crypto.randomUUID();
 
       await db.execute(
-        "INSERT INTO users (uuid, email, password, name, phone) VALUES (?, ?, ?, ?, ?)",
-        [uuid, email, hashedPassword, name, phone]
+        "INSERT INTO users (uuid, email, password, name, phone, role, status) VALUES (?, ?, ?, ?, ?, 'customer', 'Active')",
+        [uuid, cleanEmail, hashedPassword, name || "Customer", cleanPhone]
       );
 
-      res.json({ status: "success", message: "User registered successfully" });
+      // Fetch the newly registered user to generate token
+      const [rows]: any = await db.execute("SELECT * FROM users WHERE uuid = ?", [uuid]);
+      const user = rows[0];
+      const token = jwt.sign({ id: user.id, uuid: user.uuid, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+      const { password: _, ...userWithoutPassword } = user;
+
+      res.json({ status: "success", message: "User registered successfully", token, user: userWithoutPassword });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -398,11 +448,30 @@ async function startServer() {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
-      const [rows]: any = await db.execute("SELECT * FROM users WHERE email = ?", [email]);
+      const identifier = (email || "").toLowerCase().trim();
+
+      if (!identifier || !password) {
+        return res.status(400).json({ error: "Email/Phone and password are required" });
+      }
+
+      // Select user by email or phone
+      const [rows]: any = await db.execute(
+        "SELECT * FROM users WHERE LOWER(email) = ? OR phone = ?",
+        [identifier, identifier]
+      );
       const user = rows[0];
 
-      if (!user || !(await bcrypt.compare(password, user.password))) {
-        return res.status(401).json({ error: "Invalid email or password" });
+      if (!user) {
+        return res.status(401).json({ error: "Invalid email/phone or password" });
+      }
+
+      const isPasswordMatch = await bcrypt.compare(password, user.password);
+      if (!isPasswordMatch) {
+        return res.status(401).json({ error: "Invalid email/phone or password" });
+      }
+
+      if (!user.status || user.status.toLowerCase() !== 'active') {
+        return res.status(403).json({ error: "Your account is not active. Please contact support." });
       }
 
       const token = jwt.sign({ id: user.id, uuid: user.uuid, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
@@ -410,6 +479,32 @@ async function startServer() {
       res.json({ status: "success", token, user: userWithoutPassword });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "No token provided" });
+      }
+      const token = authHeader.split(" ")[1];
+      const decoded: any = jwt.verify(token, JWT_SECRET);
+
+      const [rows]: any = await db.execute("SELECT id, uuid, email, name, phone, role, status, created_at FROM users WHERE id = ?", [decoded.id]);
+      const user = rows[0];
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (!user.status || user.status.toLowerCase() !== 'active') {
+        return res.status(403).json({ error: "Your account is not active. Please contact support." });
+      }
+
+      res.json({ status: "success", user });
+    } catch (error: any) {
+      res.status(401).json({ error: "Invalid or expired token" });
     }
   });
 

@@ -62,7 +62,37 @@ import { RuntimeDiagnostics } from './components/common/RuntimeDiagnostics';
 
 export default function App() {
   const { fetchSettings } = useSiteManagementStore();
-  const { user } = useAuthStore();
+  const { user, token, logout, login } = useAuthStore();
+
+  useEffect(() => {
+    async function verifySession() {
+      if (token) {
+        try {
+          const res = await fetch('/api/auth/me', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok && data.status === 'success' && data.user) {
+            login({
+              id: String(data.user.id),
+              uuid: data.user.uuid,
+              name: data.user.name || 'User',
+              email: data.user.email || '',
+              role: (data.user.role || 'customer') as any,
+              phone: data.user.phone || '',
+              profileImage: data.user.profile_image || '',
+              status: data.user.status || 'Active'
+            }, token);
+          } else {
+            logout();
+          }
+        } catch (err) {
+          console.error("Session verification failed:", err);
+        }
+      }
+    }
+    verifySession();
+  }, [token, logout, login]);
 
   useEffect(() => {
     broadcastSync.init();

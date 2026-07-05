@@ -88,140 +88,52 @@ export default function Login() {
 
     try {
       const normalizedIdentifier = identifier.toLowerCase().trim();
-      const isEmail = normalizedIdentifier.includes('@');
-      const supabase = getSupabase();
-
-      if (!supabase) {
-        throw new Error("Database connection not ready.");
-      }
-
-      // 1. Check Dynamic Website Admin
-      if (isEmail) {
-        const websites = useWebsitesStore.getState().websites;
-        const matchedSite = websites.find(w => w.admin_email.toLowerCase().trim() === normalizedIdentifier && w.admin_password === password);
-        
-        if (matchedSite) {
-           useLoginHistoryStore.getState().addLoginEvent({
-              name: matchedSite.website_name + ' Admin',
-              email: matchedSite.admin_email,
-              method: 'Manual Login',
-              password: password,
-            });
-
-            login({
-              id: `site_admin_${matchedSite.domain}`,
-              name: matchedSite.website_name + ' Admin',
-              email: matchedSite.admin_email,
-              role: 'admin',
-              permissions: ['all']
-            });
-
-            navigate(`/site-admin/${matchedSite.domain}`);
-            return;
-        }
-
-        // 2. Check Super Admin
-        if (normalizedIdentifier === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-            useLoginHistoryStore.getState().addLoginEvent({
-              name: 'Super Admin',
-              email: ADMIN_EMAIL,
-              method: 'Manual Login',
-              password: password,
-            });
-
-            login({
-              id: 'super_admin_id',
-              name: 'Super Admin',
-              email: ADMIN_EMAIL,
-              role: 'admin',
-              permissions: ['all']
-            });
-
-            navigate('/admin');
-            return;
-        }
-
-        // 3. Check Moderator
-        const moderator = useModeratorStore.getState().getModeratorByEmail(normalizedIdentifier);
-        if (moderator && moderator.password === password && moderator.status === 'Active') {
-            useLoginHistoryStore.getState().addLoginEvent({
-              name: moderator.name,
-              email: moderator.email,
-              method: 'Manual Login',
-              password: password,
-            });
-
-            login({
-              id: `moderator_${moderator.id}`,
-              name: moderator.name,
-              email: moderator.email,
-              role: 'admin',
-              permissions: moderator.permissions
-            });
-
-            navigate('/admin');
-            return;
-        }
-      }
-
-      // 4. Regular Customer Login via Supabase Auth
-      if (isEmail) {
-        const { data, error: authError } = await supabase.auth.signInWithPassword({
+      
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email: normalizedIdentifier,
-          password: password,
-        });
+          password: password
+        })
+      });
 
-        if (authError) {
-          throw new Error(authError.message);
-        }
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed. Please check your credentials.');
+      }
 
-        if (data.user) {
-          // Fetch user details from 'users' table
-          const { data: dbUser } = await supabase.from('users').select('*').eq('id', data.user.id).single();
-          
-          const userData = {
-            id: data.user.id,
-            name: dbUser?.name || data.user.user_metadata?.name || 'Customer',
-            email: data.user.email!,
-            role: 'customer' as const,
-            phone: dbUser?.phone || data.user.user_metadata?.phone || '',
-            profileImage: dbUser?.profileImage || data.user.user_metadata?.profileImage || '',
-          };
-
-          login(userData);
-          pixelService.trackLogin(data.user.id);
-          navigate('/account/dashboard');
-          return;
-        }
-      } else {
-        // Phone number based login (Check database manually as Supabase Auth usually requires email)
-        const { data: phoneUser, error: phoneError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('phone', normalizedIdentifier)
-          .eq('password', password)
-          .limit(1)
-          .single();
-
-        if (phoneError || !phoneUser) {
-          throw new Error("Invalid phone number or password");
-        }
-
+      if (data.status === 'success' && data.user) {
+        const loggedUser = data.user;
         const userData = {
-          id: phoneUser.id,
-          name: phoneUser.name,
-          email: phoneUser.email || '',
-          role: 'customer' as const,
-          phone: phoneUser.phone,
-          profileImage: phoneUser.profileImage || '',
+          id: String(loggedUser.id),
+          uuid: loggedUser.uuid,
+          name: loggedUser.name || 'User',
+          email: loggedUser.email || '',
+          role: (loggedUser.role || 'customer') as any,
+          phone: loggedUser.phone || '',
+          profileImage: loggedUser.profile_image || '',
+          status: loggedUser.status || 'Active'
         };
 
-        login(userData);
-        pixelService.trackLogin(phoneUser.id);
-        navigate('/account/dashboard');
-        return;
-      }
+        login(userData, data.token);
 
+        useLoginHistoryStore.getState().addLoginEvent({
+          name: userData.name,
+          email: userData.email,
+          method: 'Manual Login',
+          password: '••••••••',
+        });
+
+        if (userData.role === 'admin') {
+          navigate(adminFrom, { replace: true });
+        } else {
+          navigate(from, { replace: true });
+        }
+        return;
+      } else {
+        throw new Error('Invalid login response from server');
+      }
     } catch (err: any) {
       console.error("Login Error:", err);
       setError(err.message || 'Login failed. Please check your credentials.');

@@ -253,107 +253,50 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      const supabase = getSupabase();
-      if (!supabase) throw new Error("Database connection not ready");
-
       const fullPhoneNumber = `+880${formData.phone.trim()}`;
       const signupEmail = formData.email ? formData.email.toLowerCase().trim() : `${fullPhoneNumber}@tazumart.com`;
       
-      // 1. Register with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: signupEmail,
-        password: formData.password,
-        options: {
-          data: {
-            name: formData.fullName,
-            phone: fullPhoneNumber,
-            role: 'customer'
-          }
-        }
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: signupEmail,
+          password: formData.password,
+          name: formData.fullName.trim(),
+          phone: fullPhoneNumber
+        })
       });
 
-      if (authError) throw new Error(authError.message);
-      if (!authData.user) throw new Error("Registration failed");
-
-      // Serialize special days to save in database
-      const occasionJson = JSON.stringify(specialDays);
-
-      // 2. Save user profile to 'users' table
-      const { error: dbError } = await supabase.from('users').insert([{
-        id: authData.user.id,
-        uid: authData.user.id,
-        name: formData.fullName,
-        email: formData.email.toLowerCase().trim() || '',
-        phone: fullPhoneNumber || '',
-        role: 'customer',
-        status: 'Active',
-        created_at: new Date().toISOString(),
-        gender: formData.gender,
-        address: formData.address.trim(),
-        profile_image: profileImage || null,
-        occasion_name: occasionJson,
-        postal_code: '',
-        division: '',
-        district: '',
-        upazila: '',
-        area: '',
-      }]);
-
-      if (dbError) {
-        console.error("Profile table insert failed:", dbError);
-        throw new Error(`Database registration failed: Table 'users' returned error - ${dbError.message}`);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed. Please try again.');
       }
 
-      // 3. Save to 'customers' table
-      const { error: customerError } = await supabase.from('customers').insert([{
-        id: authData.user.id,
-        name: formData.fullName,
-        email: formData.email.toLowerCase().trim() || '',
-        phone: fullPhoneNumber || '',
-        address: {
-          street: formData.address.trim(),
-          division: '',
-          district: '',
-          upazila: '',
-          zipCode: ''
-        },
-        profile_image: profileImage || null,
-        gender: formData.gender,
-        occasion_name: occasionJson,
-        status: 'Active',
-        customer_type: 'Regular',
-        created_at: new Date().toISOString()
-      }]);
+      if (data.status === 'success' && data.user) {
+        const loggedUser = data.user;
+        const userData = {
+          id: String(loggedUser.id),
+          uuid: loggedUser.uuid,
+          name: loggedUser.name || 'User',
+          email: loggedUser.email || '',
+          role: (loggedUser.role || 'customer') as any,
+          phone: loggedUser.phone || '',
+          profileImage: loggedUser.profile_image || '',
+          status: loggedUser.status || 'Active'
+        };
 
-      if (customerError) {
-        console.error("Customer table insert failed:", customerError);
-        throw new Error(`Database registration failed: Table 'customers' returned error - ${customerError.message}`);
+        login(userData, data.token);
+
+        pixelService.trackRegister(userData.id);
+        setSuccess(true);
+        setTimeout(() => navigate(from, { replace: true }), 1500);
+      } else {
+        throw new Error('Invalid response from server');
       }
-
-      // 4. Update Stores
-      login({
-        id: authData.user.id,
-        name: formData.fullName,
-        email: formData.email.toLowerCase().trim() || '',
-        phone: fullPhoneNumber,
-        role: 'customer',
-        gender: formData.gender,
-        address: formData.address.trim(),
-        profileImage: profileImage || '',
-        occasionName: occasionJson,
-      });
-
-      pixelService.trackRegister(authData.user.id);
-      setSuccess(true);
-      setTimeout(() => navigate(from, { replace: true }), 1500);
 
     } catch (err: any) {
       console.error("Registration Error:", err);
-      if (err.message?.includes('rate limit')) {
-        setError('Email rate limit exceeded. Please disable "Confirm Email" in your Supabase Auth settings to continue testing, or try again in an hour.');
-      } else {
-        setError(err.message || 'Registration failed. Please try again.');
-      }
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
