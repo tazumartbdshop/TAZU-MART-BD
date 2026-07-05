@@ -487,53 +487,7 @@ async function startServer() {
       const client = supabaseServiceRole || supabaseAdmin;
 
       if (!client) {
-        return res.status(500).json({ error: "Database client is not initialized." });
-      }
-
-      // Check table existence before saving
-      const { error: tableError } = await client.from('footer_settings').select('id').limit(1);
-      if (tableError) {
-        const msg = tableError.message || '';
-        if (msg.includes("does not exist") || tableError.code === '42P01') {
-          return res.status(400).json({
-            error: "Database schema is incomplete. Missing table: footer_settings",
-            missingTable: "footer_settings"
-          });
-        }
-      }
-
-      // Check columns before saving
-      const columnsToCheck = [
-        'id', 'footer_logo', 'footer_logo_width', 'footer_logo_height', 'about_title',
-        'about_description', 'social_facebook', 'social_messenger', 'social_whatsapp',
-        'social_instagram', 'social_telegram', 'social_youtube', 'social_tiktok',
-        'social_facebook_enabled', 'social_messenger_enabled', 'social_whatsapp_enabled',
-        'social_instagram_enabled', 'social_telegram_enabled', 'social_youtube_enabled',
-        'social_tiktok_enabled', 'quick_links', 'contact_address', 'contact_support_time',
-        'contact_phone', 'contact_email', 'card_title', 'card_subtitle', 'card_description',
-        'card_whatsapp_text', 'card_whatsapp_link', 'card_call_text', 'card_call_phone',
-        'copyright_text', 'payment_badges', 'show_footer_logo', 'show_about_section',
-        'show_social_icons', 'show_quick_links', 'show_contact_info', 'show_support_card',
-        'show_copyright', 'show_payment_badges'
-      ];
-
-      const missingColumns: string[] = [];
-      for (const col of columnsToCheck) {
-        const { error: colError } = await client
-          .from('footer_settings')
-          .select(col)
-          .limit(1);
-        
-        if (colError && (colError.code === '42703' || colError.message.includes("does not exist") || colError.message.includes("column"))) {
-          missingColumns.push(col);
-        }
-      }
-
-      if (missingColumns.length > 0) {
-        return res.status(400).json({
-          error: `Database schema is incomplete. Missing table/column: footer_settings.${missingColumns[0]}`,
-          missingColumns
-        });
+        return res.status(500).json({ success: false, error: "Database client is not initialized." });
       }
 
       // Ensure id is global
@@ -546,21 +500,23 @@ async function startServer() {
 
       // Upsert into public.footer_settings
       const { error: saveError } = await client
-        .from('footer_settings')
-        .upsert(footerSettings);
+         .from('footer_settings')
+         .upsert(footerSettings);
       
       if (saveError) {
         console.error("[POST footer-settings] DB save error:", saveError);
         return res.status(400).json({
-          error: `Database write failed: ${saveError.message}`,
-          code: saveError.code,
-          details: saveError.details,
-          hint: saveError.hint
+          success: false,
+          error: "Failed to save footer settings. Please try again."
         });
       }
 
       // Save locally as fallback/cache
-      await fs.writeFile(FOOTER_FALLBACK_FILE, JSON.stringify(footerSettings, null, 2), 'utf-8');
+      try {
+        await fs.writeFile(FOOTER_FALLBACK_FILE, JSON.stringify(footerSettings, null, 2), 'utf-8');
+      } catch (fsErr) {
+        console.warn("Could not save fallback JSON file:", fsErr);
+      }
 
       // Strict validation: Reload saved values from the database and check match
       const { data: verifiedData, error: verifyError } = await client
@@ -570,15 +526,22 @@ async function startServer() {
         .limit(1);
 
       if (verifyError || !verifiedData || verifiedData.length === 0) {
+        console.error("[POST footer-settings] Verification reload failed:", verifyError);
         return res.status(500).json({
-          error: "Verification failed. Saved settings could not be loaded/verified in the database."
+          success: false,
+          error: "Failed to save footer settings. Please try again."
         });
       }
 
-      res.json({ success: true, savedToDb: true, data: verifiedData[0] });
+      res.json({
+        success: true,
+        message: "Footer settings saved successfully.",
+        savedToDb: true,
+        data: verifiedData[0]
+      });
     } catch (err: any) {
       console.error("Failed to POST footer settings:", err);
-      res.status(500).json({ error: `Internal server error: ${err.message || err}` });
+      res.status(500).json({ success: false, error: "Failed to save footer settings. Please try again." });
     }
   });
 

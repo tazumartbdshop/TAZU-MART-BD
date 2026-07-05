@@ -15,10 +15,6 @@ export default function AdminFooterSettings() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  // Database & Schema Integrity States
-  const [schemaError, setSchemaError] = useState<string | null>(null);
-  const [checkingSchema, setCheckingSchema] = useState(true);
-  const [dbConnected, setDbConnected] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
 
@@ -59,36 +55,8 @@ export default function AdminFooterSettings() {
   // Form Submission Validation Flag to highlight empty fields
   const [hasSubmittedAttempt, setHasSubmittedAttempt] = useState(false);
 
-  // Check database table schema and connection
-  const checkDatabaseSchema = async () => {
-    setCheckingSchema(true);
-    setSchemaError(null);
-    try {
-      const response = await fetch('/api/footer-settings/check');
-      if (response.ok) {
-        const data = await response.json();
-        setDbConnected(data.connected);
-        if (data.error) {
-          setSchemaError(data.error);
-        } else {
-          setSchemaError(null);
-        }
-      } else {
-        const errData = await response.json().catch(() => ({}));
-        setSchemaError(errData.error || 'Failed to check database schema.');
-      }
-    } catch (err: any) {
-      console.error("Schema check request failed:", err);
-      setSchemaError(`Database connection failed: ${err.message || err}`);
-      setDbConnected(false);
-    } finally {
-      setCheckingSchema(false);
-    }
-  };
-
   // Initialize
   useEffect(() => {
-    checkDatabaseSchema();
     fetchFooterSettings();
   }, []);
 
@@ -173,37 +141,6 @@ export default function AdminFooterSettings() {
 
     setSaveStatus('saving');
 
-    // 1. Verify connection & schema before attempting database write
-    try {
-      const checkRes = await fetch('/api/footer-settings/check');
-      if (!checkRes.ok) {
-        throw new Error("Unable to reach database schema verification API");
-      }
-      const checkData = await checkRes.json();
-      
-      if (!checkData.connected) {
-        setValidationError("Database connectivity failed. Please ensure the database is online and accessible.");
-        setSaveStatus('error');
-        return;
-      }
-      
-      if (checkData.missingTable) {
-        setValidationError(`Database schema is incomplete. Missing table: ${checkData.missingTable}`);
-        setSaveStatus('error');
-        return;
-      }
-      
-      if (checkData.missingColumns && checkData.missingColumns.length > 0) {
-        setValidationError(`Database schema is incomplete. Missing table/column: footer_settings.${checkData.missingColumns[0]}`);
-        setSaveStatus('error');
-        return;
-      }
-    } catch (err: any) {
-      setValidationError(`Database connectivity and schema validation failed: ${err.message || err}`);
-      setSaveStatus('error');
-      return;
-    }
-
     try {
       const payload: FooterSettings = {
         id: 'global',
@@ -265,7 +202,7 @@ export default function AdminFooterSettings() {
       }
 
       const resData = await response.json();
-      if (resData.success && resData.data) {
+      if (resData.success) {
         // Reload values from the database and sync the global store
         await fetchFooterSettings();
         setSaveStatus('success');
@@ -275,8 +212,8 @@ export default function AdminFooterSettings() {
         throw new Error("Failed to verify saved values against the database after saving.");
       }
     } catch (e: any) {
-      console.error(e);
-      setDbErrorMessage(e.message || String(e));
+      console.error("Detailed error while saving footer settings:", e);
+      setDbErrorMessage("Failed to save footer settings. Please try again.");
       setSaveStatus('error');
     }
   };
@@ -386,17 +323,6 @@ export default function AdminFooterSettings() {
           <h1 className="text-lg font-black tracking-widest text-zinc-900 uppercase">Footer Management</h1>
         </div>
 
-        {/* Dynamic Warning Alert banners (simple and flat) */}
-        {checkingSchema ? (
-          <div className="border-l-2 border-zinc-300 bg-zinc-50 p-3 text-[10px] uppercase tracking-wider font-bold text-zinc-600">
-            Verifying database schema integrity...
-          </div>
-        ) : schemaError ? (
-          <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800">
-            <strong>Database Schema Warning:</strong> {schemaError}
-          </div>
-        ) : null}
-
         {validationError && (
           <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800 font-semibold">
             {validationError}
@@ -404,8 +330,8 @@ export default function AdminFooterSettings() {
         )}
 
         {dbErrorMessage && (
-          <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800 font-mono">
-            <strong>Database Write Error:</strong> {dbErrorMessage}
+          <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800 font-semibold">
+            {dbErrorMessage}
           </div>
         )}
 
