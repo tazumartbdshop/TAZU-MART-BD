@@ -712,11 +712,11 @@ export default function SettingsPage() {
           profileImage: profilePic
         });
 
-        triggerToast(result?.message || "Profile updated successfully.");
+        triggerToast("✅ " + (result?.message || "Profile updated successfully."));
       }
     } catch (err: any) {
       console.error("Profile Save Error:", err);
-      triggerToast(err.message || "Unable to save changes. Please try again.", true);
+      triggerToast("❌ " + (err.message || "Unable to save changes. Please try again."), true);
     } finally {
       setIsLoading(false);
     }

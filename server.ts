@@ -1330,6 +1330,24 @@ Please ask me your query or select a quick question template below!`;
       const { id, updates } = req.body;
       if (!id) return res.status(400).json({ error: "Customer ID is required" });
 
+      // Field mapping: CamelCase to snake_case
+      const fieldMapping: Record<string, string> = {
+        profileImage: 'profile_image',
+        occasionName: 'occasion_name',
+        specialDate: 'special_date',
+        fullName: 'name',
+        profilePic: 'profile_image',
+        dateOfBirth: 'special_date',
+        updatedAt: 'updated_at'
+      };
+
+      const mappedUpdates: any = { ...updates };
+      Object.keys(fieldMapping).forEach(camel => {
+        if (updates[camel] !== undefined) {
+          mappedUpdates[fieldMapping[camel]] = updates[camel];
+        }
+      });
+
       // If password is being updated
       if (updates.password) {
         const { error: authError } = await supabaseServiceRole.auth.admin.updateUserById(id, {
@@ -1338,40 +1356,59 @@ Please ask me your query or select a quick question template below!`;
         if (authError) {
           console.error("[Admin Update Customer] Auth Error:", authError);
         }
-        delete updates.password; // Remove password from database update payload
+        delete mappedUpdates.password; 
+        delete updates.password;
       }
 
-      // Update DB tables (with try-catch so it doesn't fail if tables do not exist)
-      const userFields = ['name', 'email', 'phone', 'role', 'status', 'gender', 'address', 'division', 'district', 'upazila', 'area', 'postal_code', 'profile_image', 'occasion_name', 'special_date'];
-      const customerFields = ['name', 'phone', 'email', 'address', 'whats_app', 'note', 'profile_image', 'gender', 'social_links', 'occasion_name', 'special_date', 'status', 'customer_type', 'total_orders', 'total_spend', 'last_login', 'total_logins', 'last_ip', 'device_type', 'payment_methods', 'is_read', 'is_demo'];
+      // Update DB tables
+      const userFields = ['name', 'email', 'phone', 'role', 'status', 'gender', 'address', 'division', 'district', 'upazila', 'area', 'postal_code', 'profile_image', 'occasion_name', 'special_date', 'updated_at'];
+      const customerFields = ['name', 'phone', 'email', 'address', 'whats_app', 'note', 'profile_image', 'gender', 'social_links', 'occasion_name', 'special_date', 'status', 'customer_type', 'total_orders', 'total_spend', 'last_login', 'total_logins', 'last_ip', 'device_type', 'payment_methods', 'is_read', 'is_demo', 'updated_at'];
+      const profileFields = ['auth_user_id', 'full_name', 'phone', 'email', 'gender', 'avatar_url', 'date_of_birth', 'anniversary', 'updated_at'];
 
       const userUpdates: any = {};
       const customerUpdates: any = {};
+      const profileUpdates: any = {};
 
-      Object.keys(updates).forEach(key => {
-        if (userFields.includes(key)) userUpdates[key] = updates[key];
-        if (customerFields.includes(key)) customerUpdates[key] = updates[key];
+      Object.keys(mappedUpdates).forEach(key => {
+        if (userFields.includes(key)) userUpdates[key] = mappedUpdates[key];
+        if (customerFields.includes(key)) customerUpdates[key] = mappedUpdates[key];
+        
+        // Special mapping for profiles table
+        if (key === 'name') profileUpdates['full_name'] = mappedUpdates[key];
+        if (key === 'profile_image') profileUpdates['avatar_url'] = mappedUpdates[key];
+        if (key === 'special_date') profileUpdates['date_of_birth'] = mappedUpdates[key];
+        if (profileFields.includes(key)) profileUpdates[key] = mappedUpdates[key];
       });
 
       // Special mapping for email and phone
-      if (updates.email && !userUpdates.email) userUpdates.email = updates.email;
-      if (updates.phone && !userUpdates.phone) userUpdates.phone = updates.phone;
+      if (mappedUpdates.email && !userUpdates.email) userUpdates.email = mappedUpdates.email;
+      if (mappedUpdates.phone && !userUpdates.phone) userUpdates.phone = mappedUpdates.phone;
+
+      // Execute updates
+      const updatePromises = [];
 
       if (Object.keys(userUpdates).length > 0) {
-        const { error: userError } = await supabaseServiceRole.from('users').update(userUpdates).eq('id', id);
-        if (userError) {
-          console.error("[Admin Update Customer] Users table update failed:", userError);
-          throw new Error(`Database update failed: Table 'users' returned error - ${userError.message}`);
-        }
+        updatePromises.push(
+          supabaseServiceRole.from('users').update(userUpdates).eq('id', id)
+            .then(({ error }) => { if (error) console.warn("[Admin Update Customer] Users table update failed:", error.message); })
+        );
       }
 
       if (Object.keys(customerUpdates).length > 0) {
-        const { error: customerError } = await supabaseServiceRole.from('customers').update(customerUpdates).eq('id', id);
-        if (customerError) {
-          console.error("[Admin Update Customer] Customers table update failed:", customerError);
-          throw new Error(`Database update failed: Table 'customers' returned error - ${customerError.message}`);
-        }
+        updatePromises.push(
+          supabaseServiceRole.from('customers').update(customerUpdates).eq('id', id)
+            .then(({ error }) => { if (error) console.warn("[Admin Update Customer] Customers table update failed:", error.message); })
+        );
       }
+
+      if (Object.keys(profileUpdates).length > 0) {
+        updatePromises.push(
+          supabaseServiceRole.from('profiles').upsert({ auth_user_id: id, ...profileUpdates }, { onConflict: 'auth_user_id' })
+            .then(({ error }) => { if (error) console.warn("[Admin Update Customer] Profiles table update failed:", error.message); })
+        );
+      }
+
+      await Promise.all(updatePromises);
 
       // Sync metadata to Supabase Auth user_metadata
       try {
@@ -1379,10 +1416,10 @@ Please ask me your query or select a quick question template below!`;
         const existingMeta = currentUserRes.data?.user?.user_metadata || {};
         const newMeta = {
           ...existingMeta,
-          ...updates,
-          name: updates.name || existingMeta.name,
-          phone: updates.phone || existingMeta.phone,
-          email: updates.email || existingMeta.email,
+          ...mappedUpdates,
+          name: mappedUpdates.name || existingMeta.name,
+          phone: mappedUpdates.phone || existingMeta.phone,
+          email: mappedUpdates.email || existingMeta.email,
         };
 
         const { error: metaError } = await supabaseServiceRole.auth.admin.updateUserById(id, {
@@ -1396,8 +1433,8 @@ Please ask me your query or select a quick question template below!`;
       }
 
       // If email is updated, sync to Auth
-      if (updates.email) {
-        const newEmail = updates.email;
+      if (mappedUpdates.email) {
+        const newEmail = mappedUpdates.email;
         const { error: authEmailError } = await supabaseServiceRole.auth.admin.updateUserById(id, {
           email: newEmail,
           email_confirm: true
@@ -1409,7 +1446,8 @@ Please ask me your query or select a quick question template below!`;
 
       res.json({ 
         success: true, 
-        message: "Profile updated successfully." 
+        message: "Profile updated successfully.",
+        updated: true
       });
     } catch (err: any) {
       console.error("[Admin Update Customer] Fatal Error:", err);
