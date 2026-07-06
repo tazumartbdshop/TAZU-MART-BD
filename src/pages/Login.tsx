@@ -79,14 +79,21 @@ export default function Login() {
     setOtpError('');
 
     try {
-      // Use our secure server-side endpoint
       const response = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phoneNumber.trim() })
       });
 
-      const result = await response.json();
+      let result;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const text = await response.text();
+        console.error("Non-JSON response:", text);
+        throw new Error('Server returned an unexpected response. Please check if the environment variables are configured.');
+      }
 
       if (!response.ok) {
         throw new Error(result.error || 'Failed to send OTP');
@@ -121,7 +128,15 @@ export default function Login() {
         body: JSON.stringify({ phone: phoneNumber.trim(), code: token })
       });
 
-      const result = await response.json();
+      let result;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const text = await response.text();
+        console.error("Non-JSON response:", text);
+        throw new Error('Verification failed. Server returned an unexpected response.');
+      }
 
       if (!response.ok) {
         throw new Error(result.error || 'Verification failed');

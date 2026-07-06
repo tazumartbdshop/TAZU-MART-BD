@@ -255,8 +255,14 @@ async function startServer() {
       const authToken = process.env.TWILIO_AUTH_TOKEN;
       const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
-      if (!accountSid || !authToken || !verifyServiceSid) {
-        return res.status(500).json({ error: "Twilio configuration is missing on server" });
+      if (!accountSid) {
+        return res.status(500).json({ error: "TWILIO_ACCOUNT_SID is missing in server environment variables" });
+      }
+      if (!authToken) {
+        return res.status(500).json({ error: "TWILIO_AUTH_TOKEN is missing in server environment variables" });
+      }
+      if (!verifyServiceSid) {
+        return res.status(500).json({ error: "TWILIO_VERIFY_SERVICE_SID is missing in server environment variables" });
       }
 
       const client = twilio(accountSid, authToken);
@@ -289,8 +295,14 @@ async function startServer() {
       const authToken = process.env.TWILIO_AUTH_TOKEN;
       const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
 
-      if (!accountSid || !authToken || !verifyServiceSid) {
-        return res.status(500).json({ error: "Twilio configuration is missing on server" });
+      if (!accountSid) {
+        return res.status(500).json({ error: "TWILIO_ACCOUNT_SID is missing in server environment variables" });
+      }
+      if (!authToken) {
+        return res.status(500).json({ error: "TWILIO_AUTH_TOKEN is missing in server environment variables" });
+      }
+      if (!verifyServiceSid) {
+        return res.status(500).json({ error: "TWILIO_VERIFY_SERVICE_SID is missing in server environment variables" });
       }
 
       const client = twilio(accountSid, authToken);
