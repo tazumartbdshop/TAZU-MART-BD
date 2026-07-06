@@ -664,28 +664,27 @@ export default function SettingsPage() {
       const supabase = getSupabase();
 
       if (supabase && user?.id) {
-        // Find special dates for profiles table
+        // Find special dates for tables
         const dob = specialDays.find(d => d.name.toLowerCase().includes('birthday'))?.date || null;
         const anniversary = specialDays.find(d => d.name.toLowerCase().includes('anniversary'))?.date || null;
 
-        // 1. Update Profile in 'profiles' table
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            auth_user_id: user.id,
-            full_name: fullName,
-            phone: fullPhone,
-            email: email,
-            gender: gender,
-            avatar_url: profilePic,
-            date_of_birth: dob,
-            anniversary: anniversary,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'auth_user_id' });
+        // 1. Prepare updates for users & customers tables
+        const updates = {
+          name: fullName,
+          phone: fullPhone,
+          email: email,
+          gender: gender,
+          profileImage: profilePic,
+          occasionName: JSON.stringify(specialDays),
+          specialDate: dob || anniversary,
+          updatedAt: new Date().toISOString()
+        };
 
-        if (profileError) throw profileError;
+        // 2. Update via Customer Store (this calls backend API /api/admin/update-customer which updates both tables)
+        const customerStore = useCustomerStore.getState();
+        await customerStore.updateCustomer(user.id, updates);
 
-        // 2. Update Special Days in 'user_special_days' table
+        // 3. Update Special Days in 'user_special_days' table for detailed tracking
         // Clean up existing records for this user
         await supabase.from('user_special_days').delete().eq('user_id', user.id);
         
@@ -701,18 +700,18 @@ export default function SettingsPage() {
             );
           if (daysError) throw daysError;
         }
-      }
 
-      // Sync local store
-      updateUser({
-        name: fullName,
-        phone: fullPhone,
-        email: email,
-        address: address,
-        gender: gender,
-        occasionName: JSON.stringify(specialDays),
-        profileImage: profilePic
-      });
+        // 4. Update local Auth Store
+        updateUser({
+          name: fullName,
+          phone: fullPhone,
+          email: email,
+          address: address,
+          gender: gender,
+          occasionName: JSON.stringify(specialDays),
+          profileImage: profilePic
+        });
+      }
 
       triggerToast("Profile Updated Successfully.");
     } catch (err: any) {
