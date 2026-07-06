@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -66,8 +66,6 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate, user, isLoading]);
 
-  const [simulatedOtp, setSimulatedOtp] = useState('');
-
   const handleSendOTP = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isSendingOtp || timer > 0) return;
@@ -81,50 +79,28 @@ export default function Login() {
     setOtpError('');
 
     try {
-      const supabase = getSupabase();
-      if (!supabase) throw new Error("Database connection not ready.");
-
-      // Format phone number
-      let formattedPhone = phoneNumber.trim();
-      if (!formattedPhone.startsWith('+')) {
-        if (formattedPhone.startsWith('01')) {
-          formattedPhone = '+88' + formattedPhone;
-        }
-      }
-
-      // Generate a local OTP for simulation/manual flow
-      const localCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setSimulatedOtp(localCode);
-
-      // Attempt Supabase OTP (Twilio etc)
-      const { error: otpErr } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
+      // Use our secure server-side endpoint
+      const response = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNumber.trim() })
       });
 
-      if (otpErr) {
-        // If external provider fails (like the Twilio Trial error in screenshot),
-        // we still proceed to verify screen so user can use the WhatsApp fallback
-        console.warn("External OTP provider failed, switching to verify screen with local fallback:", otpErr.message);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send OTP');
       }
 
       setPhoneStep('verify');
       setTimer(60);
+      setOtpError('');
     } catch (err: any) {
       console.error("OTP Error:", err);
-      // Fallback to local code on any error
-      const localCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setSimulatedOtp(localCode);
-      setPhoneStep('verify');
-      setTimer(60);
+      setOtpError(err.message || 'Failed to send OTP. Please check your connection.');
     } finally {
       setIsSendingOtp(false);
     }
-  };
-
-  const handleManualVerify = () => {
-    // Open WhatsApp with pre-filled message
-    const text = encodeURIComponent(`Your TAZU MART verification code is: ${simulatedOtp}`);
-    window.open(`https://wa.me/${phoneNumber.replace(/[^0-9]/g, '')}?text=${text}`, '_blank');
   };
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
@@ -139,66 +115,21 @@ export default function Login() {
     setOtpError('');
 
     try {
-      // 1. Check if it's the simulated OTP first
-      if (simulatedOtp && token === simulatedOtp) {
-        // Success! Simulated login
-        const supabase = getSupabase();
-        if (!supabase) throw new Error("Database connection not ready.");
-
-        let formattedPhone = phoneNumber.trim();
-        if (!formattedPhone.startsWith('+') && formattedPhone.startsWith('01')) {
-          formattedPhone = '+88' + formattedPhone;
-        }
-
-        // Try to find user or create one
-        const { data: dbUser } = await supabase.from('users').select('*').eq('phone', formattedPhone).single();
-        
-        const userData = {
-          id: dbUser?.id || `manual-${Date.now()}`,
-          name: dbUser?.name || 'Customer',
-          email: dbUser?.email || '',
-          role: 'customer' as const,
-          phone: formattedPhone,
-          profileImage: dbUser?.profileImage || '',
-        };
-
-        login(userData);
-        pixelService.trackLogin(userData.id);
-        navigate('/account/dashboard');
-        return;
-      }
-
-      // 2. Real Supabase Verification
-      const supabase = getSupabase();
-      if (!supabase) throw new Error("Database connection not ready.");
-
-      let formattedPhone = phoneNumber.trim();
-      if (!formattedPhone.startsWith('+') && formattedPhone.startsWith('01')) {
-        formattedPhone = '+88' + formattedPhone;
-      }
-
-      const { data, error: verifyErr } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token: token,
-        type: 'sms'
+      const response = await fetch('/api/auth/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNumber.trim(), code: token })
       });
 
-      if (verifyErr) throw verifyErr;
+      const result = await response.json();
 
-      if (data.user) {
-        const { data: dbUser } = await supabase.from('users').select('*').eq('id', data.user.id).single();
-        
-        const userData = {
-          id: data.user.id,
-          name: dbUser?.name || data.user.user_metadata?.name || 'Customer',
-          email: data.user.email || '',
-          role: 'customer' as const,
-          phone: dbUser?.phone || data.user.phone || formattedPhone,
-          profileImage: dbUser?.profileImage || data.user.user_metadata?.profileImage || '',
-        };
+      if (!response.ok) {
+        throw new Error(result.error || 'Verification failed');
+      }
 
-        login(userData);
-        pixelService.trackLogin(data.user.id);
+      if (result.user) {
+        login(result.user);
+        pixelService.trackLogin(result.user.id);
         navigate('/account/dashboard');
       }
     } catch (err: any) {
@@ -572,17 +503,6 @@ export default function Login() {
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'VERIFY & LOGIN'}
                   </button>
-
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={handleManualVerify}
-                      className="w-full h-[54px] bg-green-50 text-green-700 border border-green-100 rounded-[14px] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-green-100 transition-all"
-                    >
-                      <span className="text-base">📱</span>
-                      SEND CODE VIA WHATSAPP
-                    </button>
-                  </div>
                   
                   <div className="flex flex-col items-center gap-3">
                     {timer > 0 ? (
