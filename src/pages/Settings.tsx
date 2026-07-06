@@ -3,8 +3,9 @@ import {
   User, Lock, MapPin, Bell, Shield, CreditCard, Sliders, Package, 
   HelpCircle, LogOut, ChevronRight, Camera, Check, Plus, Trash2, 
   ArrowLeft, Smartphone, Laptop, Sparkles, AlertCircle, FileText, 
-  CheckCircle, Globe, Sun, Moon, Info, Send, ShoppingBag, Eye, EyeOff,
-  Zap, Gift, Percent, Truck, Ticket, ClipboardList, Megaphone, Inbox, Search, Copy
+  CheckCircle, CheckCircle2, Globe, Sun, Moon, Info, Send, ShoppingBag, Eye, EyeOff,
+  Zap, Gift, Percent, Truck, Ticket, ClipboardList, Megaphone, Inbox, Search, Copy,
+  Mail, Loader2
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
@@ -13,6 +14,7 @@ import { uploadImage } from '../lib/imageUtils';
 import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
 import { useNotificationStore } from '../store/useNotificationStore';
 import { useCustomerStore } from '../store/useCustomerStore';
+import { getSupabase } from '../lib/supabase';
 import { bdAddressData, divisions } from '../data/addressData';
 import { cn, formatPrice } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -457,31 +459,39 @@ export default function SettingsPage() {
   // States for general UI feedback
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // 1. Personal Information states
   const [fullName, setFullName] = useState(user?.name || 'Imtiaz Khan');
-  const [phone, setPhone] = useState(user?.phone || '01712345678');
+  const [phone, setPhone] = useState(user?.phone?.replace('+880', '') || '1712345678');
   const [email, setEmail] = useState(user?.email || 'mdimtiaz.dev@gmail.com');
+  const [address, setAddress] = useState(user?.address || '');
   const [gender, setGender] = useState(user?.gender || 'Male');
   
-  // Parse special days from stored joined strings
+  // Password Change Modal State
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [showModalPassword, setShowModalPassword] = useState(false);
+
+  // Parse special days
   const initialSpecialDays = useMemo(() => {
-    if (!user?.occasionName || !user?.specialDate) return [];
-    const names = user.occasionName.split(' | ');
-    const dates = user.specialDate.split(' | ');
-    return names.map((name, i) => {
-      // Convert DD-MM-YYYY back to YYYY-MM-DD for input[type="date"]
-      let d = dates[i] || '';
-      const parts = d.split('-');
-      if (parts.length === 3 && parts[2].length === 4) {
-        d = `${parts[2]}-${parts[1]}-${parts[0]}`;
-      }
-      return {
-        id: `sd-${i}-${Math.random().toString(36).substring(2, 5)}`,
+    if (!user?.occasionName) return [{ name: 'Happy Birthday', date: '' }];
+    try {
+      // Try to parse as JSON first (as done in Register)
+      const parsed = JSON.parse(user.occasionName);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      // Fallback to old pipe-separated format
+      const names = user.occasionName.split(' | ');
+      const dates = user.specialDate?.split(' | ') || [];
+      return names.map((name, i) => ({
         name,
-        date: d
-      };
-    });
+        date: dates[i] || ''
+      }));
+    }
+    return [{ name: 'Happy Birthday', date: '' }];
   }, [user?.occasionName, user?.specialDate]);
 
   const [specialDays, setSpecialDays] = useState(initialSpecialDays);
@@ -496,7 +506,6 @@ export default function SettingsPage() {
 
   // 2. Security states
   const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPasswords, setShowPasswords] = useState(false);
   const [twoFactorSMS, setTwoFactorSMS] = useState(false);
@@ -646,65 +655,102 @@ export default function SettingsPage() {
   };
 
   // Personal info save
-  const handleSavePersonalInfo = (e: React.FormEvent) => {
+  const handleSavePersonalInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    const occasionJoined = specialDays.length > 0 
-      ? specialDays.map(d => d.name.trim()).join(' | ') 
-      : '';
+    setIsLoading(true);
     
-    const datesJoined = specialDays.length > 0
-      ? specialDays.map(d => {
-          const parts = d.date.split('-');
-          if (parts.length === 3) {
-            return `${parts[2]}-${parts[1]}-${parts[0]}`; // DD-MM-YYYY
-          }
-          return d.date;
-        }).join(' | ')
-      : '';
+    try {
+      const fullPhone = phone.startsWith('+880') ? phone : `+880${phone.replace(/^0/, '')}`;
+      const supabase = getSupabase();
 
-    updateUser({
-      name: fullName,
-      phone: phone,
-      email: email,
-      gender: gender,
-      occasionName: occasionJoined,
-      specialDate: datesJoined
-    });
+      if (supabase && user?.id) {
+        // Find special dates for profiles table
+        const dob = specialDays.find(d => d.name.toLowerCase().includes('birthday'))?.date || null;
+        const anniversary = specialDays.find(d => d.name.toLowerCase().includes('anniversary'))?.date || null;
 
-    // Sync with customer record in useCustomerStore
-    if (user?.id) {
-      const customersStore = useCustomerStore.getState();
-      const currentCustomer = customersStore.customers.find(c => c.id === user?.id);
-      if (currentCustomer) {
-        customersStore.updateCustomer(user.id, {
-          name: fullName,
-          phone: phone,
-          email: email,
-          gender: gender,
-          occasionName: occasionJoined,
-          specialDate: datesJoined
-        });
+        // 1. Update Profile in 'profiles' table
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            auth_user_id: user.id,
+            full_name: fullName,
+            phone: fullPhone,
+            email: email,
+            gender: gender,
+            avatar_url: profilePic,
+            date_of_birth: dob,
+            anniversary: anniversary,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'auth_user_id' });
+
+        if (profileError) throw profileError;
+
+        // 2. Update Special Days in 'user_special_days' table
+        // Clean up existing records for this user
+        await supabase.from('user_special_days').delete().eq('user_id', user.id);
+        
+        if (specialDays.length > 0) {
+          const { error: daysError } = await supabase
+            .from('user_special_days')
+            .insert(
+              specialDays.map(sd => ({
+                user_id: user.id,
+                event_name: sd.name,
+                event_date: sd.date
+              }))
+            );
+          if (daysError) throw daysError;
+        }
       }
-    }
 
-    triggerToast(t.saveSuccess);
+      // Sync local store
+      updateUser({
+        name: fullName,
+        phone: fullPhone,
+        email: email,
+        address: address,
+        gender: gender,
+        occasionName: JSON.stringify(specialDays),
+        profileImage: profilePic
+      });
+
+      triggerToast("Profile Updated Successfully.");
+    } catch (err: any) {
+      console.error("Profile Save Error:", err);
+      triggerToast(err.message || "Failed to update profile", true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Change password save
-  const handleSaveSecurity = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPassword || !newPassword) {
-      triggerToast("Please fill in all security parameter fields.", true);
+    if (newPassword !== confirmNewPassword) {
+      triggerToast("Passwords do not match", true);
       return;
     }
-    if (newPassword !== confirmPassword) {
-      triggerToast("New Password and Confirm Password fields must match.", true);
+    if (newPassword.length < 6) {
+      triggerToast("Password must be at least 6 characters", true);
       return;
     }
-    triggerToast("Password profile updated successfully!");
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+
+    setIsUpdatingPassword(true);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Database connection not ready");
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+
+      triggerToast("Password Updated Successfully.");
+      setShowPasswordModal(false);
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (err: any) {
+      triggerToast(err.message || "Failed to update password", true);
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   // OTP reset trigger
@@ -1097,187 +1143,225 @@ For customer support, call 09612-TAZU-MART.
                   <User className="w-6 h-6 text-gray-300" />
                 </div>
 
-                {/* Profile Photo system box */}
-                <div className="flex flex-col sm:flex-row items-center gap-6 p-5 bg-gray-50/50 rounded-2xl border border-gray-100 mb-8 max-w-xl mx-auto">
-                  <div className="relative group/avatar cursor-pointer" onClick={() => setShowPhotoSource(true)}>
-                    <div className="w-24 h-24 rounded-full border-2 border-white overflow-hidden shadow-md bg-white">
-                      <img src={profilePic} alt="Customer avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                    <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover/avatar:opacity-100 hover:scale-105 active:scale-95 transition-all flex items-center justify-center">
-                      <Camera className="w-6 h-6 text-white" />
-                    </div>
-                  </div>
-                  <div className="text-center sm:text-left space-y-1.5 flex-1">
-                    <h4 className="text-xs font-black text-black uppercase tracking-tight">Profile Photo Avatar</h4>
-                    <p className="text-[9.5px] text-gray-400 font-bold uppercase tracking-wider leading-relaxed">
-                      Acceptable parameters: JPG, PNG, WEBP. Maximum file weight limit of 2MB is enforced via server upload firewalls.
-                    </p>
-                    <button 
-                      type="button"
+                <form onSubmit={handleSavePersonalInfo} className="space-y-5">
+                  {/* Profile Picture Box (1:1 Square - matching Register) */}
+                  <div className="flex flex-col items-center space-y-2 mb-4">
+                    <label className="block text-[11px] font-extrabold text-neutral-500 uppercase tracking-wider">
+                      Profile Picture
+                    </label>
+                    <div 
                       onClick={() => setShowPhotoSource(true)}
-                      className="px-4 py-2 bg-black hover:bg-black/90 text-white font-black text-[9px] uppercase tracking-widest rounded-lg transition-colors cursor-pointer"
+                      className="relative w-28 h-28 rounded-2xl border-2 border-dashed border-neutral-200 hover:border-black bg-neutral-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 group shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
                     >
-                      Update Picture
-                    </button>
-                  </div>
-                </div>
-
-                {/* Form fields */}
-                <form onSubmit={handleSavePersonalInfo} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-[0.15em] ml-1">Full Name *</label>
-                      <input 
-                        type="text" 
-                        required
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-150/60 rounded-xl px-5 py-4 text-xs font-bold focus:outline-none focus:border-black transition-all"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between ml-1">
-                        <label className="text-[10px] font-black text-black uppercase tracking-[0.15em]">Phone Number *</label>
-                        {isPhoneVerified ? (
-                          <span className="text-[8px] bg-green-500 text-white font-extrabold px-1.5 py-0.5 uppercase tracking-widest rounded flex items-center gap-1">
-                            <Check className="w-2.5 h-2.5 stroke-[4]" /> {t.verified}
-                          </span>
-                        ) : (
-                          <button type="button" onClick={() => triggerToast("Dispatching verification token...")} className="text-[8px] text-blue-500 font-bold hover:underline transition-all">{t.verifyPhone}</button>
-                        )}
-                      </div>
-                      <input 
-                        type="text" 
-                        required
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-150/60 rounded-xl px-5 py-4 text-xs font-bold focus:outline-none focus:border-black transition-all"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between ml-1">
-                        <label className="text-[10px] font-black text-black uppercase tracking-[0.15em]">Email Address *</label>
-                        {isEmailVerified ? (
-                          <span className="text-[8px] bg-green-500 text-white font-extrabold px-1.5 py-0.5 uppercase tracking-widest rounded flex items-center gap-1">
-                            <Check className="w-2.5 h-2.5 stroke-[4]" /> {t.verified}
-                          </span>
-                        ) : (
-                          <button type="button" onClick={() => triggerToast("Sending email gatekeeper OTP...")} className="text-[8px] text-blue-500 font-bold hover:underline transition-all">{t.verifyEmail}</button>
-                        )}
-                      </div>
-                      <input 
-                        type="email" 
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Email Address (Optional)"
-                        className="w-full bg-gray-50 border border-gray-150/60 rounded-xl px-5 py-4 text-xs font-bold focus:outline-none focus:border-black transition-all"
-                      />
-                    </div>
-
-                    <div className="space-y-4 text-left pt-2 pb-2">
-                      <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                        <h3 className="text-[10px] font-black uppercase text-zinc-950 tracking-wider flex items-center gap-1.5">
-                          Special Day (Optional)
-                        </h3>
-                        
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSpecialDays([...specialDays, { id: 'day_' + Math.random().toString(36).substring(2, 9), name: '', date: '' }]);
-                          }}
-                          className="flex items-center gap-1 text-[9px] font-black uppercase text-black hover:bg-gray-50 px-2 py-1 transition-all border border-gray-200 h-7"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Add More</span>
-                        </button>
-                      </div>
-
-                      {specialDays.length === 0 ? (
-                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-relaxed">
-                          No Special Days added yet.
-                        </p>
+                      {profilePic ? (
+                        <>
+                          <img src={profilePic} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white space-y-1">
+                            <Camera className="w-4 h-4" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">Change</span>
+                          </div>
+                        </>
                       ) : (
-                        <div className="space-y-3">
-                          {specialDays.map((day, idx) => (
-                            <div key={day.id} className="p-3 bg-gray-50 rounded-xl space-y-3 border border-gray-100">
-                              <div className="flex justify-between items-center pb-2 border-b border-gray-200/50">
-                                <span className="text-[9px] font-black text-black uppercase tracking-widest">Occasion #{idx + 1}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSpecialDays(specialDays.filter(item => item.id !== day.id));
-                                  }}
-                                  className="text-gray-400 hover:text-red-500 transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                  <label className="block text-[9px] font-black text-black uppercase tracking-wider">Occasion Name</label>
-                                  <input
-                                    type="text"
-                                    value={day.name}
-                                    onChange={(e) => {
-                                      const updated = [...specialDays];
-                                      updated[idx].name = e.target.value;
-                                      setSpecialDays(updated);
-                                    }}
-                                    placeholder="e.g. Birthday"
-                                    className="w-full h-9 bg-white border border-gray-200 px-3 text-xs font-bold focus:outline-none focus:border-black"
-                                  />
-                                </div>
-
-                                <div className="space-y-1">
-                                  <label className="block text-[9px] font-black text-black uppercase tracking-wider">Sought Date</label>
-                                  <input
-                                    type="date"
-                                    value={day.date}
-                                    onChange={(e) => {
-                                      const updated = [...specialDays];
-                                      updated[idx].date = e.target.value;
-                                      setSpecialDays(updated);
-                                    }}
-                                    className="w-full h-9 bg-white border border-gray-200 px-2 text-xs font-bold focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                        <div className="flex flex-col items-center text-center p-3 text-neutral-400 group-hover:text-neutral-600 transition-colors">
+                          <Camera className="w-5 h-5 mb-1 text-neutral-400 group-hover:text-black transition-colors" />
+                          <span className="text-[9px] font-extrabold uppercase tracking-widest leading-none">Tap to Upload</span>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-black uppercase tracking-[0.15em] ml-1">Gender (Male / Female / Others)</label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {['Male', 'Female', 'Other'].map((g) => (
-                        <button
-                          key={g}
-                          type="button"
-                          onClick={() => setGender(g)}
-                          className={cn(
-                            "py-3 rounded-xl text-xs font-bold border transition-all cursor-pointer",
-                            gender === g 
-                              ? "bg-black text-white border-black" 
-                              : "bg-gray-50 text-gray-600 border-gray-150 hover:bg-gray-100"
-                          )}
-                        >
-                          {g}
-                        </button>
+                  {/* Full Name */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Full Name *</label>
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        value={fullName} 
+                        onChange={(e) => setFullName(e.target.value)} 
+                        required 
+                        className="w-full h-[50px] border border-[#E5E5E5] rounded-[14px] pl-10 pr-4 text-sm focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
+                        placeholder="Full Name" 
+                      />
+                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    </div>
+                  </div>
+
+                  {/* Phone Number */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Phone Number *</label>
+                    <div className="relative flex items-center">
+                      <span className="absolute left-10 text-sm font-bold text-neutral-800 border-r border-neutral-200 pr-2 h-5 flex items-center select-none">
+                        +880
+                      </span>
+                      <input 
+                        type="tel" 
+                        value={phone.replace('+880', '')} 
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))} 
+                        required 
+                        className="w-full h-[50px] border border-[#E5E5E5] rounded-[14px] pl-24 pr-4 text-sm focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
+                        placeholder="17XXXXXXXX" 
+                      />
+                      <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    </div>
+                  </div>
+
+                  {/* Address Field */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Address *</label>
+                    <div className="relative">
+                      <textarea 
+                        value={address} 
+                        onChange={(e) => setAddress(e.target.value)} 
+                        required 
+                        className="w-full h-[50px] min-h-[50px] max-h-[180px] border border-[#E5E5E5] rounded-[14px] py-3.5 pl-10 pr-4 text-sm focus:border-black focus:ring-1 focus:ring-black outline-none transition-all resize-none overflow-y-auto block leading-relaxed"
+                        placeholder="Street Address, Village/City, Division *" 
+                      />
+                      <MapPin className="absolute left-3.5 top-[15px] w-4 h-4 text-neutral-400" />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Email (Optional)</label>
+                    <div className="relative">
+                      <input 
+                        type="email" 
+                        value={email} 
+                        onChange={(e) => setEmail(e.target.value)} 
+                        className="w-full h-[50px] border border-[#E5E5E5] rounded-[14px] pl-10 pr-4 text-sm focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
+                        placeholder="Email Address" 
+                      />
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    </div>
+                  </div>
+
+                  {/* Password Security Status & Change Button */}
+                  <div className="space-y-3 bg-neutral-50 p-4 rounded-2xl border border-neutral-100 mt-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-neutral-400" />
+                        <span className="text-[11px] font-black text-neutral-500 uppercase tracking-widest">Login Security</span>
+                      </div>
+                      <span className="text-[9px] bg-green-500/10 text-green-600 font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-green-500/20">Securely Hashed</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1">
+                        <div className="h-10 bg-white border border-neutral-200 rounded-xl flex items-center px-4 overflow-hidden">
+                          <span className="text-neutral-300 text-lg tracking-[0.4em] leading-none select-none">••••••••</span>
+                        </div>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setShowPasswordModal(true)}
+                        className="h-10 px-4 bg-white border border-neutral-200 hover:border-black hover:bg-neutral-50 text-black rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-sm active:scale-95 flex items-center gap-2"
+                      >
+                        <span>🔒 Change Password</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Gender selection */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Gender *</label>
+                    <div className="flex gap-6 pl-1 pt-1">
+                      {['Male', 'Female', 'Other'].map(g => (
+                        <label key={g} className="flex items-center gap-2 cursor-pointer group">
+                          <input 
+                            type="radio" 
+                            name="gender" 
+                            value={g} 
+                            checked={gender === g} 
+                            onChange={(e) => setGender(e.target.value)} 
+                            className="w-4.5 h-4.5 accent-black text-black border-neutral-300 focus:ring-0" 
+                          />
+                          <span className="text-sm font-semibold text-neutral-700 group-hover:text-black transition-colors">{g}</span>
+                        </label>
                       ))}
                     </div>
                   </div>
 
+                  {/* Special Days Section */}
+                  <div className="border-t border-neutral-100 pt-5 mt-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-neutral-400" />
+                        <span className="text-[11px] font-black text-neutral-500 uppercase tracking-widest">Special Days</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSpecialDays([...specialDays, { name: 'Happy Birthday', date: '' }])}
+                        className="w-7 h-7 bg-neutral-900 hover:bg-black text-white rounded-full flex items-center justify-center transition-all shadow-sm active:scale-90"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <p className="text-[10.5px] text-neutral-400 font-medium leading-relaxed uppercase tracking-wider">
+                      Save your important days (e.g. birthday, anniversary) for exclusive offers & gifts!
+                    </p>
+
+                    <div className="space-y-3">
+                      <AnimatePresence initial={false}>
+                        {specialDays.map((sd, index) => (
+                          <motion.div 
+                            key={index}
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            transition={{ duration: 0.15 }}
+                            className="flex gap-2.5 items-center bg-neutral-50/50 p-2.5 rounded-xl border border-neutral-100"
+                          >
+                            <div className="flex-1">
+                              <select 
+                                value={sd.name} 
+                                onChange={(e) => {
+                                  const updated = [...specialDays];
+                                  updated[index].name = e.target.value;
+                                  setSpecialDays(updated);
+                                }}
+                                className="w-full h-[44px] border border-[#E5E5E5] rounded-[10px] px-3 text-xs font-bold bg-white focus:border-black outline-none transition-colors"
+                              >
+                                {[
+                                  'Happy Birthday', 'Marriage Day', 'Anniversary', 'Engagement', 
+                                  'Graduation', 'First Job', 'Baby Birthday', 'Parents Anniversary', 
+                                  'Eid Celebration', 'Victory Day', 'Independence Day', 'Personal Reminder', 'Custom Occasion'
+                                ].map(opt => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex-1">
+                              <input 
+                                type="text" 
+                                value={sd.date} 
+                                onChange={(e) => {
+                                  const updated = [...specialDays];
+                                  updated[index].date = e.target.value;
+                                  setSpecialDays(updated);
+                                }}
+                                placeholder="e.g. 21 June 2026" 
+                                className="w-full h-[44px] border border-[#E5E5E5] rounded-[10px] px-3 text-xs font-semibold bg-white focus:border-black outline-none transition-colors"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSpecialDays(specialDays.filter((_, i) => i !== index))}
+                              className="w-9 h-9 border border-neutral-200 hover:border-red-200 hover:bg-red-50 text-neutral-400 hover:text-red-500 rounded-xl flex items-center justify-center transition-all active:scale-95"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
                   <button 
-                    type="submit"
-                    className="w-full bg-black hover:bg-neutral-900 font-black text-white py-4 rounded-xl text-[10px] uppercase tracking-[0.2em] transition-all cursor-pointer"
+                    type="submit" 
+                    className="w-full h-[54px] bg-neutral-950 hover:bg-neutral-900 text-white rounded-[16px] font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 mt-4 transition-all duration-150 active:scale-98 shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
                   >
-                    Save Changes
+                    SAVE CHANGES
                   </button>
                 </form>
               </div>
@@ -1296,71 +1380,22 @@ For customer support, call 09612-TAZU-MART.
                   <Lock className="w-6 h-6 text-gray-300" />
                 </div>
 
-                {/* Password input form fields */}
-                <form onSubmit={handleSaveSecurity} className="space-y-6 pb-6 border-b border-gray-100">
+                {/* Security Section with Change Password Button */}
+                <div className="py-6 border-b border-gray-100 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-black uppercase tracking-wider text-black">Update Password PIN</h3>
+                    <div>
+                      <h3 className="text-xs font-black uppercase tracking-wider text-black">Update Password PIN</h3>
+                      <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Securely update your authorization credentials</p>
+                    </div>
                     <button 
                       type="button"
-                      onClick={() => setShowPasswords(!showPasswords)}
-                      className="text-[9px] hover:underline font-bold uppercase tracking-widest text-gray-500"
+                      onClick={() => setShowPasswordModal(true)}
+                      className="h-10 px-4 bg-black hover:bg-neutral-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-sm active:scale-95 flex items-center gap-2"
                     >
-                      {showPasswords ? "Hide Password Field" : "Reveal Current Passwords"}
+                      <span>🔒 Change Password</span>
                     </button>
                   </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-[0.15em] ml-1">Current Password *</label>
-                      <input 
-                        type={showPasswords ? "text" : "password"} 
-                        placeholder="••••••••••••••"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-150/60 rounded-xl px-5 py-4 text-xs font-bold focus:outline-none focus:border-black transition-all"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-black uppercase tracking-[0.15em] ml-1">New Password *</label>
-                        <input 
-                          type={showPasswords ? "text" : "password"} 
-                          placeholder="••••••••••••••"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-150/60 rounded-xl px-5 py-4 text-xs font-bold focus:outline-none focus:border-black transition-all"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-black uppercase tracking-[0.15em] ml-1">Confirm New Password *</label>
-                        <input 
-                          type={showPasswords ? "text" : "password"} 
-                          placeholder="••••••••••••••"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          className="w-full bg-gray-50 border border-gray-150/60 rounded-xl px-5 py-4 text-xs font-bold focus:outline-none focus:border-black transition-all"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button 
-                      type="submit"
-                      className="flex-1 bg-black hover:bg-neutral-900 text-white font-black py-4 rounded-xl text-[10px] uppercase tracking-[0.2em] transition-all cursor-pointer"
-                    >
-                      Save Password PIN
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={triggerOtpReset}
-                      className="px-6 py-4 border border-gray-200 hover:bg-gray-50 font-black text-gray-500 rounded-xl text-[10px] uppercase tracking-widest transition-all cursor-pointer"
-                    >
-                      Forgot Password? Reset via OTP
-                    </button>
-                  </div>
-                </form>
+                </div>
 
                 {/* Two Factor Authentication triggers */}
                 <div className="py-6 border-b border-gray-100 space-y-4">
@@ -1985,6 +2020,94 @@ For customer support, call 09612-TAZU-MART.
       </div>
 
       {/* Dynamic Popups and Dialog Sheets */}
+
+      {/* 1. CHANGE PASSWORD MODAL */}
+      <AnimatePresence>
+        {showPasswordModal && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPasswordModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl border border-neutral-100 relative z-10"
+            >
+              <div className="p-8">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-neutral-950 rounded-2xl flex items-center justify-center">
+                      <Lock className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-black leading-none mb-1">Update Password</h3>
+                      <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Secure auth update</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setShowPasswordModal(false)}
+                    className="w-8 h-8 rounded-full hover:bg-neutral-100 flex items-center justify-center transition-colors"
+                  >
+                    <Plus className="w-5 h-5 rotate-45 text-neutral-400" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">New Password</label>
+                    <div className="relative">
+                      <input 
+                        type={showModalPassword ? 'text' : 'password'} 
+                        value={newPassword} 
+                        onChange={(e) => setNewPassword(e.target.value)} 
+                        required
+                        className="w-full h-[50px] border border-[#E5E5E5] rounded-[14px] pl-10 pr-12 text-sm focus:border-black outline-none transition-all"
+                        placeholder="••••••••" 
+                      />
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                      <button 
+                        type="button" 
+                        onClick={() => setShowModalPassword(!showModalPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-1"
+                      >
+                        {showModalPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Confirm New Password</label>
+                    <div className="relative">
+                      <input 
+                        type={showModalPassword ? 'text' : 'password'} 
+                        value={confirmNewPassword} 
+                        onChange={(e) => setConfirmNewPassword(e.target.value)} 
+                        required
+                        className="w-full h-[50px] border border-[#E5E5E5] rounded-[14px] pl-10 pr-4 text-sm focus:border-black outline-none transition-all"
+                        placeholder="••••••••" 
+                      />
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={isUpdatingPassword}
+                    className="w-full h-[54px] bg-neutral-950 hover:bg-neutral-900 text-white rounded-[16px] font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 mt-6 transition-all shadow-[0_4px_12px_rgba(0,0,0,0.1)] disabled:opacity-50"
+                  >
+                    {isUpdatingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : 'UPDATE PASSWORD'}
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* 2. PROFILE IMAGE SOURCE SELECTOR BOTTOM SHEET */}
       <AnimatePresence>
