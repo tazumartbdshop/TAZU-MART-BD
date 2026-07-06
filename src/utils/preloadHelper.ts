@@ -272,9 +272,13 @@ export async function preloadHomepageDataAndAssets(): Promise<void> {
     }
 
     // Save to local caches so subsequent views are instant from store initializer
-    localStorage.setItem('cached_banners', JSON.stringify(banners));
-    localStorage.setItem('cached_categories', JSON.stringify(categories));
-    localStorage.setItem('cached_products', JSON.stringify(products));
+    try {
+      localStorage.setItem('cached_banners', JSON.stringify(banners));
+      localStorage.setItem('cached_categories', JSON.stringify(categories));
+      localStorage.setItem('cached_products', JSON.stringify(products));
+    } catch (e) {
+      console.warn("Failed to save homepage data to localStorage cache (quota likely exceeded):", e);
+    }
 
     // 4. Extract first image resources for background asset preloading (above the fold)
     const imagesToPreload: string[] = [];

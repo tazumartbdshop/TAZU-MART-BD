@@ -74,7 +74,10 @@ function AdminCustomerList() {
       if (activeUser && activeUser.id === customerId) {
         useAuthStore.getState().logout();
       }
-      deleteCustomer(customerId);
+      deleteCustomer(customerId).catch(err => {
+        console.error("[AdminCustomers] Delete customer failed:", err);
+        // We can use a toast or just a console error as the confirmation alert already handled intent
+      });
     }
   };
 

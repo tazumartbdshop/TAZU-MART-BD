@@ -55,7 +55,7 @@ interface CustomerState {
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'isRead'> & { id?: string }) => Promise<void>;
   syncCustomerFromAuth: (user: any) => void;
   updateCustomer: (id: string, updates: Partial<Customer>) => Promise<any>;
-  deleteCustomer: (id: string) => void;
+  deleteCustomer: (id: string) => Promise<void>;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearDemoData: () => void;
@@ -105,16 +105,24 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
     );
     
     if (existing) {
-      get().updateCustomer(existing.id, { 
-        lastLogin: Date.now(),
-        lastLoginAt: new Date().toISOString(),
-        totalLogins: (existing.totalLogins || 0) + 1,
-        lastIP: 'User Sync',
-        deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop'
-      });
+      try {
+        await get().updateCustomer(existing.id, { 
+          lastLogin: Date.now(),
+          lastLoginAt: new Date().toISOString(),
+          totalLogins: (existing.totalLogins || 0) + 1,
+          lastIP: 'User Sync',
+          deviceType: window.innerWidth < 768 ? 'Mobile' : 'Desktop'
+        });
+      } catch (err) {
+        console.warn("[Customer Store] Failed to update customer on sync:", err);
+      }
     } else {
       // If not in customer table, create the record (Auth user already exists here)
-      await get().checkAndCreateCustomerRecord(user);
+      try {
+        await get().checkAndCreateCustomerRecord(user);
+      } catch (err) {
+        console.warn("[Customer Store] Failed to create customer on sync:", err);
+      }
     }
   },
   checkAndCreateCustomerRecord: async (user) => {
@@ -264,19 +272,23 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       console.error("[Customer Store] fetchCustomers API failed, falling back to Supabase:", err);
     }
 
-    console.log("[Customer Store] Falling back to Supabase fetch...");
-    const supabase = getSupabase();
-    if (!supabase) {
-      console.warn("[Customer Store] Supabase client not available for fallback");
-      return;
-    }
-    
-    const { data, error } = await supabase.from('customers').select('*');
-    if (error) {
-      console.error("[Customer Store] Supabase fallback error:", error);
-    } else if (data) {
-      console.log("[Customer Store] Supabase fallback data:", data);
-      set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
+    try {
+      console.log("[Customer Store] Falling back to Supabase fetch...");
+      const supabase = getSupabase();
+      if (!supabase) {
+        console.warn("[Customer Store] Supabase client not available for fallback");
+        return;
+      }
+      
+      const { data, error } = await supabase.from('customers').select('*');
+      if (error) {
+        console.error("[Customer Store] Supabase fallback error:", error);
+      } else if (data) {
+        console.log("[Customer Store] Supabase fallback data:", data);
+        set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
+      }
+    } catch (fallbackErr) {
+      console.error("[Customer Store] Supabase fallback failed critically:", fallbackErr);
     }
   },
   subscribe: () => {

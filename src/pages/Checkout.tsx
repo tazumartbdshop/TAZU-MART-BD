@@ -776,7 +776,7 @@ export default function Checkout() {
           totalSpend: total,
           lastLogin: Date.now(),
           totalLogins: 1,
-        });
+        }).catch(err => console.warn("[Checkout] Background customer creation failed:", err));
       }
 
       orderPlacedRef.current = true;
