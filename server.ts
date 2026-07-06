@@ -1363,21 +1363,13 @@ Please ask me your query or select a quick question template below!`;
       // Update DB tables
       const userFields = ['name', 'email', 'phone', 'role', 'status', 'gender', 'address', 'division', 'district', 'upazila', 'area', 'postal_code', 'profile_image', 'occasion_name', 'special_date', 'updated_at'];
       const customerFields = ['name', 'phone', 'email', 'address', 'whats_app', 'note', 'profile_image', 'gender', 'social_links', 'occasion_name', 'special_date', 'status', 'customer_type', 'total_orders', 'total_spend', 'last_login', 'total_logins', 'last_ip', 'device_type', 'payment_methods', 'is_read', 'is_demo', 'updated_at'];
-      const profileFields = ['auth_user_id', 'full_name', 'phone', 'email', 'gender', 'avatar_url', 'date_of_birth', 'anniversary', 'updated_at'];
 
       const userUpdates: any = {};
       const customerUpdates: any = {};
-      const profileUpdates: any = {};
 
       Object.keys(mappedUpdates).forEach(key => {
         if (userFields.includes(key)) userUpdates[key] = mappedUpdates[key];
         if (customerFields.includes(key)) customerUpdates[key] = mappedUpdates[key];
-        
-        // Special mapping for profiles table
-        if (key === 'name') profileUpdates['full_name'] = mappedUpdates[key];
-        if (key === 'profile_image') profileUpdates['avatar_url'] = mappedUpdates[key];
-        if (key === 'special_date') profileUpdates['date_of_birth'] = mappedUpdates[key];
-        if (profileFields.includes(key)) profileUpdates[key] = mappedUpdates[key];
       });
 
       // Special mapping for email and phone
@@ -1398,13 +1390,6 @@ Please ask me your query or select a quick question template below!`;
         updatePromises.push(
           supabaseServiceRole.from('customers').update(customerUpdates).eq('id', id)
             .then(({ error }) => { if (error) console.warn("[Admin Update Customer] Customers table update failed:", error.message); })
-        );
-      }
-
-      if (Object.keys(profileUpdates).length > 0) {
-        updatePromises.push(
-          supabaseServiceRole.from('profiles').upsert({ auth_user_id: id, ...profileUpdates }, { onConflict: 'auth_user_id' })
-            .then(({ error }) => { if (error) console.warn("[Admin Update Customer] Profiles table update failed:", error.message); })
         );
       }
 
