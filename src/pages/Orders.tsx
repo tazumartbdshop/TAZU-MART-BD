@@ -8,15 +8,16 @@ import { useNavigate } from 'react-router-dom';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../lib/loyalty';
 
 const STATUS_COLORS: Record<string, string> = {
-  'Placed': 'bg-yellow-100 text-yellow-700 border border-yellow-200',
-  'Pending': 'bg-yellow-100 text-yellow-700 border border-yellow-200',
-  'Processing': 'bg-blue-100 text-blue-700 border border-blue-200',
-  'Packed': 'bg-purple-100 text-purple-700 border border-purple-200',
-  'Shipped': 'bg-indigo-100 text-indigo-700 border border-indigo-200',
-  'Shipping': 'bg-indigo-100 text-indigo-700 border border-indigo-200',
-  'Out For Delivery': 'bg-orange-100 text-orange-700 border border-orange-200',
-  'Delivered': 'bg-green-100 text-green-700 border border-green-200',
-  'Cancelled': 'bg-red-100 text-red-700 border border-red-200',
+  'Placed': 'bg-neutral-100 text-neutral-600 border border-neutral-200',
+  'Pending Payment': 'bg-amber-50 text-amber-600 border border-amber-200',
+  'Confirmed': 'bg-purple-50 text-purple-600 border border-purple-200',
+  'Preparing': 'bg-orange-50 text-orange-600 border border-orange-200',
+  'Packed': 'bg-cyan-50 text-cyan-600 border border-cyan-200',
+  'Shipping': 'bg-blue-50 text-blue-600 border border-blue-200',
+  'Delivered': 'bg-green-50 text-green-600 border border-green-200',
+  'Completed': 'bg-emerald-50 text-emerald-600 border border-emerald-200',
+  'Cancelled': 'bg-red-50 text-red-600 border border-red-200',
+  'Returned': 'bg-gray-100 text-gray-600 border border-gray-200',
 };
 
 export default function Orders() {
@@ -33,7 +34,7 @@ export default function Orders() {
 
   // Helper to map store orders into standard viewing structure
   const mapDynamicOrder = (o: any) => {
-    const possibleStatuses = ['Placed', 'Confirmed', 'Processing', 'Shipping', 'Delivered'];
+    const possibleStatuses = ['Placed', 'Confirmed', 'Preparing', 'Packed', 'Shipping', 'Delivered', 'Completed'];
     const statusHistory = o.statusHistory || [];
     
     const steps = possibleStatuses.map(statusName => {
@@ -64,7 +65,7 @@ export default function Orders() {
         name: o.courier?.name || 'Pathao',
         trackingNo: o.courier?.trackingId || `TX-${o.billId?.split('-')[1] || 'PENDING'}`,
       },
-      status: o.status === 'Placed' ? 'Pending' : o.status === 'Confirmed' ? 'Processing' : o.status,
+      status: o.status,
       steps: steps,
       items: o.items || []
     };

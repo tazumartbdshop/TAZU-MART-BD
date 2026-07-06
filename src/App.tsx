@@ -52,6 +52,9 @@ import LiveWebsiteAdmin from './pages/generated/LiveWebsiteAdmin';
 import Wishlist from './pages/Wishlist';
 import WebViewViewer from './pages/WebViewViewer';
 
+import OrderHistoryPage from './pages/orders/OrderHistoryPage';
+import OrderDetailView from './pages/orders/OrderDetailView';
+
 import AdminContentPages from './pages/admin/AdminContentPages';
 import DynamicLinkPage from './pages/DynamicLinkPage';
 import { useSiteManagementStore } from './store/useSiteManagementStore';
@@ -316,8 +319,11 @@ export default function App() {
           <Route path="checkout" element={<Checkout />} />
           <Route path="checkout/success/:orderId" element={<OrderSuccess />} />
           <Route path="checkout/invoice/:orderId" element={<OrderInvoice />} />
-          <Route path="orders" element={<Orders />} />
-          <Route path="orders/:id" element={<OrderDetails />} />
+          <Route path="orders" element={<OrderHistoryPage />} />
+          <Route path="orders/:id" element={<OrderDetailView />} />
+          <Route path="account/orders" element={<OrderHistoryPage />} />
+          <Route path="account/orders/:status" element={<OrderHistoryPage />} />
+          <Route path="account/orders/details/:id" element={<OrderDetailView />} />
 
           <Route path="admin/link-pages" element={<AdminContentPages />} />
           {/* Dynamic Link Pages */}

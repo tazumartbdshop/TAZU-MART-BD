@@ -4,7 +4,7 @@ import {
   Eye, Calendar, ArrowUpDown, ChevronLeft, ChevronRight,
   MoreVertical, MoreHorizontal, MessageSquare, ShieldCheck,
   Smartphone, User, Package, Clock, ShieldX, Ban, Archive,
-  X, ChevronDown
+  X, ChevronDown, Edit3
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,12 +17,17 @@ type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'hidden';
 
 export default function AdminReviewList() {
   const navigate = useNavigate();
-  const { reviews, deleteReview, approveReview, rejectReview, updateReview, fetchReviews, isLoading } = useReviewStore();
+  const { 
+    reviews, deleteReview, approveReview, rejectReview, 
+    updateReview, fetchReviews, isLoading, subscribe 
+  } = useReviewStore();
   const { products } = useProductStore();
 
   React.useEffect(() => {
     fetchReviews();
-  }, []);
+    const unsubscribe = subscribe();
+    return () => unsubscribe();
+  }, [fetchReviews, subscribe]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -240,10 +245,10 @@ export default function AdminReviewList() {
         </AnimatePresence>
       </div>
 
-      {/* Review Cards List */}
-      <div className="space-y-4 relative min-h-[400px]">
+      {/* Review Table List */}
+      <div className="bg-white rounded-lg border border-zinc-100 shadow-sm overflow-hidden relative min-h-[400px]">
         {isLoading && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-lg">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-[1px]">
             <div className="flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-4 border-zinc-200 border-t-zinc-950 rounded-full animate-spin" />
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Syncing Reviews...</p>
@@ -251,186 +256,154 @@ export default function AdminReviewList() {
           </div>
         )}
 
-        <div className="flex items-center justify-between px-2">
-          <button 
-            onClick={handleSelectAll}
-            className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-zinc-950 transition-colors"
-          >
-            {selectedReviews.length === filteredReviews.length ? 'Deselect All' : 'Select All Visible'}
-          </button>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-            Showing {filteredReviews.length} Reviews
-          </div>
-        </div>
-
-        {filteredReviews.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredReviews.map((review) => {
-              const product = products.find(p => String(p.id) === String(review.productId));
-              const isSelected = selectedReviews.includes(review.reviewId);
-
-              return (
-                <motion.div 
-                  key={review.reviewId}
-                  layout
-                  className={cn(
-                    "bg-white border rounded-lg p-5 shadow-sm transition-all group relative",
-                    isSelected ? "border-zinc-950 ring-2 ring-zinc-950/5" : "border-zinc-100 hover:border-zinc-200"
-                  )}
-                >
-                  {/* Select Checkbox */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-zinc-50/50 border-b border-zinc-100">
+                <th className="p-4 w-10">
                   <button 
-                    onClick={() => handleSelectOne(review.reviewId)}
+                    onClick={handleSelectAll}
                     className={cn(
-                      "absolute top-5 left-5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all z-10",
-                      isSelected ? "bg-zinc-950 border-zinc-950 text-white" : "bg-white border-zinc-200 opacity-0 group-hover:opacity-100"
+                      "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                      selectedReviews.length === filteredReviews.length && filteredReviews.length > 0
+                        ? "bg-zinc-950 border-zinc-950 text-white" 
+                        : "bg-white border-zinc-200"
                     )}
                   >
-                    {isSelected && <CheckCircle className="w-3 h-3" />}
+                    {selectedReviews.length === filteredReviews.length && filteredReviews.length > 0 && <CheckCircle className="w-3 h-3" />}
                   </button>
+                </th>
+                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Customer Name</th>
+                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Product Name</th>
+                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Star Rating</th>
+                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Review Status</th>
+                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">Review Date</th>
+                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-50">
+              {filteredReviews.length > 0 ? (
+                filteredReviews.map((review) => {
+                  const product = products.find(p => String(p.id) === String(review.productId));
+                  const isSelected = selectedReviews.includes(review.reviewId);
 
-                  <div className={cn("space-y-4 transition-all", isSelected && "pl-8")}>
-                    {/* Header Info */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0 border border-zinc-200 overflow-hidden">
-                          {review.customerId ? (
-                            <div className="text-xs font-bold text-zinc-400">{review.customerName.charAt(0)}</div>
-                          ) : (
-                            <User className="w-5 h-5 text-zinc-400" />
+                  return (
+                    <motion.tr 
+                      key={review.reviewId}
+                      layout
+                      className={cn(
+                        "hover:bg-zinc-50/50 transition-colors group",
+                        isSelected && "bg-zinc-50"
+                      )}
+                    >
+                      <td className="p-4">
+                        <button 
+                          onClick={() => handleSelectOne(review.reviewId)}
+                          className={cn(
+                            "w-5 h-5 rounded border-2 flex items-center justify-center transition-all",
+                            isSelected ? "bg-zinc-950 border-zinc-950 text-white" : "bg-white border-zinc-200"
                           )}
-                        </div>
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-bold text-zinc-950 truncate uppercase tracking-tight">
-                            {review.customerName}
-                          </h4>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <div className="flex items-center">
-                              {[...Array(5)].map((_, i) => (
-                                <Star 
-                                  key={i} 
-                                  className={cn(
-                                    "w-2.5 h-2.5",
-                                    i < review.rating ? "fill-amber-400 text-amber-400" : "fill-zinc-100 text-zinc-100"
-                                  )} 
-                                />
-                              ))}
-                            </div>
-                            <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                              <Clock className="w-2.5 h-2.5" />
-                              {new Date(review.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
-                            </span>
+                        >
+                          {isSelected && <CheckCircle className="w-3 h-3" />}
+                        </button>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center shrink-0 border border-zinc-200">
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase">{review.customerName.charAt(0)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-bold text-zinc-950 uppercase truncate">{review.customerName}</div>
+                            {review.verified && (
+                              <div className="flex items-center gap-1 text-[8px] font-bold text-emerald-600 uppercase tracking-widest">
+                                <ShieldCheck className="w-2.5 h-2.5" /> Verified
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-                      <div className="shrink-0">
-                        {getStatusBadge(review.status)}
-                      </div>
-                    </div>
-
-                    {/* Product Info */}
-                    {product && (
-                      <div className="flex items-center gap-2 p-2 bg-zinc-50 rounded-lg border border-zinc-100">
-                        <div className="w-10 h-10 rounded-md overflow-hidden border border-zinc-200 shrink-0">
-                          <img src={product.image} alt="" className="w-full h-full object-cover" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Product</div>
-                          <div className="text-[10px] font-bold text-zinc-950 uppercase truncate tracking-tight">{product.name}</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Review Text */}
-                    <div className="relative">
-                      <p className="text-xs text-zinc-600 font-medium leading-[1.6] line-clamp-3">
-                        {review.reviewText}
-                      </p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-between pt-4 border-t border-zinc-50">
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex -space-x-1.5">
-                          {review.mediaUrls?.slice(0, 3).map((url, idx) => (
-                            <div key={idx} className="w-6 h-6 rounded-md border-2 border-white overflow-hidden bg-zinc-100">
-                              <img src={url} alt="" className="w-full h-full object-cover" />
+                      </td>
+                      <td className="p-4 max-w-[200px]">
+                        <div className="flex items-center gap-2">
+                          {product && (
+                            <div className="w-8 h-8 rounded border border-zinc-100 overflow-hidden shrink-0">
+                              <img src={product.image} alt="" className="w-full h-full object-cover" />
                             </div>
+                          )}
+                          <div className="text-[11px] font-bold text-zinc-600 uppercase truncate">
+                            {product?.name || 'Unknown Product'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-0.5">
+                          {[...Array(5)].map((_, i) => (
+                            <Star 
+                              key={i} 
+                              className={cn(
+                                "w-3 h-3",
+                                i < review.rating ? "fill-amber-400 text-amber-400" : "fill-zinc-100 text-zinc-100"
+                              )} 
+                            />
                           ))}
-                          {review.mediaUrls && review.mediaUrls.length > 3 && (
-                            <div className="w-6 h-6 rounded-md border-2 border-white bg-zinc-950 text-[8px] font-bold text-white flex items-center justify-center">
-                              +{review.mediaUrls.length - 3}
-                            </div>
-                          )}
                         </div>
-                        {review.mediaUrls && review.mediaUrls.length > 0 && (
-                          <span className="text-[9px] font-bold uppercase text-zinc-400 tracking-widest">Media</span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => {
-                            setQuickStatusTarget(review.reviewId);
-                            setSelectedStatus(review.status);
-                          }}
-                          className={cn(
-                            "flex items-center gap-1.5 px-3 h-8 rounded-lg border text-[9px] font-bold uppercase tracking-widest transition-all",
-                            review.status === 'approved' ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100" :
-                            review.status === 'rejected' ? "bg-red-50 text-red-600 border-red-100 hover:bg-red-100" :
-                            "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100"
-                          )}
-                        >
-                          {review.status}
-                          <ChevronDown className="w-3 h-3" />
-                        </button>
-
-                        <button 
-                          onClick={() => navigate(`/admin/reviews/detail/${review.reviewId}`)}
-                          className="p-2 text-zinc-400 hover:text-zinc-950 hover:bg-zinc-50 rounded-md transition-all"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => {
-                            if (window.confirm('Delete this review?')) deleteReview(review.reviewId);
-                          }}
-                          className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      </td>
+                      <td className="p-4">
+                        {getStatusBadge(review.status)}
+                      </td>
+                      <td className="p-4">
+                        <div className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                          {new Date(review.createdAt).toLocaleDateString('en-GB', { 
+                            day: '2-digit', 
+                            month: 'short', 
+                            year: 'numeric' 
+                          })}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <button 
+                            onClick={() => navigate(`/admin/reviews/detail/${review.reviewId}`)}
+                            className="p-2 text-zinc-400 hover:text-zinc-950 hover:bg-zinc-100 rounded-md transition-all"
+                            title="View"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => navigate(`/admin/reviews/detail/${review.reviewId}`)}
+                            className="p-2 text-zinc-400 hover:text-zinc-950 hover:bg-zinc-100 rounded-md transition-all"
+                            title="Edit"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (window.confirm('Are you sure you want to delete this review?')) {
+                                deleteReview(review.reviewId);
+                              }
+                            }}
+                            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <Search className="w-8 h-8 text-zinc-200" />
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">No reviews found matching filters</p>
                     </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-        ) : (
-          <div className="bg-white border border-dashed border-zinc-200 rounded-lg p-12 text-center space-y-4">
-            <div className="w-16 h-16 bg-zinc-50 rounded-lg flex items-center justify-center mx-auto text-zinc-300">
-              <Search className="w-8 h-8" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-bold uppercase tracking-tight text-zinc-950">No Reviews Found</h3>
-              <p className="text-xs text-zinc-400 font-medium">Try adjusting your filters or search query.</p>
-            </div>
-            <button 
-              onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('all');
-                setRatingFilter('all');
-              }}
-              className="px-6 h-10 bg-zinc-950 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest"
-            >
-              Clear All Filters
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Quick Status Modal */}

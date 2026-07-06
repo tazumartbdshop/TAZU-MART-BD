@@ -33,6 +33,7 @@ import {
 import { useOrderStore, OrderItem, Order } from '../../store/useOrderStore';
 import { useProductStore } from '../../store/useProductStore';
 import { useDeliveryStore } from '../../store/useDeliveryStore';
+import { useCustomerStore } from '../../store/useCustomerStore';
 import { formatPrice } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -49,12 +50,20 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
   const { addOrder, orders, updateOrder } = useOrderStore();
   const { products } = useProductStore();
   const { courierApis } = useDeliveryStore();
+  const { customers, fetchCustomers } = useCustomerStore();
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
 
   const activeCouriers = useMemo(() => courierApis.filter(api => api.status === 'active'), [courierApis]);
 
   const editingOrder = useMemo(() => orders.find(o => o.id === id), [orders, id]);
 
   // State
+  const [selectedUserId, setSelectedUserId] = useState<string | undefined>(editingOrder?.userId);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [showCustomerResults, setShowCustomerResults] = useState(false);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [customer, setCustomer] = useState({
     name: '',
@@ -104,8 +113,34 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
       setCourierTrackingId(editingOrder.courier?.trackingId || '');
       setCourierStatus(editingOrder.courier?.status || '');
       setCustomerImage(editingOrder.customerImage);
+      setSelectedUserId(editingOrder.userId);
     }
   }, [editingOrder]);
+
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch) return [];
+    return customers.filter(c => 
+      c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+      c.phone.includes(customerSearch) ||
+      c.email.toLowerCase().includes(customerSearch.toLowerCase())
+    ).slice(0, 5);
+  }, [customers, customerSearch]);
+
+  const handleSelectCustomer = (c: any) => {
+    setSelectedUserId(c.id);
+    setCustomer({
+      name: c.name,
+      phone: c.phone,
+      email: c.email || '',
+      address: c.address?.street || '',
+      city: c.address?.city || c.address?.district || '',
+      area: c.address?.area || c.address?.upazila || '',
+      postalCode: c.address?.zipCode || ''
+    });
+    setCustomerImage(c.profileImage);
+    setCustomerSearch('');
+    setShowCustomerResults(false);
+  };
 
   // Modals
   const [showProductSelector, setShowProductSelector] = useState(false);
@@ -143,7 +178,7 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
   const dueAmount = Math.max(0, total - paidAmount);
 
   // Status Stepper Data
-  const steps: Order['status'][] = ['Placed', 'Confirmed', 'Processing', 'Shipping', 'Delivered'];
+  const steps: Order['status'][] = ['Placed', 'Confirmed', 'Preparing', 'Packed', 'Shipping', 'Delivered', 'Completed'];
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -205,6 +240,7 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
       dueAmount,
       total,
       notes,
+      userId: selectedUserId,
       courier: { 
         name: courier, 
         trackingId: courierTrackingId,
@@ -545,10 +581,71 @@ export default function PremiumOrderAdd({ editId, isModal, onClose }: PremiumOrd
 
           {/* Customer Information Section */}
           <div className="bg-white border border-gray-200 p-4 md:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] rounded-xl md:rounded-2xl">
-            <h3 className="text-xs md:text-sm font-black uppercase tracking-widest text-black mb-6 flex items-center gap-2">
-              <User className="w-4 h-4 text-purple-600" />
-              Customer Information
-            </h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xs md:text-sm font-black uppercase tracking-widest text-black flex items-center gap-2">
+                <User className="w-4 h-4 text-purple-600" />
+                Customer Information
+              </h3>
+              
+              <div className="relative">
+                <div className="flex items-center gap-2">
+                   <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                      <input 
+                        type="text" 
+                        placeholder="Search existing customer..."
+                        value={customerSearch}
+                        onChange={(e) => {
+                          setCustomerSearch(e.target.value);
+                          setShowCustomerResults(true);
+                        }}
+                        onFocus={() => setShowCustomerResults(true)}
+                        className="h-8 pl-8 pr-3 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-bold focus:outline-none focus:border-black w-48 md:w-64"
+                      />
+                   </div>
+                   {selectedUserId && (
+                     <button 
+                       onClick={() => {
+                         setSelectedUserId(undefined);
+                         setCustomer({ name: '', phone: '', email: '', address: '', city: '', area: '', postalCode: '' });
+                         setCustomerImage(undefined);
+                       }}
+                       className="p-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-600 hover:text-white transition-all"
+                       title="Unlink Customer"
+                     >
+                       <X className="w-3.5 h-3.5" />
+                     </button>
+                   )}
+                </div>
+
+                <AnimatePresence>
+                  {showCustomerResults && filteredCustomers.length > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 top-full mt-2 w-full md:w-72 bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden"
+                    >
+                      {filteredCustomers.map(c => (
+                        <button 
+                          key={c.id}
+                          onClick={() => handleSelectCustomer(c)}
+                          className="w-full p-3 flex items-center gap-3 hover:bg-gray-50 border-b border-gray-50 last:border-0 text-left"
+                        >
+                          <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center overflow-hidden shrink-0">
+                            {c.profileImage ? <img src={c.profileImage} className="w-full h-full object-cover" /> : <User className="w-4 h-4 text-purple-600" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-black text-black truncate">{c.name}</p>
+                            <p className="text-[9px] font-bold text-gray-400">{c.phone}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                <div className="space-y-4">

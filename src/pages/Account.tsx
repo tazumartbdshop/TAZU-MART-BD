@@ -37,21 +37,25 @@ const darazStatusItems = [
     label: 'To Pay',
     backendStatuses: ['placed'],
     icon: Wallet,
+    path: '/account/orders/to-pay'
   },
   {
     label: 'To Ship',
     backendStatuses: ['pending'],
     icon: Package,
+    path: '/account/orders/to-ship'
   },
   {
     label: 'To Receive',
     backendStatuses: ['processing'],
     icon: Truck,
+    path: '/account/orders/to-receive'
   },
   {
     label: 'Returns & Cancellations',
     backendStatuses: ['cancelled', 'returned'],
     icon: RefreshCcw,
+    path: '/account/orders/returns'
   },
 ];
 
@@ -281,15 +285,13 @@ export default function Account() {
                 <button
                   key={i}
                   onClick={() => {
-                    setActiveFilter(prev => prev === item.label ? null : item.label);
+                    navigate(item.path);
                   }}
                   className={cn(
                     "flex flex-col items-center justify-center gap-2 px-4 py-3 border rounded-xl cursor-pointer transition-all shrink-0 min-w-[95px] relative",
                     isTrackingActive 
                       ? "bg-[#111111] text-white border-black ring-2 ring-black shadow-lg scale-102"
-                      : isFilteredActive
-                        ? "bg-slate-200 text-slate-900 border-slate-300 font-extrabold scale-102"
-                        : "bg-white text-gray-500 border-gray-100 hover:bg-neutral-50 hover:border-gray-300"
+                      : "bg-white text-gray-500 border-gray-100 hover:bg-neutral-50 hover:border-gray-300"
                   )}
                 >
                   {/* Black Badge Counter */}

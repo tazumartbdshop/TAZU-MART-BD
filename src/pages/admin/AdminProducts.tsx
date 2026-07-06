@@ -679,7 +679,7 @@ function AdminProductAdd() {
         </div>
         
         <div className="p-6 md:p-10">
-           <form className="space-y-12 max-w-5xl mx-auto" onSubmit={handleSubmit}>
+           <form className="space-y-12 w-full" onSubmit={handleSubmit}>
               
               {/* 8. IMAGE UPLOAD SECTION */}
               <div className="space-y-4">
@@ -833,7 +833,7 @@ function AdminProductAdd() {
                       </p>
                       
                       {bannerImage && (
-                         <div className="mt-2 p-3 bg-zinc-50 border border-zinc-200 rounded-none max-w-xl relative">
+                         <div className="mt-2 p-3 bg-zinc-50 border border-zinc-200 rounded-none w-full relative">
                             <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Banner Preview</p>
                             <img src={bannerImage} alt="Product Banner Preview" className="h-32 w-full object-cover border border-zinc-200" referrerPolicy="no-referrer" />
                             <button
@@ -867,7 +867,7 @@ function AdminProductAdd() {
                        Upgraded Media Module. Supports: <b className="text-zinc-700">YouTube Video URL, Shorts, Reels, and Facebook Videos</b>. Visually appears as the primary thumb preview element in the customer-facing gallery.
                     </p>
                     {videoUrl && (
-                       <div className="mt-2 p-3 bg-zinc-50 border border-zinc-200 rounded-none max-w-xl space-y-1.5 font-sans">
+                       <div className="mt-2 p-3 bg-zinc-50 border border-zinc-200 rounded-none w-full space-y-1.5 font-sans">
                           <span className="inline-block text-[8px] bg-red-50 text-red-650 border border-red-155 font-black uppercase px-2 py-0.5">Media Link Detected</span>
                           <p className="text-[10px] font-semibold text-neutral-700 truncate" title={videoUrl}>Link: {videoUrl}</p>
                        </div>
@@ -1013,7 +1013,7 @@ function AdminProductAdd() {
               {/* 12. CATEGORY SYSTEM */}
               <div className="space-y-4 pt-8 border-t border-zinc-200">
                  <h4 className="block text-xs font-black text-black uppercase tracking-widest border-l-4 border-black pl-3">CATEGORY</h4>
-                 <div className="space-y-1.5 max-w-sm">
+                 <div className="space-y-1.5 w-full">
                     <label className="text-[10px] font-black text-black uppercase tracking-widest">Choose Store Category *</label>
                     <select 
                        name="category" 
@@ -1239,7 +1239,7 @@ function AdminProductAdd() {
                         </div>
 
                         {/* Input tools */}
-                        <div className="flex gap-2 max-w-md">
+                        <div className="flex gap-2 w-full">
                            <input 
                               type="text"
                               value={newKeywordInput}
@@ -1311,7 +1311,7 @@ function AdminProductAdd() {
                  <button 
                     type="submit" 
                     disabled={isLoading}
-                     className="w-full max-w-sm py-4 bg-black text-white font-black uppercase text-xs tracking-[0.2em] rounded-none hover:bg-zinc-900 transition-colors shadow-xl shadow-black/10 text-center cursor-pointer disabled:bg-zinc-700 disabled:cursor-not-allowed"
+                     className="w-full py-4 bg-black text-white font-black uppercase text-xs tracking-[0.2em] rounded-none hover:bg-zinc-900 transition-colors shadow-xl shadow-black/10 text-center cursor-pointer disabled:bg-zinc-700 disabled:cursor-not-allowed"
                  >
                     {isLoading ? '[ SAVING... ]' : '[ SAVE PRODUCT ]'}
                  </button>

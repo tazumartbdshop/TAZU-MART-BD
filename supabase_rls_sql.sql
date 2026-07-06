@@ -156,7 +156,8 @@ CREATE TABLE IF NOT EXISTS public.orders (
   paid_amount NUMERIC,
   due_amount NUMERIC,
   promo_code_used TEXT,
-  type TEXT DEFAULT 'Online'
+  type TEXT DEFAULT 'Online',
+  user_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS public.order_items (
@@ -478,12 +479,38 @@ BEGIN
     -- Orders Policies
     ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Orders access" ON public.orders;
-    CREATE POLICY "Orders access" ON public.orders FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "Orders access" ON public.orders 
+    FOR ALL 
+    TO public 
+    USING (
+      (auth.uid()::text = user_id) OR 
+      (is_admin())
+    ) 
+    WITH CHECK (
+      (auth.uid()::text = user_id) OR 
+      (is_admin())
+    );
 
     -- Order Items Policies
     ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Order items access" ON public.order_items;
-    CREATE POLICY "Order items access" ON public.order_items FOR ALL TO public USING (true) WITH CHECK (true);
+    CREATE POLICY "Order items access" ON public.order_items 
+    FOR ALL 
+    TO public 
+    USING (
+      EXISTS (
+        SELECT 1 FROM public.orders o 
+        WHERE o.id = order_items.order_id 
+        AND (o.user_id = auth.uid()::text OR is_admin())
+      )
+    )
+    WITH CHECK (
+      EXISTS (
+        SELECT 1 FROM public.orders o 
+        WHERE o.id = order_items.order_id 
+        AND (o.user_id = auth.uid()::text OR is_admin())
+      )
+    );
 
     -- Leads Policies
     ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
@@ -537,6 +564,28 @@ BEGIN
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS public.refunds (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      amount NUMERIC NOT NULL,
+      status TEXT DEFAULT 'Pending',
+      images TEXT[] DEFAULT '{}',
+      admin_note TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS public.notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      type TEXT,
+      is_read BOOLEAN DEFAULT false,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
     ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "Reviews read access" ON public.reviews;
     CREATE POLICY "Reviews read access" ON public.reviews FOR SELECT TO public USING (
@@ -546,6 +595,14 @@ BEGIN
     CREATE POLICY "Reviews insert access" ON public.reviews FOR INSERT TO public WITH CHECK (true);
     DROP POLICY IF EXISTS "Reviews admin access" ON public.reviews;
     CREATE POLICY "Reviews admin access" ON public.reviews FOR ALL TO public USING (is_admin()) WITH CHECK (is_admin());
+
+    ALTER TABLE public.refunds ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Refunds access" ON public.refunds;
+    CREATE POLICY "Refunds access" ON public.refunds FOR ALL TO public USING (true) WITH CHECK (true);
+
+    ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Notifications access" ON public.notifications;
+    CREATE POLICY "Notifications access" ON public.notifications FOR ALL TO public USING (true) WITH CHECK (true);
 END $$;
 
 -- 4. ORDER SYNC TRIGGERS & FUNCTIONS

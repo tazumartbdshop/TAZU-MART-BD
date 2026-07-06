@@ -62,7 +62,7 @@ const TrackingSheet = ({
   const { orders, updateOrderStatus } = useOrderStore();
   const order = orders.find(o => o.id === initialOrder?.id) || initialOrder;
   const statuses: Order['status'][] = [
-    'Placed', 'Pending', 'Processing', 'Confirmed', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'
+    'Placed', 'Pending Payment', 'Confirmed', 'Preparing', 'Packed', 'Shipping', 'Delivered', 'Completed', 'Cancelled', 'Returned', 'Refund Requested', 'Refund Approved', 'Refunded'
   ];
 
   if (!isOpen || !order) return null;
@@ -179,15 +179,19 @@ export default function AdminOrdersCardView() {
 
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
-      case 'Pending': return 'bg-yellow-50 text-yellow-700 border-yellow-100';
+      case 'Pending Payment': return 'bg-yellow-50 text-yellow-700 border-yellow-100';
       case 'Placed': return 'bg-gray-50/70 text-slate-700 border-gray-150';
-      case 'Processing': return 'bg-orange-50 text-orange-700 border-orange-100';
+      case 'Preparing': return 'bg-orange-50 text-orange-700 border-orange-100';
       case 'Delivered': return 'bg-green-50 text-green-700 border-green-100';
       case 'Cancelled': return 'bg-red-50 text-red-700 border-red-100';
       case 'Shipping': return 'bg-blue-50 text-blue-700 border-blue-105';
       case 'Confirmed': return 'bg-purple-50 text-purple-700 border-purple-100';
-      case 'Packaging': return 'bg-cyan-50 text-cyan-700 border-cyan-100';
+      case 'Packed': return 'bg-cyan-50 text-cyan-700 border-cyan-100';
       case 'Returned': return 'bg-gray-200 text-gray-700 border-gray-300';
+      case 'Completed': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      case 'Refund Requested': return 'bg-pink-50 text-pink-700 border-pink-100';
+      case 'Refund Approved': return 'bg-pink-100 text-pink-800 border-pink-200';
+      case 'Refunded': return 'bg-indigo-50 text-indigo-700 border-indigo-100';
       default: return 'bg-gray-50 text-gray-700 border-gray-100';
     }
   };
@@ -203,7 +207,7 @@ export default function AdminOrdersCardView() {
   };
 
   const menuStatuses: Order['status'][] = [
-    'Pending', 'Processing', 'Confirmed', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'
+    'Placed', 'Pending Payment', 'Confirmed', 'Preparing', 'Packed', 'Shipping', 'Delivered', 'Completed', 'Cancelled', 'Returned', 'Refund Requested', 'Refund Approved', 'Refunded'
   ];
 
   return (

@@ -40,6 +40,7 @@ interface ReviewState {
   
   // Actions
   fetchReviews: (silent?: boolean) => Promise<void>;
+  recalculateProductStats: (productId: string) => Promise<void>;
   addReview: (review: Omit<ProductReview, 'reviewId' | 'createdAt' | 'status'> & { status?: 'pending' | 'approved' | 'hidden' | 'rejected', createdAt?: string }) => Promise<void>;
   updateReview: (reviewId: string, updates: Partial<Omit<ProductReview, 'reviewId' | 'productId' | 'customerId' | 'createdAt'>>) => Promise<void>;
   approveReview: (reviewId: string) => Promise<void>;
@@ -51,6 +52,7 @@ interface ReviewState {
   replyToReview: (reviewId: string, reply: string) => Promise<void>;
   clearNotifications: () => void;
   markNotificationsAsRead: () => void;
+  subscribe: () => () => void;
 }
 
 export const useReviewStore = create<ReviewState>((set, get) => ({
@@ -94,6 +96,40 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       console.error('Error fetching reviews:', error);
       if (!silent) toast.error('Failed to load reviews');
       set({ isLoading: false });
+    }
+  },
+
+  // Helper to recalculate product stats
+  recalculateProductStats: async (productId: string) => {
+    try {
+      // 1. Fetch all approved reviews for this product
+      const { data: approvedReviews, error: fetchError } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('product_id', productId)
+        .eq('status', 'approved');
+
+      if (fetchError) throw fetchError;
+
+      const count = approvedReviews?.length || 0;
+      const average = count > 0 
+        ? Number((approvedReviews.reduce((sum, r) => sum + r.rating, 0) / count).toFixed(1))
+        : 4.5; // Default back to 4.5 if no reviews
+
+      // 2. Update product table
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({
+          rating: average,
+          reviews: count
+        })
+        .eq('id', productId);
+
+      if (updateError) {
+        console.error("Error updating product stats:", updateError);
+      }
+    } catch (err) {
+      console.error("Failed to recalculate product stats:", err);
     }
   },
 
@@ -162,6 +198,11 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         reviews: [addedReview, ...state.reviews]
       }));
 
+      // 4. Recalculate product stats if status is approved
+      if (newRev.status === 'approved') {
+        await get().recalculateProductStats(newRev.productId);
+      }
+
     } catch (error: any) {
       console.error('addReview error:', error);
       throw error;
@@ -179,6 +220,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       if (updates.customerName) dbUpdates.customer_name = updates.customerName;
       if (updates.reviewText) dbUpdates.review_text = updates.reviewText;
       if (updates.rating) dbUpdates.rating = updates.rating;
+      if ((updates as any).productId) dbUpdates.product_id = (updates as any).productId;
 
       const { error } = await supabase
         .from('reviews')
@@ -186,6 +228,17 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
         .eq('id', id);
 
       if (error) throw error;
+      
+      // Get the review to know which product to update
+      const review = get().reviews.find(r => r.reviewId === id);
+      if (review) {
+        await get().recalculateProductStats(review.productId);
+        // If product was changed, recalculate for the new product too
+        if ((updates as any).productId && (updates as any).productId !== review.productId) {
+          await get().recalculateProductStats((updates as any).productId);
+        }
+      }
+
       await get().fetchReviews();
     } catch (error: any) {
       console.error('Error updating review:', error);
@@ -210,15 +263,24 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
 
   deleteReview: async (id) => {
     try {
+      const review = get().reviews.find(r => r.reviewId === id);
+      const productId = review?.productId;
+
       const { error } = await supabase
         .from('reviews')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+
       set((state) => ({
         reviews: state.reviews.filter((r) => r.reviewId !== id)
       }));
+
+      if (productId) {
+        await get().recalculateProductStats(productId);
+      }
+
       toast.success('Review deleted permanently');
     } catch (error: any) {
       console.error('Error deleting review:', error);
@@ -251,6 +313,19 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     set((state) => ({
       notifications: state.notifications.map(n => ({ ...n, read: true }))
     }));
+  },
+
+  subscribe: () => {
+    const channel = supabase
+      .channel('public:reviews')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, (payload) => {
+        get().fetchReviews(true);
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }
 }));
 

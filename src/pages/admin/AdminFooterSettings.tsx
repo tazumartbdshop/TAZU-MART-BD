@@ -97,47 +97,11 @@ export default function AdminFooterSettings() {
     }
   }, [settings]);
 
-  // Validation checks for empty required fields
-  const isAboutTitleEmpty = !aboutTitle || aboutTitle.trim() === '';
-  const isAboutDescriptionEmpty = !aboutDescription || aboutDescription.trim() === '';
-  const isContactAddressEmpty = !contactAddress || contactAddress.trim() === '';
-  const isContactSupportTimeEmpty = !contactSupportTime || contactSupportTime.trim() === '';
-  const isContactPhoneEmpty = !contactPhone || contactPhone.trim() === '';
-  const isContactEmailEmpty = !contactEmail || contactEmail.trim() === '';
-  const isCardTitleEmpty = !cardTitle || cardTitle.trim() === '';
-  const isCardDescriptionEmpty = !cardDescription || cardDescription.trim() === '';
-  const isCopyrightTextEmpty = !copyrightText || copyrightText.trim() === '';
-
-  // Quick link item validation (prevent empty name or URL inside added links)
-  const isAnyQuickLinkEmpty = quickLinks.some(link => !link.name || link.name.trim() === '' || !link.url || link.url.trim() === '');
-
-  // Form overall validity helper
-  const isFormValid = 
-    !isAboutTitleEmpty &&
-    !isAboutDescriptionEmpty &&
-    !isContactAddressEmpty &&
-    !isContactSupportTimeEmpty &&
-    !isContactPhoneEmpty &&
-    !isContactEmailEmpty &&
-    !isCardTitleEmpty &&
-    !isCardDescriptionEmpty &&
-    !isCopyrightTextEmpty &&
-    !isAnyQuickLinkEmpty;
-
   // Save changes
   const handleSave = async () => {
     setHasSubmittedAttempt(true);
     setValidationError(null);
     setDbErrorMessage(null);
-
-    // Front-end strict validation safeguard
-    if (!isFormValid) {
-      setValidationError("Validation failed. Please fill out all required fields marked with * and ensure no Quick Link is blank.");
-      setSaveStatus('error');
-      // Scroll smoothly to top of the page to show errors
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
 
     setSaveStatus('saving');
 
@@ -213,7 +177,7 @@ export default function AdminFooterSettings() {
       }
     } catch (e: any) {
       console.error("Detailed error while saving footer settings:", e);
-      setDbErrorMessage("Failed to save footer settings. Please try again.");
+      setDbErrorMessage(e.message || "Failed to save footer settings. Please try again.");
       setSaveStatus('error');
     }
   };
@@ -315,8 +279,8 @@ export default function AdminFooterSettings() {
   }
 
   return (
-    <div className="bg-white min-h-screen py-10 px-4 sm:px-6 md:px-8 font-sans text-zinc-950">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="bg-white min-h-screen py-10 px-4 sm:px-6 md:px-8 font-sans text-zinc-950 overflow-x-hidden">
+      <div className="max-w-2xl mx-auto space-y-6 w-full overflow-hidden">
         
         {/* Header Title */}
         <div className="border-y border-zinc-200 py-6 mb-8 text-center">
@@ -337,7 +301,7 @@ export default function AdminFooterSettings() {
 
         {saveStatus === 'success' && (
           <div className="border-l-2 border-emerald-500 bg-emerald-50 p-3 text-xs text-emerald-800 font-bold">
-            ✓ Footer settings saved successfully.
+            ✅ Footer settings saved successfully.
           </div>
         )}
 
@@ -347,7 +311,7 @@ export default function AdminFooterSettings() {
           <div className="flex gap-2">
             <label className="flex-1 h-11 px-3 border border-zinc-300 hover:border-black flex items-center justify-between text-sm bg-white cursor-pointer transition-colors">
               <span className="text-zinc-500 truncate text-xs">
-                {uploadingLogo ? 'Uploading logo image...' : footerLogo || 'Choose Logo File'}
+                {uploadingLogo ? 'Uploading logo image...' : 'Choose Logo File'}
               </span>
               <span className="text-xs font-bold uppercase text-zinc-800 border-l border-zinc-200 pl-3 shrink-0">Upload Logo</span>
               <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploadingLogo} />
@@ -368,7 +332,7 @@ export default function AdminFooterSettings() {
                 src={footerLogo} 
                 alt="Logo Preview" 
                 style={{ width: `${footerLogoWidth}px`, height: `${footerLogoHeight}px` }} 
-                className="object-contain max-w-full"
+                className="object-contain max-w-full h-auto"
                 referrerPolicy="no-referrer"
               />
             </div>
@@ -402,39 +366,29 @@ export default function AdminFooterSettings() {
         {/* About Title */}
         <div className="space-y-1">
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            About Title <span className="text-red-500 font-bold">*</span>
+            About Title
           </label>
           <input 
             type="text" 
             value={aboutTitle} 
             onChange={(e) => setAboutTitle(e.target.value)} 
-            className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-              hasSubmittedAttempt && isAboutTitleEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-            }`}
+            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
             placeholder="e.g. About Tazu Mart"
           />
-          {hasSubmittedAttempt && isAboutTitleEmpty && (
-            <p className="text-red-500 text-xs font-bold">This field is required.</p>
-          )}
         </div>
 
         {/* About Description */}
         <div className="space-y-1">
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            About Description <span className="text-red-500 font-bold">*</span>
+            About Description
           </label>
           <textarea 
             value={aboutDescription} 
             onChange={(e) => setAboutDescription(e.target.value)} 
             rows={3}
-            className={`w-full p-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white resize-none ${
-              hasSubmittedAttempt && isAboutDescriptionEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-            }`}
+            className="w-full p-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white resize-none"
             placeholder="e.g. Browse and shop premium collections with our secure offline / online experience..."
           />
-          {hasSubmittedAttempt && isAboutDescriptionEmpty && (
-            <p className="text-red-500 text-xs font-bold">This field is required.</p>
-          )}
         </div>
 
         {/* Facebook URL */}
@@ -523,14 +477,12 @@ export default function AdminFooterSettings() {
 
         {/* Quick Links Group */}
         {quickLinks.map((link, idx) => {
-          const isNameEmpty = !link.name || link.name.trim() === '';
-          const isUrlEmpty = !link.url || link.url.trim() === '';
           return (
             <div key={idx} className="space-y-3 pt-3 pb-3 border-b border-zinc-100 relative">
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-                    Quick Link {idx + 1} Name <span className="text-red-500 font-bold">*</span>
+                    Quick Link {idx + 1} Name
                   </label>
                   <button
                     type="button"
@@ -544,32 +496,22 @@ export default function AdminFooterSettings() {
                   type="text" 
                   value={link.name} 
                   onChange={(e) => handleUpdateLink(idx, 'name', e.target.value)} 
-                  className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-                    hasSubmittedAttempt && isNameEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-                  }`}
+                  className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
                   placeholder="Link Display Name"
                 />
-                {hasSubmittedAttempt && isNameEmpty && (
-                  <p className="text-red-500 text-xs font-bold">This field is required.</p>
-                )}
               </div>
               
               <div className="space-y-1">
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-                  Quick Link {idx + 1} URL <span className="text-red-500 font-bold">*</span>
+                  Quick Link {idx + 1} URL
                 </label>
                 <input 
                   type="text" 
                   value={link.url} 
                   onChange={(e) => handleUpdateLink(idx, 'url', e.target.value)} 
-                  className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-                    hasSubmittedAttempt && isUrlEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-                  }`}
+                  className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
                   placeholder="Link URL (e.g. /all-products)"
                 />
-                {hasSubmittedAttempt && isUrlEmpty && (
-                  <p className="text-red-500 text-xs font-bold">This field is required.</p>
-                )}
               </div>
             </div>
           );
@@ -588,115 +530,85 @@ export default function AdminFooterSettings() {
         {/* Store Address */}
         <div className="space-y-1">
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Store Address <span className="text-red-500 font-bold">*</span>
+            Store Address
           </label>
           <input 
             type="text" 
             value={contactAddress} 
             onChange={(e) => setContactAddress(e.target.value)} 
-            className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-              hasSubmittedAttempt && isContactAddressEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-            }`}
+            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
             placeholder="e.g. Dhaka, Bangladesh"
           />
-          {hasSubmittedAttempt && isContactAddressEmpty && (
-            <p className="text-red-500 text-xs font-bold">This field is required.</p>
-          )}
         </div>
 
         {/* Support Time */}
         <div className="space-y-1">
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Support Time <span className="text-red-500 font-bold">*</span>
+            Support Time
           </label>
           <input 
             type="text" 
             value={contactSupportTime} 
             onChange={(e) => setContactSupportTime(e.target.value)} 
-            className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-              hasSubmittedAttempt && isContactSupportTimeEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-            }`}
+            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
             placeholder="e.g. 10 AM - 10 PM (Everyday)"
           />
-          {hasSubmittedAttempt && isContactSupportTimeEmpty && (
-            <p className="text-red-500 text-xs font-bold">This field is required.</p>
-          )}
         </div>
 
         {/* Phone Number */}
         <div className="space-y-1">
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Phone Number <span className="text-red-500 font-bold">*</span>
+            Phone Number
           </label>
           <input 
             type="text" 
             value={contactPhone} 
             onChange={(e) => setContactPhone(e.target.value)} 
-            className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-              hasSubmittedAttempt && isContactPhoneEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-            }`}
+            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
             placeholder="e.g. +8801700000000"
           />
-          {hasSubmittedAttempt && isContactPhoneEmpty && (
-            <p className="text-red-500 text-xs font-bold">This field is required.</p>
-          )}
         </div>
 
         {/* Email Address */}
         <div className="space-y-1">
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Email Address <span className="text-red-500 font-bold">*</span>
+            Email Address
           </label>
           <input 
             type="email" 
             value={contactEmail} 
             onChange={(e) => setContactEmail(e.target.value)} 
-            className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-              hasSubmittedAttempt && isContactEmailEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-            }`}
+            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
             placeholder="e.g. support@tazumartbd.com"
           />
-          {hasSubmittedAttempt && isContactEmailEmpty && (
-            <p className="text-red-500 text-xs font-bold">This field is required.</p>
-          )}
         </div>
 
         {/* Customer Support Title */}
         <div className="space-y-1">
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Customer Support Title <span className="text-red-500 font-bold">*</span>
+            Customer Support Title
           </label>
           <input 
             type="text" 
             value={cardTitle} 
             onChange={(e) => setCardTitle(e.target.value)} 
-            className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-              hasSubmittedAttempt && isCardTitleEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-            }`}
+            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
             placeholder="e.g. Customer Support"
           />
-          {hasSubmittedAttempt && isCardTitleEmpty && (
-            <p className="text-red-500 text-xs font-bold">This field is required.</p>
-          )}
         </div>
 
         {/* Customer Support Description */}
         <div className="space-y-1">
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Customer Support Description <span className="text-red-500 font-bold">*</span>
+            Customer Support Description
           </label>
           <input 
             type="text" 
             value={cardDescription} 
             onChange={(e) => setCardDescription(e.target.value)} 
-            className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-              hasSubmittedAttempt && isCardDescriptionEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-            }`}
+            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
             placeholder="e.g. Need help? Contact us now!"
           />
-          {hasSubmittedAttempt && isCardDescriptionEmpty && (
-            <p className="text-red-500 text-xs font-bold">This field is required.</p>
-          )}
         </div>
 
         {/* WhatsApp Button Text */}
@@ -750,20 +662,15 @@ export default function AdminFooterSettings() {
         {/* Copyright Text */}
         <div className="space-y-1">
           <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Copyright Text <span className="text-red-500 font-bold">*</span>
+            Copyright Text
           </label>
           <input 
             type="text" 
             value={copyrightText} 
             onChange={(e) => setCopyrightText(e.target.value)} 
-            className={`w-full h-11 px-3 border focus:ring-0 focus:outline-none text-sm transition-colors bg-white ${
-              hasSubmittedAttempt && isCopyrightTextEmpty ? 'border-red-500 bg-red-50/20 focus:border-red-500' : 'border-zinc-300 focus:border-black'
-            }`}
+            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
             placeholder="e.g. © 2026 TAZU MART BD. All Rights Reserved."
           />
-          {hasSubmittedAttempt && isCopyrightTextEmpty && (
-            <p className="text-red-500 text-xs font-bold">This field is required.</p>
-          )}
         </div>
 
         {/* Payment Badges Group */}
@@ -835,7 +742,7 @@ export default function AdminFooterSettings() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={saveStatus === 'saving' || (hasSubmittedAttempt && !isFormValid)}
+            disabled={saveStatus === 'saving'}
             className="flex-[2] h-12 bg-zinc-950 hover:bg-zinc-800 disabled:bg-zinc-200 disabled:text-zinc-400 text-white font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:cursor-not-allowed"
           >
             {saveStatus === 'saving' ? (

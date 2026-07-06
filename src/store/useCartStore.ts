@@ -13,6 +13,7 @@ export interface CartItem {
   price: number;
   image: string;
   quantity: number;
+  variant?: string;
   originalPrice?: number;
   discountType?: 'Percentage' | 'Fixed Amount';
   discountValue?: number;

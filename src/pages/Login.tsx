@@ -19,12 +19,22 @@ export default function Login() {
   const ADMIN_EMAIL = (settings.adminEmail && settings.adminEmail !== "admin@tazumart.com" ? settings.adminEmail : "admin.tazumartbd@gmail.com").toLowerCase().trim();
   const ADMIN_PASSWORD = settings.adminPassword && settings.adminPassword !== "12345678" ? settings.adminPassword : "8963885522";
 
+  const [loginTab, setLoginTab] = useState<'email' | 'phone'>('email');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
+  
+  // Phone OTP States
+  const [phoneStep, setPhoneStep] = useState<'input' | 'verify'>('input');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
+  const [timer, setTimer] = useState(0);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
+
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated, user } = useAuthStore();
@@ -37,6 +47,16 @@ export default function Login() {
   const adminFrom = location.state?.from?.pathname || '/admin';
 
   useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timer]);
+
+  useEffect(() => {
     if (isAuthenticated && !isLoading) {
       if (user?.role === 'admin') {
         navigate(adminFrom, { replace: true });
@@ -45,6 +65,123 @@ export default function Login() {
       }
     }
   }, [isAuthenticated, navigate, user, isLoading]);
+
+  const handleSendOTP = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isSendingOtp || timer > 0) return;
+    
+    if (!phoneNumber.trim()) {
+      setOtpError('Please enter a valid phone number');
+      return;
+    }
+
+    setIsSendingOtp(true);
+    setOtpError('');
+
+    try {
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Database connection not ready.");
+
+      // Format phone number to E.164 if needed (e.g. +880...)
+      let formattedPhone = phoneNumber.trim();
+      if (!formattedPhone.startsWith('+')) {
+        // Assume BD if starts with 01
+        if (formattedPhone.startsWith('01')) {
+          formattedPhone = '+88' + formattedPhone;
+        } else {
+          // Add default prefix or alert
+        }
+      }
+
+      const { error: otpErr } = await supabase.auth.signInWithOtp({
+        phone: formattedPhone,
+      });
+
+      if (otpErr) throw otpErr;
+
+      setPhoneStep('verify');
+      setTimer(60);
+    } catch (err: any) {
+      console.error("OTP Error:", err);
+      setOtpError(err.message || 'Failed to send OTP. Please try again.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = otpCode.join('');
+    if (token.length !== 6) {
+      setOtpError('Please enter a valid 6-digit code');
+      return;
+    }
+
+    setIsLoading(true);
+    setOtpError('');
+
+    try {
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Database connection not ready.");
+
+      let formattedPhone = phoneNumber.trim();
+      if (!formattedPhone.startsWith('+') && formattedPhone.startsWith('01')) {
+        formattedPhone = '+88' + formattedPhone;
+      }
+
+      const { data, error: verifyErr } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token: token,
+        type: 'sms'
+      });
+
+      if (verifyErr) throw verifyErr;
+
+      if (data.user) {
+        // Fetch user details from 'users' table
+        const { data: dbUser } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+        
+        const userData = {
+          id: data.user.id,
+          name: dbUser?.name || data.user.user_metadata?.name || 'Customer',
+          email: data.user.email || '',
+          role: 'customer' as const,
+          phone: dbUser?.phone || data.user.phone || formattedPhone,
+          profileImage: dbUser?.profileImage || data.user.user_metadata?.profileImage || '',
+        };
+
+        login(userData);
+        pixelService.trackLogin(data.user.id);
+        navigate('/account/dashboard');
+      }
+    } catch (err: any) {
+      console.error("Verify OTP Error:", err);
+      setOtpError(err.message || 'Invalid or expired OTP');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    
+    const newOtp = [...otpCode];
+    newOtp[index] = value.slice(-1);
+    setOtpCode(newOtp);
+
+    // Auto focus next
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpCode[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
 
   const activeProviders = [
     { id: 'google', name: 'Google' },
@@ -165,59 +302,30 @@ export default function Login() {
       }
 
       // 4. Regular Customer Login via Supabase Auth
-      if (isEmail) {
-        const { data, error: authError } = await supabase.auth.signInWithPassword({
-          email: normalizedIdentifier,
-          password: password,
-        });
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: normalizedIdentifier,
+        password: password,
+      });
 
-        if (authError) {
-          throw new Error(authError.message);
-        }
+      if (authError) {
+        throw new Error(authError.message);
+      }
 
-        if (data.user) {
-          // Fetch user details from 'users' table
-          const { data: dbUser } = await supabase.from('users').select('*').eq('id', data.user.id).single();
-          
-          const userData = {
-            id: data.user.id,
-            name: dbUser?.name || data.user.user_metadata?.name || 'Customer',
-            email: data.user.email!,
-            role: 'customer' as const,
-            phone: dbUser?.phone || data.user.user_metadata?.phone || '',
-            profileImage: dbUser?.profileImage || data.user.user_metadata?.profileImage || '',
-          };
-
-          login(userData);
-          pixelService.trackLogin(data.user.id);
-          navigate('/account/dashboard');
-          return;
-        }
-      } else {
-        // Phone number based login (Check database manually as Supabase Auth usually requires email)
-        const { data: phoneUser, error: phoneError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('phone', normalizedIdentifier)
-          .eq('password', password)
-          .limit(1)
-          .single();
-
-        if (phoneError || !phoneUser) {
-          throw new Error("Invalid phone number or password");
-        }
-
+      if (data.user) {
+        // Fetch user details from 'users' table
+        const { data: dbUser } = await supabase.from('users').select('*').eq('id', data.user.id).single();
+        
         const userData = {
-          id: phoneUser.id,
-          name: phoneUser.name,
-          email: phoneUser.email || '',
+          id: data.user.id,
+          name: dbUser?.name || data.user.user_metadata?.name || 'Customer',
+          email: data.user.email!,
           role: 'customer' as const,
-          phone: phoneUser.phone,
-          profileImage: phoneUser.profileImage || '',
+          phone: dbUser?.phone || data.user.user_metadata?.phone || '',
+          profileImage: dbUser?.profileImage || data.user.user_metadata?.profileImage || '',
         };
 
         login(userData);
-        pixelService.trackLogin(phoneUser.id);
+        pixelService.trackLogin(data.user.id);
         navigate('/account/dashboard');
         return;
       }
@@ -274,20 +382,44 @@ export default function Login() {
           </div>
         )}
 
-        {isEmailPasswordEnabled && (
+        {/* Login Tabs */}
+        <div className="flex bg-neutral-100 p-1 rounded-2xl mb-6">
+          <button
+            onClick={() => setLoginTab('email')}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all",
+              loginTab === 'email' ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-700"
+            )}
+          >
+            <Mail className="w-4 h-4" />
+            EMAIL LOGIN
+          </button>
+          <button
+            onClick={() => setLoginTab('phone')}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all",
+              loginTab === 'phone' ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-700"
+            )}
+          >
+            <span className="text-base leading-none">📱</span>
+            PHONE LOGIN
+          </button>
+        </div>
+
+        {isEmailPasswordEnabled && loginTab === 'email' && (
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email or Mobile Number</label>
+              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email Address</label>
               <div className="relative">
                 <input 
                   id="login-identifier"
-                  type="text" 
+                  type="email" 
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  autoComplete="username"
+                  autoComplete="email"
                   required 
                   className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
-                  placeholder="Enter Email or Phone Number"
+                  placeholder="Enter your email"
                 />
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
               </div>
@@ -328,6 +460,103 @@ export default function Login() {
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SIGN IN'}
             </button>
           </form>
+        )}
+
+        {loginTab === 'phone' && (
+          <div className="space-y-4">
+            {otpError && (
+              <div className="p-3 rounded-xl bg-red-50 text-red-700 text-[11px] font-medium border border-red-100 flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <div>{otpError}</div>
+              </div>
+            )}
+
+            {phoneStep === 'input' ? (
+              <form onSubmit={handleSendOTP} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Phone Number</label>
+                  <div className="relative">
+                    <input 
+                      type="tel" 
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      required 
+                      className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
+                      placeholder="e.g. 017XXXXXXXX"
+                    />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-lg">📱</div>
+                  </div>
+                </div>
+                <button 
+                  type="submit"
+                  disabled={isSendingOtp}
+                  className="w-full h-[54px] bg-neutral-950 text-white rounded-[14px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2"
+                >
+                  {isSendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SEND OTP'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOTP} className="space-y-6">
+                <div className="text-center">
+                  <p className="text-xs text-neutral-500 mb-4">
+                    Enter the 6-digit code sent to <span className="text-black font-bold">{phoneNumber}</span>
+                  </p>
+                  <div className="flex justify-between gap-2 max-w-[320px] mx-auto">
+                    {otpCode.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        id={`otp-${idx}`}
+                        type="text"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(idx, e)}
+                        className="w-full aspect-square text-center text-xl font-black bg-neutral-50 border-2 border-neutral-150 rounded-xl focus:border-black focus:bg-white focus:outline-none transition-all"
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button 
+                    type="submit"
+                    disabled={isLoading || otpCode.some(d => !d)}
+                    className="w-full h-[54px] bg-neutral-950 text-white rounded-[14px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2 disabled:bg-neutral-300"
+                  >
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'VERIFY & LOGIN'}
+                  </button>
+                  
+                  <div className="flex flex-col items-center gap-3">
+                    {timer > 0 ? (
+                      <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+                        Resend OTP in {timer}s
+                      </p>
+                    ) : (
+                      <button 
+                        type="button"
+                        onClick={() => handleSendOTP()}
+                        className="text-[11px] font-bold text-black uppercase tracking-wider hover:underline"
+                      >
+                        Resend OTP
+                      </button>
+                    )}
+                    
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setPhoneStep('input');
+                        setOtpError('');
+                        setOtpCode(['', '', '', '', '', '']);
+                      }}
+                      className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider hover:text-black"
+                    >
+                      Change Phone Number
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+          </div>
         )}
 
         {activeProviders.length > 0 && (

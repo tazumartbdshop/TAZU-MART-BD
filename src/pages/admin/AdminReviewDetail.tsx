@@ -42,6 +42,8 @@ export default function AdminReviewDetail() {
   const [editMedia, setEditMedia] = useState<string[]>([]);
   const [editReply, setEditReply] = useState('');
 
+  const [editProductId, setEditProductId] = useState('');
+
   useEffect(() => {
     if (review) {
       setEditName(review.customerName);
@@ -50,6 +52,7 @@ export default function AdminReviewDetail() {
       setEditStatus(review.status);
       setEditMedia(review.mediaUrls || []);
       setEditReply(review.adminReply || '');
+      setEditProductId(review.productId);
     }
   }, [review]);
 
@@ -66,8 +69,8 @@ export default function AdminReviewDetail() {
   }
 
   const handleSave = () => {
-    if (!editName.trim() || !editText.trim()) {
-      toast.error('Name and Review text are required');
+    if (!editName.trim() || !editText.trim() || !editProductId) {
+      toast.error('Name, Review text, and Product are required');
       return;
     }
 
@@ -77,8 +80,9 @@ export default function AdminReviewDetail() {
       reviewText: editText.trim(),
       status: editStatus,
       mediaUrls: editMedia,
-      adminReply: editReply.trim() || undefined
-    });
+      adminReply: editReply.trim() || undefined,
+      productId: editProductId
+    } as any);
 
     setIsEditing(false);
     toast.success('Review updated successfully');
@@ -279,7 +283,29 @@ export default function AdminReviewDetail() {
               <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-950">Product Information</h3>
             </div>
 
-            {product ? (
+            {isEditing ? (
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-zinc-400">Select Product</label>
+                  <select 
+                    value={editProductId}
+                    onChange={(e) => setEditProductId(e.target.value)}
+                    className="w-full h-10 px-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-bold focus:outline-none focus:border-zinc-950"
+                  >
+                    <option value="">Choose Product</option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {products.find(p => String(p.id) === String(editProductId)) && (
+                  <div className="flex items-center gap-2 p-2 bg-zinc-50 rounded border border-zinc-100">
+                    <img src={products.find(p => String(p.id) === String(editProductId))?.image} alt="" className="w-10 h-10 object-cover rounded" />
+                    <div className="text-[10px] font-bold uppercase truncate">{products.find(p => String(p.id) === String(editProductId))?.name}</div>
+                  </div>
+                )}
+              </div>
+            ) : product ? (
               <div className="space-y-4">
                 <Link 
                   to={`/product/${product.slug || product.id}`}

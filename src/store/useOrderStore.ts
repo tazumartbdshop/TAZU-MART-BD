@@ -2,6 +2,7 @@ import { create } from 'zustand';
 // Removed demo generators to enforce single DB rule
 import { getSupabase } from '../lib/supabase';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
+import toast from 'react-hot-toast';
 
 export interface OrderItem {
   productId: string;
@@ -19,6 +20,18 @@ export interface OrderItem {
   };
 }
 
+export interface Refund {
+  id: string;
+  orderId: string;
+  reason: string;
+  amount: number;
+  status: 'Pending' | 'Approved' | 'Processing' | 'Completed' | 'Rejected';
+  createdAt: string;
+  updatedAt: string;
+  images?: string[];
+  adminNote?: string;
+}
+
 export interface Order {
   id: string;
   orderId: string;
@@ -32,7 +45,7 @@ export interface Order {
   postalCode?: string;
   deliveryMode: 'Express Delivery' | 'Standard Delivery';
   paymentMethod: string;
-  status: 'Placed' | 'Confirmed' | 'Processing' | 'Shipping' | 'Delivered' | 'Cancelled' | 'Pending' | 'Packaging' | 'Returned' | 'Completed';
+  status: 'Placed' | 'Pending Payment' | 'Confirmed' | 'Preparing' | 'Packed' | 'Shipping' | 'Delivered' | 'Completed' | 'Cancelled' | 'Returned' | 'Refund Requested' | 'Refund Approved' | 'Refunded';
   statusHistory: { status: string; timestamp: string; updatedBy?: string }[];
   status_updated_at: string;
   edited_by_admin?: string;
@@ -55,6 +68,7 @@ export interface Order {
   isDemo?: boolean;
   promoCodeUsed?: string;
   storeName?: string;
+  refundInfo?: Refund;
   courier?: {
     name: string;
     trackingId?: string;
@@ -87,6 +101,10 @@ interface OrderState {
   clearDemoData: () => void;
   subscribeOrders: (userId?: string) => () => void;
   subscribeTrackingStatuses: () => () => void;
+  requestRefund: (orderId: string, reason: string, images?: string[]) => Promise<void>;
+  updateRefundStatus: (refundId: string, status: Refund['status'], adminNote?: string) => Promise<void>;
+  cancelOrder: (orderId: string) => Promise<void>;
+  confirmReceived: (orderId: string) => Promise<void>;
 }
 
 const initialOrders: Order[] = [];
@@ -603,4 +621,91 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         supabase.removeChannel(channel);
     };
   },
+  requestRefund: async (orderId, reason, images = []) => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const order = get().orders.find(o => o.id === orderId || o.orderId === orderId);
+    if (!order) throw new Error('Order not found');
+
+    const refundId = Math.random().toString(36).substring(2, 9);
+    const now = new Date().toISOString();
+
+    const refund: Refund = {
+      id: refundId,
+      orderId: order.id,
+      reason,
+      amount: order.total,
+      status: 'Pending',
+      createdAt: now,
+      updatedAt: now,
+      images
+    };
+
+    const { error } = await supabase.from('refunds').insert([objectToSnake(refund)]);
+    if (error) throw error;
+
+    // Update order status to Refund Requested
+    get().updateOrderStatus(order.id, 'Refund Requested');
+    
+    // Create notification
+    const notificationId = Math.random().toString(36).substring(2, 9);
+    await supabase.from('notifications').insert([{
+      id: notificationId,
+      user_id: order.userId || 'admin',
+      title: 'Refund Requested',
+      message: `A refund has been requested for Order #${order.orderId}`,
+      type: 'refund',
+      created_at: now
+    }]);
+  },
+  updateRefundStatus: async (refundId, status, adminNote) => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    const now = new Date().toISOString();
+    const { data: refundData, error: fetchErr } = await supabase.from('refunds').select('*').eq('id', refundId).single();
+    if (fetchErr || !refundData) throw new Error('Refund not found');
+
+    const updates: any = { status, updated_at: now };
+    if (adminNote) updates.admin_note = adminNote;
+
+    const { error } = await supabase.from('refunds').update(updates).eq('id', refundId);
+    if (error) throw error;
+
+    // If approved or completed, update order status
+    if (status === 'Approved' || status === 'Completed') {
+      const orderStatus = status === 'Completed' ? 'Refunded' : 'Refund Requested';
+      get().updateOrderStatus(refundData.order_id, orderStatus);
+    }
+
+    // Notify user
+    const { data: orderData } = await supabase.from('orders').select('user_id, order_id').eq('id', refundData.order_id).single();
+    if (orderData?.user_id) {
+      await supabase.from('notifications').insert([{
+        id: Math.random().toString(36).substring(2, 9),
+        user_id: orderData.user_id,
+        title: `Refund ${status}`,
+        message: `Your refund request for Order #${orderData.order_id} has been ${status.toLowerCase()}.`,
+        type: 'refund',
+        created_at: now
+      }]);
+    }
+  },
+  cancelOrder: async (orderId) => {
+    try {
+      await get().updateOrderStatus(orderId, 'Cancelled');
+      toast.success('Order cancelled successfully');
+    } catch (err) {
+      toast.error('Failed to cancel order');
+    }
+  },
+  confirmReceived: async (orderId) => {
+    try {
+      await get().updateOrderStatus(orderId, 'Completed');
+      toast.success('Order confirmed as received');
+    } catch (err) {
+      toast.error('Failed to confirm delivery');
+    }
+  }
 }));

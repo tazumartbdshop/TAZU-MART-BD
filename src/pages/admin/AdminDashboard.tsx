@@ -828,15 +828,15 @@ function Overview() {
   const reviewsGrowth = getGrowthPercentage(curReviews, prevReviews);
 
   // Order status distribution
-  const deliveredVal = orders.filter(o => o.status === 'Delivered').length;
-  const processingVal = orders.filter(o => ['Processing', 'Confirmed', 'Packaging', 'Shipping'].includes(o.status)).length;
-  const pendingVal = orders.filter(o => ['Pending', 'Placed'].includes(o.status)).length;
+  const deliveredVal = orders.filter(o => o.status === 'Completed').length;
+  const processingVal = orders.filter(o => ['Confirmed', 'Preparing', 'Packed', 'Shipping'].includes(o.status)).length;
+  const pendingVal = orders.filter(o => ['Pending Payment', 'Placed'].includes(o.status)).length;
   const cancelledVal = orders.filter(o => ['Cancelled', 'Returned'].includes(o.status)).length;
 
   const doughnutData = [
-    { name: 'Delivered', value: deliveredVal, color: deliveredVal === 0 ? '#d4d4d8' : '#18181b' },
-    { name: 'Processing', value: processingVal, color: processingVal === 0 ? '#d4d4d8' : '#0ea5e9' },
-    { name: 'Pending', value: pendingVal, color: pendingVal === 0 ? '#d4d4d8' : '#a855f7' },
+    { name: 'Completed', value: deliveredVal, color: deliveredVal === 0 ? '#d4d4d8' : '#18181b' },
+    { name: 'Preparing', value: processingVal, color: processingVal === 0 ? '#d4d4d8' : '#0ea5e9' },
+    { name: 'New Orders', value: pendingVal, color: pendingVal === 0 ? '#d4d4d8' : '#a855f7' },
     { name: 'Cancelled', value: cancelledVal, color: cancelledVal === 0 ? '#d4d4d8' : '#f43f5e' },
   ];
   const COLORS = doughnutData.map(item => item.color);
@@ -1180,7 +1180,7 @@ function Overview() {
                     <td className="p-5 text-right">
                       <span className={`px-2.5 py-1.5 text-[9px] font-black rounded-none border whitespace-nowrap uppercase tracking-widest shadow-sm transition-all ${
                         order.status === 'Delivered' ? 'bg-purple-600 text-white border-purple-600' :
-                        ['Processing', 'Confirmed', 'Packaging', 'Shipping'].includes(order.status) ? 'bg-blue-600 text-white border-blue-600' :
+                        ['Confirmed', 'Preparing', 'Packed', 'Shipping'].includes(order.status) ? 'bg-blue-600 text-white border-blue-600' :
                         ['Pending', 'Placed'].includes(order.status) ? 'bg-amber-500 text-white border-amber-500' :
                         ['Cancelled', 'Returned'].includes(order.status) ? 'bg-rose-500 text-white border-rose-500' :
                         'bg-emerald-500 text-white border-emerald-500'

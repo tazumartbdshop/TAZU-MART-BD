@@ -507,7 +507,7 @@ async function startServer() {
         console.error("[POST footer-settings] DB save error:", saveError);
         return res.status(400).json({
           success: false,
-          error: "Failed to save footer settings. Please try again."
+          error: `Database save failed: ${saveError.message || "Please check your connection and try again."}`
         });
       }
 
@@ -529,7 +529,7 @@ async function startServer() {
         console.error("[POST footer-settings] Verification reload failed:", verifyError);
         return res.status(500).json({
           success: false,
-          error: "Failed to save footer settings. Please try again."
+          error: "Verification failed. Saved settings could not be reloaded from the database."
         });
       }
 

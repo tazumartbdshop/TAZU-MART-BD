@@ -31,16 +31,19 @@ function AdminOrderList() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'Pending Payment': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'Placed': return 'bg-gray-100 text-gray-700 border-gray-200';
       case 'Confirmed': return 'bg-purple-100 text-purple-700 border-purple-200';
-      case 'Processing': return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'Packaging': return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+      case 'Preparing': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'Packed': return 'bg-cyan-100 text-cyan-700 border-cyan-200';
       case 'Shipped':
       case 'Shipping': return 'bg-blue-100 text-blue-750 border-blue-200';
       case 'Delivered': return 'bg-green-100 text-green-700 border-green-200';
+      case 'Completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
       case 'Cancelled': return 'bg-red-100 text-red-700 border-red-200';
       case 'Returned': return 'bg-gray-200 text-gray-700 border-gray-300';
+      case 'Refund Requested': return 'bg-pink-100 text-pink-700 border-pink-200';
+      case 'Refunded': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
@@ -123,7 +126,7 @@ function AdminOrderList() {
 
         {/* Status Filter Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
-          {['All', 'Placed', 'Pending', 'Confirmed', 'Processing', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'].map((status) => (
+          {['All', 'Placed', 'Pending Payment', 'Confirmed', 'Preparing', 'Packed', 'Shipping', 'Delivered', 'Completed', 'Cancelled', 'Returned', 'Refund Requested', 'Refunded'].map((status) => (
             <button 
               key={status} 
               onClick={() => setActiveTab(status)}
@@ -180,7 +183,7 @@ function AdminOrderList() {
                     <p className="font-black text-black text-sm sm:text-base">
                       {formatPrice(order.total)}
                     </p>
-                    {(order.status === 'Delivered' || order.status === 'Completed') ? (
+                    {(order.status === 'Completed') ? (
                       <span className="px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 select-none uppercase tracking-wider">
                         <span className="w-2 h-2 rounded-full bg-green-500"></span>
                         Complete Order
@@ -192,7 +195,7 @@ function AdminOrderList() {
                           onChange={(e) => updateOrderStatus(order.id, e.target.value as any)}
                           className={`px-3 py-1 text-xs font-bold rounded-full border outline-none cursor-pointer ${getStatusColor(order.status || '')}`}
                         >
-                          {['Placed', 'Pending', 'Confirmed', 'Processing', 'Packaging', 'Shipping', 'Delivered', 'Cancelled', 'Returned'].map(s => (
+                          {['Placed', 'Pending Payment', 'Confirmed', 'Preparing', 'Packed', 'Shipping', 'Delivered', 'Completed', 'Cancelled', 'Returned', 'Refund Requested', 'Refund Approved', 'Refunded'].map(s => (
                             <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
