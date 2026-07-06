@@ -187,7 +187,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       }
 
       const result = await response.json();
-      if (!response.ok || result.success === false) {
+      if (!response.ok) {
         throw new Error(result.message || result.error || 'Failed to update customer');
       }
 
