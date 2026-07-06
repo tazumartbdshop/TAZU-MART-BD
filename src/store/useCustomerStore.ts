@@ -54,7 +54,7 @@ interface CustomerState {
   customers: Customer[];
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'isRead'> & { id?: string }) => Promise<void>;
   syncCustomerFromAuth: (user: any) => void;
-  updateCustomer: (id: string, updates: Partial<Customer>) => Promise<void>;
+  updateCustomer: (id: string, updates: Partial<Customer>) => Promise<any>;
   deleteCustomer: (id: string) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
@@ -175,15 +175,16 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text();
         console.error("[Store Update Customer] Non-JSON response:", text);
-        throw new Error("Server returned an invalid response (HTML). Please check server logs.");
+        throw new Error("Unable to save changes. Please try again.");
       }
 
       const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update customer');
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || result.error || 'Failed to update customer');
       }
 
       await get().fetchCustomers();
+      return result;
     } catch (error: any) {
       console.error("[Store Update Customer] Error:", error);
       throw error;

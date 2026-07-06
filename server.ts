@@ -1407,10 +1407,16 @@ Please ask me your query or select a quick question template below!`;
         }
       }
 
-      res.json({ status: "success" });
+      res.json({ 
+        success: true, 
+        message: "Profile updated successfully." 
+      });
     } catch (err: any) {
       console.error("[Admin Update Customer] Fatal Error:", err);
-      res.status(500).json({ error: "Customer update failed" });
+      res.status(200).json({ 
+        success: false, 
+        message: "Unable to save changes. Please try again." 
+      });
     }
   });
 

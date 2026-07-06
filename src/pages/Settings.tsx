@@ -682,7 +682,7 @@ export default function SettingsPage() {
 
         // 2. Update via Customer Store (this calls backend API /api/admin/update-customer which updates both tables)
         const customerStore = useCustomerStore.getState();
-        await customerStore.updateCustomer(user.id, updates);
+        const result = await customerStore.updateCustomer(user.id, updates);
 
         // 3. Update Special Days in 'user_special_days' table for detailed tracking
         // Clean up existing records for this user
@@ -711,12 +711,12 @@ export default function SettingsPage() {
           occasionName: JSON.stringify(specialDays),
           profileImage: profilePic
         });
-      }
 
-      triggerToast("Profile Updated Successfully.");
+        triggerToast(result?.message || "Profile updated successfully.");
+      }
     } catch (err: any) {
       console.error("Profile Save Error:", err);
-      triggerToast(err.message || "Failed to update profile", true);
+      triggerToast(err.message || "Unable to save changes. Please try again.", true);
     } finally {
       setIsLoading(false);
     }
