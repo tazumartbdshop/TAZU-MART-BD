@@ -1,6 +1,6 @@
 {
-  "name": "Tazu Mart BD Offers System",
-  "description": "Enterprise ecommerce visual campaigns panel with auto-banner templates, smart homepage controls, and product multi-select portals.",
+  "name": "TAZU MART BD",
+  "description": "TAZU MART BD Official Online Shopping Platform",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

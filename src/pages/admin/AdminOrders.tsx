@@ -2,22 +2,24 @@ import React, { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Search, Plus, Trash2, MessageSquare, Loader2 } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
-import { useOrderStore } from '../../store/useOrderStore';
+import { useOrderStore, Order } from '../../store/useOrderStore';
 import AdminOrdersCardView from './AdminOrdersCardView';
 import PremiumOrderAdd from './PremiumOrderAdd';
 import AdminFakeOrderControl from './AdminFakeOrderControl';
 import { InvoiceView } from '../../components/checkout/InvoiceView';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
 import { toast } from 'react-hot-toast';
+import { DeleteOrderModal } from '../../components/admin/DeleteOrderModal';
 
 function AdminOrderList() {
-  const { orders, updateOrderStatus, markAsRead, deleteOrder } = useOrderStore();
+  const { orders, updateOrderStatus, markAsRead, deleteOrder, clearAllOrders } = useOrderStore();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewType, setViewType] = useState('All'); // 'All' | 'Online' | 'Offline'
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any>(null);
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
 
   const filteredOrders = orders.filter(order => {
     const matchesTab = activeTab === 'All' || order.status === activeTab;
@@ -55,13 +57,25 @@ function AdminOrderList() {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const handleDeleteOrder = async (id: string) => {
-    if (window.confirm('Are you sure you want to permanently delete this order and all its items from the database?')) {
+  const confirmDeleteOrder = async () => {
+    if (!orderToDelete) return;
+    try {
+      await deleteOrder(orderToDelete.id);
+      toast.success('Order deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete order. Please try again.');
+    } finally {
+      setOrderToDelete(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (window.confirm('Are you sure you want to clear ALL orders? This cannot be undone.')) {
       try {
-        await deleteOrder(id);
-        toast.success('Order deleted successfully');
+        await clearAllOrders();
+        toast.success('All orders cleared.');
       } catch (error) {
-        toast.error('Failed to delete order');
+        toast.error('Failed to clear orders.');
       }
     }
   };
@@ -114,13 +128,21 @@ function AdminOrderList() {
             </div>
 
             {/* Add Order Button */}
-            <button 
-              onClick={() => navigate('/admin/orders/add')}
-              className="bg-black text-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] hover:bg-gray-800 transition-all active:scale-95 flex items-center gap-1.5 shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              Add Order
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={handleClearAll}
+                className="bg-red-600 text-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] hover:bg-red-700 transition-all active:scale-95 flex items-center gap-1.5 shadow-md"
+              >
+                Clear All
+              </button>
+              <button 
+                onClick={() => navigate('/admin/orders/add')}
+                className="bg-black text-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] hover:bg-gray-800 transition-all active:scale-95 flex items-center gap-1.5 shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                Add Order
+              </button>
+            </div>
           </div>
         </div>
 
@@ -356,7 +378,7 @@ function AdminOrderList() {
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteOrder(order.id);
+                        setOrderToDelete(order);
                       }}
                       className="border border-red-200 text-red-600 hover:bg-red-600 hover:text-white py-2.5 rounded-lg font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all"
                     >
@@ -375,6 +397,11 @@ function AdminOrderList() {
             No orders found.
           </div>
         )}
+        <DeleteOrderModal 
+          isOpen={!!orderToDelete} 
+          onClose={() => setOrderToDelete(null)}
+          onConfirm={confirmDeleteOrder}
+        />
       </div>
 
       {/* Dynamic Invoice Modal Preview Overlay */}

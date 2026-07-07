@@ -99,6 +99,7 @@ interface OrderState {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearDemoData: () => void;
+  clearAllOrders: () => Promise<void>;
   subscribeOrders: (userId?: string) => () => void;
   subscribeTrackingStatuses: () => () => void;
   requestRefund: (orderId: string, reason: string, images?: string[]) => Promise<void>;
@@ -450,26 +451,44 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   deleteOrder: async (id) => {
     const supabase = getSupabase();
     if (supabase) {
-      try {
-        // 1. Delete associated reviews first if any
-        await supabase.from('reviews').delete().eq('order_id', id);
+      // 1. Delete associated reviews first if any
+      const { error: revErr } = await supabase.from('reviews').delete().eq('order_id', id);
+      if (revErr) throw revErr;
         
-        // 2. Delete associated order items
-        await supabase.from('order_items').delete().eq('order_id', id);
+      // 2. Delete associated order items
+      const { error: itemErr } = await supabase.from('order_items').delete().eq('order_id', id);
+      if (itemErr) throw itemErr;
         
-        // 3. Finally delete the order itself
-        const { error } = await supabase.from('orders').delete().eq('id', id);
-        
-        if (error) { console.error("Ignored Error:", error); }
-      } catch (error) {
-        console.error("[Supabase Delete Error]:", error);
-        // throw error; // Bypassed to allow local order placement if DB is down
-      }
+      // 3. Finally delete the order itself
+      const { error } = await supabase.from('orders').delete().eq('id', id);
+      if (error) throw error;
     }
 
     set((state) => ({
       orders: state.orders.filter(o => o.id !== id)
     }));
+  },
+  clearAllOrders: async () => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    
+    const { data: orders, error: fetchErr } = await supabase.from('orders').select('id');
+    if (fetchErr) throw fetchErr;
+    
+    if (orders && orders.length > 0) {
+      const ids = orders.map(o => o.id);
+      
+      // Delete reviews linked to these orders
+      await supabase.from('reviews').delete().in('order_id', ids);
+      
+      // Delete order_items
+      await supabase.from('order_items').delete().in('order_id', ids);
+      
+      // Delete orders
+      await supabase.from('orders').delete().in('id', ids);
+    }
+    
+    set({ orders: [] });
   },
   markAsRead: (id) => {
     const existingOrder = get().orders.find(o => o.id === id);
