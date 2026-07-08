@@ -7,6 +7,7 @@ import { useCategoryStore } from '../../store/useCategoryStore';
 import { toast } from 'react-hot-toast';
 import { uploadImage } from '../../lib/imageUtils';
 import { AutoExpandingRichTextEditor, AutoExpandingTextarea } from '../../components/admin/AutoExpandingRichTextEditor';
+import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';
 
 function AdminProductList() {
   const navigate = useNavigate();
@@ -237,6 +238,48 @@ function AdminProductAdd() {
 
   const editingProduct = products.find(p => p.id === id);
 
+  // Unsaved changes state and logic
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isDirty) return;
+
+    // Push dummy state to capture browser/gesture back button
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      // Show confirmation dialog
+      setShowLeaveDialog(true);
+      // Restore dummy state
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
+  const handleConfirmLeave = () => {
+    setIsDirty(false);
+    setShowLeaveDialog(false);
+    navigate(pendingNavigationPath || '/admin/product-listing', { replace: true });
+  };
+
+  const handleCancelLeave = () => {
+    setShowLeaveDialog(false);
+    setPendingNavigationPath(null);
+  };
+
   const [uploadedImages, setUploadedImages] = useState<{ id: string; url: string; file?: File; name: string }[]>([]);
   const [showSourceSheet, setShowSourceSheet] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -248,6 +291,7 @@ function AdminProductAdd() {
   // States
   const [seoPoints, setSeoPoints] = useState<string[]>(['']);
   const [variants, setVariants] = useState<{ name: string; price: number | '' }[]>([{ name: '', price: '' }]);
+  const [qnas, setQnas] = useState<{ question: string; answer: string }[]>([]);
   const [shippingZones, setShippingZones] = useState<{ zone: string; charge: string }[]>([
     { zone: 'Inside Dhaka', charge: '80' },
     { zone: 'Outside Dhaka', charge: '150' }
@@ -288,6 +332,7 @@ function AdminProductAdd() {
           }))
         : [{ name: '', price: '' }];
       setVariants(mappedVariants);
+      setQnas(editingProduct.qnas || []);
       setShippingZones(editingProduct.shippingZones || [
         { zone: 'Inside Dhaka', charge: '80' },
         { zone: 'Outside Dhaka', charge: '150' }
@@ -311,8 +356,23 @@ function AdminProductAdd() {
       setBannerImage('');
       setVideoUrl('');
       setManualKeywords([]);
+      setQnas([]);
     }
   }, [id, isEditing, editingProduct]);
+
+  const addQna = () => {
+    setQnas([...qnas, { question: '', answer: '' }]);
+  };
+
+  const removeQna = (index: number) => {
+    setQnas(qnas.filter((_, i) => i !== index));
+  };
+
+  const updateQna = (index: number, field: 'question' | 'answer', value: string) => {
+    const newQnas = [...qnas];
+    newQnas[index] = { ...newQnas[index], [field]: value };
+    setQnas(newQnas);
+  };
 
   const compressAndResizeFile = (file: File): Promise<{ url: string; file: File }> => {
     return new Promise((resolve) => {
@@ -623,6 +683,7 @@ function AdminProductAdd() {
           is_regular: isRegular,
           is_offer: isOffer,
           reward_coins: Number(coinAmount),
+          qnas: qnas.filter(q => q.question.trim() !== ''),
           keywords: manualKeywords.length > 0 ? manualKeywords : generateKeywords(
             (formData.get('name') as string) || '',
             (formData.get('category') as string) || '',
@@ -650,6 +711,7 @@ function AdminProductAdd() {
           }
         });
         
+        setIsDirty(false);
         navigate('/admin/product-listing');
     } catch (error: any) {
         console.error("Error saving product:", error);
@@ -666,20 +728,37 @@ function AdminProductAdd() {
            <div className="flex items-center gap-3">
               <button 
                 type="button"
-                onClick={() => navigate('/admin/product-listing')}
+                onClick={() => {
+                  if (isDirty) {
+                    setPendingNavigationPath('/admin/product-listing');
+                    setShowLeaveDialog(true);
+                  } else {
+                    navigate('/admin/product-listing');
+                  }
+                }}
                 className="p-2 border border-zinc-200 rounded-none bg-white hover:bg-gray-100 mr-1"
               >
                 <ChevronLeft className="w-4 h-4 text-black" />
               </button>
               <h3 className="text-sm font-black text-black uppercase tracking-widest">{isEditing ? 'EDIT PRODUCT' : 'ADD PRODUCT'}</h3>
            </div>
-           <button onClick={() => navigate('/admin/product-listing')} className="text-gray-400 hover:text-black bg-white border border-zinc-200 p-2 rounded-none transition-colors">
+           <button 
+             onClick={() => {
+               if (isDirty) {
+                 setPendingNavigationPath('/admin/product-listing');
+                 setShowLeaveDialog(true);
+               } else {
+                 navigate('/admin/product-listing');
+               }
+             }} 
+             className="text-gray-400 hover:text-black bg-white border border-zinc-200 p-2 rounded-none transition-colors"
+           >
              <X className="w-4 h-4" />
            </button>
         </div>
         
         <div className="p-6 md:p-10">
-           <form className="space-y-12 w-full" onSubmit={handleSubmit}>
+           <form className="space-y-12 w-full" onSubmit={handleSubmit} onChange={() => setIsDirty(true)}>
               
               {/* 8. IMAGE UPLOAD SECTION */}
               <div className="space-y-4">
@@ -1052,7 +1131,70 @@ function AdminProductAdd() {
                  </div>
               </div>
 
-              {/* VARIANTS SECTION */}
+              
+               {/* PRODUCT QUESTIONS & ANSWERS SECTION */}
+               <div className="space-y-4 pt-8 border-t border-zinc-200">
+                  <div className="flex justify-between items-center">
+                     <h4 className="block text-xs font-black text-black uppercase tracking-widest border-l-4 border-black pl-3">Product Questions & Answers</h4>
+                     <button 
+                        type="button" 
+                        onClick={addQna}
+                        className="px-4 py-2 bg-black text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-zinc-800 transition-colors rounded-none"
+                     >
+                        <Plus className="w-3.5 h-3.5" /> Add Q&A Row
+                     </button>
+                  </div>
+                  
+                  {qnas.length === 0 ? (
+                     <div className="border border-dashed border-zinc-200 p-6 text-center bg-zinc-50">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">No questions & answers added yet. Click the button above to add custom product Q&As.</p>
+                     </div>
+                  ) : (
+                     <div className="space-y-4">
+                        {qnas.map((qna, idx) => (
+                           <div key={idx} className="p-4 border border-zinc-200 bg-zinc-50/50 space-y-3 relative group">
+                              <div className="flex justify-between items-center pb-2 border-b border-zinc-100">
+                                 <span className="text-[10px] font-black text-black uppercase tracking-widest">Q&A Row #{idx + 1}</span>
+                                 <button 
+                                    type="button"
+                                    onClick={() => removeQna(idx)}
+                                    className="p-1 border border-zinc-200 bg-white text-gray-400 hover:text-red-500 hover:border-red-500 transition-colors"
+                                    title="Delete Row"
+                                 >
+                                    <Trash2 className="w-4 h-4" />
+                                 </button>
+                              </div>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Question *</label>
+                                    <input 
+                                       placeholder="e.g., Is this product authentic?" 
+                                       value={qna.question}
+                                       onChange={(e) => updateQna(idx, 'question', e.target.value)}
+                                       className="w-full h-11 px-3 bg-white border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-semibold text-xs"
+                                       required
+                                    />
+                                 </div>
+                                 <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">Answer *</label>
+                                    <textarea 
+                                       placeholder="e.g., Yes, we import this directly from the official manufacturer." 
+                                       value={qna.answer}
+                                       onChange={(e) => updateQna(idx, 'answer', e.target.value)}
+                                       className="w-full min-h-[44px] p-3 bg-white border border-zinc-200 rounded-none focus:outline-none focus:border-black transition-colors font-semibold text-xs resize-y"
+                                       rows={1}
+                                       required
+                                    />
+                                 </div>
+                              </div>
+                           </div>
+                        ))}
+                     </div>
+                  )}
+               </div>
+
+               {/* VARIANTS SECTION */}
               <div className="space-y-4 pt-8 border-t border-zinc-200">
                  <div className="flex justify-between items-center">
                     <h4 className="block text-xs font-black text-black uppercase tracking-widest border-l-4 border-black pl-3">VARIANTS</h4>
@@ -1284,7 +1426,10 @@ function AdminProductAdd() {
                          <button
                            type="button"
                            key={badge.title}
-                           onClick={() => badge.set(!badge.state)}
+                           onClick={() => {
+                             badge.set(!badge.state);
+                             setIsDirty(true);
+                           }}
                            className={`px-3 py-2 text-[9px] font-black uppercase tracking-widest border transition-all rounded-none ${
                              badge.state ? 'bg-black text-white border-black' : 'bg-white text-zinc-400 border-zinc-200 hover:border-black'
                            }`}
@@ -1371,6 +1516,16 @@ function AdminProductAdd() {
               </>
            )}
         </AnimatePresence>
+        
+        <UnsavedChangesDialog
+          isOpen={showLeaveDialog}
+          title="Unsaved Changes"
+          message="আপনি এখনও প্রোডাক্টটি Save করেননি। আপনি কি নিশ্চিত এই পেজ থেকে বের হতে চান? আপনার করা পরিবর্তনগুলো হারিয়ে যাবে।"
+          onConfirm={handleConfirmLeave}
+          onCancel={handleCancelLeave}
+          cancelText="Cancel"
+          confirmText="Yes, Leave"
+        />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import {
   ArrowLeft, Share2, Heart, Star, Minus, Plus, 
   ShieldCheck, Truck, RotateCcw, Box, Eye, Flame, 
   ChevronLeft, ChevronRight, CheckCircle2, ShoppingBag, 
-  Info, Sparkles, Loader2, ArrowRight, Coins, Play
+  Info, Sparkles, Loader2, ArrowRight, Coins, Play, X
 } from 'lucide-react';
 import { formatPrice } from '../lib/utils';
 import { useCartStore } from '../store/useCartStore';
@@ -279,6 +279,38 @@ export default function Product() {
   }, [bannerUrls]);
   
   const [activeImage, setActiveImage] = useState(0);
+  const [isQnaOpen, setIsQnaOpen] = useState(false);
+  const [reviewSummary, setReviewSummary] = useState<{
+    product_id: string;
+    average_rating: number;
+    total_reviews: number;
+    total_verified_reviews: number;
+    rating_breakdown: Record<string, number>;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    let isMounted = true;
+    
+    const fetchSummary = async () => {
+      try {
+        const res = await fetch(`/api/reviews/summary?productId=${product.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setReviewSummary(data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch review summary:", err);
+      }
+    };
+
+    fetchSummary();
+    return () => {
+      isMounted = false;
+    };
+  }, [product?.id, reviews]);
   const [quantity, setQuantity] = useState(1);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'shipping' | 'returns'>('description');
@@ -1204,14 +1236,151 @@ export default function Product() {
                   </motion.div>
                 </AnimatePresence>
               </div>
-            </div>
 
+              {/* COMPACT SUMMARY BUTTONS (Customer Panel) */}
+              <div className="mt-6 space-y-3">
+                 {/* 1. Reviews Compact Button */}
+                 {(() => {
+                    const displayAvgRating = reviewSummary !== null ? reviewSummary.average_rating : liveAverageRating;
+                    const displayTotalReviews = reviewSummary !== null ? reviewSummary.total_reviews : liveReviewsCount;
+                    const roundedStars = Math.round(displayAvgRating);
+                    const starsStringFilled = '★'.repeat(roundedStars);
+                    const starsStringEmpty = '☆'.repeat(5 - roundedStars);
+
+                    return (
+                       <button
+                          type="button"
+                          onClick={() => navigate(`/product/${product.slug}/reviews`)}
+                          className="w-full h-[66px] px-4 border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors flex items-center justify-between rounded-none text-left select-none"
+                       >
+                          <div className="flex flex-col justify-center">
+                             {displayTotalReviews === 0 ? (
+                                <>
+                                   <div className="flex items-center gap-1.5">
+                                      <span className="text-sm font-bold text-zinc-300 tracking-wider">☆☆☆☆☆</span>
+                                      <span className="text-xs font-black text-black">0 Reviews</span>
+                                   </div>
+                                   <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mt-0.5">Be the first to review</span>
+                                </>
+                             ) : (
+                                <>
+                                   <div className="flex items-center gap-1.5">
+                                      <span className="text-sm font-bold text-amber-500 tracking-wider">
+                                         {starsStringFilled}{starsStringEmpty}
+                                      </span>
+                                      <span className="text-xs font-black text-black">
+                                         {displayAvgRating.toFixed(1)}
+                                      </span>
+                                      <span className="text-neutral-400 text-[10px] font-bold">
+                                         ({displayTotalReviews} {displayTotalReviews === 1 ? 'Review' : 'Reviews'})
+                                      </span>
+                                   </div>
+                                   <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mt-0.5">See all customer reviews</span>
+                                </>
+                             )}
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-neutral-400 animate-pulse shrink-0" />
+                       </button>
+                    );
+                 })()}
+
+                 {/* 2. Questions & Answers Compact Button */}
+                 <button
+                    type="button"
+                    onClick={() => setIsQnaOpen(true)}
+                    className="w-full h-[60px] px-4 border border-zinc-200 bg-white hover:bg-zinc-50 transition-colors flex items-center justify-between rounded-none text-left select-none"
+                 >
+                    <div className="flex flex-col">
+                       <div className="flex items-center gap-1.5">
+                          <span className="text-xs">❓</span>
+                          <span className="text-xs font-black text-black uppercase tracking-wider">Questions & Answers</span>
+                          <span className="text-neutral-400 text-[10px] font-mono font-bold">
+                             ({product.qnas?.length || 0})
+                          </span>
+                       </div>
+                       <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">See all answered questions</span>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-neutral-400 animate-pulse" />
+                 </button>
+              </div>
+
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Customer Reviews Section */}
-      <ProductReviews />
+      {/* Square Q&A Modal / Bottom Sheet */}
+      <AnimatePresence>
+        {isQnaOpen && (
+          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsQnaOpen(false)}
+              className="absolute inset-0 bg-black"
+            />
+            
+            {/* Modal Box */}
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="relative w-full md:max-w-xl bg-white border border-zinc-200 shadow-2xl p-6 md:m-4 flex flex-col max-h-[85vh] md:max-h-[75vh] rounded-none z-10 text-left"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center pb-4 border-b border-zinc-100 mb-4 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">❓</span>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-black">Questions & Answers ({product.qnas?.length || 0})</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQnaOpen(false)}
+                  className="p-1.5 border border-zinc-200 hover:border-black text-black hover:bg-zinc-50 transition-colors rounded-none"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body Content */}
+              <div className="flex-1 overflow-y-auto space-y-5 pr-1 scrollbar-thin">
+                {(!product.qnas || product.qnas.length === 0) ? (
+                  <div className="text-center py-12 border border-dashed border-zinc-200 bg-zinc-50/50">
+                    <p className="text-[11px] font-black text-zinc-400 uppercase tracking-widest">No questions have been answered for this product yet.</p>
+                  </div>
+                ) : (
+                  product.qnas.map((qna, index) => (
+                    <div key={index} className="p-4 border border-zinc-150 bg-zinc-50/30 space-y-2.5">
+                      <div className="flex gap-2.5 items-start">
+                        <span className="px-1.5 py-0.5 bg-black text-white text-[9px] font-black tracking-wider uppercase shrink-0 mt-0.5">Q</span>
+                        <p className="text-xs font-bold text-black tracking-tight">{qna.question}</p>
+                      </div>
+                      <div className="flex gap-2.5 items-start pt-2 border-t border-zinc-200">
+                        <span className="px-1.5 py-0.5 bg-emerald-600 text-white text-[9px] font-black tracking-wider uppercase shrink-0 mt-0.5">A</span>
+                        <p className="text-xs font-semibold text-zinc-600 leading-relaxed">{qna.answer}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="pt-4 border-t border-zinc-100 mt-4 text-center shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsQnaOpen(false)}
+                  className="w-full py-3 bg-black text-white text-xs font-black uppercase tracking-widest hover:bg-zinc-800 transition-colors rounded-none"
+                >
+                  CLOSE PANEL
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Related Products - "You May Also Like" */}
       {relatedProducts.length > 0 && (

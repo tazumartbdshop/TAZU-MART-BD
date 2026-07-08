@@ -46,6 +46,7 @@ export interface Product {
   coin_enabled?: boolean;
   isDemo?: boolean;
   keywords?: string[];
+  qnas?: { question: string; answer: string }[];
 }
 
 interface ProductState {
@@ -264,6 +265,23 @@ const mapDbToProduct = (row: any): Product => {
     parsedKeywords = [String(camelRow.keywords)];
   }
 
+  let description = camelRow.description || '';
+  let parsedQnas: { question: string; answer: string }[] = [];
+  
+  if (description.includes('<!-- QNA_START -->')) {
+    const startIdx = description.indexOf('<!-- QNA_START -->');
+    const endIdx = description.indexOf('<!-- QNA_END -->');
+    if (endIdx > startIdx) {
+      const jsonStr = description.substring(startIdx + '<!-- QNA_START -->'.length, endIdx).trim();
+      try {
+        parsedQnas = JSON.parse(jsonStr);
+      } catch (e) {
+        console.warn("Failed to parse QnAs from description", e);
+      }
+      description = description.substring(0, startIdx).trim();
+    }
+  }
+
   return {
     ...camelRow,
     id: camelRow.id || '',
@@ -286,7 +304,8 @@ const mapDbToProduct = (row: any): Product => {
     isNew: camelRow.isNew !== undefined ? camelRow.isNew : true,
     brand: camelRow.brand || '',
     status: (camelRow.status || 'active').toLowerCase(),
-    description: camelRow.description || '',
+    description,
+    qnas: parsedQnas,
     createdAt: camelRow.createdAt || Date.now(),
     buyingPrice: camelRow.buyingPrice,
     warranty: camelRow.warranty || '',
@@ -363,7 +382,18 @@ export const useProductStore = create<ProductState>((set, get) => ({
   addProduct: async (payload) => {
     const supabase = getSupabase();
     const id = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    const keywords = generateKeywords(payload.name, payload.category, payload.brand, payload.description);
+    
+    // Serialize QnAs into description HTML comments
+    let finalDescription = payload.description || '';
+    if (finalDescription.includes('<!-- QNA_START -->')) {
+      const startIdx = finalDescription.indexOf('<!-- QNA_START -->');
+      finalDescription = finalDescription.substring(0, startIdx).trim();
+    }
+    if (payload.qnas && payload.qnas.length > 0) {
+      finalDescription = `${finalDescription}\n\n<!-- QNA_START -->${JSON.stringify(payload.qnas)}<!-- QNA_END -->`;
+    }
+
+    const keywords = generateKeywords(payload.name, payload.category, payload.brand, finalDescription);
     let baseSlug = payload.slug || generateSlug(payload.name);
     if (!baseSlug) baseSlug = "product-" + Date.now();
     let slug = baseSlug;
@@ -374,6 +404,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const newProduct: Product = {
       ...payload,
       id,
+      description: finalDescription,
       keywords,
       slug,
       createdAt: Date.now(),
@@ -388,6 +419,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     
     if (supabase) {
       const dbPayload = objectToSnake(newProduct);
+      delete dbPayload.qnas; // Prevent column mismatch in DB
       const { error, status, statusText } = await supabase.from('products').insert([dbPayload]);
       if (error) {
         // Rollback on error
@@ -420,16 +452,30 @@ export const useProductStore = create<ProductState>((set, get) => ({
     const currentProduct = currentProducts.find(p => p.id === id);
     const finalPayload = { ...payload };
 
+    // Process QNAs if they are updated
+    if (payload.qnas !== undefined) {
+      let desc = payload.description !== undefined ? payload.description : (currentProduct?.description || '');
+      if (desc.includes('<!-- QNA_START -->')) {
+        const startIdx = desc.indexOf('<!-- QNA_START -->');
+        desc = desc.substring(0, startIdx).trim();
+      }
+      if (payload.qnas && payload.qnas.length > 0) {
+        desc = `${desc}\n\n<!-- QNA_START -->${JSON.stringify(payload.qnas)}<!-- QNA_END -->`;
+      }
+      finalPayload.description = desc;
+    }
+
     if (
       payload.name !== undefined ||
       payload.category !== undefined ||
       payload.brand !== undefined ||
-      payload.description !== undefined
+      payload.description !== undefined ||
+      payload.qnas !== undefined
     ) {
       const name = payload.name !== undefined ? payload.name : (currentProduct?.name || '');
       const category = payload.category !== undefined ? payload.category : (currentProduct?.category || '');
       const brand = payload.brand !== undefined ? payload.brand : (currentProduct?.brand || '');
-      const description = payload.description !== undefined ? payload.description : (currentProduct?.description || '');
+      const description = finalPayload.description !== undefined ? finalPayload.description : (currentProduct?.description || '');
       finalPayload.keywords = generateKeywords(name, category, brand, description);
     }
     
@@ -441,6 +487,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     
     if (supabase) {
       const dbPayload = objectToSnake(finalPayload);
+      delete dbPayload.qnas; // Prevent column mismatch in DB
       const { error } = await supabase.from('products').update(dbPayload).eq('id', id);
       if (error) {
         // Rollback on error

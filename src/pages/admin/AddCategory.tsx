@@ -6,12 +6,56 @@ import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { uploadImage } from '../../lib/imageUtils';
+import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';
 
 export default function AddCategory() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { categories, addCategory, updateCategory } = useCategoryStore();
   const isEditing = !!id;
+
+  // Unsaved changes state and logic
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isDirty) return;
+
+    // Push dummy state to the history stack to capture browser/gesture back buttons
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      // Show the premium confirmation dialog
+      setShowLeaveDialog(true);
+      // Restore dummy state to keep the lock active
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
+  const handleConfirmLeave = () => {
+    setIsDirty(false);
+    setShowLeaveDialog(false);
+    navigate(pendingNavigationPath || '/admin/category-listing', { replace: true });
+  };
+
+  const handleCancelLeave = () => {
+    setShowLeaveDialog(false);
+    setPendingNavigationPath(null);
+  };
+
 
   const [activeTab, setActiveTab] = useState<'general' | 'seo'>('general');
   const [formData, setFormData] = useState({
@@ -93,6 +137,7 @@ export default function AddCategory() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    setIsDirty(true);
     if (name === 'displayOrder') {
       setDisplayOrderError(null);
     }
@@ -102,6 +147,7 @@ export default function AddCategory() {
   };
 
   const handleToggle = (name: 'status' | 'showOnHomepage') => {
+    setIsDirty(true);
     if (name === 'status') {
       setFormData(prev => ({ ...prev, status: prev.status === 'Active' ? 'Inactive' : 'Active' }));
     } else {
@@ -112,6 +158,7 @@ export default function AddCategory() {
   const processBannerFiles = (files: FileList | null) => {
     if (!files) return;
     setBannerError(null);
+    setIsDirty(true);
     const newBanners = [...bannerImages];
     const newFiles = [...bannerFiles];
 
@@ -137,6 +184,7 @@ export default function AddCategory() {
   const processThumbnailFile = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setThumbnailError(null);
+    setIsDirty(true);
     const file = files[0];
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
     if (!validTypes.includes(file.type)) {
@@ -155,6 +203,7 @@ export default function AddCategory() {
   const processWideBannerFile = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setWideBannerError(null);
+    setIsDirty(true);
     const file = files[0];
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
     if (!validTypes.includes(file.type)) {
@@ -171,6 +220,7 @@ export default function AddCategory() {
   };
 
   const removeWideBannerImage = () => {
+    setIsDirty(true);
     if (formData.wideBannerImage && formData.wideBannerImage.startsWith('blob:')) {
       URL.revokeObjectURL(formData.wideBannerImage);
     }
@@ -179,6 +229,7 @@ export default function AddCategory() {
   };
 
   const removeBannerImage = (index: number) => {
+    setIsDirty(true);
     const target = bannerImages[index];
     if (target && target.startsWith('blob:')) {
       URL.revokeObjectURL(target);
@@ -188,6 +239,7 @@ export default function AddCategory() {
   };
 
   const removeThumbnailImage = () => {
+    setIsDirty(true);
     if (formData.iconImage && formData.iconImage.startsWith('blob:')) {
       URL.revokeObjectURL(formData.iconImage);
     }
@@ -273,6 +325,7 @@ export default function AddCategory() {
           }
         });
         
+        setIsDirty(false);
         navigate('/admin/category-listing');
     } catch (error: any) {
         console.error("Save Category Error:", error);
@@ -289,7 +342,14 @@ export default function AddCategory() {
         <div className="flex items-center gap-3">
           <button 
             type="button" 
-            onClick={() => navigate('/admin/category-listing')} 
+            onClick={() => {
+              if (isDirty) {
+                setPendingNavigationPath('/admin/category-listing');
+                setShowLeaveDialog(true);
+              } else {
+                navigate('/admin/category-listing');
+              }
+            }} 
             className="p-2 border border-zinc-200 rounded-none bg-white hover:bg-gray-100 mr-1"
           >
             <ChevronLeft className="w-4 h-4 text-black" />
@@ -602,7 +662,10 @@ export default function AddCategory() {
                 <h5 className="text-[10px] font-black text-black uppercase tracking-widest">Auto Scroll</h5>
                 <button
                   type="button"
-                  onClick={() => setSliderSettings(p => ({...p, autoScroll: !p.autoScroll}))}
+                  onClick={() => {
+                    setSliderSettings(p => ({...p, autoScroll: !p.autoScroll}));
+                    setIsDirty(true);
+                  }}
                   className={`px-4 py-1.5 text-[8px] font-black uppercase tracking-widest border ${sliderSettings.autoScroll ? 'bg-black text-white border-black' : 'bg-white text-zinc-400 border-zinc-200'}`}
                 >
                   {sliderSettings.autoScroll ? 'ON' : 'OFF'}
@@ -612,7 +675,10 @@ export default function AddCategory() {
                 <h5 className="text-[10px] font-black text-black uppercase tracking-widest">Manual Scroll</h5>
                 <button
                   type="button"
-                  onClick={() => setSliderSettings(p => ({...p, manualScroll: !p.manualScroll}))}
+                  onClick={() => {
+                    setSliderSettings(p => ({...p, manualScroll: !p.manualScroll}));
+                    setIsDirty(true);
+                  }}
                   className={`px-4 py-1.5 text-[8px] font-black uppercase tracking-widest border ${sliderSettings.manualScroll ? 'bg-black text-white border-black' : 'bg-white text-zinc-400 border-zinc-200'}`}
                 >
                   {sliderSettings.manualScroll ? 'ON' : 'OFF'}
@@ -623,7 +689,10 @@ export default function AddCategory() {
                 <input 
                   type="number"
                   value={sliderSettings.interval}
-                  onChange={(e) => setSliderSettings(p => ({...p, interval: Number(e.target.value)}))}
+                  onChange={(e) => {
+                    setSliderSettings(p => ({...p, interval: Number(e.target.value)}));
+                    setIsDirty(true);
+                  }}
                   className="w-full px-4 py-2 bg-white border border-zinc-200 text-xs font-bold"
                 />
               </div>
@@ -658,6 +727,16 @@ export default function AddCategory() {
           </div>
         </div>
       </form>
+      
+      <UnsavedChangesDialog
+        isOpen={showLeaveDialog}
+        title="Unsaved Changes"
+        message="আপনি এখনও ক্যাটাগরি তথ্য Save করেননি। আপনি কি নিশ্চিত এই পেজ থেকে বের হতে চান? আপনার করা পরিবর্তনগুলো হারিয়ে যাবে।"
+        onConfirm={handleConfirmLeave}
+        onCancel={handleCancelLeave}
+        cancelText="Cancel"
+        confirmText="Yes, Leave"
+      />
       </div>
     );
   }

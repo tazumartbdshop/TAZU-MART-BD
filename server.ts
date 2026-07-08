@@ -462,6 +462,85 @@ async function startServer() {
     }
   });
 
+  // Review Summary API Endpoint
+  app.get("/api/reviews/summary", async (req, res) => {
+    try {
+      const productId = (req.query.productId || req.query.product_id) as string;
+      if (!productId) {
+        return res.status(400).json({ error: "productId parameter is required" });
+      }
+
+      let client = supabaseServiceRole || supabaseAdmin;
+      if (!client) {
+        let fileUrl = "";
+        let fileKey = "";
+        try {
+          const data = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
+          const parsed = JSON.parse(data);
+          fileUrl = parsed.supabaseUrl || "";
+          fileKey = parsed.supabaseKey || "";
+        } catch (e) {}
+
+        let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
+        let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
+
+        if (!supabaseUrl || !supabaseKey) {
+          const firestoreConfig = await getSupabaseCredentialsFromFirestore();
+          if (firestoreConfig) {
+            supabaseUrl = supabaseUrl || firestoreConfig.supabaseUrl || "";
+            supabaseKey = supabaseKey || firestoreConfig.supabaseKey || "";
+          }
+        }
+
+        if (supabaseUrl && supabaseKey) {
+          client = createClient(supabaseUrl, supabaseKey);
+        }
+      }
+
+      if (!client) {
+        return res.status(500).json({ error: "Supabase not initialized on backend" });
+      }
+
+      const { data, error } = await client
+        .from('reviews')
+        .select('rating, verified')
+        .eq('product_id', productId)
+        .eq('status', 'approved');
+
+      if (error) {
+        console.error("Error fetching reviews for summary:", error);
+        return res.status(500).json({ error: "Failed to fetch reviews" });
+      }
+
+      const total_reviews = data ? data.length : 0;
+      const average_rating = total_reviews > 0
+        ? Number((data.reduce((sum, r) => sum + r.rating, 0) / total_reviews).toFixed(1))
+        : 0;
+      const total_verified_reviews = data ? data.filter(r => r.verified === true).length : 0;
+
+      const rating_breakdown = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+      if (data) {
+        data.forEach(r => {
+          const key = String(r.rating) as "1" | "2" | "3" | "4" | "5";
+          if (rating_breakdown[key] !== undefined) {
+            rating_breakdown[key]++;
+          }
+        });
+      }
+
+      res.json({
+        product_id: productId,
+        average_rating,
+        total_reviews,
+        total_verified_reviews,
+        rating_breakdown
+      });
+    } catch (err: any) {
+      console.error("Reviews summary endpoint error:", err);
+      res.status(500).json({ error: "Failed to fetch review summary" });
+    }
+  });
+
   // Footer Settings API Endpoints
   const FOOTER_FALLBACK_FILE = path.join(process.cwd(), 'footer_settings.json');
 

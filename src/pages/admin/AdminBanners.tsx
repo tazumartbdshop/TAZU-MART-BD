@@ -4,6 +4,7 @@ import { Upload, Layers, ChevronLeft, Search, X, Database, ArrowLeft } from 'luc
 import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
 import { useProductStore } from '../../store/useProductStore';
+import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';
 
 enum OperationType {
   CREATE = 'create',
@@ -57,6 +58,48 @@ export default function AdminBanners() {
   const editId = searchParams.get('editId');
   const initialAction = searchParams.get('action');
   const navigate = useNavigate();
+
+  // Unsaved changes state and logic
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isDirty) return;
+
+    // Push dummy state to capture browser/gesture back button
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      // Show confirmation dialog
+      setShowLeaveDialog(true);
+      // Restore dummy state
+      window.history.pushState(null, '', window.location.href);
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
+  const handleConfirmLeave = () => {
+    setIsDirty(false);
+    setShowLeaveDialog(false);
+    navigate(pendingNavigationPath || '/admin/banner/list', { replace: true });
+  };
+
+  const handleCancelLeave = () => {
+    setShowLeaveDialog(false);
+    setPendingNavigationPath(null);
+  };
 
   // Form Fields State
   const [name, setName] = useState('');
@@ -125,16 +168,19 @@ export default function AdminBanners() {
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleImageFiles(Array.from(e.dataTransfer.files));
+      setIsDirty(true);
     }
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       handleImageFiles(Array.from(e.target.files));
+      setIsDirty(true);
     }
   };
 
   const handleRemovePreview = (id: string) => {
+    setIsDirty(true);
     setLocalPreviews((prev) => {
       const target = prev.find(item => item.id === id);
       if (target) {
@@ -325,6 +371,7 @@ export default function AdminBanners() {
         setButtonLink('');
         setConnectedProductId('');
 
+        setIsDirty(false);
         // Redirect user to Banner Listing as part of a smooth administrative workflow
         navigate('/admin/banner/list');
       }
@@ -337,6 +384,7 @@ export default function AdminBanners() {
   };
 
   const handleCancel = () => {
+    setIsDirty(false);
     navigate('/admin/banner/list');
   };
 
@@ -384,7 +432,14 @@ export default function AdminBanners() {
       <div className="flex justify-between items-center pt-2">
         <button 
           type="button" 
-          onClick={() => navigate('/admin/banner/list')} 
+          onClick={() => {
+            if (isDirty) {
+              setPendingNavigationPath('/admin/banner/list');
+              setShowLeaveDialog(true);
+            } else {
+              navigate('/admin/banner/list');
+            }
+          }} 
           className="text-xs font-black tracking-wider uppercase text-neutral-600 hover:text-black flex items-center gap-1.5 transition-colors cursor-pointer"
         >
           &larr; Back to Banners
@@ -392,7 +447,7 @@ export default function AdminBanners() {
       </div>
 
       {/* Form Sections (Each Field inside its own separate card container) */}
-      <div className="space-y-6">
+      <div className="space-y-6" onChange={() => setIsDirty(true)}>
         
         {/* 1. Banner Image Upload Card */}
         <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-4 shadow-sm">
@@ -671,6 +726,16 @@ export default function AdminBanners() {
           </div>
         </section>
       )}
+      
+      <UnsavedChangesDialog
+        isOpen={showLeaveDialog}
+        title="Unsaved Changes"
+        message="আপনি এখনও ব্যানার তথ্য Save করেননি। আপনি কি নিশ্চিত এই পেজ থেকে বের হতে চান? আপনার করা পরিবর্তনগুলো হারিয়ে যাবে।"
+        onConfirm={handleConfirmLeave}
+        onCancel={handleCancelLeave}
+        cancelText="Cancel"
+        confirmText="Yes, Leave"
+      />
     </div>
   );
 }

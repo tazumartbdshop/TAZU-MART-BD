@@ -3,6 +3,20 @@ import { ArrowRight, Clock } from 'lucide-react';
 import { Banner } from '../store/useBannerStore';
 import { Link } from 'react-router-dom';
 
+function isNumericOrId(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const t = text.trim();
+  // If it's purely numbers e.g. "1000049033" or "1000050220"
+  if (/^\d+$/.test(t)) return true;
+  // If it has standard database/banner prefix like ban_
+  if (/^ban_/.test(t)) return true;
+  // If it's a UUID or DB ID pattern
+  if (/^[0-9a-fA-F-]{8,}$/.test(t)) return true;
+  // If it looks like a filename, e.g., contains file extension
+  if (/\.(jpg|jpeg|png|gif|webp)$/i.test(t)) return true;
+  return false;
+}
+
 interface DesignedBannerRendererProps {
   banner: Banner;
   isDemo?: boolean; // If true, ignores navigation and prevents clicks in the creator preview
@@ -238,7 +252,7 @@ export default function DesignedBannerRenderer({ banner, isDemo = false }: Desig
         <div className={`col-span-1 md:col-span-8 flex flex-col justify-center gap-2 md:gap-4 ${alignmentClass}`}>
           
           {/* Dynamic Small Offer Header Badge text */}
-          {offerText && (
+          {offerText && !isNumericOrId(offerText) && (
             <span 
               className="inline-block px-2.5 py-1 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-dashed text-opacity-95 select-none"
               style={{
@@ -251,7 +265,7 @@ export default function DesignedBannerRenderer({ banner, isDemo = false }: Desig
           )}
 
           {/* Core Mega Discount Label Text */}
-          {discountText && (
+          {discountText && !isNumericOrId(discountText) && (
             <p 
               className="text-xs md:text-sm font-mono tracking-widest uppercase font-black"
               style={{ color: buttonColor || '#fbbf24' }}
@@ -261,7 +275,7 @@ export default function DesignedBannerRenderer({ banner, isDemo = false }: Desig
           )}
 
           {/* Primary Header/Title Text */}
-          {name && (
+          {name && !isNumericOrId(name) && (
             <h2 
               className={`${getHeaderSizeClass()} ${getWeightClass()} leading-[1.1] text-balance select-none`}
               style={{ 
@@ -274,7 +288,7 @@ export default function DesignedBannerRenderer({ banner, isDemo = false }: Desig
           )}
 
           {/* Subtitle / Description Text */}
-          {description && (
+          {description && !isNumericOrId(description) && (
             <p 
               className="text-[9px] md:text-sm max-w-[85%] md:max-w-[75%] leading-relaxed opacity-90 select-none font-medium"
               style={{ 

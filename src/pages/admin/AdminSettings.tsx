@@ -119,18 +119,24 @@ export default function AdminSettings() {
     </div>
   );
 
-  const Input = ({ label, field, type = 'text', placeholder = '' }: { label: string, field: keyof AppSettings, type?: string, placeholder?: string }) => (
-    <div>
-      <label className="block text-[10px] font-black text-[#000000] mb-2 uppercase tracking-widest font-mono">{label}</label>
-      <input 
-        type={type} 
-        value={(formState[field] ?? '') as string | number}
-        onChange={(e) => handleUpdate(field, type === 'number' ? Number(e.target.value) : e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-4 py-3 bg-white border border-[#222] rounded-none focus:outline-none focus:ring-1 focus:ring-black transition-all font-bold text-sm" 
-      />
-    </div>
-  );
+  const Input = ({ label, field, type = 'text', placeholder = '' }: { label: string, field: keyof AppSettings, type?: string, placeholder?: string }) => {
+    let inputValue = (formState[field] ?? '') as string | number;
+    if (type === 'datetime-local' && typeof inputValue === 'string' && inputValue.includes('T')) {
+      inputValue = inputValue.slice(0, 16);
+    }
+    return (
+      <div>
+        <label className="block text-[10px] font-black text-[#000000] mb-2 uppercase tracking-widest font-mono">{label}</label>
+        <input 
+          type={type} 
+          value={inputValue}
+          onChange={(e) => handleUpdate(field, type === 'number' ? Number(e.target.value) : e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-4 py-3 bg-white border border-[#222] rounded-none focus:outline-none focus:ring-1 focus:ring-black transition-all font-bold text-sm" 
+        />
+      </div>
+    );
+  };
 
   const ImageUpload = ({ label, field }: { label: string, field: keyof AppSettings }) => (
     <div className="space-y-2">

@@ -2,15 +2,17 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Star, MessageSquare, Image as ImageIcon, Video, CheckCircle, X, 
-  Edit3, Filter, MessageCircle, ChevronRight, Sparkles, SlidersHorizontal, ArrowUpDown,
-  Plus, Play, AlertTriangle, Database, ShieldAlert, Layers, HelpCircle
+  Edit3, Filter, ChevronRight, SlidersHorizontal, ArrowUpDown,
+  Plus, Play, AlertTriangle, ThumbsUp, Calendar, ArrowUpRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useReviewStore, ProductReview } from '../../store/useReviewStore';
 import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useSettingsStore } from '../../store/useSettingsStore';
+import { toast } from 'react-hot-toast';
 
-type FilterType = 'Latest' | 'Highest Rating' | 'Lowest Rating' | 'With Photos' | 'Verified Reviews';
+type FilterType = 'Latest' | 'Highest Rating' | 'Lowest Rating' | 'With Photos' | 'Verified Reviews' | '5 Stars' | '4 Stars' | '3 Stars' | '2 Stars' | '1 Stars';
 
 export default function ProductReviews() {
   const { slug: urlParam } = useParams<{ slug: string }>();
@@ -20,6 +22,7 @@ export default function ProductReviews() {
   const { reviews, addReview, fetchReviews, isLoading } = useReviewStore();
   const { products } = useProductStore();
   const { user, isAuthenticated } = useAuthStore();
+  const { settings } = useSettingsStore();
 
   React.useEffect(() => {
     fetchReviews();
@@ -35,6 +38,7 @@ export default function ProductReviews() {
   // Add Review Form Fields State
   const [rating, setRating] = useState(0);
   const [customerName, setCustomerName] = useState('');
+  const [reviewTitle, setReviewTitle] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [mediaUrlInput, setMediaUrlInput] = useState('');
   const [videoUrlInput, setVideoUrlInput] = useState('');
@@ -44,6 +48,20 @@ export default function ProductReviews() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccessPopupOpen, setIsSuccessPopupOpen] = useState(false);
+
+  // Helpful Votes Tracking (Saved locally in localStorage)
+  const [helpfulVotes, setHelpfulVotes] = useState<Record<string, number>>({});
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem('review_helpful_votes');
+    if (saved) {
+      try {
+        setHelpfulVotes(JSON.parse(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
 
   // Initialize form default values when opening the modal
   React.useEffect(() => {
@@ -62,6 +80,7 @@ export default function ProductReviews() {
         setCustomerName('');
       }
       setRating(0);
+      setReviewTitle('');
       setReviewText('');
       setAttachedMedia([]);
       setVideoUrlInput('');
@@ -85,8 +104,18 @@ export default function ProductReviews() {
   // Image Viewer Modal
   const [viewingImage, setViewingImage] = useState<string | null>(null);
 
+  // Parse reviewText to extract title & description
+  const parseReviewText = (text: string) => {
+    if (!text) return { title: '', description: '' };
+    const parts = text.split('|||');
+    if (parts.length > 1) {
+      return { title: parts[0].trim(), description: parts[1].trim() };
+    }
+    return { title: '', description: text };
+  };
+
   // Fetch reviews specific to this product & only approved
-  const productReviews = reviews.filter(rev => rev.productId === product?.id && rev.status === 'approved');
+  const productReviews = reviews.filter(rev => rev.productId === product?.id && (rev.status === 'approved' || !rev.status));
 
   // Compute stats on the fly for absolute live sync
   const totalReviews = productReviews.length;
@@ -123,6 +152,16 @@ export default function ProductReviews() {
     filteredReviews = filteredReviews.filter(r => r.mediaUrls && r.mediaUrls.length > 0);
   } else if (activeFilter === 'Verified Reviews') {
     filteredReviews = filteredReviews.filter(r => r.verified === true);
+  } else if (activeFilter === '5 Stars') {
+    filteredReviews = filteredReviews.filter(r => r.rating === 5);
+  } else if (activeFilter === '4 Stars') {
+    filteredReviews = filteredReviews.filter(r => r.rating === 4);
+  } else if (activeFilter === '3 Stars') {
+    filteredReviews = filteredReviews.filter(r => r.rating === 3);
+  } else if (activeFilter === '2 Stars') {
+    filteredReviews = filteredReviews.filter(r => r.rating === 2);
+  } else if (activeFilter === '1 Stars') {
+    filteredReviews = filteredReviews.filter(r => r.rating === 1);
   } else {
     // 'Latest'
     filteredReviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -176,33 +215,44 @@ export default function ProductReviews() {
     setAttachedMedia(attachedMedia.filter((_, i) => i !== idx));
   };
 
+  const handleHelpfulClick = (reviewId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const current = helpfulVotes[reviewId] || 0;
+    const hasVoted = localStorage.getItem(`voted_helpful_${reviewId}`);
+    if (hasVoted) {
+      toast.error("You already marked this review as helpful!");
+      return;
+    }
+    const updated = { ...helpfulVotes, [reviewId]: current + 1 };
+    setHelpfulVotes(updated);
+    localStorage.setItem('review_helpful_votes', JSON.stringify(updated));
+    localStorage.setItem(`voted_helpful_${reviewId}`, 'true');
+    toast.success("Thank you for marking this review as helpful!");
+  };
+
   // Form Submission Validation State
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [detailedError, setDetailedError] = useState<{
-    title: string;
-    reason: string;
-    table?: string;
-    missingColumn?: string;
-    solution: string;
-  } | null>(null);
 
   // Form Submission
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
     setValidationError(null);
-    setDetailedError(null);
 
     if (!rating || rating < 1 || rating > 5) {
       setValidationError("Please select a star rating.");
       return;
     }
-    if (!anonymousToggle && !customerName.trim()) {
-      setValidationError("Full Name is required.");
+    if (!reviewTitle.trim()) {
+      setValidationError("Please provide a review title.");
       return;
     }
     if (!reviewText.trim()) {
-      setValidationError("Please write your review.");
+      setValidationError("Please write your detailed review description.");
+      return;
+    }
+    if (!anonymousToggle && !customerName.trim()) {
+      setValidationError("Full Name is required.");
       return;
     }
 
@@ -244,6 +294,7 @@ export default function ProductReviews() {
     }
 
     const finalName = anonymousToggle ? 'Anonymous Customer' : customerName.trim();
+    const combinedText = `${reviewTitle.trim()} ||| ${reviewText.trim()}`;
 
     try {
       await addReview({
@@ -251,7 +302,7 @@ export default function ProductReviews() {
         customerId: user?.id || 'guest',
         customerName: finalName,
         rating,
-        reviewText: reviewText.trim(),
+        reviewText: combinedText,
         mediaUrls: finalMedia,
         verified: verifiedToggle,
         isPinned: false,
@@ -267,6 +318,7 @@ export default function ProductReviews() {
 
       // Reset form states
       setRating(0);
+      setReviewTitle('');
       setCustomerName('');
       setReviewText('');
       setAttachedMedia([]);
@@ -274,55 +326,44 @@ export default function ProductReviews() {
       setAnonymousToggle(false);
     } catch (err: any) {
       setIsSubmitting(false);
-      if (err.title) {
-        setDetailedError({
-          ...err,
-          title: `❌ Review could not be saved`
-        });
-      } else {
-        setDetailedError({
-          title: `❌ Review could not be saved`,
-          reason: err.message || "An unexpected database error occurred.",
-          solution: "Please check your network connection and try again."
-        });
-      }
+      setValidationError(err.message || "An unexpected database error occurred.");
     }
   };
 
   return (
     <div className="bg-white border-t border-zinc-200 font-sans" id="reviews-section">
-      <div className="container mx-auto px-4 lg:px-8 max-w-7xl py-16 md:py-24">
+      <div className="container mx-auto px-4 lg:px-8 max-w-7xl py-12 md:py-16">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-8 mb-12 border-b border-zinc-100 pb-10">
-          <div>
-            <h2 className="text-3xl font-black uppercase tracking-tighter mb-4 text-zinc-950">Ratings & Reviews</h2>
+        <div className="flex flex-col gap-5 mb-10 border-b border-zinc-100 pb-8">
+          <div className="space-y-2">
+            <h2 className="text-2xl font-black uppercase tracking-widest text-zinc-950">Ratings & Reviews</h2>
             <div className="flex items-center gap-2">
-              <span className="text-xs bg-zinc-900 text-white px-2.5 py-0.5 rounded-full font-bold uppercase tracking-widest text-[9px]">
-                TAZU MART Quality Verified
+              <span className="text-[10px] bg-zinc-900 text-white px-3 py-1 font-black uppercase tracking-widest rounded-none">
+                {settings.storeName ? `${settings.storeName.trim().toUpperCase()} QUALITY VERIFIED` : 'TAZU MART QUALITY VERIFIED'}
               </span>
             </div>
           </div>
           
           <button 
+            type="button"
             onClick={handleWriteReviewClick}
-            className="group flex items-center justify-center gap-2 bg-zinc-950 text-white hover:bg-zinc-800 px-8 py-4 rounded-none text-xs font-bold uppercase tracking-widest transition-all shadow-md active:translate-y-0.5"
+            className="w-full group flex items-center justify-center gap-2 bg-zinc-950 text-white hover:bg-zinc-800 px-8 py-4 rounded-none text-xs font-black uppercase tracking-widest transition-all shadow-md active:translate-y-0.5 border border-black"
           >
-            <Edit3 className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
-            Write Storefront Review
+            <span className="text-xs">✏️</span> WRITE STOREFRONT REVIEW
           </button>
         </div>
 
-        {/* OVERALL RATING & STAR BREAKDOWN LAYOUT (Daraz + Amazon Hybrid style) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-16 bg-zinc-50/50 p-6 md:p-8 border border-zinc-200/60 rounded-xl">
+        {/* OVERALL RATING & STAR BREAKDOWN LAYOUT */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-12 bg-zinc-50/50 p-6 md:p-8 border border-zinc-200/60 rounded-xl">
           
           {/* Left Column: Stats overview */}
-          <div className="lg:col-span-4 flex flex-col items-center justify-center text-center lg:border-r border-zinc-200 lg:pr-8 py-4">
-            <span className="text-7xl font-black text-zinc-950 tracking-tighter leading-none mb-2">
+          <div className="lg:col-span-4 flex flex-col items-center justify-center text-center lg:border-r border-zinc-200 lg:pr-8 py-2">
+            <span className="text-6xl font-black text-zinc-950 tracking-tighter leading-none mb-2">
               {averageRating > 0 ? averageRating : '0.0'}
             </span>
             
-            <div className="flex items-center gap-1 mb-2">
+            <div className="flex items-center gap-0.5 mb-2">
               {[1, 2, 3, 4, 5].map(s => (
                 <Star 
                   key={s} 
@@ -335,20 +376,20 @@ export default function ProductReviews() {
               ))}
             </div>
 
-            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-1">
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
               based on {totalReviews} trusted reviews
             </p>
           </div>
 
           {/* Middle Column: Star Breakdown progress bars */}
-          <div className="lg:col-span-5 space-y-2.5 py-2">
+          <div className="lg:col-span-5 space-y-2 py-2">
             {[5, 4, 3, 2, 1].map((stars) => {
               const count = starCounts[stars as 5 | 4 | 3 | 2 | 1];
               const percent = totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0;
               return (
                 <div key={stars} className="flex items-center gap-3 text-xs font-semibold text-zinc-700">
                   <span className="w-12 text-zinc-600 font-bold whitespace-nowrap">{stars} Stars</span>
-                  <div className="flex-1 h-3 bg-zinc-200/60 rounded-full overflow-hidden relative">
+                  <div className="flex-1 h-2.5 bg-zinc-200/60 rounded-full overflow-hidden relative">
                     <div 
                       className="absolute left-0 top-0 h-full bg-amber-500 rounded-full transition-all duration-500"
                       style={{ width: `${percent}%` }}
@@ -389,17 +430,20 @@ export default function ProductReviews() {
           </div>
         </div>
 
-        {/* REVIEW FILTERS (Daraz Stacked layout controls) */}
+        {/* REVIEW FILTERS */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 pb-5 mb-8">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             <SlidersHorizontal className="w-4 h-4 text-zinc-500 shrink-0" />
-            <span className="text-xs font-black uppercase text-zinc-500 tracking-wider mr-2">Filter By:</span>
+            <span className="text-xs font-black uppercase text-zinc-500 tracking-wider mr-2">Filter:</span>
             
-            {(['Latest', 'Highest Rating', 'Lowest Rating', 'With Photos', 'Verified Reviews'] as FilterType[]).map((filter) => (
+            {([
+              'Latest', 'Highest Rating', 'Lowest Rating', 'With Photos', 'Verified Reviews',
+              '5 Stars', '4 Stars', '3 Stars', '2 Stars', '1 Stars'
+            ] as FilterType[]).map((filter) => (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
-                className={`flex-shrink-0 px-4 py-1.5 rounded-none text-[10px] font-bold uppercase tracking-wider transition-all border
+                className={`flex-shrink-0 px-3.5 py-1.5 rounded-none text-[10px] font-black uppercase tracking-wider transition-all border
                   ${activeFilter === filter 
                     ? 'bg-zinc-950 text-white border-zinc-950 shadow-sm' 
                     : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400'}`}
@@ -414,122 +458,169 @@ export default function ProductReviews() {
           </div>
         </div>
 
-        {/* REVIEWS DISPLAY LIST SYSTEM */}
+        {/* FACEBOOK-LIKE REVIEW CARDS LIST SYSTEM */}
         <div className="space-y-6">
           {filteredReviews.length === 0 ? (
             <div className="py-16 flex flex-col items-center justify-center text-center bg-zinc-50 rounded-xl border border-zinc-200/80">
                <MessageSquare className="w-12 h-12 text-zinc-300 mb-4 animate-bounce" />
-               <p className="text-zinc-500 font-bold text-sm tracking-wide">No reviews yet.</p>
+               <p className="text-zinc-500 font-bold text-sm tracking-wide">No reviews found.</p>
                <p className="text-xs text-zinc-400 mt-1">Be the first to share your purchase reviews with the community!</p>
             </div>
           ) : (
             filteredReviews.map(review => {
-              // Extract initials for the avatar bubble
               const displayName = review.anonymous ? 'Anonymous Customer' : review.customerName;
               const initials = displayName ? displayName.substring(0, 2).toUpperCase() : 'AC';
               
-              // Verify video format if extension is standard video
-              const isVideo = (url: string) => url.toLowerCase().endsWith('.mp4') || url.toLowerCase().includes('video');
+              const { title, description } = parseReviewText(review.reviewText);
+
+              // Helpful counts
+              const helpfulCount = (helpfulVotes[review.reviewId] || 0) + (review.isPinned ? 3 : 0);
 
               return (
                 <motion.div 
                   key={review.reviewId} 
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  onClick={() => navigate(`/product/${urlParam}/reviews`)}
-                  className="bg-white p-6 rounded-xl border border-zinc-200 shadow-[0_2px_12px_rgb(0,0,0,0.01)] hover:shadow-lg hover:border-zinc-400 transition-all cursor-pointer relative"
+                  className="bg-white p-5 md:p-6 rounded-2xl border border-zinc-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.02)] relative flex flex-col gap-4 hover:border-zinc-300/80 transition-all"
                 >
                   {/* Pin status badge */}
                   {review.isPinned && (
-                    <span className="absolute top-4 right-4 text-[8px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 px-2.5 py-1 rounded border border-amber-200/40 select-none">
+                    <span className="absolute top-5 right-5 text-[8px] font-black uppercase tracking-widest text-amber-650 bg-amber-50 px-2.5 py-1 rounded border border-amber-200/40 select-none">
                       📌 Pinned Review
                     </span>
                   )}
 
-                  <div className="flex flex-col md:flex-row md:items-start gap-6">
-                    {/* Customer Profile Column */}
-                    <div className="flex md:flex-col items-center md:items-start gap-4 md:gap-2.5 md:w-44 shrink-0">
-                      <div className="w-12 h-12 bg-zinc-900 border border-zinc-950 text-white rounded-full flex items-center justify-center text-sm font-black tracking-widest shadow-inner">
-                        {initials}
-                      </div>
-                      
-                      <div>
-                        <h4 className="text-xs font-black text-zinc-900 flex items-center gap-1">
+                  {/* HEADER ROW */}
+                  <div className="flex items-center gap-3">
+                    {/* Customer Profile Initials Circle */}
+                    <div className="w-11 h-11 bg-zinc-950 border border-zinc-900 text-white rounded-full flex items-center justify-center text-xs font-black tracking-widest shrink-0 shadow-inner">
+                      {initials}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="text-xs font-black text-zinc-900 truncate">
                           {displayName}
                         </h4>
                         
                         {review.verified && (
-                          <div className="flex items-center gap-1 mt-1 text-[8px] font-extrabold text-emerald-600 uppercase tracking-wider bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
+                          <div className="flex items-center gap-0.5 text-[8px] font-extrabold text-emerald-600 uppercase tracking-wider bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
                             <CheckCircle className="w-2.5 h-2.5" /> Verified Buyer
                           </div>
                         )}
-                        
-                        <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-1">
-                          {new Date(review.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </p>
                       </div>
+                      
+                      <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-widest mt-0.5 flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-zinc-300" />
+                        {new Date(review.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* BODY SECTOR */}
+                  <div className="space-y-3 pl-1">
+                    {/* Rating Stars Row */}
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map(s => (
+                        <Star 
+                          key={s} 
+                          className={`w-3.5 h-3.5 ${
+                            s <= review.rating 
+                              ? 'fill-amber-500 text-amber-500' 
+                              : 'fill-zinc-100 text-zinc-100 border-none'
+                          }`} 
+                        />
+                      ))}
                     </div>
 
-                    {/* Review Specs & Media Column */}
-                    <div className="flex-1 space-y-4">
-                      
-                      {/* Rating Stars */}
-                      <div className="flex items-center gap-1">
-                        {[1, 2, 3, 4, 5].map(s => (
-                          <Star 
-                            key={s} 
-                            className={`w-4 h-4 ${
-                              s <= review.rating 
-                                ? 'fill-amber-500 text-amber-500' 
-                                : 'fill-zinc-100 text-zinc-100 border-none'
-                            }`} 
-                          />
-                        ))}
-                      </div>
-
-                      {/* Review Text */}
-                      <p className="text-[13px] text-zinc-800 font-medium leading-relaxed select-text">
-                        {review.reviewText}
+                    {/* Review Title & Content Text */}
+                    <div className="space-y-1">
+                      {title && (
+                        <h5 className="text-sm font-black text-zinc-950 leading-tight">
+                          {title}
+                        </h5>
+                      )}
+                      <p className="text-xs text-zinc-700 font-medium leading-relaxed select-text whitespace-pre-wrap">
+                        {description}
                       </p>
+                    </div>
 
-                      {/* Display Uploaded Images or Videos inside specific Carousel */}
-                      {review.mediaUrls && review.mediaUrls.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-2.5 pt-2">
-                          {review.mediaUrls.map((url, index) => {
-                            if (isVideo(url)) {
+                    {/* DYNAMIC GRID LAYOUT FOR IMAGES / MEDIA */}
+                    {review.mediaUrls && review.mediaUrls.length > 0 && (
+                      <div className="pt-2">
+                        {review.mediaUrls.length === 1 ? (
+                          <div className="max-w-md rounded-xl border border-zinc-150 overflow-hidden bg-zinc-50 max-h-96">
+                            {review.mediaUrls[0].toLowerCase().endsWith('.mp4') ? (
+                              <video src={review.mediaUrls[0]} controls className="w-full h-full object-contain" />
+                            ) : (
+                              <img 
+                                src={review.mediaUrls[0]} 
+                                alt="customer attachment" 
+                                className="w-full h-full object-contain cursor-pointer" 
+                                referrerPolicy="no-referrer"
+                                onClick={() => setViewingImage(review.mediaUrls[0])}
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <div className={`grid gap-2 max-w-2xl rounded-xl overflow-hidden border border-zinc-150 p-1 bg-zinc-50/50
+                            ${review.mediaUrls.length === 2 ? 'grid-cols-2' : ''}
+                            ${review.mediaUrls.length === 3 ? 'grid-cols-3' : ''}
+                            ${review.mediaUrls.length === 4 ? 'grid-cols-4' : ''}
+                            ${review.mediaUrls.length >= 5 ? 'grid-cols-5' : ''}
+                          `}>
+                            {review.mediaUrls.map((url, idx) => {
+                              const isVideo = url.toLowerCase().endsWith('.mp4') || url.toLowerCase().includes('video');
                               return (
-                                <div key={index} className="relative w-20 h-20 bg-zinc-950 border border-zinc-200 rounded-md overflow-hidden flex items-center justify-center text-white">
-                                  <Video className="w-6 h-6 text-white" />
-                                  <span className="absolute bottom-1 right-1 text-[7px] font-black uppercase bg-black text-white px-1">MP4</span>
+                                <div key={idx} className="aspect-square relative bg-white border border-zinc-200/60 rounded-lg overflow-hidden group">
+                                  {isVideo ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-zinc-950 text-white">
+                                      <Video className="w-6 h-6 text-zinc-400" />
+                                      <span className="absolute bottom-1 right-1 text-[7px] font-black bg-black/80 px-1 py-0.2 rounded uppercase">Video</span>
+                                    </div>
+                                  ) : (
+                                    <img 
+                                      src={url} 
+                                      alt="review grid item" 
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform cursor-pointer" 
+                                      referrerPolicy="no-referrer"
+                                      onClick={() => setViewingImage(url)}
+                                    />
+                                  )}
                                 </div>
                               );
-                            }
-                            return (
-                              <button
-                                key={index}
-                                onClick={(e) => { e.stopPropagation(); setViewingImage(url); }}
-                                className="w-20 h-20 rounded-md overflow-hidden border border-zinc-200/80 hover:border-zinc-500 transition-colors"
-                              >
-                                <img src={url} alt="user review media" className="w-full h-full object-cover rounded-md" referrerPolicy="no-referrer" />
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                      {/* Brand Official Reply section inside bubble */}
-                      {review.adminReply && (
-                        <div className="mt-5 p-4 bg-zinc-100 text-zinc-900 border border-zinc-200/50 rounded-lg relative">
-                           <div className="flex items-center gap-1.5 text-[8px] text-zinc-500 font-extrabold tracking-widest uppercase border-b border-zinc-200 pb-1 mt-0 mb-2 whitespace-nowrap">
-                              <span className="w-3.5 h-3.5 bg-purple-600 text-white font-serif rounded-full flex items-center justify-center text-[7px] font-black shrink-0">T</span>
-                              <span className="font-sans">TAZU MART BD</span>
-                              <span className="text-[6.5px] bg-purple-950 text-purple-300 border border-purple-800/40 px-1 py-0.2 rounded font-black uppercase ml-auto">Official Response</span>
-                           </div>
-                           <p className="text-xs text-zinc-700 font-bold leading-relaxed">{review.adminReply}</p>
-                        </div>
-                      )}
+                    {/* Brand Official Reply Bubble */}
+                    {review.adminReply && (
+                      <div className="mt-4 p-4 bg-zinc-50 text-zinc-900 border border-zinc-200/60 rounded-xl relative">
+                         <div className="flex items-center gap-1.5 text-[8px] text-zinc-500 font-extrabold tracking-widest uppercase border-b border-zinc-100 pb-1.5 mb-2.5 whitespace-nowrap">
+                            <span className="w-4 h-4 bg-purple-600 text-white font-serif rounded-full flex items-center justify-center text-[7px] font-black shrink-0">T</span>
+                            <span className="font-sans font-black tracking-wider text-zinc-700">TAZU MART BD</span>
+                            <span className="text-[6.5px] bg-purple-950 text-purple-300 border border-purple-800/40 px-1.5 py-0.5 rounded font-black uppercase ml-auto">Official Response</span>
+                         </div>
+                         <p className="text-xs text-zinc-700 font-bold leading-relaxed">{review.adminReply}</p>
+                      </div>
+                    )}
+                  </div>
 
-                    </div>
+                  {/* FOOTER ROW: HELPFUL BUTTON */}
+                  <div className="border-t border-zinc-100 pt-3 flex justify-between items-center px-1">
+                    <button 
+                      onClick={(e) => handleHelpfulClick(review.reviewId, e)}
+                      className="inline-flex items-center gap-1.5 text-[10px] font-black text-zinc-500 hover:text-zinc-900 uppercase tracking-wider transition-colors py-1 px-2.5 hover:bg-zinc-50 rounded-lg"
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5" />
+                      <span>Helpful ({helpfulCount})</span>
+                    </button>
+                    
+                    <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">
+                      💬 Verified Feedback
+                    </span>
                   </div>
                 </motion.div>
               );
@@ -538,7 +629,7 @@ export default function ProductReviews() {
         </div>
 
         {productReviews.length > 3 && (
-          <div className="mt-12 flex justify-center">
+          <div className="mt-10 flex justify-center">
             <button 
               onClick={() => navigate(`/product/${urlParam}/reviews`)}
               className="px-8 py-4 bg-white border border-zinc-300 text-zinc-950 rounded-none text-xs font-bold uppercase tracking-widest hover:border-zinc-900 transition-all flex items-center gap-2 group"
@@ -579,7 +670,7 @@ export default function ProductReviews() {
                 
                 {validationError && (
                   <div className="bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-650 inline-block animate-pulse shrink-0" />
+                    <span className="w-2 h-2 rounded-full bg-red-600 inline-block animate-pulse shrink-0" />
                     <span className="flex-1">{validationError}</span>
                   </div>
                 )}
@@ -608,6 +699,34 @@ export default function ProductReviews() {
                   </div>
                 </div>
 
+                {/* Review Title */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Review Title *</label>
+                  <input 
+                    type="text" 
+                    required
+                    disabled={isSubmitting}
+                    placeholder="e.g., Premium quality product, Fits perfectly!"
+                    value={reviewTitle}
+                    onChange={(e) => setReviewTitle(e.target.value)}
+                    className="w-full px-4 py-3 border border-zinc-200 rounded-md text-xs font-semibold placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-950/20 text-zinc-900 disabled:bg-zinc-50"
+                  />
+                </div>
+
+                {/* Review Text Area */}
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block">Review Description *</label>
+                  <textarea 
+                    required
+                    rows={4}
+                    disabled={isSubmitting}
+                    placeholder="Write your detailed observations on sizing, delivery, colors, comfort..."
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    className="w-full px-4 py-3 border border-zinc-200 rounded-md text-xs font-bold placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-950/20 text-zinc-900 disabled:bg-zinc-50 disabled:text-zinc-500"
+                  />
+                </div>
+
                 {/* Customer Block Info */}
                 <div className="space-y-1">
                   <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Full Name</label>
@@ -621,20 +740,6 @@ export default function ProductReviews() {
                     className={`w-full px-4 py-3 border border-zinc-200 rounded-md text-xs font-semibold placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-950/20 text-zinc-900 ${
                       anonymousToggle || isSubmitting ? 'bg-zinc-100 cursor-not-allowed text-zinc-500' : ''
                     }`}
-                  />
-                </div>
-
-                {/* Review Text Area */}
-                <div className="space-y-1">
-                  <label className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Review Experience</label>
-                  <textarea 
-                    required
-                    rows={4}
-                    disabled={isSubmitting}
-                    placeholder="Write your detailed observations on sizing, delivery, colors, comfort..."
-                    value={reviewText}
-                    onChange={(e) => setReviewText(e.target.value)}
-                    className="w-full px-4 py-3 border border-zinc-200 rounded-md text-xs font-bold placeholder-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-950/20 text-zinc-900 disabled:bg-zinc-50 disabled:text-zinc-500"
                   />
                 </div>
 
@@ -654,7 +759,7 @@ export default function ProductReviews() {
                   </span>
 
                   <div className="mt-2">
-                    <label className={`flex flex-col items-center justify-center border border-dashed border-zinc-350 bg-white hover:bg-zinc-50/50 hover:border-zinc-400 transition-all rounded-xl p-6 text-center h-40 ${isSubmitting || attachedMedia.length >= 5 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <label className={`flex flex-col items-center justify-center border border-dashed border-zinc-300 bg-white hover:bg-zinc-50/50 hover:border-zinc-400 transition-all rounded-xl p-6 text-center h-40 ${isSubmitting || attachedMedia.length >= 5 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       <input 
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
@@ -710,7 +815,7 @@ export default function ProductReviews() {
                   </span>
 
                   <div className="mt-2">
-                    <label className={`flex flex-col items-center justify-center border border-dashed border-zinc-350 bg-white hover:bg-zinc-50/50 hover:border-zinc-400 transition-all rounded-xl p-6 text-center h-40 ${isSubmitting || !!videoUrlInput ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <label className={`flex flex-col items-center justify-center border border-dashed border-zinc-300 bg-white hover:bg-zinc-50/50 hover:border-zinc-400 transition-all rounded-xl p-6 text-center h-40 ${isSubmitting || !!videoUrlInput ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                       <input 
                         type="file"
                         accept="video/mp4,video/quicktime,video/webm"
@@ -744,232 +849,102 @@ export default function ProductReviews() {
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
-                        
-                        {/* Absolute Center Play Button indicator to look extremely high fidelity */}
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/15">
-                          <div className="w-10 h-10 rounded-full bg-white/25 backdrop-blur-sm border border-white/50 flex items-center justify-center text-white shadow-sm">
-                            <Play className="w-4 h-4 fill-white text-white ml-0.5" />
+                          <div className="w-8 h-8 rounded-full bg-white/25 backdrop-blur-sm border border-white/50 flex items-center justify-center text-white">
+                            <Play className="w-3.5 h-3.5 fill-white text-white ml-0.5" />
                           </div>
                         </div>
-
-                        <div className="absolute bottom-2 left-2 z-10 bg-black/60 backdrop-blur-sm text-[8px] font-black uppercase text-amber-400 px-1.5 py-0.5 rounded flex items-center gap-1">
-                          <Video className="w-2.5 h-2.5 text-amber-400" />
-                          <span>9:16 Vertical</span>
+                        <div className="absolute bottom-1.5 left-1.5 z-10 bg-black/60 backdrop-blur-sm text-[7px] font-black uppercase text-amber-400 px-1.5 py-0.5 rounded">
+                          9:16 Preview
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Toggles */}
-                <div className="flex items-center justify-between gap-4 pt-2">
+                {/* Verified Toggle + Anonymous Toggle */}
+                <div className="flex items-center justify-between gap-4 pt-2 border-t border-zinc-100">
                   <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
                     <input 
                       type="checkbox" 
                       checked={verifiedToggle}
-                      disabled={isSubmitting}
                       onChange={(e) => setVerifiedToggle(e.target.checked)}
-                      className="w-4 h-4 accent-zinc-900 disabled:opacity-50"
+                      className="w-4 h-4 accent-zinc-950 rounded text-zinc-950"
                     />
-                    <span>Verified Purchase</span>
+                    <span>Verified Purchase badge</span>
                   </label>
 
                   <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
                     <input 
                       type="checkbox" 
                       checked={anonymousToggle}
-                      disabled={isSubmitting}
                       onChange={(e) => setAnonymousToggle(e.target.checked)}
-                      className="w-4 h-4 accent-zinc-900 disabled:opacity-50"
+                      className="w-4 h-4 accent-zinc-950 rounded text-zinc-950"
                     />
-                    <span>Anonymously post</span>
+                    <span>Hide name (Anonymous)</span>
                   </label>
                 </div>
 
-                <div className="pt-4 border-t border-zinc-100 flex justify-end gap-3">
+                <div className="border-t border-zinc-100 pt-4 flex justify-end gap-2.5">
                   <button 
-                    type="button"
-                    disabled={isSubmitting}
+                    type="button" 
                     onClick={() => setIsReviewModalOpen(false)}
-                    className="px-5 py-3 border border-zinc-200 rounded text-xs font-bold uppercase tracking-wider hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-5 py-3 border border-zinc-200 text-zinc-700 rounded-none text-xs font-bold uppercase hover:bg-zinc-50"
                   >
-                    Cancel
+                    Discard Form
                   </button>
                   <button 
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-6 py-3 bg-zinc-950 text-white rounded text-xs font-black uppercase tracking-wider hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2 min-w-[120px] disabled:opacity-75 disabled:cursor-not-allowed"
+                    type="submit" 
+                    className="px-6 py-3 bg-zinc-950 text-white rounded-none text-xs font-black uppercase tracking-widest hover:bg-zinc-800"
                   >
-                    {isSubmitting ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        <span>Submitting...</span>
-                      </>
-                    ) : (
-                      <span>Post Review</span>
-                    )}
+                    Publish Instantly
                   </button>
                 </div>
 
               </form>
+
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Success Popup Modal Overlay */}
+      {/* SUCCESS MODAL POPUP DIALOG */}
       <AnimatePresence>
         {isSuccessPopupOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.9, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-sm rounded-none shadow-2xl p-8 border border-zinc-200 text-center flex flex-col items-center justify-center space-y-6"
+              exit={{ opacity: 0, scale: 0.9, y: 15 }}
+              className="bg-white p-8 max-w-sm w-full text-center border border-zinc-150 shadow-2xl relative"
             >
-              <motion.div 
-                initial={{ scale: 0, rotate: -45 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center border border-emerald-200 shadow-sm"
-              >
-                <svg className="w-8 h-8 stroke-current" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </motion.div>
-
-              <div className="space-y-2">
-                <h4 className="text-base font-black text-emerald-600 uppercase tracking-tight">
-                  ✅ Review submitted successfully.
-                </h4>
-                <p className="text-sm font-black text-zinc-950 uppercase tracking-tight">
-                  Waiting for admin approval.
-                </p>
-                <p className="text-xs text-zinc-500 font-bold leading-relaxed pt-2">
-                  Thank you for sharing your feedback. <br />
-                  Your review will appear in the Customer Ratings section after verification.
-                </p>
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-5 border border-emerald-100">
+                <CheckCircle className="w-8 h-8 stroke-[2.5]" />
               </div>
-
-              <button
+              <h3 className="text-base font-black uppercase tracking-widest text-[#000000] mb-2">Review Submitted</h3>
+              <p className="text-xs text-zinc-500 font-bold mb-6 uppercase leading-relaxed">
+                Thank you! Your storefront review is now under review and will be published shortly.
+              </p>
+              <button 
                 onClick={() => setIsSuccessPopupOpen(false)}
-                className="w-full py-3.5 bg-zinc-950 text-white hover:bg-zinc-800 rounded-none text-xs font-black uppercase tracking-widest transition-colors focus:outline-none shadow-md"
+                className="w-full py-3.5 bg-zinc-950 hover:bg-zinc-800 text-white font-black text-xs uppercase tracking-widest transition-colors border border-black"
               >
-                OK
+                Close Window
               </button>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* Viewing full image preview modal pop */}
-      <AnimatePresence>
-        {viewingImage && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md" onClick={() => setViewingImage(null)}>
-             <button 
-               className="absolute top-6 right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors focus:outline-none"
-               onClick={() => setViewingImage(null)}
-             >
-               <X className="w-5 h-5" />
-             </button>
-             <motion.img 
-               initial={{ opacity: 0, scale: 0.95 }}
-               animate={{ opacity: 1, scale: 1 }}
-               exit={{ opacity: 0, scale: 0.95 }}
-               src={viewingImage} 
-               alt="Zoomed Review" 
-               className="max-w-full max-h-[85vh] object-contain rounded-lg border border-zinc-700 shadow-2xl"
-               onClick={e => e.stopPropagation()}
-             />
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Detailed Error Modal */}
-      <AnimatePresence>
-        {detailedError && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-zinc-200"
-            >
-              {/* Header */}
-              <div className="bg-rose-50 p-6 flex items-center gap-4 border-b border-rose-100">
-                <div className="w-12 h-12 bg-rose-500 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-rose-200">
-                  <AlertTriangle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-rose-950 uppercase tracking-tight">{detailedError.title}</h3>
-                  <p className="text-xs text-rose-700 font-bold uppercase tracking-wider opacity-70">Review Submission Failed</p>
-                </div>
-                <button 
-                  onClick={() => setDetailedError(null)}
-                  className="ml-auto w-8 h-8 bg-rose-100 hover:bg-rose-200 text-rose-900 rounded-full flex items-center justify-center transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="p-6 space-y-5">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-zinc-400">
-                    <ShieldAlert className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Reason</span>
-                  </div>
-                  <p className="text-sm font-bold text-zinc-900 leading-relaxed">{detailedError.reason}</p>
-                </div>
-
-                {(detailedError.table || detailedError.missingColumn) && (
-                  <div className="grid grid-cols-2 gap-4">
-                    {detailedError.table && (
-                      <div className="space-y-1.5 bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-                        <div className="flex items-center gap-2 text-zinc-400">
-                          <Database className="w-3.5 h-3.5" />
-                          <span className="text-[9px] font-black uppercase tracking-widest">Table</span>
-                        </div>
-                        <p className="text-xs font-black text-zinc-950 font-mono">{detailedError.table}</p>
-                      </div>
-                    )}
-                    {detailedError.missingColumn && (
-                      <div className="space-y-1.5 bg-zinc-50 p-3 rounded-lg border border-zinc-100">
-                        <div className="flex items-center gap-2 text-zinc-400">
-                          <Layers className="w-3.5 h-3.5" />
-                          <span className="text-[9px] font-black uppercase tracking-widest">Missing Column</span>
-                        </div>
-                        <p className="text-xs font-black text-rose-600 font-mono">{detailedError.missingColumn}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="space-y-1.5 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <div className="flex items-center gap-2 text-emerald-600">
-                    <HelpCircle className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Suggested Fix</span>
-                  </div>
-                  <p className="text-xs font-bold text-emerald-800 leading-relaxed">{detailedError.solution}</p>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="p-4 bg-zinc-50 border-t border-zinc-100 flex justify-end">
-                <button 
-                  onClick={() => setDetailedError(null)}
-                  className="px-8 h-12 bg-zinc-950 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-md active:translate-y-0.5"
-                >
-                  Understood
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {/* Lightbox image full viewer */}
+      {viewingImage && (
+        <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4" onClick={() => setViewingImage(null)}>
+          <button className="absolute top-5 right-5 text-white/70 hover:text-white p-2">
+            <X className="w-8 h-8" />
+          </button>
+          <img src={viewingImage} alt="large review" className="max-w-full max-h-[90vh] object-contain rounded-lg" referrerPolicy="no-referrer" />
+        </div>
+      )}
 
     </div>
   );

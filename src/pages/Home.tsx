@@ -12,6 +12,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { formatPrice } from '../lib/utils';
 import { CompactProductCard } from '../components/product/CompactProductCard';
 import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
+import FlashSaleTimer from '../components/home/FlashSaleTimer';
 import { motion, AnimatePresence } from 'motion/react';
 import { preloadHomepageDataAndAssets } from '../utils/preloadHelper';
 
@@ -32,6 +33,21 @@ function getOptimizedImageUrl(url: string, width = 1200): string {
     }
   }
   return url;
+}
+
+// Check if a text is a numeric ID, file name ID, database ID, or contains mostly numbers
+export function isNumericOrId(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const t = text.trim();
+  // If it's purely numbers e.g. "1000049033" or "1000050220"
+  if (/^\d+$/.test(t)) return true;
+  // If it has standard database/banner prefix like ban_
+  if (/^ban_/.test(t)) return true;
+  // If it's a UUID or DB ID pattern
+  if (/^[0-9a-fA-F-]{8,}$/.test(t)) return true;
+  // If it looks like a filename, e.g., contains file extension
+  if (/\.(jpg|jpeg|png|gif|webp)$/i.test(t)) return true;
+  return false;
 }
 
 export default function Home() {
@@ -204,7 +220,7 @@ export default function Home() {
               {/* Main Banner Image */}
               <img 
                 src={getOptimizedImageUrl(sliderBanners[activeSlide].image)} 
-                alt={sliderBanners[activeSlide].name || "Luxury Banner Graphic"} 
+                alt={isNumericOrId(sliderBanners[activeSlide].name) ? "Luxury Banner Graphic" : (sliderBanners[activeSlide].name || "Luxury Banner Graphic")} 
                 className="w-full h-full object-cover object-center pointer-events-none select-none"
                 referrerPolicy="no-referrer"
                 fetchPriority={activeSlide === 0 ? "high" : "low"}
@@ -215,7 +231,7 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 flex flex-col justify-end pb-8 sm:pb-12 md:pb-16 px-3 md:px-12 z-10 select-text">
                 <div className="max-w-2xl space-y-1.5 sm:space-y-3">
                   {/* 1. Title (name) */}
-                  {sliderBanners[activeSlide].name && (
+                  {sliderBanners[activeSlide].name && !isNumericOrId(sliderBanners[activeSlide].name) && (
                     <motion.h2 
                       initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -227,7 +243,7 @@ export default function Home() {
                   )}
 
                   {/* 2. Subtitle (offerText) */}
-                  {sliderBanners[activeSlide].offerText && (
+                  {sliderBanners[activeSlide].offerText && !isNumericOrId(sliderBanners[activeSlide].offerText) && (
                     <motion.h3
                       initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -239,7 +255,7 @@ export default function Home() {
                   )}
                   
                   {/* 3. Description */}
-                  {sliderBanners[activeSlide].description && (
+                  {sliderBanners[activeSlide].description && !isNumericOrId(sliderBanners[activeSlide].description) && (
                     <motion.p 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -337,13 +353,15 @@ export default function Home() {
 
       {/* 4. DYNAMIC SPECIAL SECTIONS */}
       {/* 1) Flash Sale Section */}
-      {flashSaleProducts.length > 0 && (
+      {settings.flashSaleEnabled && flashSaleProducts.length > 0 && (
         <section className="py-4 md:py-6 container mx-auto px-3 border-b border-neutral-100 last:border-b-0">
-          <div className="flex items-center justify-between mb-4 md:mb-6">
+          {/* Header Row: Title on the left, VIEW ALL on the right */}
+          <div className="flex items-center justify-between pb-3 border-b border-neutral-100/60 mb-4">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-pulse" />
               <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">FLASH SALE</h2>
             </div>
+            
             <Link 
               to="/search?q=flash_sale" 
               className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
@@ -351,6 +369,13 @@ export default function Home() {
               View All <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
+          
+          {/* Re-designed Centered Countdown Timer underneath the header */}
+          <div className="flex justify-center w-full mb-[12px]">
+            <FlashSaleTimer />
+          </div>
+
+          {/* Product Grid */}
           {renderProductGrid(flashSaleProducts.slice(0, 6))}
         </section>
       )}
