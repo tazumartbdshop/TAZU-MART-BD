@@ -295,11 +295,6 @@ export default function AdminBanners() {
     let successCount = 0;
 
     const { uploadImage } = await import('../../lib/imageUtils');
-    const supabase = await import('../../lib/supabase').then(m => m.getSupabase());
-    if (!supabase) {
-      setIsSubmitting(false);
-      return;
-    }
 
     try {
       const currentBannersLength = useBannerStore.getState().banners.length;
@@ -339,31 +334,11 @@ export default function AdminBanners() {
       }
 
       if (successCount > 0) {
-        // Convert to snake_case for Supabase database compatibility
-        const { objectToSnake } = await import('../../lib/supabaseUtils');
-        const dbPayloads = objectToSnake(newBanners);
+        const result = await useBannerStore.getState().publishNewBanners(newBanners);
 
-        const { error: bannersErr } = await supabase.from('banners').upsert(dbPayloads);
-        if (bannersErr) {
-          throw new Error('Failed to save banner. Please try again.');
+        if (!result.success) {
+            throw result.error;
         }
-
-        // Silent try-catch for banners_draft so that it is completely non-blocking if the table is absent
-        try {
-          await supabase.from('banners_draft').upsert(dbPayloads);
-        } catch (draftErr) {
-          console.warn("[Admin Banners] Optional banners_draft table error, ignored:", draftErr);
-        }
-
-        // Instantly update the local Zustand store state to keep Homepage, Banner Listing, and Banner Management in perfect real-time sync
-        const existingBanners = useBannerStore.getState().banners;
-        const existingDraftBanners = useBannerStore.getState().draftBanners;
-
-        const updatedBanners = [...existingBanners.filter(b => !newBanners.some(n => n.id === b.id)), ...newBanners];
-        const updatedDraftBanners = [...existingDraftBanners.filter(b => !newBanners.some(n => n.id === b.id)), ...newBanners];
-
-        useBannerStore.getState().setBanners(updatedBanners);
-        useBannerStore.getState().setDraftBanners(updatedDraftBanners);
         
         localPreviews.forEach(p => URL.revokeObjectURL(p.previewUrl));
         setLocalPreviews([]);

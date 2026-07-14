@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getSupabase } from '../lib/supabase';
+import { mysqlClient } from '../lib/mysql_db';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 import { broadcastSync } from '../lib/broadcastSync';
 
@@ -73,7 +73,7 @@ interface BannerState {
   reorderBanners: (startIndex: number, endIndex: number) => void;
   reorderDraftBanners: (startIndex: number, endIndex: number) => void;
   saveDraftBanners: () => Promise<void>;
-  publishBanners: () => Promise<void>;
+  publishNewBanners: (newBanners: Banner[]) => Promise<{ success: boolean; error?: any }>;
   resetDraftBanners: () => Promise<void>;
   seedDefaultBanner: () => Promise<void>;
   subscribe: () => () => void;
@@ -113,11 +113,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   },
 
   subscribe: () => {
-    const supabase = getSupabase();
-    if (!supabase) {
-        set({ isLoaded: true });
-        return () => {};
-    }
+    const supabase = mysqlClient;
 
     supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
         if (!error && data) {
@@ -136,33 +132,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     // Fake slider config for now since we don't have key-value tables 
     // unless we create a generic settings table. 
 
-    const channelLive = supabase
-      .channel('public:banners:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, (payload) => {
-          supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-            if (!error && data) {
-              const mapped = (data as any[]).map(row => objectToCamel(row)) as Banner[];
-              set({ banners: mapped, isLoaded: true });
-              saveCachedBanners(mapped);
-              broadcastSync.publish('banners', mapped);
-            }
-          });
-      })
-      .subscribe();
-
-    const channelDraft = supabase
-      .channel('public:banners_draft:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'banners_draft' }, (payload) => {
-          supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-            if (!error && data) set({ draftBanners: (data as any[]).map(row => objectToCamel(row)) as Banner[] });
-          });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channelLive);
-      supabase.removeChannel(channelDraft);
-    };
+    return () => {};
   },
 
   setBanners: (banners) => {
@@ -183,11 +153,9 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
     broadcastSync.publish('banners', nextBanners);
-    const supabase = getSupabase();
-    if (supabase) {
-      const dbPayload = objectToSnake(updates);
-      supabase.from('banners').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
-    }
+    const supabase = mysqlClient;
+    const dbPayload = objectToSnake(updates);
+    supabase.from('banners').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
   },
 
   updateDraftBanner: (id, updates) => set((state) => ({
@@ -230,11 +198,9 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
     broadcastSync.publish('banners', nextBanners);
-    const supabase = getSupabase();
-    if (supabase) {
-      const dbPayload = objectToSnake(newBanner);
-      supabase.from('banners').insert([dbPayload]).then(({error}) => error && console.warn(error));
-    }
+    const supabase = mysqlClient;
+    const dbPayload = objectToSnake(newBanner);
+    supabase.from('banners').insert([dbPayload]).then(({error}) => error && console.warn(error));
   },
 
   addDraftBanner: (type = 'uploaded') => {
@@ -296,30 +262,21 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
     broadcastSync.publish('banners', nextBanners);
-    const supabase = getSupabase();
-    if (supabase) supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
+    const supabase = mysqlClient;
+    supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
   },
 
   removeDraftBanner: (id) => {
     set((state) => ({
       draftBanners: state.draftBanners.filter((b) => b.id !== id)
     }));
-    const supabase = getSupabase();
-    if (supabase) {
-        supabase.from('banners_draft').delete().eq('id', id).then(({error}) => error && console.warn(error));
-        supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
-    }
+    const supabase = mysqlClient;
+    supabase.from('banners_draft').delete().eq('id', id).then(({error}) => error && console.warn(error));
+    supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
   },
 
   deleteBannerPermanently: async (id) => {
-    const supabase = getSupabase();
-    if (!supabase) {
-      set((state) => ({
-        banners: state.banners.filter((b) => b.id !== id),
-        draftBanners: state.draftBanners.filter((b) => b.id !== id)
-      }));
-      return;
-    }
+    const supabase = mysqlClient;
 
     const previousBanners = get().banners;
     const previousDraftBanners = get().draftBanners;
@@ -364,11 +321,9 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     saveCachedBanners(reordered);
     broadcastSync.publish('banners', reordered);
 
-    const supabase = getSupabase();
-    if (supabase) {
-        const dbPayloads = reordered.map(b => objectToSnake(b));
-        supabase.from('banners').upsert(dbPayloads).then(({error}) => error && console.warn(error));
-    }
+    const supabase = mysqlClient;
+    const dbPayloads = reordered.map(b => objectToSnake(b));
+    supabase.from('banners').upsert(dbPayloads).then(({error}) => error && console.warn(error));
   },
 
   reorderDraftBanners: (startIndex, endIndex) => {
@@ -382,20 +337,18 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   saveDraftBanners: async () => {
     try {
       const draftBanners = [...get().draftBanners].sort((a, b) => (Number(a.order) ?? 0) - (Number(b.order) ?? 0));
-      const supabase = getSupabase();
+      const supabase = mysqlClient;
       
-      if (supabase) {
-          // Sync Draft Collection in Supabase
-          // First delete all existing rows
-          await supabase.from('banners_draft').delete().neq('id', '0'); // Delete all filter
-          
-          const cleanDrafts = draftBanners.map((b, idx) => ({...b, order: b.order !== undefined && b.order !== null ? Number(b.order) : idx}));
-          const dbDrafts = cleanDrafts.map(d => objectToSnake(d));
-          await supabase.from('banners_draft').upsert(dbDrafts);
-          
-          await supabase.from('banners').delete().neq('id', '0');
-          await supabase.from('banners').upsert(dbDrafts);
-      }
+      // Sync Draft Collection in MySQL
+      // First delete all existing rows
+      await supabase.from('banners_draft').delete().neq('id', '0'); // Delete all filter
+      
+      const cleanDrafts = draftBanners.map((b, idx) => ({...b, order: b.order !== undefined && b.order !== null ? Number(b.order) : idx}));
+      const dbDrafts = cleanDrafts.map(d => objectToSnake(d));
+      await supabase.from('banners_draft').upsert(dbDrafts);
+      
+      await supabase.from('banners').delete().neq('id', '0');
+      await supabase.from('banners').upsert(dbDrafts);
       
       set({ 
         banners: draftBanners,
@@ -411,38 +364,40 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     }
   },
 
-  publishBanners: async () => {
+  publishNewBanners: async (newBanners: Banner[]) => {
     try {
-      const draftBanners = [...get().draftBanners].sort((a, b) => (Number(a.order) ?? 0) - (Number(b.order) ?? 0));
+      const supabase = mysqlClient;
       
-      const updatedDraftBanners = draftBanners.map(b => 
-        b.status === 'draft' ? { ...b, status: 'active' as const } : b
-      );
-
-      const supabase = getSupabase();
-      if (supabase) {
-          await supabase.from('banners_draft').delete().neq('id', '0');
-          const cleanDrafts = updatedDraftBanners.map((b, idx) => ({...b, order: b.order !== undefined && b.order !== null ? Number(b.order) : idx}));
-          const dbPayloads = cleanDrafts.map(d => objectToSnake(d));
-          await supabase.from('banners_draft').upsert(dbPayloads);
-          
-          await supabase.from('banners').delete().neq('id', '0');
-          await supabase.from('banners').upsert(dbPayloads);
+      const dbPayloads = newBanners.map(b => objectToSnake(b));
+      
+      await supabase.from('banners').upsert(dbPayloads);
+      
+      // Silent try-catch for banners_draft so that it is completely non-blocking if the table is absent
+      try {
+        await supabase.from('banners_draft').upsert(dbPayloads);
+      } catch (draftErr) {
+        console.warn("[Admin Banners] Optional banners_draft table error, ignored:", draftErr);
       }
 
-      console.log("Banners published successfully.");
-      set({ banners: updatedDraftBanners, draftBanners: updatedDraftBanners, hasUnsavedChanges: false });
-      saveCachedBanners(updatedDraftBanners);
-      broadcastSync.publish('banners', updatedDraftBanners);
+      const existingBanners = get().banners;
+      const existingDraftBanners = get().draftBanners;
+
+      const updatedBanners = [...existingBanners.filter(b => !newBanners.some(n => n.id === b.id)), ...newBanners];
+      const updatedDraftBanners = [...existingDraftBanners.filter(b => !newBanners.some(n => n.id === b.id)), ...newBanners];
+
+      set({ banners: updatedBanners, draftBanners: updatedDraftBanners });
+      saveCachedBanners(updatedBanners);
+      broadcastSync.publish('banners', updatedBanners);
+      
+      return { success: true };
     } catch (error) {
-      console.error("Error publishing banners:", error);
-      throw error;
+      console.error("Error saving banners:", error);
+      return { success: false, error };
     }
   },
 
   resetDraftBanners: async () => {
-    const supabase = getSupabase();
-    if (!supabase) return;
+    const supabase = mysqlClient;
     
     try {
       const { data: draftData } = await supabase.from('banners_draft').select('*');
@@ -470,8 +425,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   },
 
   seedDefaultBanner: async () => {
-      const supabase = getSupabase();
-      if (!supabase) return;
+      const supabase = mysqlClient;
       
     try {
       const { data: liveSnapshot } = await supabase.from('banners').select('*').limit(1);

@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function TemplateDraftBar() {
   const { publishTheme, resetDraftTheme } = useThemeStore();
   const { publishSettings, resetDraftSettings } = useSettingsStore();
-  const { publishBanners, resetDraftBanners } = useBannerStore();
+  const { resetDraftBanners } = useBannerStore();
   const { publishBanner: publishSupportBanner, resetDraftBanner: resetDraftSupportBanner } = useSupportBannerStore();
   
   const [isPublishing, setIsPublishing] = useState(false);
@@ -23,7 +23,10 @@ export default function TemplateDraftBar() {
     try {
       await publishTheme();
       await publishSettings();
-      await publishBanners();
+      
+      const { draftBanners, publishNewBanners } = useBannerStore.getState();
+      await publishNewBanners(draftBanners);
+      
       await publishSupportBanner();
       
       setIsPublishing(false);

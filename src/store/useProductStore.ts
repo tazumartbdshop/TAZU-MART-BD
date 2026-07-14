@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getSupabase } from '../lib/supabase';
+import { mysqlClient } from '../lib/mysql_db';
 import { deleteImage } from '../lib/imageUtils';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 import { broadcastSync } from '../lib/broadcastSync';
@@ -195,7 +195,7 @@ interface ProductState {
   products: Product[];
   isLoading: boolean;
   isLoaded: boolean;
-  addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => Promise<void>;
+  addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => Promise<{ success: boolean; error?: any }>;
   updateProduct: (id: string, updatedFields: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   subscribe: () => () => void;
@@ -521,8 +521,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
     saveCachedProducts(nonDemo);
   },
   
-  addProduct: async (payload) => {
-    const supabase = getSupabase();
+  addProduct: async (payload: Omit<Product, 'id' | 'createdAt'>) => {
     const id = `prod_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     
     // Serialize QnAs into description HTML comments
@@ -551,61 +550,42 @@ export const useProductStore = create<ProductState>((set, get) => ({
       slug,
       createdAt: Date.now(),
     };
-    
-    // Optimistic Update
-    const currentProducts = get().products;
-    const nextProducts = [...currentProducts, newProduct];
-    set({ products: nextProducts });
-    saveCachedProducts(nextProducts);
-    broadcastSync.publish('products', nextProducts);
-    
-    if (supabase) {
-      try {
+
+    try {
+        const supabase = mysqlClient;
         const dbPayload = objectToSnake(newProduct);
         delete dbPayload.qnas; // Prevent column mismatch in DB
         
         const selfHealResult = await executeWithSelfHealingProducts(
-          async (prunedDbPayload) => {
+            async (prunedDbPayload) => {
             return await supabase.from('products').insert([prunedDbPayload]);
-          },
-          dbPayload
+            },
+            dbPayload
         );
         
-        const { error, status, statusText } = selfHealResult;
+        const { error } = selfHealResult;
         if (error) {
-          // Rollback on error
-          set({ products: currentProducts });
-          saveCachedProducts(currentProducts);
-          broadcastSync.publish('products', currentProducts);
-          console.error("%c[Supabase Product Sync] INSERT ERROR:", "color: #ef4444; font-weight: bold;", {
-            code: error.code,
-            message: error.message,
-            hint: (error as any).hint,
-            details: (error as any).details,
-            httpStatus: status,
-            httpStatusText: statusText
-          });
-          
-          if (error.code === 'PGRST205') {
-            throw new Error(`Database Table Not Found [Code: ${error.code}]: The 'products' table was not found. Please ensure you have run the provisioning SQL script and clicked 'Reload Schema' in Supabase Settings.`);
-          }
-          
-          throw new Error(error.message || "Failed to add product to database");
+            console.error("%c[MySQL Product Sync] INSERT ERROR:", "color: #ef4444; font-weight: bold;", {
+            message: error.message
+            });
+            return { success: false, error };
         }
-      } catch (err: any) {
-        // Rollback on error
-        set({ products: currentProducts });
-        saveCachedProducts(currentProducts);
-        broadcastSync.publish('products', currentProducts);
+        
+        const currentProducts = get().products;
+        const nextProducts = [...currentProducts, newProduct];
+        set({ products: nextProducts });
+        saveCachedProducts(nextProducts);
+        broadcastSync.publish('products', nextProducts);
+        
+        return { success: true };
+    } catch (err: any) {
         console.error("Product insert exception:", err);
-        throw new Error(err.message || "Failed to add product to database");
-      }
+        return { success: false, error: err };
     }
   },
   
   updateProduct: async (id, payload) => {
-    const supabase = getSupabase();
-    console.log(`[Supabase Log] Preparing to update product document: products/${id}`);
+    const supabase = mysqlClient;
     
     const currentProducts = get().products;
     const currentProduct = currentProducts.find(p => p.id === id);
@@ -644,43 +624,41 @@ export const useProductStore = create<ProductState>((set, get) => ({
     saveCachedProducts(updatedProducts);
     broadcastSync.publish('products', updatedProducts);
     
-    if (supabase) {
-      try {
+    try {
         const dbPayload = objectToSnake(finalPayload);
         delete dbPayload.qnas; // Prevent column mismatch in DB
         delete dbPayload.id; // Prevent updating id key
         delete dbPayload.created_at; // Prevent changing created_at timestamp
         
         const selfHealResult = await executeWithSelfHealingProducts(
-          async (prunedDbPayload) => {
+            async (prunedDbPayload) => {
             return await supabase.from('products').update(prunedDbPayload).eq('id', id);
-          },
-          dbPayload
+            },
+            dbPayload
         );
         
         const { error } = selfHealResult;
         if (error) {
-          // Rollback on error
-          set({ products: currentProducts });
-          saveCachedProducts(currentProducts);
-          broadcastSync.publish('products', currentProducts);
-          console.error("Supabase update error:", error);
-          throw new Error(error.message || "Failed to update product in database");
+            // Rollback on error
+            set({ products: currentProducts });
+            saveCachedProducts(currentProducts);
+            broadcastSync.publish('products', currentProducts);
+            console.error("MySQL update error:", error);
+            throw new Error(error.message || "Failed to update product in database");
         }
-      } catch (err: any) {
+    } catch (err: any) {
         // Rollback on error
         set({ products: currentProducts });
         saveCachedProducts(currentProducts);
         broadcastSync.publish('products', currentProducts);
         console.error("Product update exception:", err);
         throw new Error(err.message || "Failed to update product in database");
-      }
     }
   },
   
   deleteProduct: async (id) => {
-    const supabase = getSupabase();
-    console.log(`[Supabase Log] Preparing to delete product document: products/${id}`);
+    const supabase = mysqlClient;
+    console.log(`[MySQL Log] Preparing to delete product: products/${id}`);
     
     const currentProducts = get().products;
     const product = currentProducts.find(p => p.id === id);
@@ -711,42 +689,34 @@ export const useProductStore = create<ProductState>((set, get) => ({
     saveCachedProducts(newProducts);
     broadcastSync.publish('products', newProducts);
     
-    if (supabase) {
-      const { error } = await supabase.from('products').delete().eq('id', id);
-      if (error) {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) {
         // Rollback on error
         set({ products: currentProducts });
         saveCachedProducts(currentProducts);
         broadcastSync.publish('products', currentProducts);
-        console.error("Supabase delete error:", error);
+        console.error("MySQL delete error:", error);
         throw new Error(error.message || "Failed to delete product from database");
-      }
     }
   },
   
   subscribe: () => {
     // Start non-blocking directly from cache
     set({ isLoading: false });
-    const supabase = getSupabase();
+    const supabase = mysqlClient;
     
-    if (!supabase) {
-        set({ isLoaded: true });
-        return () => {}; // No-op if not configured
-    }
-    
-    const { url } = (window as any).getSupabaseCredentials?.() || {};
-    console.log(`[Supabase Product Sync] Querying 'products' from: ${url || 'Injected Key'}`);
+    console.log(`[MySQL Product Sync] Querying 'products'`);
     
     // Direct, fast asynchronous fetch from the live database
-    supabase.from('products').select('*').then(({ data, error, status, statusText }) => {
+    supabase.from('products').select('*').then(({ data, error }) => {
         if (!error && data) {
-            console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products. (HTTP ${status})`, "color: #10b981; font-weight: bold;");
+            console.log(`%c[MySQL Product Sync] SUCCESS: Fetched ${data.length} products.`, "color: #10b981; font-weight: bold;");
             try {
-              const mapped = data.map((row, index) => {
+              const mapped = data.map((row: any, index: number) => {
                 try {
                   return mapDbToProduct(row);
                 } catch (err) {
-                  console.error(`[Supabase Product Sync] Mapping failed for row index ${index}:`, row, err);
+                  console.error(`[MySQL Product Sync] Mapping failed for row index ${index}:`, row, err);
                   throw err;
                 }
               });
@@ -754,41 +724,17 @@ export const useProductStore = create<ProductState>((set, get) => ({
               set({ products: mapped, isLoading: false, isLoaded: true });
               saveCachedProducts(mapped);
             } catch (mapErr) {
-              console.error("[Supabase Product Sync] Critical mapping error:", mapErr);
+              console.error("[MySQL Product Sync] Critical mapping error:", mapErr);
               set({ isLoaded: true });
             }
         } else if (error) {
-            console.error("%c[Supabase Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
-              code: error.code,
-              message: error.message,
-              hint: (error as any).hint,
-              details: (error as any).details,
-              httpStatus: status,
-              httpStatusText: statusText
+            console.error("%c[MySQL Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
+              message: error.message
             });
             set({ isLoaded: true });
         }
-    }, (pErr) => {
-        console.error("[Supabase Product Sync] CONNECTION ERROR:", pErr);
     });
  
-    const channel = supabase
-      .channel('public:products:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
-        // Real-time synchronization
-        supabase.from('products').select('*').then(({ data, error }) => {
-            if (!error && data) {
-                const mapped = data.map(mapDbToProduct);
-                set({ products: mapped });
-                saveCachedProducts(mapped);
-                broadcastSync.publish('products', mapped);
-            }
-        });
-      })
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => {};
   }
 }));

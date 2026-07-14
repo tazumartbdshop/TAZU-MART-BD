@@ -309,6 +309,9 @@ export async function executeProxyQuery(query: {
     return { data: null, error: err.message || 'Database error', count: 0 };
   }
 }
+export const mysqlClient = {
+  from: (table: string) => new MockQueryBuilder(table)
+};
 
 class MockQueryBuilder {
   private tableName: string;
@@ -316,14 +319,15 @@ class MockQueryBuilder {
   private orderBy: any = null;
   private limitCount: number | null = null;
   private isSingle = false;
+  private method: 'select' | 'insert' | 'update' | 'delete' | 'upsert' = 'select';
+  private payload: any = null;
 
   constructor(tableName: string) {
     this.tableName = tableName;
-    // Binding then to make it thenable
-    this.then = this.then.bind(this);
   }
 
   select(cols: string = '*') {
+    this.method = 'select';
     return this;
   }
 
@@ -372,48 +376,35 @@ class MockQueryBuilder {
     return this;
   }
 
-  async insert(payload: any) {
-    const res = await executeProxyQuery({
-      table: this.tableName,
-      method: 'insert',
-      payload
-    });
-    return res;
+  insert(payload: any) {
+    this.method = 'insert';
+    this.payload = payload;
+    return this;
   }
 
-  async update(payload: any) {
-    const res = await executeProxyQuery({
-      table: this.tableName,
-      method: 'update',
-      payload,
-      filters: this.filters
-    });
-    return res;
+  update(payload: any) {
+    this.method = 'update';
+    this.payload = payload;
+    return this;
   }
 
-  async upsert(payload: any) {
-    const res = await executeProxyQuery({
-      table: this.tableName,
-      method: 'upsert',
-      payload
-    });
-    return res;
+  upsert(payload: any) {
+    this.method = 'upsert';
+    this.payload = payload;
+    return this;
   }
 
-  async delete() {
-    const res = await executeProxyQuery({
-      table: this.tableName,
-      method: 'delete',
-      filters: this.filters
-    });
-    return res;
+  delete() {
+    this.method = 'delete';
+    return this;
   }
 
   async then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
     try {
       const res = await executeProxyQuery({
         table: this.tableName,
-        method: 'select',
+        method: this.method,
+        payload: this.payload,
         filters: this.filters,
         orderBy: this.orderBy,
         limitCount: this.limitCount,
