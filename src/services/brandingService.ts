@@ -55,11 +55,10 @@ export interface BrandingSettings {
 
 export const DEFAULT_BRANDING_SETTINGS: BrandingSettings = {
   id: 'global',
-  site_name: 'TAZU MART BD',
-  site_short_name: 'Tazu Mart',
-  site_tagline: 'PREMIUM LIFETIME COLLECTION',
-  
-  // Logos - Use clean fallback/beautiful placeholders
+  site_name: '',
+  site_short_name: '',
+  site_tagline: '',
+
   primary_logo: '',
   secondary_logo: '',
   favicon: '',
@@ -76,16 +75,14 @@ export const DEFAULT_BRANDING_SETTINGS: BrandingSettings = {
   share_logo: '',
   login_logo: '',
   signup_logo: '',
-  
-  // Branding Images
+
   default_profile_image: '',
   default_store_banner: '',
   default_category_banner: '',
   default_product_image: '',
   default_blog_banner: '',
   og_image: '',
-  
-  // Theme Branding
+
   primary_color: '#000000',
   secondary_color: '#666666',
   accent_color: '#10B981',

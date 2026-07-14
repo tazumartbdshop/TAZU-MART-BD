@@ -186,11 +186,11 @@ export function mapDbToProduct(row: any): any {
     seoPoints: parsedSeoPoints,
     variants: parsedVariants,
     shippingZones: parsedShippingZones,
-    is_flash_sale: camelRow.isFlashSale,
-    is_trending: camelRow.isTrending,
-    is_best_selling: camelRow.isBestSelling,
-    is_regular: camelRow.isRegular,
-    is_offer: camelRow.isOffer,
+    is_flash_sale: !!camelRow.isFlashSale,
+    is_trending: !!camelRow.isTrending,
+    is_best_selling: !!camelRow.isBestSelling,
+    is_regular: !!camelRow.isRegular,
+    is_offer: !!camelRow.isOffer,
     reward_coins: camelRow.rewardCoins,
     coin_enabled: camelRow.coinEnabled,
     isDemo: !!camelRow.isDemo,
@@ -239,6 +239,11 @@ export async function preloadHomepageDataAndAssets(): Promise<void> {
     const res = await fetch('/api/homepage-data');
     if (!res.ok) throw new Error("Failed to fetch homepage data");
     const data = await res.json();
+
+    // Store the global database error for UI messaging/diagnostics
+    if (typeof window !== 'undefined') {
+      (window as any).__SUPABASE_DB_ERROR = data.dbError;
+    }
 
     // 1. Map data to client models
     const banners = (data.banners || []).map(mapDbToBanner);

@@ -66,62 +66,7 @@ const getBannerStyleByType = (type: Offer['type']) => {
   }
 };
 
-const initialOffers: Offer[] = [
-  {
-    id: 'o-flash-sale',
-    name: 'Flash Sale Offers',
-    type: 'Flash Sale',
-    bannerStyle: 'bg-gradient-to-br from-[#E2125B] via-red-600 to-pink-500',
-    startDate: '2026-06-01',
-    endDate: '2026-06-15',
-    status: 'Active',
-    homepageVisibility: true,
-    offersPageVisibility: true,
-    priority: 0,
-    showAsFlashSale: true,
-    showAsTrending: false,
-    showAsBestSelling: false,
-    description: 'Grab yours before they are completely sold out!',
-    productIds: ['smart-watch-series-x', 'wireless-earbuds-pro', 'bluetooth-speaker-mini', 'gaming-mouse-rgb', 'fast-charging-powerbank', 'fast-charger-33w'],
-    manualProductIds: [],
-  },
-  {
-    id: 'o-trending',
-    name: 'Trending Items',
-    type: 'Trending Items',
-    bannerStyle: 'bg-gradient-to-br from-orange-500 via-rose-500 to-purple-600',
-    startDate: '2026-06-01',
-    endDate: '2026-06-15',
-    status: 'Active',
-    homepageVisibility: true,
-    offersPageVisibility: true,
-    priority: 1,
-    showAsFlashSale: false,
-    showAsTrending: true,
-    showAsBestSelling: false,
-    description: 'Tested and loved by thousands of verified purchasers.',
-    productIds: ['travel-backpack-pro', 'mens-casual-shoe', 'womens-handbag', 'smart-led-lamp', 'fitness-band', 'wireless-keyboard'],
-    manualProductIds: [],
-  },
-  {
-    id: 'o-eid-offers',
-    name: 'Eid Offers',
-    type: 'Eid Sale',
-    bannerStyle: 'bg-gradient-to-br from-emerald-800 via-green-700 to-teal-900',
-    startDate: '2026-06-01',
-    endDate: '2026-06-15',
-    status: 'Active',
-    homepageVisibility: true,
-    offersPageVisibility: true,
-    priority: 2,
-    showAsFlashSale: false,
-    showAsTrending: false,
-    showAsBestSelling: false,
-    description: 'Exquisite collections for the upcoming festival.',
-    productIds: ['panjabi-collection', 'premium-shirt', 'ladies-3-piece', 'panjabi-combo-set', 'arabic-oud-perfume', 'gift-box-package'],
-    manualProductIds: [],
-  },
-];
+const initialOffers: Offer[] = [];
 
 export const useOfferStore = create<OfferState>((set, get) => ({
   offers: initialOffers,

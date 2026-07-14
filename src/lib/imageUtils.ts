@@ -64,54 +64,29 @@ export const uploadImage = async (
   originalName?: string,
   bucketName: string = 'media'
 ): Promise<string> => {
-  const extension = originalName?.split('.').pop() || 'jpg';
-  const cleanName = originalName ? originalName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50) : `img-${Date.now()}`;
-  const fileName = `${Date.now()}-${cleanName}.${extension}`;
-  // If bucket is 'categories', let's place the image in the root directory or categories/ as requested
-  const path = folder ? `${folder}/${fileName}` : fileName;
-  
-  console.log(`Starting upload to Supabase: Bucket: ${bucketName}, Path: ${path}`);
-  const supabase = getSupabase();
-  
-  if (!supabase) {
-    console.warn("Supabase not configured, falling back to local base64");
-    return fallbackToBase64(file);
-  }
-  
   try {
-    const uploadPromise = supabase.storage
-      .from(bucketName)
-      .upload(path, file, { cacheControl: '3600', upsert: true });
+    console.log(`Starting upload to local server...`);
+    const formData = new FormData();
+    formData.append('file', file, originalName || 'file.jpg');
 
-    const { data, error } = await withTimeout(
-      uploadPromise,
-      30000,
-      "Supabase Storage upload timed out"
-    );
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
 
-    if (error) {
-       // Attempt to create bucket if it doesn't exist, though usually you create this via dashboard
-       if (error.message.includes('bucket not found')) {
-           console.warn(`Bucket '${bucketName}' not found. Attempting to fall back...`);
-           throw error;
-       }
-       throw error;
+    if (!response.ok) {
+      throw new Error(`Upload API returned error status ${response.status}`);
     }
-    
-    console.log(`Upload complete:`, data);
-    
-    const { data: publicData } = supabase.storage
-      .from(bucketName)
-      .getPublicUrl(path);
-      
-    if (!publicData || !publicData.publicUrl) {
-        throw new Error("Could not retrieve public URL");
+
+    const data = await response.json();
+    if (!data || !data.url) {
+      throw new Error("Upload API did not return a valid URL");
     }
-    
-    console.log(`Download URL: ${publicData.publicUrl}`);
-    return publicData.publicUrl;
+
+    console.log(`Upload complete! Local path: ${data.url}`);
+    return data.url;
   } catch (err: any) {
-    console.warn(`Supabase Storage failed, falling back to compressed local Base64 storage: ${err.message || err}`, err);
+    console.warn(`Local server upload failed, falling back to compressed base64: ${err.message || err}`, err);
     return fallbackToBase64(file);
   }
 };

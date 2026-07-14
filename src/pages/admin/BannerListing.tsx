@@ -1,14 +1,20 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Edit, Trash2, Image as ImageIcon, Plus, Layers, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
 import { useProductStore } from '../../store/useProductStore';
+import DeleteBannerConfirmationDialog from '../../components/common/DeleteBannerConfirmationDialog';
 
 export default function BannerListing() {
   const { banners, sliderConfig } = useBannerStore();
   const { products } = useProductStore();
   const navigate = useNavigate();
+
+  // Delete modal states
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [bannerIdToDelete, setBannerIdToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Subscribe to real-time banner updates
   useEffect(() => {
@@ -20,16 +26,30 @@ export default function BannerListing() {
     navigate(`/admin/banner/create?editId=${banner.id}`);
   };
 
-  const handleDeleteBanner = async (bannerId: string) => {
-    if (confirm('Are you sure you want to delete this banner?')) {
-      try {
-        await useBannerStore.getState().deleteBannerPermanently(bannerId);
-        toast.success("Banner deleted successfully");
-      } catch (err: any) {
-        console.error(err);
-        toast.error(`❌ Failed to delete banner: ${err?.message || 'Unknown database error'}`);
-      }
+  const handleDeleteClick = (bannerId: string) => {
+    setBannerIdToDelete(bannerId);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!bannerIdToDelete) return;
+    setIsDeleting(true);
+    try {
+      await useBannerStore.getState().deleteBannerPermanently(bannerIdToDelete);
+      toast.success("Banner সফলভাবে ডাটাবেজ থেকে মুছে ফেলা হয়েছে।");
+      setIsDeleteModalOpen(false);
+      setBannerIdToDelete(null);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`❌ Failed to delete banner: ${err?.message || 'Unknown database error'}`);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteModalOpen(false);
+    setBannerIdToDelete(null);
   };
 
   // Drag-and-drop sequencing
@@ -99,7 +119,7 @@ export default function BannerListing() {
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center w-full min-w-0">
                   
                   {/* Left Side: Thumbnail Preview */}
-                  <div className="w-full sm:w-48 aspect-[21/9] bg-zinc-50 border border-zinc-200 shrink-0 overflow-hidden relative flex items-center justify-center">
+                  <div className="w-full sm:w-48 aspect-[1080/500] sm:aspect-[1200/500] md:aspect-[1920/650] bg-zinc-50 border border-zinc-200 shrink-0 overflow-hidden relative flex items-center justify-center">
                     {banner.image ? (
                       <img 
                         src={banner.image} 
@@ -170,7 +190,7 @@ export default function BannerListing() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDeleteBanner(banner.id)}
+                    onClick={() => handleDeleteClick(banner.id)}
                     className="px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-red-600 text-white hover:bg-red-700 transition-colors rounded-none select-none cursor-pointer"
                   >
                     Delete
@@ -189,6 +209,13 @@ export default function BannerListing() {
           </div>
         )}
       </div>
+
+      <DeleteBannerConfirmationDialog
+        isOpen={isDeleteModalOpen}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 }

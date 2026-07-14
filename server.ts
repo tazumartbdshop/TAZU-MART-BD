@@ -3,7 +3,96 @@ import express from "express";
 import path from "path";
 import fs from "fs/promises";
 import { createServer as createViteServer } from "vite";
-import { createClient } from '@supabase/supabase-js';
+import { executeProxyQuery } from "./src/lib/mysql_db.ts";
+import multer from "multer";
+import fsPromises from "fs/promises";
+
+// Configure storage for local uploads
+const storage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const dir = path.join(process.cwd(), "public", "uploads");
+    await fsPromises.mkdir(dir, { recursive: true }).catch(() => {});
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname) || ".jpg";
+    cb(null, file.fieldname + "-" + uniqueSuffix + ext);
+  },
+});
+
+const upload = multer({ storage });
+class MockSupabaseClient {
+  auth = {
+    admin: {
+      listUsers: async () => {
+        const { data, error } = await executeProxyQuery({ table: 'users', method: 'select' });
+        return { data: { users: data || [] }, error };
+      },
+      createUser: async (payload) => {
+        const { data, error } = await executeProxyQuery({ table: 'users', method: 'insert', payload });
+        return { data: { user: data }, error };
+      },
+      updateUserById: async (id, payload) => {
+        const { data, error } = await executeProxyQuery({ table: 'users', method: 'update', payload, filters: [{ type: 'eq', col: 'id', val: id }] });
+        return { data: { user: data }, error };
+      },
+      deleteUser: async (id) => {
+         const { data, error } = await executeProxyQuery({ table: 'users', method: 'delete', filters: [{ type: 'eq', col: 'id', val: id }] });
+         return { data, error };
+      },
+      getUserById: async (id) => {
+        const { data, error } = await executeProxyQuery({ table: 'users', method: 'select', filters: [{ type: 'eq', col: 'id', val: id }] });
+        return { data: { user: data?.[0] }, error };
+      },
+      generateLink: async (params) => {
+        return { data: { properties: { action_link: 'http://localhost:3000/reset-password' } }, error: null };
+      }
+    }
+  };
+
+  from(tableName) {
+    return {
+      select: (cols) => this.buildQuery(tableName, 'select', null),
+      insert: (payload) => this.buildQuery(tableName, 'insert', payload),
+      update: (payload) => this.buildQuery(tableName, 'update', payload),
+      upsert: (payload) => this.buildQuery(tableName, 'upsert', payload),
+      delete: () => this.buildQuery(tableName, 'delete', null)
+    };
+  }
+
+  buildQuery(table, method, payload) {
+    const q: any = { table, method, payload, filters: [], limitCount: null, isSingle: false };
+    const chain = {
+      eq: (col, val) => { q.filters.push({ type: 'eq', col, val }); return chain; },
+      neq: (col, val) => { q.filters.push({ type: 'neq', col, val }); return chain; },
+      like: (col, val) => { q.filters.push({ type: 'like', col, val }); return chain; },
+      ilike: (col, val) => { q.filters.push({ type: 'ilike', col, val }); return chain; },
+      in: (col, val) => { q.filters.push({ type: 'in', col, val }); return chain; },
+      order: (col, opts) => { q.orderBy = { col, ascending: opts?.ascending !== false }; return chain; },
+      limit: (num) => { q.limitCount = num; return chain; },
+      single: () => { q.isSingle = true; return chain; },
+      maybeSingle: () => { q.isMaybeSingle = true; return chain; },
+      then: async (resolve, reject) => {
+        try {
+          const res = await executeProxyQuery(q);
+          const result = { data: res.data, error: res.error, count: res.count };
+          if (resolve) resolve(result);
+          return result;
+        } catch (e) {
+          if (reject) reject(e);
+          return { data: null, error: e, count: 0 };
+        }
+      }
+    };
+    return chain;
+  }
+}
+
+function createClient(...args: any[]) {
+  return new MockSupabaseClient();
+}
+
 import twilio from 'twilio';
 import { getApps, initializeApp, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -82,7 +171,8 @@ async function startServer() {
     next();
   });
 
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Initialize Supabase in backend
   const SUPABASE_CONFIG_FILE = path.join(process.cwd(), 'supabase_config.json');
@@ -125,19 +215,14 @@ async function startServer() {
       }
     }
 
-    if (supabaseUrl && supabaseKey) {
-       supabaseAdmin = createClient(supabaseUrl, supabaseKey);
-       console.log("Supabase Backend (Anon) initialized successfully");
-    }
-
-    if (supabaseUrl && supabaseServiceKey) {
-       supabaseServiceRole = createClient(supabaseUrl, supabaseServiceKey, {
-         auth: {
-           autoRefreshToken: false,
-           persistSession: false
-         }
-       });
-       console.log("Supabase Backend (Service Role) initialized successfully");
+    supabaseAdmin = createClient(supabaseUrl, supabaseKey);
+    if (supabaseServiceKey) {
+      supabaseServiceRole = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
     }
 
     if (!supabaseAdmin && !supabaseServiceRole) {
@@ -224,6 +309,33 @@ async function startServer() {
     } catch (error: any) {
       console.error("Failed to save Supabase config:", error);
       res.status(500).json({ error: "Failed to save Supabase configuration on server" });
+    }
+  });
+
+  app.post("/api/mysql-proxy", async (req, res) => {
+    try {
+      const result = await executeProxyQuery(req.body);
+      res.json(result);
+    } catch (err: any) {
+      console.error("MySQL Proxy endpoint error:", err);
+      res.status(500).json({ error: err.message || "MySQL proxy execution failed" });
+    }
+  });
+
+  // Serve local uploaded files statically at /uploads
+  const uploadsPath = path.join(process.cwd(), 'public', 'uploads');
+  app.use('/uploads', express.static(uploadsPath));
+
+  app.post("/api/upload", upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      const fileUrl = `/uploads/${req.file.filename}`;
+      res.json({ url: fileUrl });
+    } catch (err: any) {
+      console.error("Local file upload error:", err);
+      res.status(500).json({ error: err.message || "Failed to upload file" });
     }
   });
 
@@ -407,54 +519,54 @@ async function startServer() {
   // Combined endpoint to preload all homepage data in a single request
   app.get("/api/homepage-data", async (req, res) => {
     try {
-      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=120, stale-while-revalidate=600');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       
-      let adminClient = supabaseAdmin;
-      if (!adminClient) {
-        let fileUrl = "";
-        let fileKey = "";
-        try {
-          const data = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
-          const parsed = JSON.parse(data);
-          fileUrl = parsed.supabaseUrl || "";
-          fileKey = parsed.supabaseKey || "";
-        } catch (e) {}
-
-        let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
-        let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
-
-        if (!supabaseUrl || !supabaseKey) {
-          const firestoreConfig = await getSupabaseCredentialsFromFirestore();
-          if (firestoreConfig) {
-            supabaseUrl = supabaseUrl || firestoreConfig.supabaseUrl || "";
-            supabaseKey = supabaseKey || firestoreConfig.supabaseKey || "";
-          }
-        }
-
-        if (supabaseUrl && supabaseKey) {
-          adminClient = createClient(supabaseUrl, supabaseKey);
-          supabaseAdmin = adminClient;
-        }
-      }
-
-      if (!adminClient) {
-        return res.status(500).json({ error: "Supabase not initialized on backend" });
-      }
-
       const [bannersRes, categoriesRes, productsRes, settingsRes, reviewsRes] = await Promise.all([
-        adminClient.from('banners').select('*').order('order', { ascending: true }),
-        adminClient.from('categories').select('*'),
-        adminClient.from('products').select('*'),
-        adminClient.from('settings').select('*').eq('id', 'global').limit(1),
-        adminClient.from('reviews').select('*').eq('status', 'approved').order('created_at', { ascending: false })
+        executeProxyQuery({
+          table: 'banners',
+          method: 'select',
+          orderBy: { col: 'order', ascending: true }
+        }),
+        executeProxyQuery({
+          table: 'categories',
+          method: 'select'
+        }),
+        executeProxyQuery({
+          table: 'products',
+          method: 'select'
+        }),
+        executeProxyQuery({
+          table: 'settings',
+          method: 'select',
+          filters: [{ type: 'eq', col: 'id', val: 'global' }],
+          limitCount: 1
+        }),
+        executeProxyQuery({
+          table: 'reviews',
+          method: 'select',
+          filters: [{ type: 'eq', col: 'status', val: 'approved' }],
+          orderBy: { col: 'created_at', ascending: false }
+        })
       ]);
+
+      const firstError = bannersRes.error || categoriesRes.error || productsRes.error || settingsRes.error || reviewsRes.error;
+
+      if (firstError) {
+        console.error("[MySQL API Connection Error]", firstError);
+      }
 
       res.json({
         banners: bannersRes.data || [],
         categories: categoriesRes.data || [],
         products: productsRes.data || [],
         settings: settingsRes.data || [],
-        reviews: reviewsRes.data || []
+        reviews: reviewsRes.data || [],
+        dbError: firstError ? {
+          message: typeof firstError === 'string' ? firstError : firstError.message,
+          code: firstError.code || 'MYSQL_ERROR',
+          status: 500,
+          isQuotaRestricted: false
+        } : null
       });
     } catch (err: any) {
       console.error("Homepage data combined fetch error:", err);
@@ -470,57 +582,29 @@ async function startServer() {
         return res.status(400).json({ error: "productId parameter is required" });
       }
 
-      let client = supabaseServiceRole || supabaseAdmin;
-      if (!client) {
-        let fileUrl = "";
-        let fileKey = "";
-        try {
-          const data = await fs.readFile(SUPABASE_CONFIG_FILE, 'utf-8');
-          const parsed = JSON.parse(data);
-          fileUrl = parsed.supabaseUrl || "";
-          fileKey = parsed.supabaseKey || "";
-        } catch (e) {}
-
-        let supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || fileUrl || "";
-        let supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || fileKey || "";
-
-        if (!supabaseUrl || !supabaseKey) {
-          const firestoreConfig = await getSupabaseCredentialsFromFirestore();
-          if (firestoreConfig) {
-            supabaseUrl = supabaseUrl || firestoreConfig.supabaseUrl || "";
-            supabaseKey = supabaseKey || firestoreConfig.supabaseKey || "";
-          }
-        }
-
-        if (supabaseUrl && supabaseKey) {
-          client = createClient(supabaseUrl, supabaseKey);
-        }
-      }
-
-      if (!client) {
-        return res.status(500).json({ error: "Supabase not initialized on backend" });
-      }
-
-      const { data, error } = await client
-        .from('reviews')
-        .select('rating, verified')
-        .eq('product_id', productId)
-        .eq('status', 'approved');
+      const { data, error } = await executeProxyQuery({
+        table: 'reviews',
+        method: 'select',
+        filters: [
+          { type: 'eq', col: 'product_id', val: productId },
+          { type: 'eq', col: 'status', val: 'approved' }
+        ]
+      });
 
       if (error) {
-        console.error("Error fetching reviews for summary:", error);
+        console.error("Error fetching reviews for summary from MySQL:", error);
         return res.status(500).json({ error: "Failed to fetch reviews" });
       }
 
       const total_reviews = data ? data.length : 0;
       const average_rating = total_reviews > 0
-        ? Number((data.reduce((sum, r) => sum + r.rating, 0) / total_reviews).toFixed(1))
+        ? Number((data.reduce((sum: number, r: any) => sum + r.rating, 0) / total_reviews).toFixed(1))
         : 0;
-      const total_verified_reviews = data ? data.filter(r => r.verified === true).length : 0;
+      const total_verified_reviews = data ? data.filter((r: any) => r.verified === true || r.verified === 1).length : 0;
 
       const rating_breakdown = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
       if (data) {
-        data.forEach(r => {
+        data.forEach((r: any) => {
           const key = String(r.rating) as "1" | "2" | "3" | "4" | "5";
           if (rating_breakdown[key] !== undefined) {
             rating_breakdown[key]++;
@@ -546,31 +630,28 @@ async function startServer() {
 
   app.get("/api/footer-settings", async (req, res) => {
     try {
-      const client = supabaseServiceRole || supabaseAdmin;
       let footerData: any = null;
-
-      if (client) {
-        // Try getting from dedicated table
-        const { data, error } = await client
-          .from('footer_settings')
-          .select('*')
-          .eq('id', 'global')
-          .limit(1);
+      const { data, error } = await executeProxyQuery({
+        table: 'footer_settings',
+        method: 'select',
+        filters: [{ type: 'eq', col: 'id', val: 'global' }],
+        limitCount: 1
+      });
+      
+      if (!error && data && data.length > 0) {
+        footerData = data[0];
+      } else {
+        // Try getting from settings table with id = 'footer_settings'
+        const { data: settingsData, error: settingsError } = await executeProxyQuery({
+          table: 'settings',
+          method: 'select',
+          filters: [{ type: 'eq', col: 'id', val: 'footer_settings' }],
+          limitCount: 1
+        });
         
-        if (!error && data && data.length > 0) {
-          footerData = data[0];
-        } else {
-          // Try getting from settings table with id = 'footer_settings'
-          const { data: settingsData, error: settingsError } = await client
-            .from('settings')
-            .select('value')
-            .eq('id', 'footer_settings')
-            .limit(1);
-          
-          if (!settingsError && settingsData && settingsData.length > 0) {
-            const val = settingsData[0].value;
-            footerData = typeof val === 'string' ? JSON.parse(val) : val;
-          }
+        if (!settingsError && settingsData && settingsData.length > 0) {
+          const val = settingsData[0].value;
+          footerData = typeof val === 'string' ? JSON.parse(val) : val;
         }
       }
 
@@ -807,16 +888,11 @@ async function startServer() {
         });
       }
       
-      if (!supabaseAdmin) {
-        return res.json({ 
-          isValid: false, 
-          state: 'inactive',
-          error: "Database offline",
-          message: "❌ এই Promo Code বর্তমানে সক্রিয় নয়।"
-        });
-      }
-      
-      const { data: promos, error: promoError } = await supabaseAdmin.from('promo_codes').select('*').ilike('code', code.trim());
+      const { data: promos, error: promoError } = await executeProxyQuery({
+        table: 'promo_codes',
+        method: 'select',
+        filters: [{ type: 'ilike', col: 'code', val: code.trim() }]
+      });
       
       let matchingPromo: any = null;
       if (promos && promos.length > 0) {

@@ -27,24 +27,7 @@ interface BrandShowcaseState {
 }
 
 const defaultState = {
-  slides: [
-    {
-      id: 'slide-1',
-      image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=1200',
-      title: 'EXQUISITE ARTISAN SELECTIONS',
-      tagline: 'Step into a world of curated digital craftsmanship',
-      redirectLink: '/categories',
-      isActive: true,
-    },
-    {
-      id: 'slide-2',
-      image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=1200',
-      title: 'MEMBERS ONLY VIP ACCORDS',
-      tagline: 'Exclusive brand alignments with worldwide shipping',
-      redirectLink: '/offers',
-      isActive: true,
-    },
-  ],
+  slides: [],
   autoScrollSpeed: 4000,
   companyName: 'TAZU MART',
   companySubtext: 'Premium Ecommerce Platform',

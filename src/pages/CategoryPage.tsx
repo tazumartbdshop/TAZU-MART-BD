@@ -29,7 +29,7 @@ export default function CategoryPage() {
         displayOrder: 1,
         status: 'Active',
         showOnHomepage: true,
-        createdAt: new Date().toISOString()
+        createdAt: Date.now()
       };
     } else {
       category = {
@@ -41,7 +41,7 @@ export default function CategoryPage() {
         displayOrder: 1,
         status: 'Active',
         showOnHomepage: true,
-        createdAt: new Date().toISOString()
+        createdAt: Date.now()
       };
     }
   }

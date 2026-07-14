@@ -154,6 +154,10 @@ export default function Home() {
   const finalProducts = activeProducts;
 
   // 1. Flash Sale
+  const isFlashSaleExpired = settings.flashSaleEndTime 
+    ? new Date().getTime() > new Date(settings.flashSaleEndTime).getTime() 
+    : false;
+
   const flashSaleProducts = finalProducts.filter(p => p.is_flash_sale);
 
   // 2. Trending Item
@@ -205,9 +209,9 @@ export default function Home() {
   return (
     <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-clip font-sans">
       
-      {/* 1. MAIN SLIDER BANNER (16:9, Dynamic Overlays and Optional Button Actions) */}
+      {/* 1. MAIN SLIDER BANNER (Responsive Balance Ratio: Desktop 1920:650 / Tablet 1200:500 / Mobile 1080:500) */}
       {sliderBanners.length > 0 && (
-        <section className="relative w-full aspect-[16/9] bg-neutral-100 overflow-hidden select-none">
+        <section className="relative w-full aspect-[1080/500] sm:aspect-[1200/500] md:aspect-[1920/650] bg-neutral-900 overflow-hidden select-none">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSlide}
@@ -228,15 +232,15 @@ export default function Home() {
               />
 
               {/* Text and CTA Button Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/30 flex flex-col justify-end pb-8 sm:pb-12 md:pb-16 px-3 md:px-12 z-10 select-text">
-                <div className="max-w-2xl space-y-1.5 sm:space-y-3">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/35 flex flex-col justify-end pb-3 sm:pb-6 md:pb-8 lg:pb-10 px-3 sm:px-6 md:px-12 z-10 select-text">
+                <div className="max-w-2xl space-y-1 sm:space-y-2">
                   {/* 1. Title (name) */}
                   {sliderBanners[activeSlide].name && !isNumericOrId(sliderBanners[activeSlide].name) && (
                     <motion.h2 
-                      initial={{ opacity: 0, y: 15 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.15, duration: 0.4 }}
-                      className="text-lg sm:text-2xl md:text-4xl lg:text-5xl font-black text-white uppercase tracking-wider drop-shadow-md font-sans"
+                      className="text-xs sm:text-base md:text-2xl lg:text-3xl xl:text-4xl font-black text-white uppercase tracking-wider drop-shadow-md font-sans"
                     >
                       {sliderBanners[activeSlide].name}
                     </motion.h2>
@@ -245,10 +249,10 @@ export default function Home() {
                   {/* 2. Subtitle (offerText) */}
                   {sliderBanners[activeSlide].offerText && !isNumericOrId(sliderBanners[activeSlide].offerText) && (
                     <motion.h3
-                      initial={{ opacity: 0, y: 12 }}
+                      initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2, duration: 0.4 }}
-                      className="text-amber-400 text-[10px] sm:text-sm md:text-base font-black uppercase tracking-[0.2em] drop-shadow-sm"
+                      className="text-amber-400 text-[8px] sm:text-xs md:text-sm font-black uppercase tracking-[0.2em] drop-shadow-sm"
                     >
                       {sliderBanners[activeSlide].offerText}
                     </motion.h3>
@@ -257,10 +261,10 @@ export default function Home() {
                   {/* 3. Description */}
                   {sliderBanners[activeSlide].description && !isNumericOrId(sliderBanners[activeSlide].description) && (
                     <motion.p 
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.25, duration: 0.4 }}
-                      className="text-white/90 text-[10px] sm:text-xs md:text-sm font-semibold uppercase tracking-widest max-w-xl drop-shadow-sm"
+                      className="text-white/90 text-[8px] sm:text-xs md:text-sm font-semibold uppercase tracking-widest max-w-xl drop-shadow-sm line-clamp-1 sm:line-clamp-2"
                     >
                       {sliderBanners[activeSlide].description}
                     </motion.p>
@@ -269,17 +273,17 @@ export default function Home() {
                   {/* 4. CTA Button */}
                   {sliderBanners[activeSlide].buttonText && sliderBanners[activeSlide].buttonLink && (
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.35, duration: 0.4 }}
-                      className="pt-2 sm:pt-4"
+                      className="pt-1 sm:pt-2"
                     >
                       <Link 
                         to={sliderBanners[activeSlide].buttonLink}
-                        className="inline-flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-3 bg-black hover:bg-neutral-900 border border-white/20 hover:border-white/40 text-white text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-150 active:scale-95 shadow-lg"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2.5 bg-black hover:bg-neutral-900 border border-white/20 hover:border-white/40 text-white text-[7px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-150 active:scale-95 shadow-lg"
                       >
                         {sliderBanners[activeSlide].buttonText}
-                        <span className="text-[10px] sm:text-xs font-light">&rarr;</span>
+                        <span className="text-[8px] sm:text-xs font-light">&rarr;</span>
                       </Link>
                     </motion.div>
                   )}
@@ -293,24 +297,24 @@ export default function Home() {
             <>
               <button 
                 onClick={() => setActiveSlide((prev) => (prev - 1 + sliderBanners.length) % sliderBanners.length)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
+                className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-10 sm:h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
               </button>
               <button 
                 onClick={() => setActiveSlide((prev) => (prev + 1) % sliderBanners.length)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
+                className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-6 h-6 sm:w-10 sm:h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white flex items-center justify-center hover:bg-black/70 transition-all z-20 active:scale-90"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
               </button>
               
               {/* Custom Dot Bullets */}
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-25">
+              <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1 sm:gap-1.5 z-25">
                 {sliderBanners.map((_, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveSlide(idx)}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${idx === activeSlide ? 'w-4 bg-white' : 'w-1.5 bg-white/50'}`}
+                    className={`h-1 sm:h-1.5 rounded-full transition-all duration-300 ${idx === activeSlide ? 'w-3 sm:w-5 bg-white' : 'w-1 sm:w-1.5 bg-white/50'}`}
                   />
                 ))}
               </div>
@@ -353,29 +357,28 @@ export default function Home() {
 
       {/* 4. DYNAMIC SPECIAL SECTIONS */}
       {/* 1) Flash Sale Section */}
-      {settings.flashSaleEnabled && flashSaleProducts.length > 0 && (
+      {settings.flashSaleEnabled && !isFlashSaleExpired && flashSaleProducts.length > 0 && (
         <section className="py-4 md:py-6 container mx-auto px-3 border-b border-neutral-100 last:border-b-0">
-          {/* Header Row: Title on the left, VIEW ALL on the right */}
-          <div className="flex items-center justify-between pb-3 border-b border-neutral-100/60 mb-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6 pb-3 border-b border-neutral-100/60">
+            <div className="flex items-center gap-2 shrink-0">
               <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-pulse" />
               <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">FLASH SALE</h2>
             </div>
             
-            <Link 
-              to="/search?q=flash_sale" 
-              className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
-            >
-              View All <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-          
-          {/* Re-designed Centered Countdown Timer underneath the header */}
-          <div className="flex justify-center w-full mb-[12px]">
-            <FlashSaleTimer />
-          </div>
+            {/* Live Countdown Timer in the middle */}
+            <div className="flex justify-start sm:justify-center flex-1 sm:px-4">
+              <FlashSaleTimer />
+            </div>
 
-          {/* Product Grid */}
+            <div className="flex items-center justify-end shrink-0">
+              <Link 
+                to="/search?q=flash_sale" 
+                className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
+              >
+                View All <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
           {renderProductGrid(flashSaleProducts.slice(0, 6))}
         </section>
       )}

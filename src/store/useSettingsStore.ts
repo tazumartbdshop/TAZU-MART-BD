@@ -227,14 +227,14 @@ export interface AppSettings {
 }
 
 const defaultSettings: AppSettings = {
-  storeName: 'TAZU MART BD',
+  storeName: '',
   storeEmail: '',
   contactNumber: '',
   timezone: '',
   websiteUrl: '',
   storeSlug: '',
   businessType: '',
-  storeTagline: 'PREMIUM LIFETIME COLLECTION',
+  storeTagline: '',
   storeDescription: '',
 
   primaryColor: '#000000',

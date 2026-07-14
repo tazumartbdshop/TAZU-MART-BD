@@ -20,7 +20,7 @@ export interface Category {
   displayOrder: number;
   status: 'Active' | 'Inactive';
   showOnHomepage: boolean;
-  createdAt: string;
+  createdAt: number;
   metaTitle?: string;
   metaDescription?: string;
   keywords?: string;
@@ -30,15 +30,11 @@ export interface Category {
   image_url?: string;
 }
 
-export const CATEGORY_FALLBACKS = [
-  { name: "watches", image: "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop" },
-  { name: "wallets", image: "https://images.unsplash.com/photo-1588444839799-eaa4344ecc1e?q=80&w=200&h=200&auto=format&fit=crop" },
-  { name: "gift", image: "https://images.unsplash.com/photo-1549465220-1a8b9238cd48?q=80&w=200&h=200&auto=format&fit=crop" },
-  { name: "premium", image: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?q=80&w=200&h=200&auto=format&fit=crop" }
-];
+export const CATEGORY_FALLBACKS = [];
 
 export function resolveCategoryThumbnail(cat: Partial<Category> | null | undefined): string {
-  if (!cat) return "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop";
+  const placeholder = "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop";
+  if (!cat) return placeholder;
   if (cat.imageUrl && cat.imageUrl.trim() !== '') {
     return cat.imageUrl;
   }
@@ -54,13 +50,7 @@ export function resolveCategoryThumbnail(cat: Partial<Category> | null | undefin
   if (cat.bannerImages && Array.isArray(cat.bannerImages) && cat.bannerImages.length > 0 && cat.bannerImages[0]) {
     return cat.bannerImages[0];
   }
-  const term = String(cat.name || cat.slug || '').toLowerCase();
-  for (const fallback of CATEGORY_FALLBACKS) {
-    if (term.includes(fallback.name)) {
-      return fallback.image;
-    }
-  }
-  return "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?q=80&w=200&h=200&auto=format&fit=crop";
+  return placeholder;
 }
 
 interface CategoryState {
@@ -77,6 +67,44 @@ const getInitialCategories = (): Category[] => {
   return [];
 };
 
+// Strict list of actual database columns present in the MySQL `categories` table
+const VALID_CATEGORY_COLUMNS = new Set([
+  'id',
+  'name',
+  'slug',
+  'banner_name',
+  'banner_image',
+  'banner_images',
+  'icon_image',
+  'wide_banner_image',
+  'button_text',
+  'button_link',
+  'featured_products',
+  'description',
+  'display_order',
+  'status',
+  'show_on_homepage',
+  'created_at',
+  'meta_title',
+  'meta_description',
+  'keywords',
+  'is_demo',
+  'slider_settings'
+]);
+
+// Helper to strictly prune payload to only include actual database columns before query
+export const pruneInvalidCategoryColumns = (payload: any) => {
+  const pruned: any = {};
+  Object.keys(payload).forEach(key => {
+    if (VALID_CATEGORY_COLUMNS.has(key)) {
+      pruned[key] = payload[key];
+    } else {
+      console.warn(`[Prune Column] Filtered out invalid category column '${key}' from database write payload`);
+    }
+  });
+  return pruned;
+};
+
 // Cache of columns detected as non-existent to avoid redundant network attempts
 const knownInvalidColumns = new Set<string>();
 
@@ -84,7 +112,8 @@ async function executeWithSelfHealing(
   action: (payload: any) => Promise<{ data: any; error: any; status: number; statusText: string }>,
   initialPayload: any
 ): Promise<{ data: any; error: any; status: number; statusText: string }> {
-  let dbPayload = { ...initialPayload };
+  // Always pre-prune to prevent issues
+  let dbPayload = pruneInvalidCategoryColumns(initialPayload);
   
   // Prune any column already known to be invalid
   for (const col of knownInvalidColumns) {
@@ -107,7 +136,15 @@ async function executeWithSelfHealing(
       console.warn(`[Self-Healing Error Received] Code: ${errCode} | Status: ${result.status} | Msg: ${errMsg}`);
       
       // PGRST204: column not found. PGRST205: table/relation mismatch. 42703: undefined_column.
-      if (errCode === 'PGRST204' || errCode === 'PGRST205' || errCode === '42703' || result.status === 400) {
+      // Also match MySQL "Unknown column" or "field list" issues
+      if (
+        errCode === 'PGRST204' || 
+        errCode === 'PGRST205' || 
+        errCode === '42703' || 
+        result.status === 400 || 
+        errMsg.toLowerCase().includes('unknown column') || 
+        errMsg.toLowerCase().includes('field list')
+      ) {
         let badCol = '';
         
         // Match 1: "Could not find the 'banner_image' column"
@@ -118,6 +155,12 @@ async function executeWithSelfHealing(
         if (!badCol) {
           const match2 = errMsg.match(/column\s+['"“]?(?:[a-zA-Z0-9_]+\.)?([a-zA-Z0-9_]+)/i);
           if (match2) badCol = match2[1];
+        }
+
+        // Match MySQL: "Unknown column 'image_url' in 'field list'"
+        if (!badCol) {
+          const mysqlMatch = errMsg.match(/Unknown column ['"“]?([a-zA-Z0-9_]+)['"”]? in/i);
+          if (mysqlMatch) badCol = mysqlMatch[1];
         }
         
         // Fallback: find any word term mentioned in quotes that exists in the payload keys
@@ -183,7 +226,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     const newCategory: Category = {
       ...payload,
       id,
-      createdAt: new Date().toISOString(),
+      createdAt: Date.now(),
     };
     
     console.log(`%c[Supabase Category Insert] Attempting INSERT in 'categories' table`, "color: #3b82f6; font-weight: bold; font-size: 13px;");
@@ -215,6 +258,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         if (error) {
           // Rollback on error
           set({ categories: currentCats });
+          saveCachedCategories(currentCats);
           broadcastSync.publish('categories', currentCats);
           console.error("%c[Supabase DB Insert Fail Error Details]:", "color: #ef4444; font-weight: bold;", {
             message: error.message,
@@ -237,6 +281,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
+        saveCachedCategories(currentCats);
         broadcastSync.publish('categories', currentCats);
         console.error("%c[Supabase DB Insert Exception]:", "color: #f43f5e; font-weight: bold;", err);
         throw new Error(err?.message || err || "Database connection failure during insert");
@@ -244,6 +289,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     } else {
       // Rollback
       set({ categories: currentCats });
+      saveCachedCategories(currentCats);
       broadcastSync.publish('categories', currentCats);
       console.error("%c[Supabase Client Missing] Cannot write category: Supabase Client not initialized.", "color: #ef4444; font-weight: bold;");
       throw new Error("Database client is not initialized");
@@ -289,6 +335,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         if (error) {
           // Rollback on error
           set({ categories: currentCats });
+          saveCachedCategories(currentCats);
           broadcastSync.publish('categories', currentCats);
           console.error("%c[Supabase DB Update Fail Error Details]:", "color: #ef4444; font-weight: bold;", {
             message: error.message,
@@ -305,6 +352,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
+        saveCachedCategories(currentCats);
         broadcastSync.publish('categories', currentCats);
         console.error("%c[Supabase DB Update Exception]:", "color: #f43f5e; font-weight: bold;", err);
         throw new Error(err?.message || err || "Database connection failure during update");
@@ -312,6 +360,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     } else {
       // Rollback
       set({ categories: currentCats });
+      saveCachedCategories(currentCats);
       broadcastSync.publish('categories', currentCats);
       console.error("%c[Supabase Client Missing] Cannot update category: Supabase Client not initialized.", "color: #ef4444; font-weight: bold;");
       throw new Error("Database client is not initialized");
@@ -355,6 +404,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         if (error) {
           // Rollback on error
           set({ categories: currentCats });
+          saveCachedCategories(currentCats);
           broadcastSync.publish('categories', currentCats);
           console.error("Supabase category delete error:", error);
           throw new Error(error.message || "Failed to delete category from database");
@@ -362,6 +412,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
+        saveCachedCategories(currentCats);
         broadcastSync.publish('categories', currentCats);
         console.error("Supabase delete catch exception:", err);
         throw new Error(err?.message || err || "Database connection failure");
@@ -369,6 +420,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     } else {
       // Rollback
       set({ categories: currentCats });
+      saveCachedCategories(currentCats);
       broadcastSync.publish('categories', currentCats);
       throw new Error("Database client is not initialized");
     }
@@ -408,7 +460,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         displayOrder: Number(camelRow.displayOrder ?? 1),
         status: camelRow.status || 'Active',
         showOnHomepage: camelRow.showOnHomepage !== false,
-        createdAt: camelRow.createdAt || '',
+        createdAt: Number(camelRow.createdAt) || 0,
         metaTitle: camelRow.metaTitle || '',
         metaDescription: camelRow.metaDescription || '',
         keywords: camelRow.keywords || '',

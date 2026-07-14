@@ -13,12 +13,12 @@ export interface SupportBannerData {
 
 const DEFAULT_BANNER: SupportBannerData = {
   id: 'supportBanner',
-  banner_image: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&q=80&w=2000',
-  heading: 'How can we help you today?',
-  sub_heading: 'Our dedicated support team is here to assist you 24/7 with any queries or concerns.',
-  button_text: 'Track Order',
-  button_link: '/orders',
-  status: true
+  banner_image: '',
+  heading: '',
+  sub_heading: '',
+  button_text: '',
+  button_link: '',
+  status: false
 };
 
 export const supportBannerService = {

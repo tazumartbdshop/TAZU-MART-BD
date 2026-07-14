@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
 import { useProductStore } from '../../store/useProductStore';
 import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';
+import DeleteBannerConfirmationDialog from '../../components/common/DeleteBannerConfirmationDialog';
 
 enum OperationType {
   CREATE = 'create',
@@ -113,6 +114,11 @@ export default function AdminBanners() {
   const [dragActive, setDragActive] = useState(false);
   const [localPreviews, setLocalPreviews] = useState<LocalPreview[]>([]);
 
+  // Delete modal states
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [bannerIdToDelete, setBannerIdToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Database Schema Readiness Check State
   const [schemaStatus, setSchemaStatus] = useState<{
     checked: boolean;
@@ -206,9 +212,9 @@ export default function AdminBanners() {
           reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
-              const targetRatio = 21 / 9;
+              const targetRatio = 1920 / 650;
               const targetWidth = 1920;
-              const targetHeight = targetWidth / targetRatio;
+              const targetHeight = 650;
               
               const canvas = document.createElement('canvas');
               canvas.width = targetWidth;
@@ -396,16 +402,30 @@ export default function AdminBanners() {
     navigate(url);
   };
 
-  const handleDeleteBanner = async (bannerId: string) => {
-    if (confirm('Are you sure you want to delete this banner?')) {
-      try {
-        await useBannerStore.getState().deleteBannerPermanently(bannerId);
-        toast.success("Banner deleted successfully");
-      } catch (err: any) {
-        console.error(err);
-        toast.error(`❌ Failed to delete banner: ${err?.message || 'Unknown database error'}`);
-      }
+  const handleDeleteClick = (bannerId: string) => {
+    setBannerIdToDelete(bannerId);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!bannerIdToDelete) return;
+    setIsDeleting(true);
+    try {
+      await useBannerStore.getState().deleteBannerPermanently(bannerIdToDelete);
+      toast.success("Banner সফলভাবে ডাটাবেজ থেকে মুছে ফেলা হয়েছে।");
+      setIsDeleteModalOpen(false);
+      setBannerIdToDelete(null);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`❌ Failed to delete banner: ${err?.message || 'Unknown database error'}`);
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteModalOpen(false);
+    setBannerIdToDelete(null);
   };
 
   const handleSeqDragStart = (e: React.DragEvent, index: number) => {
@@ -490,7 +510,7 @@ export default function AdminBanners() {
               <>
                 <Upload className="w-6 h-6 text-neutral-400 mb-2" />
                 <span className="text-[10px] font-black uppercase text-black tracking-wider">Drag Multiple Images Here or Browse</span>
-                <span className="text-[8px] text-zinc-400 uppercase tracking-widest mt-1.5 font-bold font-mono">Hero Banner Ratio Recommended</span>
+                <span className="text-[8px] text-zinc-400 uppercase tracking-widest mt-1.5 font-bold font-mono">Recommended Size: Desktop 1920 × 650 px / Mobile 1080 × 500 px</span>
               </>
             )}
           </div>
@@ -506,7 +526,7 @@ export default function AdminBanners() {
                 {localPreviews.map((preview, index) => (
                   <div 
                     key={preview.id} 
-                    className="relative flex-none w-40 sm:w-48 aspect-[21/9] bg-zinc-100 border border-zinc-200 snap-start overflow-hidden group/thumb select-none"
+                    className="relative flex-none w-48 sm:w-64 aspect-[1080/500] sm:aspect-[1200/500] md:aspect-[1920/650] bg-zinc-100 border border-zinc-200 snap-start overflow-hidden group/thumb select-none"
                   >
                     <img 
                       src={preview.previewUrl} 
@@ -717,7 +737,7 @@ export default function AdminBanners() {
                 key={banner.id}
                 banner={banner}
                 index={index}
-                onDelete={() => handleDeleteBanner(banner.id)}
+                onDelete={() => handleDeleteClick(banner.id)}
                 onDragStart={(e) => handleSeqDragStart(e, index)}
                 onDrop={(e) => handleSeqDrop(e, index)}
                 onDragOver={handleSeqDragOver}
@@ -735,6 +755,13 @@ export default function AdminBanners() {
         onCancel={handleCancelLeave}
         cancelText="Cancel"
         confirmText="Yes, Leave"
+      />
+
+      <DeleteBannerConfirmationDialog
+        isOpen={isDeleteModalOpen}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        isDeleting={isDeleting}
       />
     </div>
   );
@@ -781,7 +808,7 @@ const BannerThumbnailItem: React.FC<BannerThumbnailItemProps> = ({
 
         {/* Thumbnail Image */}
         <div 
-          className="aspect-[21/9] w-full bg-neutral-950 overflow-hidden relative border-b border-zinc-150 flex items-center justify-center cursor-pointer pointer-events-none"
+          className="aspect-[1080/500] sm:aspect-[1200/500] md:aspect-[1920/650] w-full bg-neutral-950 overflow-hidden relative border-b border-zinc-150 flex items-center justify-center cursor-pointer pointer-events-none"
         >
           {banner.image ? (
             <img 

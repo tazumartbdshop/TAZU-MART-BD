@@ -5,6 +5,148 @@ import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 import { broadcastSync } from '../lib/broadcastSync';
 import { generateSlug } from '../lib/utils';
 
+// Strict list of actual database columns present in the MySQL `products` table
+export const VALID_PRODUCT_COLUMNS = new Set([
+  'id',
+  'name',
+  'sku',
+  'category',
+  'price',
+  'discount_price',
+  'stock',
+  'image',
+  'image_url',
+  'featured_image',
+  'banner_image',
+  'images',
+  'video_url',
+  'media_url',
+  'rating',
+  'reviews',
+  'is_new',
+  'brand',
+  'status',
+  'description',
+  'created_at',
+  'buying_price',
+  'warranty',
+  'unit_name',
+  'sold_count',
+  'seo_points',
+  'variants',
+  'shipping_zones',
+  'is_flash_sale',
+  'is_trending',
+  'is_best_selling',
+  'is_regular',
+  'is_offer',
+  'reward_coins',
+  'coin_enabled',
+  'is_demo',
+  'keywords',
+  'display_order',
+  'thumbnail',
+  'slug'
+]);
+
+export const pruneInvalidProductColumns = (payload: any) => {
+  const pruned: any = {};
+  Object.keys(payload).forEach(key => {
+    if (VALID_PRODUCT_COLUMNS.has(key)) {
+      pruned[key] = payload[key];
+    } else {
+      console.warn(`[Prune Column] Filtered out invalid product column '${key}' from database write payload`);
+    }
+  });
+  return pruned;
+};
+
+// Cache of columns detected as non-existent to avoid redundant network attempts
+const knownInvalidProductColumns = new Set<string>();
+
+async function executeWithSelfHealingProducts(
+  action: (payload: any) => Promise<{ data: any; error: any; status: number; statusText: string }>,
+  initialPayload: any
+): Promise<{ data: any; error: any; status: number; statusText: string }> {
+  // Always pre-prune to prevent issues
+  let dbPayload = pruneInvalidProductColumns(initialPayload);
+  
+  // Prune any column already known to be invalid
+  for (const col of knownInvalidProductColumns) {
+    delete dbPayload[col];
+  }
+
+  let attempts = 0;
+  const maxAttempts = 25;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    console.log(`[Self-Healing Products Client] Attempting DB write (Attempt ${attempts}/${maxAttempts}) with keys:`, Object.keys(dbPayload));
+    
+    const result = await action(dbPayload);
+    
+    if (result.error) {
+      const errMsg = String(result.error.message || '');
+      const errCode = String(result.error.code || '');
+      
+      console.warn(`[Self-Healing Error Received] Code: ${errCode} | Status: ${result.status} | Msg: ${errMsg}`);
+      
+      // PGRST204: column not found. PGRST205: table/relation mismatch. 42703: undefined_column.
+      // Also match MySQL "Unknown column" or "field list" issues
+      if (
+        errCode === 'PGRST204' || 
+        errCode === 'PGRST205' || 
+        errCode === '42703' || 
+        result.status === 400 || 
+        errMsg.toLowerCase().includes('unknown column') || 
+        errMsg.toLowerCase().includes('field list')
+      ) {
+        let badCol = '';
+        
+        // Match 1: "Could not find the 'xyz' column"
+        const match1 = errMsg.match(/['"“]([a-zA-Z0-9_]+)['"”]\s+column/i);
+        if (match1) badCol = match1[1];
+        
+        // Match 2: "column products.xyz does not exist"
+        if (!badCol) {
+          const match2 = errMsg.match(/column\s+['"“]?(?:[a-zA-Z0-9_]+\.)?([a-zA-Z0-9_]+)/i);
+          if (match2) badCol = match2[1];
+        }
+
+        // Match MySQL: "Unknown column 'image_url' in 'field list'"
+        if (!badCol) {
+          const mysqlMatch = errMsg.match(/Unknown column ['"“]?([a-zA-Z0-9_]+)['"”]? in/i);
+          if (mysqlMatch) badCol = mysqlMatch[1];
+        }
+        
+        // Fallback: find any word term mentioned in quotes that exists in the payload keys
+        if (!badCol) {
+          const matches = errMsg.match(/['"“]([a-zA-Z0-9_]+)['"”]/g);
+          if (matches) {
+            for (const item of matches) {
+              const cleaned = item.replace(/['"“’”]/g, '');
+              if (dbPayload[cleaned] !== undefined) {
+                badCol = cleaned;
+                break;
+              }
+            }
+          }
+        }
+
+        if (badCol) {
+          console.warn(`[Self-Healing Database Engine] Pruning non-existent column '${badCol}' and retrying write...`);
+          knownInvalidProductColumns.add(badCol);
+          delete dbPayload[badCol];
+          continue;
+        }
+      }
+      return result;
+    }
+    return result;
+  }
+  return { data: null, error: new Error("Too many self-healing retrieval attempts"), status: 400, statusText: "Bad Request" };
+}
+
 export interface Product {
   id: string;
   slug?: string;
@@ -315,11 +457,11 @@ const mapDbToProduct = (row: any): Product => {
     seoPoints: parsedSeoPoints,
     variants: parsedVariants,
     shippingZones: parsedShippingZones,
-    is_flash_sale: camelRow.isFlashSale,
-    is_trending: camelRow.isTrending,
-    is_best_selling: camelRow.isBestSelling,
-    is_regular: camelRow.isRegular,
-    is_offer: camelRow.isOffer,
+    is_flash_sale: !!camelRow.isFlashSale,
+    is_trending: !!camelRow.isTrending,
+    is_best_selling: !!camelRow.isBestSelling,
+    is_regular: !!camelRow.isRegular,
+    is_offer: !!camelRow.isOffer,
     reward_coins: camelRow.rewardCoins,
     coin_enabled: camelRow.coinEnabled,
     isDemo: !!camelRow.isDemo,
@@ -418,28 +560,45 @@ export const useProductStore = create<ProductState>((set, get) => ({
     broadcastSync.publish('products', nextProducts);
     
     if (supabase) {
-      const dbPayload = objectToSnake(newProduct);
-      delete dbPayload.qnas; // Prevent column mismatch in DB
-      const { error, status, statusText } = await supabase.from('products').insert([dbPayload]);
-      if (error) {
+      try {
+        const dbPayload = objectToSnake(newProduct);
+        delete dbPayload.qnas; // Prevent column mismatch in DB
+        
+        const selfHealResult = await executeWithSelfHealingProducts(
+          async (prunedDbPayload) => {
+            return await supabase.from('products').insert([prunedDbPayload]);
+          },
+          dbPayload
+        );
+        
+        const { error, status, statusText } = selfHealResult;
+        if (error) {
+          // Rollback on error
+          set({ products: currentProducts });
+          saveCachedProducts(currentProducts);
+          broadcastSync.publish('products', currentProducts);
+          console.error("%c[Supabase Product Sync] INSERT ERROR:", "color: #ef4444; font-weight: bold;", {
+            code: error.code,
+            message: error.message,
+            hint: (error as any).hint,
+            details: (error as any).details,
+            httpStatus: status,
+            httpStatusText: statusText
+          });
+          
+          if (error.code === 'PGRST205') {
+            throw new Error(`Database Table Not Found [Code: ${error.code}]: The 'products' table was not found. Please ensure you have run the provisioning SQL script and clicked 'Reload Schema' in Supabase Settings.`);
+          }
+          
+          throw new Error(error.message || "Failed to add product to database");
+        }
+      } catch (err: any) {
         // Rollback on error
         set({ products: currentProducts });
         saveCachedProducts(currentProducts);
         broadcastSync.publish('products', currentProducts);
-        console.error("%c[Supabase Product Sync] INSERT ERROR:", "color: #ef4444; font-weight: bold;", {
-          code: error.code,
-          message: error.message,
-          hint: (error as any).hint,
-          details: (error as any).details,
-          httpStatus: status,
-          httpStatusText: statusText
-        });
-        
-        if (error.code === 'PGRST205') {
-          throw new Error(`Database Table Not Found [Code: ${error.code}]: The 'products' table was not found. Please ensure you have run the provisioning SQL script and clicked 'Reload Schema' in Supabase Settings.`);
-        }
-        
-        throw new Error(error.message || "Failed to add product to database");
+        console.error("Product insert exception:", err);
+        throw new Error(err.message || "Failed to add product to database");
       }
     }
   },
@@ -486,16 +645,35 @@ export const useProductStore = create<ProductState>((set, get) => ({
     broadcastSync.publish('products', updatedProducts);
     
     if (supabase) {
-      const dbPayload = objectToSnake(finalPayload);
-      delete dbPayload.qnas; // Prevent column mismatch in DB
-      const { error } = await supabase.from('products').update(dbPayload).eq('id', id);
-      if (error) {
+      try {
+        const dbPayload = objectToSnake(finalPayload);
+        delete dbPayload.qnas; // Prevent column mismatch in DB
+        delete dbPayload.id; // Prevent updating id key
+        delete dbPayload.created_at; // Prevent changing created_at timestamp
+        
+        const selfHealResult = await executeWithSelfHealingProducts(
+          async (prunedDbPayload) => {
+            return await supabase.from('products').update(prunedDbPayload).eq('id', id);
+          },
+          dbPayload
+        );
+        
+        const { error } = selfHealResult;
+        if (error) {
+          // Rollback on error
+          set({ products: currentProducts });
+          saveCachedProducts(currentProducts);
+          broadcastSync.publish('products', currentProducts);
+          console.error("Supabase update error:", error);
+          throw new Error(error.message || "Failed to update product in database");
+        }
+      } catch (err: any) {
         // Rollback on error
         set({ products: currentProducts });
         saveCachedProducts(currentProducts);
         broadcastSync.publish('products', currentProducts);
-        console.error("Supabase update error:", error);
-        throw new Error(error.message || "Failed to update product in database");
+        console.error("Product update exception:", err);
+        throw new Error(err.message || "Failed to update product in database");
       }
     }
   },
