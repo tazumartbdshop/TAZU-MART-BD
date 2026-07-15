@@ -322,6 +322,23 @@ async function startServer() {
     }
   });
 
+  app.post("/api/products", async (req, res) => {
+    try {
+      const result = await executeProxyQuery({
+        table: 'products',
+        method: 'insert',
+        payload: req.body
+      });
+      if (result.error) {
+        return res.status(500).json({ error: result.error });
+      }
+      res.json({ message: "Product Saved Successfully" });
+    } catch (err: any) {
+      console.error("Product insert error:", err);
+      res.status(500).json({ error: err.message || "Product insert failed" });
+    }
+  });
+
   // Serve local uploaded files statically at /uploads
   const uploadsPath = path.join(process.cwd(), 'public', 'uploads');
   app.use('/uploads', express.static(uploadsPath));

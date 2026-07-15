@@ -1,6 +1,6 @@
 {
-  "name": "TAZU MART BD",
-  "description": "TAZU MART BD Official Online Shopping Platform",
+  "name": "Product Manager",
+  "description": "An online platform for managing products with direct MySQL integration.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
