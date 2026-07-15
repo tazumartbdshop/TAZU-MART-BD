@@ -3,7 +3,7 @@ import * as mysql from 'mysql2/promise';
 // MySQL Connection Config
 function getMySQLConfig() {
   let host = process.env.MYSQL_HOST || '';
-  // Sanitize: extract just the hostname if a full URL is provided
+  // Sanitize: extract just the hostname if a full URL or a path to PHPMyAdmin is provided
   if (host.startsWith('http')) {
       try {
           const url = new URL(host);
@@ -11,6 +11,9 @@ function getMySQLConfig() {
       } catch (e) {
           console.warn('[MySQL] Could not parse host URL, using as-is:', host);
       }
+  } else if (host.includes('/')) {
+      // Handle cases like "server.com/path"
+      host = host.split('/')[0];
   }
 
   const config = {
