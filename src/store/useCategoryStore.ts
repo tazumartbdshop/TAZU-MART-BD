@@ -251,7 +251,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
             })
         });
         
-        const result = await response.json();
+        let result;
+        const responseText = await response.text();
+        try {
+            result = JSON.parse(responseText);
+        } catch (e) {
+            console.error("Failed to parse JSON response:", responseText);
+            throw new Error(`Invalid JSON response from server: ${responseText.substring(0, 50)}...`);
+        }
         
         if (result.error) {
           // Rollback on error
@@ -306,7 +313,14 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
             })
         });
         
-        const result = await response.json();
+        let result;
+        const responseText = await response.text();
+        try {
+            result = JSON.parse(responseText);
+        } catch (e) {
+            console.error("Failed to parse JSON response:", responseText);
+            throw new Error(`Invalid JSON response from server: ${responseText.substring(0, 50)}...`);
+        }
         
         if (result.error) {
           // Rollback on error
