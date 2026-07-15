@@ -52,7 +52,6 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip 
 
 import AdminSettings from './AdminSettings';
 import AdminProducts from './AdminProducts';
-import AdminAddProduct from './AdminAddProduct';
 import AdminCustomers from './AdminCustomers';
 import AdminOrders from './AdminOrders';
 import AdminAutomation from './AdminAutomation';
@@ -589,7 +588,6 @@ export default function AdminDashboard() {
               <Route path="/category-add/*" element={<PermissionGate moduleId="categories"><AdminCategories /></PermissionGate>} />
               <Route path="/product-listing/*" element={<PermissionGate moduleId="products"><AdminProducts /></PermissionGate>} />
               <Route path="/products/*" element={<PermissionGate moduleId="products"><AdminProducts /></PermissionGate>} />
-              <Route path="/products/add" element={<PermissionGate moduleId="products"><AdminAddProduct /></PermissionGate>} />
               <Route path="/offers/*" element={<PermissionGate moduleId="products"><AdminOffers /></PermissionGate>} />
               <Route path="/orders/*" element={<PermissionGate moduleId="orders"><AdminOrders /></PermissionGate>} />
               <Route path="/orders/incomplete" element={<PermissionGate moduleId="orders"><AdminIncompleteOrders /></PermissionGate>} />

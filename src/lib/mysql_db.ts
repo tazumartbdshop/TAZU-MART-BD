@@ -1,24 +1,43 @@
 import * as mysql from 'mysql2/promise';
 
 // MySQL Connection Config
-const config = {
-  host: 'auth-db2141.hstgr.io',
-  user: 'u103041740_tazumartbd',
-  password: 'YOU@suf60679',
-  database: 'u103041740_TAZU_MART_BD',
-  port: 3306,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 10000
-};
+function getMySQLConfig() {
+  const config = {
+    host: process.env.MYSQL_HOST,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE,
+    port: parseInt(process.env.MYSQL_PORT || '3306'),
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000
+  };
+
+  if (!config.host || !config.user || !config.password || !config.database) {
+    console.error('[MySQL Configuration Error] One or more required environment variables (MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE) are missing.');
+  }
+  return config;
+}
 
 let pool: mysql.Pool | null = null;
 
 export function getPool() {
   if (!pool) {
+    const config = getMySQLConfig();
     pool = mysql.createPool(config);
+    
+    // Explicitly test connection on initialization
+    pool.getConnection()
+      .then(conn => {
+        console.log('[MySQL] Connection pool established and verified.');
+        conn.release();
+      })
+      .catch(err => {
+        console.error('[MySQL Connection Error] Failed to establish initial connection:', err);
+      });
+
     (pool as any).on('error', (err: any) => {
       console.error('[MySQL Pool Error]', err);
     });
