@@ -309,10 +309,10 @@ export default function AddCategory() {
         console.log("Uploading payload to Supabase...");
         if (isEditing && id) {
           await updateCategory(id, payload);
-          console.log("Category updated in Supabase.");
+          console.log("Category updated in Database.");
         } else {
           await addCategory(payload);
-          console.log("Category added to Supabase.");
+          console.log("Category added to Database.");
         }
         
         toast.success(isEditing ? "✅ Category Updated Successfully" : "✅ Category Added Successfully", {
@@ -329,7 +329,14 @@ export default function AddCategory() {
         navigate('/admin/category-listing');
     } catch (error: any) {
         console.error("Save Category Error:", error);
-        toast.error(`❌ Failed to save category: ${error.message || error}`);
+        
+        // Handle unexpected non-JSON response errors specifically
+        let errorMessage = error.message || "Unknown error";
+        if (errorMessage.includes("Unexpected token")) {
+          errorMessage = "Server response error. Please check your internet connection or try again later.";
+        }
+        
+        toast.error(`❌ Failed to save category: ${errorMessage}`);
     } finally {
         setIsLoading(false);
         console.log("handleSubmit finished (finally block).");
