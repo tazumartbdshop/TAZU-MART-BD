@@ -313,12 +313,14 @@ async function startServer() {
   });
 
   app.post("/api/mysql-proxy", async (req, res) => {
+    console.log("[Server] Received request to /api/mysql-proxy", req.body);
     try {
       const result = await executeProxyQuery(req.body);
+      console.log("[Server] mysql-proxy result success:", JSON.stringify(result).substring(0, 200));
       res.json(result);
     } catch (err: any) {
-      console.error("MySQL Proxy endpoint error:", err);
-      res.status(500).json({ error: err.message || "MySQL proxy execution failed" });
+      console.error("[Server] mysql-proxy error:", err);
+      res.status(500).json({ error: String(err.message || err) });
     }
   });
 

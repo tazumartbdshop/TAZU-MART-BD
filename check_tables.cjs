@@ -12,17 +12,10 @@ async function check() {
   console.log('Connected to MySQL...');
 
   try {
-    const [banners] = await conn.execute('DESCRIBE `banners`');
-    console.log('Banners columns:', banners.map(b => b.Field));
+    const [categories] = await conn.execute('SELECT * FROM `categories`');
+    console.log('Categories:', categories.map(c => c.name));
   } catch (err) {
-    console.error('Error describing banners:', err.message);
-  }
-
-  try {
-    const [bannersDraft] = await conn.execute('DESCRIBE `banners_draft`');
-    console.log('BannersDraft columns:', bannersDraft.map(b => b.Field));
-  } catch (err) {
-    console.error('Error describing banners_draft:', err.message);
+    console.error('Error selecting categories:', err.message);
   }
 
   await conn.end();

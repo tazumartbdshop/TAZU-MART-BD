@@ -2,8 +2,19 @@ import * as mysql from 'mysql2/promise';
 
 // MySQL Connection Config
 function getMySQLConfig() {
+  let host = process.env.MYSQL_HOST || '';
+  // Sanitize: extract just the hostname if a full URL is provided
+  if (host.startsWith('http')) {
+      try {
+          const url = new URL(host);
+          host = url.hostname;
+      } catch (e) {
+          console.warn('[MySQL] Could not parse host URL, using as-is:', host);
+      }
+  }
+
   const config = {
-    host: process.env.MYSQL_HOST,
+    host: host,
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
