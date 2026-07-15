@@ -319,8 +319,9 @@ async function startServer() {
       console.log("[Server] mysql-proxy result success:", JSON.stringify(result).substring(0, 200));
       res.json(result);
     } catch (err: any) {
-      console.error("[Server] mysql-proxy error:", err);
-      res.status(500).json({ error: String(err.message || err) });
+      console.error("[Server] mysql-proxy EXCEPTION (outside try-catch block if reached):", err);
+      // Ensure we send a valid JSON error response
+      res.status(500).json({ error: "Internal Server Error during mysql-proxy: " + String(err.message || err) });
     }
   });
 
