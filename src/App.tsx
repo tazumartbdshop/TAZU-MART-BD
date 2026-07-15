@@ -67,6 +67,7 @@ export default function App() {
   const { fetchSettings } = useSiteManagementStore();
   const { user } = useAuthStore();
   const [isConfigLoaded, setIsConfigLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const initConfig = async () => {
@@ -74,6 +75,7 @@ export default function App() {
         await fetchSupabaseConfigFromServer();
       } catch (err) {
         console.error("Failed to fetch Supabase config:", err);
+        setLoadError("Failed to initialize application.");
       } finally {
         setIsConfigLoaded(true);
       }
@@ -83,7 +85,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isConfigLoaded) return;
+    if (!isConfigLoaded || loadError) return;
 
     // Initial fetch for site management and branding data
     fetchSettings();
@@ -132,139 +134,143 @@ export default function App() {
       unsubMenuSort();
       unsubDelivery();
     };
-  }, [isConfigLoaded, fetchSettings, user?.id]);
+  }, [isConfigLoaded, loadError, fetchSettings, user?.id]);
 
   useEffect(() => {
-    if (!isConfigLoaded) return;
+    if (!isConfigLoaded || loadError) return;
     let sub: any = null;
     const initSbAuth = async () => {
-      const { getSupabase } = await import('./lib/supabase');
-      const supabase = getSupabase();
-      if (supabase) {
-        let isProcessing = false;
-        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-          if (event === 'SIGNED_OUT') {
-            useAuthStore.getState().logout();
-          } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
-            if (isProcessing) return;
-            isProcessing = true;
-            // Keep state synchronized with database user profile
-            try {
-              const { data: dbUserProfile, error } = await supabase
-                .from('users')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-              if (dbUserProfile && !error) {
-                const currentAuth = useAuthStore.getState();
-                if (!currentAuth.isAuthenticated || currentAuth.user?.id !== session.user.id) {
-                  useAuthStore.getState().login({
-                    id: dbUserProfile.id,
-                    name: dbUserProfile.name,
-                    email: dbUserProfile.email,
-                    role: dbUserProfile.role,
-                    phone: dbUserProfile.phone,
-                    profileImage: dbUserProfile.profileImage,
-                    gender: dbUserProfile.gender,
-                    address: dbUserProfile.address,
-                    division: dbUserProfile.division,
-                    district: dbUserProfile.district,
-                    city: dbUserProfile.district,
-                    upazila: dbUserProfile.upazila,
-                    area: dbUserProfile.area,
-                    postalCode: dbUserProfile.postalCode,
-                  });
-                }
-              } else {
-                // If profile is missing in the public.users database table, automatically create it!
-                console.log("[App Auth] Profile row is missing or not fetched. Attempting automatically to create/sync...");
-                const meta = session.user.user_metadata || {};
-                const name = meta.name || meta.fullName || session.user.email?.split('@')[0] || 'Registered User';
-                const phone = meta.phone || '';
-                
-                const profileData = {
-                  id: session.user.id,
-                  uid: session.user.id,
-                  name: name,
-                  email: session.user.email || '',
-                  phone: phone,
-                  role: 'customer',
-                  status: 'Active',
-                  createdAt: new Date().toISOString(),
-                  lastLoginAt: new Date().toISOString(),
-                  gender: meta.gender || '',
-                  address: meta.address || '',
-                  division: meta.division || '',
-                  district: meta.district || '',
-                  upazila: meta.upazila || '',
-                  area: meta.area || '',
-                  postalCode: meta.postalCode || meta.zipCode || '',
-                  profileImage: meta.profileImage || '',
-                  occasionName: meta.occasionName || '',
-                  specialDate: meta.specialDate || '',
-                };
-
-                const { data: insertedUser, error: insertError } = await supabase
+      try {
+        const { getSupabase } = await import('./lib/supabase');
+        const supabase = getSupabase();
+        if (supabase) {
+          let isProcessing = false;
+          const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_OUT') {
+              useAuthStore.getState().logout();
+            } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+              if (isProcessing) return;
+              isProcessing = true;
+              // Keep state synchronized with database user profile
+              try {
+                const { data: dbUserProfile, error } = await supabase
                   .from('users')
-                  .upsert([profileData])
                   .select('*')
+                  .eq('id', session.user.id)
                   .single();
-
-                // Also sync to customers table
-                const customerData = {
-                  id: session.user.id,
-                  name: name,
-                  email: session.user.email || '',
-                  phone: phone,
-                  address: {
-                    street: meta.address || '',
-                    division: meta.division || '',
-                    district: meta.district || '',
-                    upazila: meta.upazila || '',
-                    zipCode: meta.postalCode || meta.zipCode || ''
-                  },
-                  profile_image: meta.profileImage || '',
-                  gender: meta.gender || '',
-                  status: 'Active',
-                  customer_type: 'Regular',
-                  created_at: new Date().toISOString(),
-                };
-                
-                await supabase.from('customers').upsert([customerData]);
-
-                if (!insertError && insertedUser) {
-                  console.log("[App Auth] Database profile successfully created/synchronized!");
+                if (dbUserProfile && !error) {
                   const currentAuth = useAuthStore.getState();
                   if (!currentAuth.isAuthenticated || currentAuth.user?.id !== session.user.id) {
                     useAuthStore.getState().login({
-                      id: insertedUser.id,
-                      name: insertedUser.name,
-                      email: insertedUser.email,
-                      role: insertedUser.role,
-                      phone: insertedUser.phone,
-                      profileImage: insertedUser.profileImage,
-                      gender: insertedUser.gender,
-                      address: insertedUser.address,
-                      division: insertedUser.division,
-                      district: insertedUser.district,
-                      city: insertedUser.district,
-                      upazila: insertedUser.upazila,
-                      area: insertedUser.area,
-                      postalCode: insertedUser.postalCode,
+                      id: dbUserProfile.id,
+                      name: dbUserProfile.name,
+                      email: dbUserProfile.email,
+                      role: dbUserProfile.role,
+                      phone: dbUserProfile.phone,
+                      profileImage: dbUserProfile.profileImage,
+                      gender: dbUserProfile.gender,
+                      address: dbUserProfile.address,
+                      division: dbUserProfile.division,
+                      district: dbUserProfile.district,
+                      city: dbUserProfile.district,
+                      upazila: dbUserProfile.upazila,
+                      area: dbUserProfile.area,
+                      postalCode: dbUserProfile.postalCode,
                     });
                   }
-                } else if (insertError) {
-                  console.error("[App Auth] Auto-creation of user database profile failed:", insertError);
+                } else {
+                  // If profile is missing in the public.users database table, automatically create it!
+                  console.log("[App Auth] Profile row is missing or not fetched. Attempting automatically to create/sync...");
+                  const meta = session.user.user_metadata || {};
+                  const name = meta.name || meta.fullName || session.user.email?.split('@')[0] || 'Registered User';
+                  const phone = meta.phone || '';
+                  
+                  const profileData = {
+                    id: session.user.id,
+                    uid: session.user.id,
+                    name: name,
+                    email: session.user.email || '',
+                    phone: phone,
+                    role: 'customer',
+                    status: 'Active',
+                    createdAt: new Date().toISOString(),
+                    lastLoginAt: new Date().toISOString(),
+                    gender: meta.gender || '',
+                    address: meta.address || '',
+                    division: meta.division || '',
+                    district: meta.district || '',
+                    upazila: meta.upazila || '',
+                    area: meta.area || '',
+                    postalCode: meta.postalCode || meta.zipCode || '',
+                    profileImage: meta.profileImage || '',
+                    occasionName: meta.occasionName || '',
+                    specialDate: meta.specialDate || '',
+                  };
+
+                  const { data: insertedUser, error: insertError } = await supabase
+                    .from('users')
+                    .upsert([profileData])
+                    .select('*')
+                    .single();
+
+                  // Also sync to customers table
+                  const customerData = {
+                    id: session.user.id,
+                    name: name,
+                    email: session.user.email || '',
+                    phone: phone,
+                    address: {
+                      street: meta.address || '',
+                      division: meta.division || '',
+                      district: meta.district || '',
+                      upazila: meta.upazila || '',
+                      zipCode: meta.postalCode || meta.zipCode || ''
+                    },
+                    profile_image: meta.profileImage || '',
+                    gender: meta.gender || '',
+                    status: 'Active',
+                    customer_type: 'Regular',
+                    created_at: new Date().toISOString(),
+                  };
+                  
+                  await supabase.from('customers').upsert([customerData]);
+
+                  if (!insertError && insertedUser) {
+                    console.log("[App Auth] Database profile successfully created/synchronized!");
+                    const currentAuth = useAuthStore.getState();
+                    if (!currentAuth.isAuthenticated || currentAuth.user?.id !== session.user.id) {
+                      useAuthStore.getState().login({
+                        id: insertedUser.id,
+                        name: insertedUser.name,
+                        email: insertedUser.email,
+                        role: insertedUser.role,
+                        phone: insertedUser.phone,
+                        profileImage: insertedUser.profileImage,
+                        gender: insertedUser.gender,
+                        address: insertedUser.address,
+                        division: insertedUser.division,
+                        district: insertedUser.district,
+                        city: insertedUser.district,
+                        upazila: insertedUser.upazila,
+                        area: insertedUser.area,
+                        postalCode: insertedUser.postalCode,
+                      });
+                    }
+                  } else if (insertError) {
+                    console.error("[App Auth] Auto-creation of user database profile failed:", insertError);
+                  }
                 }
+              } catch (err) {
+                console.warn("Could not sync profile metadata from Supabase:", err);
+              } finally {
+                isProcessing = false;
               }
-            } catch (err) {
-              console.warn("Could not sync profile metadata from Supabase:", err);
-            } finally {
-              isProcessing = false;
             }
-          }
-        });
-        sub = data?.subscription;
+          });
+          sub = data?.subscription;
+        }
+      } catch (err) {
+        console.error("Auth initialization failed:", err);
       }
     };
     initSbAuth();
@@ -273,7 +279,7 @@ export default function App() {
         sub.unsubscribe();
       }
     };
-  }, []);
+  }, [isConfigLoaded, loadError]);
 
   const isSettingsLoaded = useSettingsStore((state) => state.isLoaded);
   const isBrandingLoaded = useBrandingStore((state) => state.isLoaded);
@@ -284,6 +290,14 @@ export default function App() {
   const isProductLoaded = useProductStore((state) => state.isLoaded);
   
   const isAppReady = isConfigLoaded && isSettingsLoaded && isBrandingLoaded && isSiteManagementLoaded && isBannerLoaded && isBrandShowcaseLoaded && isCategoryLoaded && isProductLoaded;
+
+  if (loadError) {
+    return <div className="flex h-screen items-center justify-center text-red-600 font-bold">{loadError}</div>;
+  }
+
+  if (!isAppReady) {
+    return <div className="flex h-screen items-center justify-center font-bold">Loading...</div>;
+  }
 
   return (
     <Router>
@@ -324,11 +338,11 @@ export default function App() {
           <Route path="account/orders" element={<OrderHistoryPage />} />
           <Route path="account/orders/:status" element={<OrderHistoryPage />} />
           <Route path="account/orders/details/:id" element={<OrderDetailView />} />
-
+          
           <Route path="admin/link-pages" element={<AdminContentPages />} />
           {/* Dynamic Link Pages */}
           <Route path=":slug" element={<DynamicLinkPage />} />
-
+          
           <Route element={<ProtectedRoute />}>
             <Route path="account/dashboard" element={<Account />} />
             <Route path="games" element={<Games />} />
@@ -340,7 +354,7 @@ export default function App() {
           
           <Route path="*" element={<div className="container mx-auto py-24 text-center text-primary-900"><h1 className="text-4xl font-serif mb-4">404</h1><p className="text-gray-500">Page Not Found</p></div>} />
         </Route>
-
+        
         {/* Admin Dashboard */}
         <Route element={<ProtectedRoute requireAdmin />}>
           <Route path="/admin/*" element={<AdminDashboard />} />
