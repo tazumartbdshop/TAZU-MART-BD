@@ -9,6 +9,8 @@ import {
 import { useFooterSettingsStore } from '../../store/useFooterSettingsStore';
 import { FooterSettings, FooterQuickLink } from '../../services/footerSettingsService';
 import { uploadImage } from '../../lib/imageUtils';
+import { safeFetch } from '../../utils/apiUrl';
+
 
 export default function AdminFooterSettings() {
   const { settings, isLoading, fetchFooterSettings } = useFooterSettingsStore();
@@ -152,7 +154,7 @@ export default function AdminFooterSettings() {
       };
 
       // Perform strict database write request
-      const response = await fetch('/api/footer-settings', {
+      const response = await safeFetch('/api/footer-settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

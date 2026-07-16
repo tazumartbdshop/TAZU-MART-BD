@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { getSupabase } from '../lib/supabase';
+import { safeFetch } from '../utils/apiUrl';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
+
 
 export interface PaymentMethod {
   id: string;
@@ -70,7 +72,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   customers: initialDemoCustomers,
   addCustomer: async (customerData) => {
     try {
-      const response = await fetch('/api/admin/create-customer', {
+      const response = await safeFetch('/api/admin/create-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(customerData)
@@ -170,7 +172,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   },
   updateCustomer: async (id, updates) => {
     try {
-      const response = await fetch('/api/admin/update-customer', {
+      const response = await safeFetch('/api/admin/update-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -200,7 +202,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   },
   deleteCustomer: async (id) => {
     try {
-      const response = await fetch('/api/admin/delete-customer', {
+      const response = await safeFetch('/api/admin/delete-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })
@@ -253,7 +255,7 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   fetchCustomers: async () => {
     try {
       console.log("[Customer Store] Fetching customers from API...");
-      const response = await fetch('/api/admin/customers');
+      const response = await safeFetch('/api/admin/customers');
       const contentType = response.headers.get("content-type");
       if (response.ok && contentType?.includes("application/json")) {
         const data = await response.json();

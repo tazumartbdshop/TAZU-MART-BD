@@ -20,6 +20,8 @@ import ProductCard from '../components/ui/ProductCard';
 import ProductReviews from '../components/product/ProductReviews';
 import BannerSlider from '../components/common/BannerSlider';
 import { pixelService } from '../utils/pixelService';
+import { safeFetch } from '../utils/apiUrl';
+
 
 const ALL_FALLBACK_PRODUCTS = [
   {
@@ -294,7 +296,7 @@ export default function Product() {
     
     const fetchSummary = async () => {
       try {
-        const res = await fetch(`/api/reviews/summary?productId=${product.id}`);
+        const res = await safeFetch(`/api/reviews/summary?productId=${product.id}`);
         if (res.ok) {
           const data = await res.json();
           if (isMounted) {

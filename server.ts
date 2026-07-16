@@ -161,6 +161,23 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Custom CORS middleware to support cross-origin requests from the client's live domain (tazumartbd.com)
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   // Domain Redirection Middleware (www to non-www)
   app.use((req, res, next) => {
     const host = req.get('host');

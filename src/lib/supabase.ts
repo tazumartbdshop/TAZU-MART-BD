@@ -1,4 +1,6 @@
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
+import { getApiUrl } from '../utils/apiUrl';
+
 
 class MySqlBuilder {
   private tableName: string;
@@ -92,7 +94,7 @@ class MySqlBuilder {
 
   async then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
     try {
-      const res = await fetch('/api/mysql-proxy', {
+      const res = await fetch(getApiUrl('/api/mysql-proxy'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -205,7 +207,7 @@ class MySqlAuth {
 
   async signUp(payload: any) {
     try {
-      const res = await fetch('/api/mysql-proxy', {
+      const res = await fetch(getApiUrl('/api/mysql-proxy'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -226,7 +228,7 @@ class MySqlAuth {
 
   async signInWithPassword(payload: any) {
     try {
-      const res = await fetch('/api/mysql-proxy', {
+      const res = await fetch(getApiUrl('/api/mysql-proxy'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -259,7 +261,7 @@ class MySqlAuth {
     try {
       const session = this.getSessionSync();
       if (!session?.user?.id) return { error: 'Not logged in' };
-      const res = await fetch('/api/mysql-proxy', {
+      const res = await fetch(getApiUrl('/api/mysql-proxy'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

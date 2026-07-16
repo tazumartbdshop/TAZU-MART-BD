@@ -3,6 +3,8 @@ import { useProductStore } from '../store/useProductStore';
 import { useBannerStore } from '../store/useBannerStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useReviewStore } from '../store/useReviewStore';
+import { safeFetch } from './apiUrl';
+
 
 function toCamelCase(str: string): string {
   return str.replace(/([-_][a-z])/ig, ($1) => {
@@ -236,7 +238,7 @@ export function preloadImage(url: string): Promise<void> {
 
 export async function preloadHomepageDataAndAssets(): Promise<void> {
   try {
-    const res = await fetch('/api/homepage-data');
+    const res = await safeFetch('/api/homepage-data');
     if (!res.ok) throw new Error("Failed to fetch homepage data");
     const data = await res.json();
 
