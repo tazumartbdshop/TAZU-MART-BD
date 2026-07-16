@@ -37,6 +37,98 @@ export async function executeQuery(sql: string, params: any[] = []) {
   }
 }
 
+const tableColumnsCache: Record<string, string[]> = {};
+
+async function getTableColumns(table: string, poolInstance: any): Promise<string[]> {
+  const cached = tableColumnsCache[table];
+  if (cached) return cached;
+  try {
+    const [rows]: any[] = await poolInstance.execute(`DESCRIBE \`${table}\``);
+    const cols = rows.map((r: any) => r.Field);
+    tableColumnsCache[table] = cols;
+    return cols;
+  } catch (err) {
+    console.warn(`[getTableColumns] Failed to describe table ${table}:`, err);
+    return [];
+  }
+}
+
+async function filterAndMapPayload(table: string, payload: any, poolInstance: any): Promise<any> {
+  if (!payload || typeof payload !== 'object') return payload;
+  
+  const columns = await getTableColumns(table, poolInstance);
+  if (columns.length === 0) return payload; // Fallback if query fails
+  
+  const hasValueCol = columns.includes('value');
+  const hasSettingsValueCol = columns.includes('settings_value');
+  
+  const mapping: Record<string, string> = {
+    'store_name': 'name',
+    'storeName': 'name',
+    'primary_logo': 'logo',
+    'primaryLogo': 'logo',
+    'store_logo': 'logo',
+    'storeLogo': 'logo',
+    'contact_number': 'contactPhone',
+    'contactNumber': 'contactPhone',
+    'support_email': 'contactEmail',
+    'supportEmail': 'contactEmail',
+    'store_email': 'contactEmail',
+    'storeEmail': 'contactEmail',
+    'store_description': 'address',
+    'storeDescription': 'address',
+    'house_building': 'address',
+    'houseBuilding': 'address'
+  };
+
+  const processed: any = {};
+  const extraFields: any = {};
+  const colSet = new Set(columns);
+
+  Object.keys(payload).forEach(key => {
+    let val = payload[key];
+    
+    // Check if the key matches a column directly
+    if (colSet.has(key)) {
+      processed[key] = val;
+      return;
+    }
+    
+    // Check mapped versions of keys
+    const mappedKey = mapping[key];
+    if (mappedKey && colSet.has(mappedKey)) {
+      processed[mappedKey] = val;
+      return;
+    }
+    
+    // Store remaining unrecognized keys in extraFields
+    extraFields[key] = val;
+  });
+
+  // If there are extra fields and the table supports a generic 'value' or 'settings_value' JSON store column:
+  if (Object.keys(extraFields).length > 0) {
+    if (hasValueCol) {
+      let parsedVal: any = {};
+      if (processed['value']) {
+        try {
+          parsedVal = typeof processed['value'] === 'string' ? JSON.parse(processed['value']) : processed['value'];
+        } catch(e) {}
+      }
+      processed['value'] = { ...parsedVal, ...extraFields };
+    } else if (hasSettingsValueCol) {
+      let parsedVal: any = {};
+      if (processed['settings_value']) {
+        try {
+          parsedVal = typeof processed['settings_value'] === 'string' ? JSON.parse(processed['settings_value']) : processed['settings_value'];
+        } catch(e) {}
+      }
+      processed['settings_value'] = { ...parsedVal, ...extraFields };
+    }
+  }
+
+  return processed;
+}
+
 export async function executeProxyQuery(query: {
   table: string;
   method: 'select' | 'insert' | 'update' | 'delete' | 'upsert' | 'signUp' | 'signInWithPassword';
@@ -198,6 +290,15 @@ export async function executeProxyQuery(query: {
             }
           }
         });
+        
+        // Dynamic self-healing: Flatten parsed JSON from 'value' or 'settings_value' to top level
+        if (copy.value && typeof copy.value === 'object' && !Array.isArray(copy.value)) {
+          Object.assign(copy, copy.value);
+        }
+        if (copy.settings_value && typeof copy.settings_value === 'object' && !Array.isArray(copy.settings_value)) {
+          Object.assign(copy, copy.settings_value);
+        }
+        
         return copy;
       });
 
@@ -208,14 +309,17 @@ export async function executeProxyQuery(query: {
     }
     
     if (method === 'insert') {
-      const records = Array.isArray(payload) ? payload : [payload];
-      if (records.length === 0) {
+      const recordsRaw = Array.isArray(payload) ? payload : [payload];
+      if (recordsRaw.length === 0) {
         return { data: [], error: null, count: 0 };
       }
       
       const insertedRows: any[] = [];
-      for (const record of records) {
+      for (const rawRec of recordsRaw) {
+        const record = await filterAndMapPayload(table, rawRec, poolInstance);
         const fields = Object.keys(record);
+        if (fields.length === 0) continue;
+
         const recordValues = fields.map(f => {
           let val = record[f];
           if (val && (typeof val === 'object' || Array.isArray(val))) {
@@ -229,21 +333,22 @@ export async function executeProxyQuery(query: {
         
         const insertSql = "INSERT INTO `" + table + "` (`" + fields.join("`, `") + "`) VALUES (" + fields.map(() => '?').join(', ') + ")";
         const [result]: any = await poolInstance.execute(insertSql, recordValues);
-        insertedRows.push({ ...record, id: record.id || result.insertId });
+        insertedRows.push({ ...rawRec, ...record, id: record.id || result.insertId });
       }
       
       return { data: Array.isArray(payload) ? insertedRows : insertedRows[0], error: null, count: insertedRows.length };
     }
     
     if (method === 'update') {
-      const fields = Object.keys(payload);
+      const record = await filterAndMapPayload(table, payload, poolInstance);
+      const fields = Object.keys(record);
       if (fields.length === 0) {
         return { data: null, error: null, count: 0 };
       }
       
       let updateSql = `UPDATE \`${table}\` SET `;
       const updateParts = fields.map(f => {
-        let val = payload[f];
+        let val = record[f];
         if (val && (typeof val === 'object' || Array.isArray(val))) {
           params.push(JSON.stringify(val));
         } else if (typeof val === 'boolean') {
@@ -257,7 +362,7 @@ export async function executeProxyQuery(query: {
       updateSql += buildWhereClause();
       
       const [result]: any = await poolInstance.execute(updateSql, params);
-      return { data: payload, error: null, count: result.affectedRows };
+      return { data: { ...payload, ...record }, error: null, count: result.affectedRows };
     }
     
     if (method === 'delete') {
@@ -269,14 +374,17 @@ export async function executeProxyQuery(query: {
     }
     
     if (method === 'upsert') {
-      const records = Array.isArray(payload) ? payload : [payload];
-      if (records.length === 0) {
+      const recordsRaw = Array.isArray(payload) ? payload : [payload];
+      if (recordsRaw.length === 0) {
         return { data: [], error: null, count: 0 };
       }
       
       const upsertedRows: any[] = [];
-      for (const record of records) {
+      for (const rawRec of recordsRaw) {
+        const record = await filterAndMapPayload(table, rawRec, poolInstance);
         const fields = Object.keys(record);
+        if (fields.length === 0) continue;
+
         const recordValues = fields.map(f => {
           let val = record[f];
           if (val && (typeof val === 'object' || Array.isArray(val))) {
@@ -291,13 +399,13 @@ export async function executeProxyQuery(query: {
         // Build ON DUPLICATE KEY UPDATE clause
         const updateClause = fields
           .filter(f => f !== 'id')
-          .map(f => "`" + f + "` = VALUES(`" + f + "`)")
+          .map(f => "`" + f + "` = VALUES(\`" + f + "\`)")
           .join(', ');
           
         const upsertSql = "INSERT INTO `" + table + "` (`" + fields.join("`, `") + "`) VALUES (" + fields.map(() => '?').join(', ') + ") ON DUPLICATE KEY UPDATE " + (updateClause || "`id` = VALUES(`id`)");
           
         await poolInstance.execute(upsertSql, recordValues);
-        upsertedRows.push(record);
+        upsertedRows.push({ ...rawRec, ...record });
       }
       
       return { data: Array.isArray(payload) ? upsertedRows : upsertedRows[0], error: null, count: upsertedRows.length };

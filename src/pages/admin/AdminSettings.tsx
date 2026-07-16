@@ -44,6 +44,7 @@ export default function AdminSettings() {
   const [formState, setFormState] = useState<AppSettings>(draftSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [showErrorToast, setShowErrorToast] = useState<string | null>(null);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [nextTab, setNextTab] = useState<string | null>(null);
 
@@ -79,6 +80,7 @@ export default function AdminSettings() {
 
   const handleSave = async () => {
     setIsSaving(true);
+    setShowErrorToast(null);
     try {
       updateDraftSettings(formState);
       await useSettingsStore.getState().publishSettings();
@@ -86,8 +88,12 @@ export default function AdminSettings() {
       setTimeout(() => {
         setShowToast(false);
       }, 3000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save settings:", err);
+      setShowErrorToast(err?.message || "Failed to save settings. Please try again.");
+      setTimeout(() => {
+        setShowErrorToast(null);
+      }, 5000);
     } finally {
       setIsSaving(false);
     }
@@ -770,6 +776,25 @@ export default function AdminSettings() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               <span>✓ Saved Successfully</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Error Save Toast */}
+      <AnimatePresence>
+        {showErrorToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center w-full max-w-md px-4"
+          >
+            <div className="bg-rose-600 text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 font-semibold text-sm border border-rose-500 font-sans w-full">
+              <svg className="w-5 h-5 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="flex-1 text-left">{showErrorToast}</span>
             </div>
           </motion.div>
         )}
