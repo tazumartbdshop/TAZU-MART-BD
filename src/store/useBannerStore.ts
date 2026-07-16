@@ -127,9 +127,6 @@ export const useBannerStore = create<BannerState>((set, get) => ({
         } else {
           set({ isLoaded: true });
         }
-    }).catch(err => {
-      console.error("[Banner Store Fetch Error]:", err);
-      set({ isLoaded: true });
     });
 
     supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {

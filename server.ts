@@ -233,6 +233,38 @@ async function startServer() {
   }
 
   // API Routes
+  app.get("/api/db-test", async (req, res) => {
+    try {
+      const start = Date.now();
+      const result = await executeProxyQuery({ table: 'settings', method: 'select', limitCount: 1 });
+      const durationMs = Date.now() - start;
+      if (result.error) {
+        return res.status(500).json({
+          success: false,
+          message: "Database query returned an error.",
+          error: result.error,
+          timestamp: new Date().toISOString()
+        });
+      }
+      res.json({
+        success: true,
+        message: "Successfully connected to the MySQL backend production database!",
+        durationMs,
+        timestamp: new Date().toISOString(),
+        host: 'auth-db2141.hstgr.io',
+        database: 'u103041740_TAZU_MART_BD',
+        count: result.count
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to connect to the MySQL database.",
+        error: err.message || err,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   app.get("/api/supabase-config", async (req, res) => {
     try {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -313,15 +345,12 @@ async function startServer() {
   });
 
   app.post("/api/mysql-proxy", async (req, res) => {
-    console.log("[Server] Received request to /api/mysql-proxy", req.body);
     try {
       const result = await executeProxyQuery(req.body);
-      console.log("[Server] mysql-proxy result success:", JSON.stringify(result).substring(0, 200));
       res.json(result);
     } catch (err: any) {
-      console.error("[Server] mysql-proxy EXCEPTION (outside try-catch block if reached):", err);
-      // Ensure we send a valid JSON error response
-      res.status(500).json({ error: "Internal Server Error during mysql-proxy: " + String(err.message || err) });
+      console.error("MySQL Proxy endpoint error:", err);
+      res.status(500).json({ error: err.message || "MySQL proxy execution failed" });
     }
   });
 
@@ -2636,8 +2665,21 @@ Please ask me your query or select a quick question template below!`;
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server is listening on 0.0.0.0:${PORT}`);
+    
+    // Ping MySQL Production Database on startup to verify connectivity
+    try {
+      console.log("[MySQL Connection Test] Pinging production database on startup...");
+      const dbTest = await executeProxyQuery({ table: 'settings', method: 'select', limitCount: 1 });
+      if (dbTest.error) {
+        console.error("[MySQL Connection Test] ❌ Failed to reach database on startup:", dbTest.error);
+      } else {
+        console.log("[MySQL Connection Test] ✅ Successfully reached production database on startup!");
+      }
+    } catch (err: any) {
+      console.error("[MySQL Connection Test] ❌ Fatal exception during startup database check:", err.message || err);
+    }
   });
 }
 

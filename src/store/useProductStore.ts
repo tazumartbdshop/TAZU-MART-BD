@@ -770,7 +770,6 @@ export const useProductStore = create<ProductState>((set, get) => ({
         }
     }, (pErr) => {
         console.error("[Supabase Product Sync] CONNECTION ERROR:", pErr);
-        set({ isLoaded: true });
     });
  
     const channel = supabase

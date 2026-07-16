@@ -1,57 +1,24 @@
 import * as mysql from 'mysql2/promise';
 
 // MySQL Connection Config
-function getMySQLConfig() {
-  let host = process.env.MYSQL_HOST || '';
-  // Sanitize: extract just the hostname if a full URL or a path to PHPMyAdmin is provided
-  if (host.startsWith('http')) {
-      try {
-          const url = new URL(host);
-          host = url.hostname;
-      } catch (e) {
-          console.warn('[MySQL] Could not parse host URL, using as-is:', host);
-      }
-  } else if (host.includes('/')) {
-      // Handle cases like "server.com/path"
-      host = host.split('/')[0];
-  }
-
-  const config = {
-    host: host,
-    user: process.env.MYSQL_USER,
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE,
-    port: parseInt(process.env.MYSQL_PORT || '3306'),
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 10000
-  };
-
-  if (!config.host || !config.user || !config.password || !config.database) {
-    console.error('[MySQL Configuration Error] One or more required environment variables (MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE) are missing.');
-  }
-  return config;
-}
+const config = {
+  host: 'auth-db2141.hstgr.io',
+  user: 'u103041740_tazumartbd',
+  password: 'YOU@suf60679',
+  database: 'u103041740_TAZU_MART_BD',
+  port: 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000
+};
 
 let pool: mysql.Pool | null = null;
 
 export function getPool() {
   if (!pool) {
-    const config = getMySQLConfig();
     pool = mysql.createPool(config);
-    
-    // Explicitly test connection on initialization
-    pool.getConnection()
-      .then(conn => {
-        console.log('[MySQL] Connection pool established and verified.');
-        conn.release();
-      })
-      .catch(err => {
-        console.error('[MySQL Connection Error] Failed to establish initial connection:', err);
-      });
-
     (pool as any).on('error', (err: any) => {
       console.error('[MySQL Pool Error]', err);
     });

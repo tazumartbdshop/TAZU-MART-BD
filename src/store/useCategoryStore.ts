@@ -220,6 +220,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   isLoaded: getCachedCategories().length > 0,
   
   addCategory: async (payload) => {
+    const supabase = getSupabase();
     const id = `cat_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const newCategory: Category = {
       ...payload,
@@ -229,7 +230,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     console.log(`%c[MySQL Category Insert] Attempting INSERT in 'categories' table`, "color: #3b82f6; font-weight: bold; font-size: 13px;");
     
-    // Transform to snake_case for DB
+    // Transform to snake_case for MySQL
     const dbPayload = objectToSnake(newCategory);
     console.log("[MySQL Category DB Payload]", dbPayload);
     
@@ -240,54 +241,61 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     saveCachedCategories(nextCats);
     broadcastSync.publish('categories', nextCats);
     
-    try {
-        const response = await fetch('/api/mysql-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                table: 'categories',
-                method: 'insert',
-                payload: dbPayload
-            })
-        });
+    if (supabase) {
+      try {
+        const selfHealResult = await executeWithSelfHealing(
+          async (prunedDbPayload) => {
+            return await supabase.from('categories').insert([prunedDbPayload]).select();
+          },
+          dbPayload
+        );
         
-        let result;
-        const responseText = await response.text();
-        try {
-            result = JSON.parse(responseText);
-        } catch (e) {
-            console.error("Failed to parse JSON response:", responseText);
-            throw new Error(`Invalid JSON response from server: ${responseText.substring(0, 50)}...`);
-        }
+        const { data, error, status, statusText } = selfHealResult;
+        console.log(`%c[MySQL Insert Response] HTTP Status: ${status} (${statusText})`, "color: #a855f7; font-weight: bold;");
         
-        if (result.error) {
+        if (error) {
           // Rollback on error
           set({ categories: currentCats });
           saveCachedCategories(currentCats);
           broadcastSync.publish('categories', currentCats);
-          console.error("%c[MySQL DB Insert Fail Error Details]:", "color: #ef4444; font-weight: bold;", result.error);
-          throw new Error(`Database Insert Failed: ${result.error}`);
+          console.error("%c[MySQL DB Insert Fail Error Details]:", "color: #ef4444; font-weight: bold;", {
+            message: error.message,
+            code: error.code,
+            status,
+            statusText
+          });
+          
+          throw new Error(`MySQL Insert Failed: ${error.message}`);
         } else {
-          console.log(`%c[MySQL DB Insert SUCCESS] Record written successfully!`, "color: #10b981; font-weight: bold; font-size: 12px;", result.data);
+          console.log(`%c[MySQL DB Insert SUCCESS] Record written successfully!`, "color: #10b981; font-weight: bold; font-size: 12px;", data);
         }
-    } catch (err: any) {
+      } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
         saveCachedCategories(currentCats);
         broadcastSync.publish('categories', currentCats);
         console.error("%c[MySQL DB Insert Exception]:", "color: #f43f5e; font-weight: bold;", err);
-        throw new Error(err?.message || err || "Database connection failure during insert");
+        throw new Error(err?.message || err || "MySQL connection failure during insert");
+      }
+    } else {
+      // Rollback
+      set({ categories: currentCats });
+      saveCachedCategories(currentCats);
+      broadcastSync.publish('categories', currentCats);
+      console.error("%c[MySQL Client Missing] Cannot write category: MySQL client not initialized.", "color: #ef4444; font-weight: bold;");
+      throw new Error("Database client is not initialized");
     }
   },
   
   updateCategory: async (id, payload) => {
+    const supabase = getSupabase();
     const currentCats = get().categories;
     const existing = currentCats.find(c => c.id === id);
     const mergedPayload = existing ? { ...existing, ...payload } : payload;
     
     console.log(`%c[MySQL Category Update] Attempting UPDATE in 'categories' for ID: ${id}`, "color: #eab308; font-weight: bold; font-size: 13px;");
     
-    // Transform to snake_case for DB
+    // Transform to snake_case for MySQL
     const dbPayload = objectToSnake(mergedPayload);
     // Remove auto-generated timestamp and id from updates just in case
     delete dbPayload.id;
@@ -301,50 +309,55 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     saveCachedCategories(updatedCats as Category[]);
     broadcastSync.publish('categories', updatedCats as Category[]);
     
-    try {
-        const response = await fetch('/api/mysql-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                table: 'categories',
-                method: 'update',
-                payload: dbPayload,
-                filters: [{ type: 'eq', col: 'id', val: id }]
-            })
-        });
+    if (supabase) {
+      try {
+        const selfHealResult = await executeWithSelfHealing(
+          async (prunedDbPayload) => {
+            return await supabase.from('categories').update(prunedDbPayload).eq('id', id).select();
+          },
+          dbPayload
+        );
         
-        let result;
-        const responseText = await response.text();
-        try {
-            result = JSON.parse(responseText);
-        } catch (e) {
-            console.error("Failed to parse JSON response:", responseText);
-            throw new Error(`Invalid JSON response from server: ${responseText.substring(0, 50)}...`);
-        }
+        const { data, error, status, statusText } = selfHealResult;
+        console.log(`%c[MySQL Update Response] HTTP Status: ${status} (${statusText})`, "color: #a855f7; font-weight: bold;");
         
-        if (result.error) {
+        if (error) {
           // Rollback on error
           set({ categories: currentCats });
           saveCachedCategories(currentCats);
           broadcastSync.publish('categories', currentCats);
-          console.error("%c[MySQL DB Update Fail Error Details]:", "color: #ef4444; font-weight: bold;", result.error);
-          throw new Error(`Database Update Failed: ${result.error}`);
+          console.error("%c[MySQL DB Update Fail Error Details]:", "color: #ef4444; font-weight: bold;", {
+            message: error.message,
+            code: error.code,
+            status,
+            statusText
+          });
+          throw new Error(`MySQL Update Failed: ${error.message}`);
         } else {
-          console.log(`%c[MySQL DB Update SUCCESS] Record updated successfully!`, "color: #10b981; font-weight: bold; font-size: 12px;", result.data);
+          console.log(`%c[MySQL DB Update SUCCESS] Record updated successfully!`, "color: #10b981; font-weight: bold; font-size: 12px;", data);
         }
-    } catch (err: any) {
+      } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
         saveCachedCategories(currentCats);
         broadcastSync.publish('categories', currentCats);
         console.error("%c[MySQL DB Update Exception]:", "color: #f43f5e; font-weight: bold;", err);
-        throw new Error(err?.message || err || "Database connection failure during update");
+        throw new Error(err?.message || err || "MySQL connection failure during update");
+      }
+    } else {
+      // Rollback
+      set({ categories: currentCats });
+      saveCachedCategories(currentCats);
+      broadcastSync.publish('categories', currentCats);
+      console.error("%c[MySQL Client Missing] Cannot update category: MySQL client not initialized.", "color: #ef4444; font-weight: bold;");
+      throw new Error("Database client is not initialized");
     }
   },
   
   deleteCategory: async (id) => {
     const currentCats = get().categories;
     const category = currentCats.find(c => c.id === id);
+    const supabase = getSupabase();
     
     if (category) {
       try {
@@ -372,34 +385,31 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     saveCachedCategories(newCats);
     broadcastSync.publish('categories', newCats);
     
-    try {
-        const response = await fetch('/api/mysql-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                table: 'categories',
-                method: 'delete',
-                filters: [{ type: 'eq', col: 'id', val: id }]
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.error) {
+    if (supabase) {
+      try {
+        const { error } = await supabase.from('categories').delete().eq('id', id);
+        if (error) {
           // Rollback on error
           set({ categories: currentCats });
           saveCachedCategories(currentCats);
           broadcastSync.publish('categories', currentCats);
-          console.error("MySQL category delete error:", result.error);
-          throw new Error(result.error || "Failed to delete category from database");
+          console.error("MySQL category delete error:", error);
+          throw new Error(error.message || "Failed to delete category from MySQL database");
         }
-    } catch (err: any) {
+      } catch (err: any) {
         // Rollback on catch
         set({ categories: currentCats });
         saveCachedCategories(currentCats);
         broadcastSync.publish('categories', currentCats);
         console.error("MySQL delete catch exception:", err);
-        throw new Error(err?.message || err || "Database connection failure");
+        throw new Error(err?.message || err || "MySQL database connection failure");
+      }
+    } else {
+      // Rollback
+      set({ categories: currentCats });
+      saveCachedCategories(currentCats);
+      broadcastSync.publish('categories', currentCats);
+      throw new Error("Database client is not initialized");
     }
   },
   
@@ -411,7 +421,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   subscribe: () => {
     const supabase = getSupabase();
     if (!supabase) {
-        console.warn("[Supabase Categories Sync] Supabase client is not available or configured. Defaulting to empty array.");
+        console.warn("[MySQL Categories Sync] MySQL client is not available. Defaulting to empty array.");
         set({ isLoaded: true });
         return () => {}; // fallback
     }
@@ -450,22 +460,19 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     // Core Fetch Function
     const fetchCategoriesData = () => {
-      fetch('/api/mysql-proxy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              table: 'categories',
-              method: 'select'
-          })
-      })
-      .then(res => res.json())
-      .then(result => {
-          if (result.error) {
-              console.warn("%c[MySQL Categories FETCH ERROR]:", "color: #f59e0b; font-weight: bold;", result.error);
+      supabase.from('categories').select('*')
+        .then(({ data, error, status, statusText }) => {
+          if (error) {
+              console.warn("%c[MySQL Categories FETCH ERROR]:", "color: #f59e0b; font-weight: bold;", {
+                code: error.code,
+                message: error.message,
+                httpStatus: status,
+                httpStatusText: statusText
+              });
               set({ isLoaded: true });
-          } else if (result.data) {
+          } else if (data) {
               try {
-                const mappedData = result.data.map((row: any, idx: number) => {
+                const mappedData = data.map((row, idx) => {
                   try {
                     return mapDbToCategory(row);
                   } catch (e) {
@@ -483,8 +490,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
           } else {
               set({ isLoaded: true });
           }
-      })
-      .catch(err => {
+      }, (err) => {
           console.warn("[MySQL Categories Fetch CONNECTION ERROR]:", err);
           set({ isLoaded: true });
       });
@@ -493,22 +499,20 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     // 1. Initial Load immediately
     fetchCategoriesData();
 
-    // 2. Real-time changes subscription - DISABLED (Supabase removed)
+    // 2. Real-time changes subscription
     let channel: any = null;
-    /*
     try {
       channel = supabase
         .channel('public:categories:' + Math.random().toString(36).substring(2, 9))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, (payload) => {
-          console.log("[Supabase Categories Sync] Real-time postgres_changes event received:", payload);
+          console.log("[MySQL Categories Sync] Real-time changes event received:", payload);
           fetchCategoriesData();
         })
         .subscribe();
     } catch (realtimeErr) {
-      console.warn("[Supabase Categories Real-time Subscription - Suppressed]:", realtimeErr);
+      console.warn("[MySQL Categories Real-time Subscription - Suppressed]:", realtimeErr);
     }
-    */
-    
+
     // 3. Robust background polling interval (every 12 seconds) 
     // This acts as a bulletproof failsafe if WebSocket drops or during cross-device navigation.
     const pollInterval = setInterval(() => {
@@ -519,7 +523,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     return () => {
       clearInterval(pollInterval);
       if (channel) {
-        console.log("[Supabase Categories Sync] Unsubscribing real-time channel and polling");
+        console.log("[MySQL Categories Sync] Unsubscribing real-time channel and polling");
         try {
           supabase.removeChannel(channel);
         } catch (e) {}
