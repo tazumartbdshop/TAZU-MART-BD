@@ -3,6 +3,7 @@ import { getSupabase } from '../lib/supabase';
 import { deleteImage } from '../lib/imageUtils';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 import { broadcastSync } from '../lib/broadcastSync';
+import { resolveImageUrl } from '../utils/apiUrl';
 
 export interface Category {
   id: string;
@@ -436,10 +437,12 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         name: camelRow.name || '',
         slug: camelRow.slug || '',
         bannerName: camelRow.bannerName || '',
-        bannerImage: camelRow.bannerImage || '',
-        bannerImages: camelRow.bannerImages || (camelRow.bannerImage ? [camelRow.bannerImage] : []),
-        iconImage: camelRow.iconImage || '',
-        wideBannerImage: camelRow.wideBannerImage || '',
+        bannerImage: resolveImageUrl(camelRow.bannerImage),
+        bannerImages: (camelRow.bannerImages && Array.isArray(camelRow.bannerImages))
+          ? camelRow.bannerImages.map(resolveImageUrl)
+          : (camelRow.bannerImage ? [resolveImageUrl(camelRow.bannerImage)] : []),
+        iconImage: resolveImageUrl(camelRow.iconImage),
+        wideBannerImage: resolveImageUrl(camelRow.wideBannerImage),
         buttonText: camelRow.buttonText || '',
         buttonLink: camelRow.buttonLink || '',
         featuredProducts: camelRow.featuredProducts || '',

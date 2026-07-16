@@ -36,3 +36,17 @@ export function safeFetch(input: RequestInfo | URL, init?: RequestInit): Promise
   return fetch(input, init);
 }
 
+/**
+ * Utility to resolve relative image paths (e.g., starting with /uploads/)
+ * to the absolute URL pointing to our Cloud Run backend.
+ * This ensures uploaded images display perfectly on custom domains like tazumartbd.com.
+ */
+export function resolveImageUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('/uploads/')) {
+    return getApiUrl(trimmed);
+  }
+  return trimmed;
+}
+

@@ -4,6 +4,7 @@ import { deleteImage } from '../lib/imageUtils';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 import { broadcastSync } from '../lib/broadcastSync';
 import { generateSlug } from '../lib/utils';
+import { resolveImageUrl } from '../utils/apiUrl';
 
 // Strict list of actual database columns present in the MySQL `products` table
 export const VALID_PRODUCT_COLUMNS = new Set([
@@ -434,11 +435,11 @@ const mapDbToProduct = (row: any): Product => {
     price: Number(camelRow.price || 0),
     discountPrice: camelRow.discountPrice,
     stock: Number(camelRow.stock || 0),
-    image: camelRow.image || camelRow.imageUrl || camelRow.featuredImage || '',
-    imageUrl: camelRow.imageUrl || camelRow.image || '',
-    featured_image: camelRow.featuredImage || camelRow.image || '',
-    banner_image: camelRow.bannerImage || '',
-    images: parsedImages,
+    image: resolveImageUrl(camelRow.image || camelRow.imageUrl || camelRow.featuredImage || ''),
+    imageUrl: resolveImageUrl(camelRow.imageUrl || camelRow.image || ''),
+    featured_image: resolveImageUrl(camelRow.featuredImage || camelRow.image || ''),
+    banner_image: resolveImageUrl(camelRow.bannerImage || ''),
+    images: parsedImages.map(resolveImageUrl),
     videoUrl: camelRow.videoUrl || camelRow.mediaUrl || '',
     mediaUrl: camelRow.mediaUrl || camelRow.videoUrl || '',
     rating: Number(camelRow.rating || 4.5),
