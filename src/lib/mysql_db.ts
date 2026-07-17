@@ -517,24 +517,16 @@ class MockQueryBuilder {
     return res;
   }
 
-  async then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
-    try {
-      const res = await executeProxyQuery({
-        table: this.tableName,
-        method: 'select',
-        filters: this.filters,
-        orderBy: this.orderBy,
-        limitCount: this.limitCount,
-        isSingle: this.isSingle
-      });
-      if (onfulfilled) {
-        return onfulfilled(res);
-      }
-      return res;
-    } catch (err) {
-      if (onrejected) return onrejected(err);
-      throw err;
-    }
+  then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
+    const promise = executeProxyQuery({
+      table: this.tableName,
+      method: 'select',
+      filters: this.filters,
+      orderBy: this.orderBy,
+      limitCount: this.limitCount,
+      isSingle: this.isSingle
+    });
+    return promise.then(onfulfilled, onrejected);
   }
 }
 

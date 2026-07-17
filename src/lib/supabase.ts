@@ -92,55 +92,51 @@ class MySqlBuilder {
     return this;
   }
 
-  async then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
-    try {
-      const res = await fetch(getApiUrl('/api/mysql-proxy'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          table: this.tableName,
-          method: this.method,
-          payload: this.payload,
-          filters: this.filters,
-          orderBy: this.orderBy,
-          limitCount: this.limitCount,
-          isSingle: this.isSingle,
-          isMaybeSingle: this.isMaybeSingle
-        })
-      });
+  then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
+    const promise = (async () => {
+      try {
+        const res = await fetch(getApiUrl('/api/mysql-proxy'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            table: this.tableName,
+            method: this.method,
+            payload: this.payload,
+            filters: this.filters,
+            orderBy: this.orderBy,
+            limitCount: this.limitCount,
+            isSingle: this.isSingle,
+            isMaybeSingle: this.isMaybeSingle
+          })
+        });
 
-      if (!res.ok) {
-        throw new Error(`MySQL Proxy error: ${res.statusText}`);
+        if (!res.ok) {
+          throw new Error(`MySQL Proxy error: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        return {
+          data: data.data,
+          error: data.error ? { message: data.error, code: data.error_code || '' } : null,
+          count: data.count || 0,
+          status: res.status,
+          statusText: res.statusText
+        };
+      } catch (err: any) {
+        console.error("[MySqlBuilder Error]", err);
+        return {
+          data: null,
+          error: { message: err.message || 'Database connection error', code: 'CONNECTION_FAILURE' },
+          count: 0,
+          status: 500,
+          statusText: 'Internal Server Error'
+        };
       }
+    })();
 
-      const data = await res.json();
-      const result = {
-        data: data.data,
-        error: data.error ? { message: data.error, code: data.error_code || '' } : null,
-        count: data.count || 0,
-        status: res.status,
-        statusText: res.statusText
-      };
-
-      if (onfulfilled) {
-        return onfulfilled(result);
-      }
-      return result;
-    } catch (err: any) {
-      console.error("[MySqlBuilder Error]", err);
-      const result = {
-        data: null,
-        error: { message: err.message || 'Database connection error', code: 'CONNECTION_FAILURE' },
-        count: 0,
-        status: 500,
-        statusText: 'Internal Server Error'
-      };
-      if (onrejected) return onrejected(err);
-      if (onfulfilled) return onfulfilled(result);
-      return result;
-    }
+    return promise.then(onfulfilled, onrejected);
   }
 }
 
