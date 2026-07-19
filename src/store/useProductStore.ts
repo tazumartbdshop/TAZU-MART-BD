@@ -199,6 +199,7 @@ interface ProductState {
   addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => Promise<void>;
   updateProduct: (id: string, updatedFields: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
+  fetchProducts: () => Promise<void>;
   subscribe: () => () => void;
   autoRankTrending: () => void;
   autoRankBestSellers: () => void;
@@ -724,6 +725,48 @@ export const useProductStore = create<ProductState>((set, get) => ({
       }
     }
   },
+
+  fetchProducts: async () => {
+    const supabase = getSupabase();
+    if (!supabase) {
+        set({ isLoaded: true });
+        return;
+    }
+    
+    const { url } = (window as any).getSupabaseCredentials?.() || {};
+    console.log(`[Supabase Product Sync] Querying 'products' from: ${url || 'Injected Key'}`);
+    
+    const { data, error, status, statusText } = await supabase.from('products').select('*');
+    if (!error && data) {
+        console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products. (HTTP ${status})`, "color: #10b981; font-weight: bold;");
+        try {
+          const mapped = data.map((row, index) => {
+            try {
+              return mapDbToProduct(row);
+            } catch (err) {
+              console.error(`[Supabase Product Sync] Mapping failed for row index ${index}:`, row, err);
+              throw err;
+            }
+          });
+          
+          set({ products: mapped, isLoading: false, isLoaded: true });
+          saveCachedProducts(mapped);
+        } catch (mapErr) {
+          console.error("[Supabase Product Sync] Critical mapping error:", mapErr);
+          set({ isLoaded: true });
+        }
+    } else if (error) {
+        console.error("%c[Supabase Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
+          code: error.code,
+          message: error.message,
+          hint: (error as any).hint,
+          details: (error as any).details,
+          httpStatus: status,
+          httpStatusText: statusText
+        });
+        set({ isLoaded: true });
+    }
+  },
   
   subscribe: () => {
     // Start non-blocking directly from cache
@@ -735,43 +778,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
         return () => {}; // No-op if not configured
     }
     
-    const { url } = (window as any).getSupabaseCredentials?.() || {};
-    console.log(`[Supabase Product Sync] Querying 'products' from: ${url || 'Injected Key'}`);
-    
-    // Direct, fast asynchronous fetch from the live database
-    supabase.from('products').select('*').then(({ data, error, status, statusText }) => {
-        if (!error && data) {
-            console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products. (HTTP ${status})`, "color: #10b981; font-weight: bold;");
-            try {
-              const mapped = data.map((row, index) => {
-                try {
-                  return mapDbToProduct(row);
-                } catch (err) {
-                  console.error(`[Supabase Product Sync] Mapping failed for row index ${index}:`, row, err);
-                  throw err;
-                }
-              });
-              
-              set({ products: mapped, isLoading: false, isLoaded: true });
-              saveCachedProducts(mapped);
-            } catch (mapErr) {
-              console.error("[Supabase Product Sync] Critical mapping error:", mapErr);
-              set({ isLoaded: true });
-            }
-        } else if (error) {
-            console.error("%c[Supabase Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
-              code: error.code,
-              message: error.message,
-              hint: (error as any).hint,
-              details: (error as any).details,
-              httpStatus: status,
-              httpStatusText: statusText
-            });
-            set({ isLoaded: true });
-        }
-    }, (pErr) => {
-        console.error("[Supabase Product Sync] CONNECTION ERROR:", pErr);
-    });
+    get().fetchProducts();
  
     const channel = supabase
       .channel('public:products:' + Math.random().toString(36).substring(2, 9))
@@ -787,7 +794,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
         });
       })
       .subscribe();
-      
+       
     return () => {
       supabase.removeChannel(channel);
     };

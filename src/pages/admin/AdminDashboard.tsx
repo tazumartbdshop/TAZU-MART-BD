@@ -43,7 +43,8 @@ import {
   Puzzle,
   Coins,
   FileText,
-  Folder
+  Folder,
+  RefreshCw
 } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
@@ -697,6 +698,23 @@ function Overview() {
   const { orders } = useOrderStore();
   const { customers } = useCustomerStore();
   const { reviews } = useReviewStore();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        useProductStore.getState().fetchProducts(),
+        useOrderStore.getState().fetchOrders(),
+      ]);
+      toast.success('Dashboard data refreshed successfully!');
+    } catch (error) {
+      console.error('Refresh failed:', error);
+      toast.error('Failed to refresh dashboard data.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleAutoRank = async (type: 'trending' | 'best') => {
     setRankingStatus(type === 'trending' ? 'Ranking Trending...' : 'Ranking Best Sellers...');
@@ -915,9 +933,25 @@ function Overview() {
   return (
     <>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8 hidden md:flex">
-        <div>
-           <h2 className="text-2xl font-sans font-bold text-[#000000]">Overview Analytics</h2>
-           <p className="text-[#666666] text-sm mt-1">Here's what's happening with your store today.</p>
+        <div className="flex flex-col gap-1">
+           <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-sans font-bold text-[#000000]">Overview Analytics</h2>
+              <div className="flex items-center gap-2">
+                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full shadow-sm">
+                   <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                   Live System
+                 </span>
+                 <button
+                   onClick={handleRefresh}
+                   disabled={isRefreshing}
+                   className="p-1.5 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center text-zinc-600 disabled:opacity-50"
+                   title="Refresh Dashboard Data"
+                 >
+                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-zinc-900' : ''}`} />
+                 </button>
+              </div>
+           </div>
+           <p className="text-[#666666] text-sm">Here's what's happening with your store today.</p>
         </div>
         <div className="flex gap-4">
            {rankingStatus && (

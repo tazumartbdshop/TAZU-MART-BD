@@ -100,6 +100,7 @@ interface OrderState {
   markAllAsRead: () => void;
   clearDemoData: () => void;
   clearAllOrders: () => Promise<void>;
+  fetchOrders: (userId?: string) => Promise<void>;
   subscribeOrders: (userId?: string) => () => void;
   subscribeTrackingStatuses: () => () => void;
   requestRefund: (orderId: string, reason: string, images?: string[]) => Promise<void>;
@@ -520,89 +521,91 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   clearDemoData: () => set((state) => ({
     orders: state.orders.filter(o => !o.isDemo)
   })),
+  fetchOrders: async (userId?: string) => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+
+    let query = supabase.from('orders').select('*');
+    
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error } = await query.order('date', { ascending: false });
+    
+    if (error) {
+        if (error.code !== '42P01') console.error('Error fetching orders:', error);
+        set({ orders: [] });
+        return;
+    }
+
+    if (!data || data.length === 0) {
+        set({ orders: [] });
+        return;
+    }
+
+    const orderIds = data.map(o => o.id);
+    const orderIdStrings = data.map(o => o.order_id);
+    
+    // Fetch order items only for the orders we just retrieved
+    const { data: itemsData } = await supabase
+        .from('order_items')
+        .select('*')
+        .or(`order_id.in.(${orderIds.join(',')}),order_id.in.(${orderIdStrings.join(',')})`);
+
+    set({ orders: (data as any[]).map(row => {
+           const parsed = objectToCamel(row);
+           if (Array.isArray(parsed.customerName)) {
+             parsed.customerName = parsed.customerName[0] || '';
+           }
+           if (typeof parsed.mobileNumber === 'number') {
+             parsed.mobileNumber = '0' + parsed.mobileNumber.toString();
+           }
+           
+           // Parse statusHistory back to array
+           if (typeof parsed.statusHistory === 'string') {
+             try {
+               parsed.statusHistory = JSON.parse(parsed.statusHistory);
+             } catch(e) {
+               parsed.statusHistory = [];
+             }
+           }
+
+           // Attach actual items from order_items table
+           if (itemsData) {
+             const orderItems = itemsData.filter(item => item.order_id === parsed.orderId || item.order_id === parsed.id);
+             if (orderItems.length > 0) {
+               parsed.items = orderItems.map(item => ({
+                 productId: item.product_id || item.productId,
+                 name: item.name || item.product_name || 'Unknown',
+                 price: item.price || item.product_price || 0,
+                 quantity: item.quantity || 1,
+                 image: item.image || item.product_image || '',
+                 variant: item.variant || 'Default',
+                 slug: item.slug || item.productId
+               }));
+             }
+           }
+           
+           if (typeof parsed.items === 'number' || !parsed.items) {
+             // Fallback if no items found in order_items
+             parsed.items = [];
+           }
+
+           return parsed;
+        }) as Order[] });
+  },
   subscribeOrders: (userId?: string) => {
     const supabase = getSupabase();
     if (!supabase) return () => {};
     console.log("[Supabase Sync] Subscribing to orders. Filter userId:", userId);
 
-    const loadOrders = async () => {
-        let query = supabase.from('orders').select('*');
-        
-        if (userId) {
-          query = query.eq('user_id', userId);
-        }
-
-        const { data, error } = await query.order('date', { ascending: false });
-        
-        if (error) {
-            if (error.code !== '42P01') console.error('Error fetching orders:', error);
-            set({ orders: [] });
-            return;
-        }
-
-        if (!data || data.length === 0) {
-            set({ orders: [] });
-            return;
-        }
-
-        const orderIds = data.map(o => o.id);
-        const orderIdStrings = data.map(o => o.order_id);
-        
-        // Fetch order items only for the orders we just retrieved
-        const { data: itemsData } = await supabase
-            .from('order_items')
-            .select('*')
-            .or(`order_id.in.(${orderIds.join(',')}),order_id.in.(${orderIdStrings.join(',')})`);
-
-        set({ orders: (data as any[]).map(row => {
-               const parsed = objectToCamel(row);
-               if (Array.isArray(parsed.customerName)) {
-                 parsed.customerName = parsed.customerName[0] || '';
-               }
-               if (typeof parsed.mobileNumber === 'number') {
-                 parsed.mobileNumber = '0' + parsed.mobileNumber.toString();
-               }
-               
-               // Parse statusHistory back to array
-               if (typeof parsed.statusHistory === 'string') {
-                 try {
-                   parsed.statusHistory = JSON.parse(parsed.statusHistory);
-                 } catch(e) {
-                   parsed.statusHistory = [];
-                 }
-               }
-
-               // Attach actual items from order_items table
-               if (itemsData) {
-                 const orderItems = itemsData.filter(item => item.order_id === parsed.orderId || item.order_id === parsed.id);
-                 if (orderItems.length > 0) {
-                   parsed.items = orderItems.map(item => ({
-                     productId: item.product_id || item.productId,
-                     name: item.name || item.product_name || 'Unknown',
-                     price: item.price || item.product_price || 0,
-                     quantity: item.quantity || 1,
-                     image: item.image || item.product_image || '',
-                     variant: item.variant || 'Default',
-                     slug: item.slug || item.productId
-                   }));
-                 }
-               }
-               
-               if (typeof parsed.items === 'number' || !parsed.items) {
-                 // Fallback if no items found in order_items
-                 parsed.items = [];
-               }
-
-               return parsed;
-            }) as Order[] });
-    };
-    
-    loadOrders();
+    get().fetchOrders(userId);
     
     const channel = supabase
       .channel('public:orders')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-          loadOrders();
+          get().fetchOrders(userId);
       })
       .subscribe();
 

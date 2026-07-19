@@ -3,6 +3,7 @@ import { getSupabase } from '../lib/supabase';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 import { useBrandingStore } from './useBrandingStore';
 import { broadcastSync } from '../lib/broadcastSync';
+import { getApiUrl } from '../utils/apiUrl';
 
 export interface AppSettings {
   // 1. Store Identity
@@ -328,7 +329,7 @@ const defaultSettings: AppSettings = {
   merchantUsername: 'tazumart_merchant',
   merchantPassword: '••••••••',
   merchantStoreId: 'tazum5019',
-  merchantCallbackUrl: 'https://ais-pre-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app/api/payment/callback',
+  merchantCallbackUrl: getApiUrl('/api/payment/callback'),
   merchantSuccessUrl: 'https://tazumart.bd/checkout/success',
   merchantCancelUrl: 'https://tazumart.bd/checkout/cancel',
 

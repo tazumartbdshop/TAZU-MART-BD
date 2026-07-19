@@ -19,7 +19,8 @@ export function getApiUrl(path: string): string {
   
   // Production Cloud Run active server domain.
   // This server maintains direct, secure connection with Hostinger MySQL backend.
-  const prodBackend = 'https://ais-pre-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app';
+  // Users can easily override this at build-time by setting VITE_API_BASE_URL in their .env
+  const prodBackend = import.meta.env.VITE_API_BASE_URL || 'https://ais-pre-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app';
   
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${prodBackend}${cleanPath}`;
