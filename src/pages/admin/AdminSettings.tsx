@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 import { 
   Store, Palette, MapPin, User, Users, ShoppingBag, 
   Truck, CreditCard, Bell, FileText, Search, Share2, 
@@ -608,8 +609,8 @@ export default function AdminSettings() {
             <h3 className="text-xs font-black uppercase tracking-widest text-[#000000]">System Backups & Control</h3>
             <Toggle label="Auto Backup Database" field="autoBackup" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-               <button className="bg-black text-white font-bold p-4 text-[10px] uppercase tracking-widest hover:bg-zinc-800 flex items-center justify-center gap-2 border border-black cursor-pointer transition-colors">
-                  <Database className="w-4 h-4 text-purple-400" /> Export Database
+               <button type="button" onClick={async () => { try { const toastId = toast.loading("⏳ Testing connection..."); const res = await fetch('/api/db-test'); const data = await res.json(); if (data.success) { toast.success(`✅ Connected! (${data.durationMs}ms)`, { id: toastId }); } else { toast.error("❌ Connection failed", { id: toastId }); } } catch (e) { toast.error("❌ Connection error", { id: toastId }); } }} className="bg-black text-white font-bold p-4 text-[10px] uppercase tracking-widest hover:bg-zinc-800 flex items-center justify-center gap-2 border border-black cursor-pointer transition-colors">
+                  <Database className="w-4 h-4 text-purple-400" /> Test Connection
                </button>
                <button className="bg-gray-150 text-gray-700 border border-black font-bold p-4 text-[10px] uppercase tracking-widest hover:bg-gray-200 flex items-center justify-center gap-2 cursor-pointer transition-colors">
                   Restore System Backup

@@ -2,11 +2,11 @@ import * as mysql from 'mysql2/promise';
 
 // MySQL Connection Config
 const config = {
-  host: 'auth-db2141.hstgr.io',
-  user: 'u103041740_tazumartbd',
+  host: '5.183.10.131',
+  user: 'u103041740',
   password: 'YOU@suf60679',
   database: 'u103041740_TAZU_MART_BD',
-  port: 3306,
+  port: 65002,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -24,6 +24,18 @@ export function getPool() {
     });
   }
   return pool;
+}
+
+export async function testConnection(): Promise<boolean> {
+  const pool = getPool();
+  try {
+    const connection = await pool.getConnection();
+    connection.release();
+    return true;
+  } catch (error) {
+    console.error('[MySQL Connection Test Error]', error);
+    return false;
+  }
 }
 
 export async function executeQuery(sql: string, params: any[] = []) {

@@ -3,7 +3,7 @@ import express from "express";
 import path from "path";
 import fs from "fs/promises";
 import { createServer as createViteServer } from "vite";
-import { executeProxyQuery } from "./src/lib/mysql_db.ts";
+import { executeProxyQuery, testConnection } from "./src/lib/mysql_db.ts";
 import multer from "multer";
 import fsPromises from "fs/promises";
 
