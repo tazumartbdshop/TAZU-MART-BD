@@ -11,7 +11,10 @@ const config = {
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 10000
+  keepAliveInitialDelay: 10000,
+  ssl: {
+    rejectUnauthorized: false
+  }
 };
 
 let pool: mysql.Pool | null = null;
