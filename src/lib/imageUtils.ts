@@ -70,10 +70,16 @@ export const uploadImage = async (
     const formData = new FormData();
     formData.append('file', file, originalName || 'file.jpg');
 
-    const response = await fetch(getApiUrl('/api/upload'), {
+    const uploadPromise = fetch(getApiUrl('/api/upload'), {
       method: 'POST',
       body: formData,
     });
+
+    const response = await withTimeout(
+      uploadPromise,
+      8000,
+      "Upload request timed out after 8 seconds"
+    );
 
     if (!response.ok) {
       throw new Error(`Upload API returned error status ${response.status}`);

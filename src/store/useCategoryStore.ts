@@ -60,6 +60,7 @@ interface CategoryState {
   addCategory: (category: Omit<Category, 'id' | 'createdAt'>) => Promise<void>;
   updateCategory: (id: string, category: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
+  fetchCategories: () => Promise<void>;
   clearDemoData: () => void;
   subscribe: () => () => void;
 }
@@ -269,6 +270,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
           throw new Error(`MySQL Insert Failed: ${error.message}`);
         } else {
           console.log(`%c[MySQL DB Insert SUCCESS] Record written successfully!`, "color: #10b981; font-weight: bold; font-size: 12px;", data);
+          await get().fetchCategories();
         }
       } catch (err: any) {
         // Rollback on catch
@@ -336,6 +338,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
           throw new Error(`MySQL Update Failed: ${error.message}`);
         } else {
           console.log(`%c[MySQL DB Update SUCCESS] Record updated successfully!`, "color: #10b981; font-weight: bold; font-size: 12px;", data);
+          await get().fetchCategories();
         }
       } catch (err: any) {
         // Rollback on catch
@@ -396,6 +399,8 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
           broadcastSync.publish('categories', currentCats);
           console.error("MySQL category delete error:", error);
           throw new Error(error.message || "Failed to delete category from MySQL database");
+        } else {
+          await get().fetchCategories();
         }
       } catch (err: any) {
         // Rollback on catch
@@ -413,23 +418,16 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       throw new Error("Database client is not initialized");
     }
   },
-  
-  clearDemoData: () => {
-    set({ categories: [] });
-    saveCachedCategories([]);
-  },
-  
-  subscribe: () => {
+
+  fetchCategories: async () => {
     const supabase = getSupabase();
     if (!supabase) {
-        console.warn("[MySQL Categories Sync] MySQL client is not available. Defaulting to empty array.");
-        set({ isLoaded: true });
-        return () => {}; // fallback
+      set({ isLoaded: true });
+      return;
     }
 
     const mapDbToCategory = (row: any): Category => {
       if (!row) return row;
-      // Use utility for conversion
       const camelRow: any = objectToCamel(row);
       
       return {
@@ -459,48 +457,52 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       };
     };
 
-    const { url } = (window as any).getSupabaseCredentials?.() || {};
-    
-    // Core Fetch Function
-    const fetchCategoriesData = () => {
-      supabase.from('categories').select('*')
-        .then(({ data, error, status, statusText }) => {
-          if (error) {
-              console.warn("%c[MySQL Categories FETCH ERROR]:", "color: #f59e0b; font-weight: bold;", {
-                code: error.code,
-                message: error.message,
-                httpStatus: status,
-                httpStatusText: statusText
-              });
-              set({ isLoaded: true });
-          } else if (data) {
-              try {
-                const mappedData = data.map((row, idx) => {
-                  try {
-                    return mapDbToCategory(row);
-                  } catch (e) {
-                     console.error(`[MySQL Categories] Mapping failed at index ${idx}:`, row, e);
-                     throw e;
-                  }
-                }).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
-                set({ categories: mappedData, isLoaded: true });
-                saveCachedCategories(mappedData);
-                broadcastSync.publish('categories', mappedData);
-              } catch (err) {
-                console.error("[MySQL Categories] Critical processing error:", err);
-                set({ isLoaded: true });
-              }
-          } else {
-              set({ isLoaded: true });
+    try {
+      const { data, error, status, statusText } = await supabase.from('categories').select('*');
+      if (error) {
+        console.warn("%c[MySQL Categories FETCH ERROR]:", "color: #f59e0b; font-weight: bold;", {
+          code: error.code,
+          message: error.message,
+          httpStatus: status,
+          httpStatusText: statusText
+        });
+        set({ isLoaded: true });
+      } else if (data) {
+        const mappedData = data.map((row: any, idx: number) => {
+          try {
+            return mapDbToCategory(row);
+          } catch (e) {
+            console.error(`[MySQL Categories] Mapping failed at index ${idx}:`, row, e);
+            throw e;
           }
-      }, (err) => {
-          console.warn("[MySQL Categories Fetch CONNECTION ERROR]:", err);
-          set({ isLoaded: true });
-      });
-    };
+        }).sort((a: any, b: any) => Number(a.displayOrder) - Number(b.displayOrder));
+        set({ categories: mappedData, isLoaded: true });
+        saveCachedCategories(mappedData);
+        broadcastSync.publish('categories', mappedData);
+      } else {
+        set({ isLoaded: true });
+      }
+    } catch (err) {
+      console.warn("[MySQL Categories Fetch CONNECTION ERROR]:", err);
+      set({ isLoaded: true });
+    }
+  },
+
+  clearDemoData: () => {
+    set({ categories: [] });
+    saveCachedCategories([]);
+  },
+  
+  subscribe: () => {
+    const supabase = getSupabase();
+    if (!supabase) {
+        console.warn("[MySQL Categories Sync] MySQL client is not available. Defaulting to empty array.");
+        set({ isLoaded: true });
+        return () => {}; // fallback
+    }
 
     // 1. Initial Load immediately
-    fetchCategoriesData();
+    get().fetchCategories();
 
     // 2. Real-time changes subscription
     let channel: any = null;
@@ -509,7 +511,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         .channel('public:categories:' + Math.random().toString(36).substring(2, 9))
         .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, (payload) => {
           console.log("[MySQL Categories Sync] Real-time changes event received:", payload);
-          fetchCategoriesData();
+          get().fetchCategories();
         })
         .subscribe();
     } catch (realtimeErr) {
@@ -519,7 +521,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     // 3. Robust background polling interval (every 12 seconds) 
     // This acts as a bulletproof failsafe if WebSocket drops or during cross-device navigation.
     const pollInterval = setInterval(() => {
-      fetchCategoriesData();
+      get().fetchCategories();
     }, 12000);
       
     // 4. Return complete cleanup

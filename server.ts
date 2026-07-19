@@ -9,9 +9,14 @@ import fsPromises from "fs/promises";
 
 // Configure storage for local uploads
 const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
+  destination: (req, file, cb) => {
     const dir = path.join(process.cwd(), "public", "uploads");
-    await fsPromises.mkdir(dir, { recursive: true }).catch(() => {});
+    try {
+      const fsSync = require('fs');
+      fsSync.mkdirSync(dir, { recursive: true });
+    } catch (e) {
+      console.error("Failed to create uploads directory:", e);
+    }
     cb(null, dir);
   },
   filename: (req, file, cb) => {
