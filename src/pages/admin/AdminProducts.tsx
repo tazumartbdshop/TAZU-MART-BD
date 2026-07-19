@@ -612,41 +612,50 @@ function AdminProductAdd() {
     }
 
     try {
-        const { uploadImage } = await import('../../lib/imageUtils');
-        console.log("Image utils imported.");
+        const toastId = toast.loading("⏳ Initializing product save...");
+        console.log("Saving process started...");
 
         // 1. Upload Product Banner if needed
         let finalBannerUrl = bannerImage;
         if (bannerFile) {
+          toast.loading("⏳ Uploading product banner image...", { id: toastId });
           console.log("Uploading product banner...");
           try {
             finalBannerUrl = await uploadImage(bannerFile, 'products', bannerFile.name);
-            console.log("Banner uploaded.");
+            console.log("Banner uploaded successfully:", finalBannerUrl);
           } catch (err) {
             console.error("Banner upload error:", err);
+            toast.error("❌ Failed to upload product banner.", { id: toastId });
             throw new Error("Failed to upload product banner.");
           }
         }
 
-        // 2. Upload any newly selected/modified files to Firebase Storage
+        // 2. Upload any newly selected/modified files
         const finalImageUrls: string[] = [];
         console.log("Uploading product images...");
         
-        for (const img of uploadedImages) {
-          if (img.file && (img.url.startsWith('blob:') || img.url.startsWith('data:'))) {
+        for (let i = 0; i < uploadedImages.length; i++) {
+          const img = uploadedImages[i];
+          if (!img) continue;
+          
+          const imgUrl = img.url || '';
+          if (img.file && (imgUrl.startsWith('blob:') || imgUrl.startsWith('data:'))) {
+            toast.loading(`⏳ Uploading product image (${i + 1}/${uploadedImages.length})...`, { id: toastId });
             try {
-              const downloadUrl = await uploadImage(img.file, 'products', img.name);
+              const downloadUrl = await uploadImage(img.file, 'products', img.name || `image_${i}`);
               finalImageUrls.push(downloadUrl);
+              console.log(`Uploaded image ${i + 1} successfully:`, downloadUrl);
             } catch (uploadErr) {
-              console.error("Firebase Storage Upload Error:", uploadErr);
-              throw new Error(`Failed to upload ${img.name}. Please try again.`);
+              console.error(`Product image upload error for ${img.name}:`, uploadErr);
+              toast.error(`❌ Failed to upload product image: ${img.name || i}`, { id: toastId });
+              throw new Error(`Failed to upload ${img.name || 'image'}. Please try again.`);
             }
-          } else {
-            // This is already a remote URL, keep it
-            finalImageUrls.push(img.url);
+          } else if (imgUrl) {
+            // Keep remote URL as is
+            finalImageUrls.push(imgUrl);
           }
         }
-        console.log("Product images uploaded.");
+        console.log("Product images processed:", finalImageUrls);
 
         const mainImage = finalImageUrls[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60';
 
@@ -692,16 +701,19 @@ function AdminProductAdd() {
           )
         };
 
-        console.log("Saving payload to Supabase...");
+        toast.loading("⏳ Writing product record to live MySQL database...", { id: toastId });
+        console.log("Saving payload to Supabase/MySQL database...");
+        
         if (isEditing && id) {
           await updateProduct(id, payload);
-          console.log("Product updated.");
+          console.log("Product updated in live DB.");
         } else {
           await addProduct(payload);
-          console.log("Product added.");
+          console.log("Product added to live DB.");
         }
         
-        toast.success("✅ Product Saved Successfully", {
+        toast.success("✅ Product Saved Successfully to Live Database", {
+          id: toastId,
           position: "top-center",
           style: {
             background: "#10B981",
