@@ -14,7 +14,7 @@ import {
 import { defaultNavItems } from '../../lib/adminMenus';
 import { useMenuSortStore } from '../../store/useMenuSortStore';
 import { useModeratorStore } from '../../store/useModeratorStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function AdminMenuManagement() {
   // Store actions & states

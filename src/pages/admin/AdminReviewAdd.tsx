@@ -4,7 +4,7 @@ import {
   Star, Image as ImageIcon, Video, CheckCircle, X, 
   ChevronLeft, Upload, Play, AlertCircle, Loader2, User, Package
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useReviewStore } from '../../store/useReviewStore';
 import { useProductStore } from '../../store/useProductStore';
 import { useCustomerStore } from '../../store/useCustomerStore';

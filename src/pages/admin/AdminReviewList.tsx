@@ -7,7 +7,7 @@ import {
   X, ChevronDown, Edit3
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useReviewStore, ProductReview } from '../../store/useReviewStore';
 import { useProductStore } from '../../store/useProductStore';
 import { formatPrice, cn } from '../../lib/utils';

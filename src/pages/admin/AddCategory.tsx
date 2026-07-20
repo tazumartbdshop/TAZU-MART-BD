@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useCategoryStore, Category } from '../../store/useCategoryStore';
 import { getApiUrl } from '../../utils/apiUrl';
 import { cn } from '../../lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 import { uploadImage } from '../../lib/imageUtils';
 import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';

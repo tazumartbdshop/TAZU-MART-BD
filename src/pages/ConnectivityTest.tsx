@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Wifi, WifiOff, RefreshCw, Loader2, Server, Clock, CheckCircle, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { getApiUrl } from '../utils/apiUrl';
 
 interface PingResult {
   success: boolean;
@@ -21,7 +22,7 @@ export default function ConnectivityTest() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/db-test');
+      const response = await fetch(getApiUrl('/api/db-test'));
       const data = await response.json();
       if (response.ok && data.success) {
         setResult(data);

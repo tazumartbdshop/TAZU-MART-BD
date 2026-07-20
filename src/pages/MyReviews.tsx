@@ -5,7 +5,7 @@ import {
   Eye, ShoppingBag, ArrowRight, MessageSquare
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useReviewStore, ProductReview } from '../store/useReviewStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProductStore } from '../store/useProductStore';

@@ -7,7 +7,7 @@ import {
   Layers, Edit3, Save, Trash, Plus, Upload, Play,
   ExternalLink, Ban, Eye, AlertCircle, ShieldAlert
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useReviewStore, ProductReview } from '../../store/useReviewStore';
 import { useProductStore } from '../../store/useProductStore';
 import { useCustomerStore } from '../../store/useCustomerStore';

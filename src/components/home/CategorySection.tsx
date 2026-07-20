@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { Sparkles, Droplet, CreditCard, Activity, Watch, Briefcase, Image as ImageIcon } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 const iconMap: Record<string, any> = {
   Sparkles,

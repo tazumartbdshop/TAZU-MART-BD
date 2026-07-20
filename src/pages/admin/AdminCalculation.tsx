@@ -16,7 +16,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useProductStore } from '../../store/useProductStore';
 
 interface CalculationEntry {

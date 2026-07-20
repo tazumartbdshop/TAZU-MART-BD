@@ -5,7 +5,7 @@ import {
   Edit3, Filter, ChevronRight, SlidersHorizontal, ArrowUpDown,
   Plus, Play, AlertTriangle, ThumbsUp, Calendar, ArrowUpRight
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useReviewStore, ProductReview } from '../../store/useReviewStore';
 import { useProductStore } from '../../store/useProductStore';
 import { useAuthStore } from '../../store/useAuthStore';

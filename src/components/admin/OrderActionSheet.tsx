@@ -29,7 +29,7 @@ import { Order, useOrderStore } from '../../store/useOrderStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useCustomerStore } from '../../store/useCustomerStore';
 import { formatPrice } from '../../lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import html2pdf from 'html2pdf.js';
 
 interface OrderActionSheetProps {

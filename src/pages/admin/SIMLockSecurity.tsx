@@ -15,7 +15,7 @@ import {
   Plus
 } from 'lucide-react';
 import { useModeratorStore } from '../../store/useModeratorStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 import SecureLockScreen from '../../components/admin/SecureLockScreen';
 

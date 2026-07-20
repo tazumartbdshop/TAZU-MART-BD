@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useModeratorStore, Moderator } from '../../store/useModeratorStore';
 import { useMenuSortStore } from '../../store/useMenuSortStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import SecureLockScreen from '../../components/admin/SecureLockScreen';
 
 const MODULES = [

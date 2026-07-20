@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import { Search, Plus, Edit, Trash2, Upload, X, Image as ImageIcon, ChevronLeft, ChevronDown, ChevronRight, Camera, AlertCircle, Loader2, Database } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useProductStore, generateKeywords } from '../../store/useProductStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { toast } from 'react-hot-toast';

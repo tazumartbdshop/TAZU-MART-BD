@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useOrderStore } from '../../store/useOrderStore';
 import { formatPrice, cn } from '../../lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import toast from 'react-hot-toast';
 
 export default function OrderDetailView() {

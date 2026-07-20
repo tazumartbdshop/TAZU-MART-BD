@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useReviewStore, ProductReview } from '../../store/useReviewStore';
 import { useProductStore } from '../../store/useProductStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
 
 export default function AdminReviews() {

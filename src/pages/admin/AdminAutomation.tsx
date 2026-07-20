@@ -9,7 +9,7 @@ import {
   LineChart, Line, BarChart as RechartsBarChart, Bar, PieChart, Pie, 
   Cell, Tooltip, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 // --- MOCK COLLECTIONS ---
 const FAKE_ORDER_LOGS = [

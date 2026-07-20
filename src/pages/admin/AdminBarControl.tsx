@@ -10,7 +10,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useMenuSortStore } from '../../store/useMenuSortStore';
 import { defaultNavItems } from '../../lib/adminMenus';
 

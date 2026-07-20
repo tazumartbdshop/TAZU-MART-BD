@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Eye, EyeOff, Save, CheckCircle, AlertCircle } from 'lucide-react';
 import { useModeratorStore } from '../../store/useModeratorStore';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 
 import SecureLockScreen from '../../components/admin/SecureLockScreen';
 

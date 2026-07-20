@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useWebsitesStore } from '../../store/useWebsitesStore';
 import { useProductStore, Product } from '../../store/useProductStore';
+import { useCategoryStore } from '../../store/useCategoryStore';
 
 const defaultProperties = [
   {
@@ -65,6 +66,7 @@ export default function LiveWebsiteGenerator() {
   const navigate = useNavigate();
   const website = useWebsitesStore(state => state.getWebsiteByDomain(storeDomain || ''));
   const { products } = useProductStore();
+  const { categories, fetchCategories, isLoaded: categoriesLoaded } = useCategoryStore();
 
   // Navigation & Tabs
   const [currentView, setCurrentView] = useState<'home' | 'categories' | 'offers' | 'support' | 'account' | 'properties'>('home');
@@ -143,6 +145,12 @@ export default function LiveWebsiteGenerator() {
       }
     };
     initAuthAndData();
+    
+    // Fetch categories for this store if not loaded
+    if (!categoriesLoaded) {
+      fetchCategories();
+    }
+
     return () => {
       if (authSub) authSub.unsubscribe();
     };
@@ -559,7 +567,11 @@ export default function LiveWebsiteGenerator() {
   const currSign = website.currency === 'USD' ? '$' : '৳';
 
   // Categories loading
-  const categoriesList = website.categories || ['Smartphone', 'Fashion', 'Grocery'];
+  const dbCategoryNames = categories.map(c => c.name).filter(n => n);
+  // Prioritize database categories if they exist, otherwise fallback to website categories or defaults
+  const categoriesList = dbCategoryNames.length > 0 
+    ? dbCategoryNames 
+    : (website.categories?.length > 0 ? website.categories : ['Smartphone', 'Fashion', 'Grocery']);
 
   // Match and fetch products dynamically
   const getProductsByCategory = (catName: string) => {

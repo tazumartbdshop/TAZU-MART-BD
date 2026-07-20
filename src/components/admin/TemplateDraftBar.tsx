@@ -4,7 +4,7 @@ import { useThemeStore } from '../../store/useThemeStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useBannerStore } from '../../store/useBannerStore';
 import { useSupportBannerStore } from '../../store/useSupportBannerStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function TemplateDraftBar() {
   const { publishTheme, resetDraftTheme } = useThemeStore();

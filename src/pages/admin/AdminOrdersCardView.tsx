@@ -38,7 +38,7 @@ import {
 import { useOrderStore, Order } from '../../store/useOrderStore';
 import { useProductStore } from '../../store/useProductStore';
 import { formatPrice } from '../../lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { getCompletedOrdersCount, LoyaltyBadge, VerifiedTick } from '../../lib/loyalty';
 
