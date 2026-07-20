@@ -234,6 +234,12 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     // Transform to snake_case for MySQL
     const dbPayload = objectToSnake(newCategory);
+    
+    // Explicitly handle booleans for MySQL (TINYINT)
+    if (typeof dbPayload.show_on_homepage === 'boolean') {
+      dbPayload.show_on_homepage = dbPayload.show_on_homepage ? 1 : 0;
+    }
+    
     console.log("[MySQL Category DB Payload]", dbPayload);
     
     // Optimistic Update
@@ -300,6 +306,12 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     
     // Transform to snake_case for MySQL
     const dbPayload = objectToSnake(mergedPayload);
+    
+    // Explicitly handle booleans for MySQL (TINYINT)
+    if (typeof dbPayload.show_on_homepage === 'boolean') {
+      dbPayload.show_on_homepage = dbPayload.show_on_homepage ? 1 : 0;
+    }
+    
     // Remove auto-generated timestamp and id from updates just in case
     delete dbPayload.id;
     delete dbPayload.created_at;
