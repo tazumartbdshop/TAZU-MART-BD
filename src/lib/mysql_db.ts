@@ -3,10 +3,10 @@ import * as mysql from 'mysql2/promise';
 // MySQL Connection Config
 const config = {
   host: '5.183.10.131',
-  user: 'u103041740',
+  user: 'u103041740_tazumartbd',
   password: 'YOU@suf60679',
   database: 'u103041740_TAZU_MART_BD',
-  port: 65002,
+  port: 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
