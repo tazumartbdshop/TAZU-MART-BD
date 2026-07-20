@@ -1,6 +1,20 @@
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
 import { getApiUrl } from '../utils/apiUrl';
 
+// Helper to add timeout to promise
+const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
+  let finished = false;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    setTimeout(() => {
+      if (!finished) reject(new Error(errorMessage));
+    }, ms);
+  });
+
+  return Promise.race([
+    promise.then(res => { finished = true; return res; }).catch(err => { finished = true; throw err; }),
+    timeoutPromise
+  ]);
+};
 
 class MySqlBuilder {
   private tableName: string;
@@ -95,22 +109,26 @@ class MySqlBuilder {
   then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
     const promise = (async () => {
       try {
-        const res = await fetch(getApiUrl('/api/mysql-proxy'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            table: this.tableName,
-            method: this.method,
-            payload: this.payload,
-            filters: this.filters,
-            orderBy: this.orderBy,
-            limitCount: this.limitCount,
-            isSingle: this.isSingle,
-            isMaybeSingle: this.isMaybeSingle
-          })
-        });
+        const res = await withTimeout(
+          fetch(getApiUrl('/api/mysql-proxy'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              table: this.tableName,
+              method: this.method,
+              payload: this.payload,
+              filters: this.filters,
+              orderBy: this.orderBy,
+              limitCount: this.limitCount,
+              isSingle: this.isSingle,
+              isMaybeSingle: this.isMaybeSingle
+            })
+          }),
+          15000,
+          "Database request timed out after 15 seconds"
+        );
 
         if (!res.ok) {
           throw new Error(`MySQL Proxy error: ${res.statusText}`);

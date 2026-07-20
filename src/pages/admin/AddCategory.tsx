@@ -255,40 +255,62 @@ export default function AddCategory() {
     setIsLoading(true);
     console.log("handleSubmit started: Uploading images...");
 
+    // Create a safety timeout for the entire operation
+    const safetyTimeout = setTimeout(() => {
+      if (isLoading) {
+        console.error("Critical: Form submission is taking too long (30s+). Forcing loading state to off.");
+        setIsLoading(false);
+        toast.error("⚠️ The operation is taking longer than expected. Please check your internet connection or try again.");
+      }
+    }, 30000);
+
     try {
         
          // Upload thumbnail if changed
         let iconUrl = formData.iconImage;
         if (thumbnailFile) {
           console.log("Uploading thumbnail...");
-          iconUrl = await uploadImage(thumbnailFile, 'categories', `icon-${formData.slug}`, 'categories');
-          console.log("Thumbnail uploaded, URL:", iconUrl);
+          try {
+            iconUrl = await uploadImage(thumbnailFile, 'categories', `icon-${formData.slug}`, 'categories');
+          } catch (uploadErr) {
+            console.warn("Thumbnail upload failed, but continuing with fallback or existing URL", uploadErr);
+          }
+          console.log("Thumbnail step complete, URL:", iconUrl);
         }
 
         // Upload wide banner (16:9) if changed
         let wideBannerUrl = formData.wideBannerImage;
         if (wideBannerFile) {
           console.log("Uploading wide banner...");
-          wideBannerUrl = await uploadImage(wideBannerFile, 'categories', `wide-banner-${formData.slug}`, 'categories');
-          console.log("Wide banner uploaded, URL:", wideBannerUrl);
+          try {
+            wideBannerUrl = await uploadImage(wideBannerFile, 'categories', `wide-banner-${formData.slug}`, 'categories');
+          } catch (uploadErr) {
+            console.warn("Wide banner upload failed, continuing...", uploadErr);
+          }
+          console.log("Wide banner step complete, URL:", wideBannerUrl);
         }
 
         // Upload all new banners
-        console.log("Uploading banners...");
+        console.log("Uploading banners gallery...");
         const finalBannerUrls = await Promise.all(
           bannerFiles.map(async (fileOrUrl) => {
             if (typeof fileOrUrl === 'string') return fileOrUrl;
-            return await uploadImage(fileOrUrl, 'categories', `banner-${formData.slug}-${Math.random().toString(36).substring(7)}`, 'categories');
+            try {
+              return await uploadImage(fileOrUrl, 'categories', `banner-${formData.slug}-${Math.random().toString(36).substring(7)}`, 'categories');
+            } catch (uploadErr) {
+              console.warn("Individual banner upload failed, using fallback", uploadErr);
+              return ''; // Or handle better
+            }
           })
         );
-        console.log("Banners uploaded, URLs:", finalBannerUrls);
+        console.log("Banners gallery complete, URLs:", finalBannerUrls);
 
         const payload = {
           name: formData.name,
           slug: formData.slug || formData.name.toLowerCase().trim().replace(/\s+/g, '-'),
           bannerName: formData.bannerName || formData.name,
           bannerImage: finalBannerUrls[0] || '',
-          bannerImages: finalBannerUrls,
+          bannerImages: finalBannerUrls.filter(u => u !== ''),
           sliderSettings: sliderSettings,
           iconImage: iconUrl,
           wideBannerImage: wideBannerUrl,
@@ -306,15 +328,16 @@ export default function AddCategory() {
           image_url: iconUrl
         };
 
-        console.log("Uploading payload to Supabase...");
+        console.log("Sending payload to Database Store:", payload);
         if (isEditing && id) {
           await updateCategory(id, payload);
-          console.log("Category updated in Supabase.");
+          console.log("Database Update Complete.");
         } else {
           await addCategory(payload);
-          console.log("Category added to Supabase.");
+          console.log("Database Insert Complete.");
         }
         
+        clearTimeout(safetyTimeout);
         toast.success(isEditing ? "✅ Category Updated Successfully" : "✅ Category Added Successfully", {
           position: "top-center",
           style: {
@@ -328,11 +351,13 @@ export default function AddCategory() {
         setIsDirty(false);
         navigate('/admin/category-listing');
     } catch (error: any) {
-        console.error("Save Category Error:", error);
-        toast.error(`❌ Failed to save category: ${error.message || error}`);
+        clearTimeout(safetyTimeout);
+        console.error("Save Category Final Error:", error);
+        toast.error(`❌ Error: ${error.message || "Failed to save category. Please check all fields."}`);
     } finally {
         setIsLoading(false);
-        console.log("handleSubmit finished (finally block).");
+        clearTimeout(safetyTimeout);
+        console.log("handleSubmit operation finished.");
     }
   };
 
