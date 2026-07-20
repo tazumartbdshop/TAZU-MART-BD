@@ -52,7 +52,11 @@ export async function executeQuery(sql: string, params: any[] = []) {
   }
 }
 
-const tableColumnsCache: Record<string, string[]> = {};
+const tableColumnsCache: Record<string, string[]> = {
+  'categories': ['id', 'name', 'slug', 'banner_name', 'banner_image', 'banner_images', 'icon_image', 'wide_banner_image', 'button_text', 'button_link', 'featured_products', 'description', 'display_order', 'status', 'show_on_homepage', 'created_at', 'meta_title', 'meta_description', 'keywords', 'is_demo', 'slider_settings'],
+  'products': ['id', 'name', 'slug', 'description', 'price', 'sale_price', 'sku', 'stock_quantity', 'category_id', 'status', 'created_at'],
+  'banners': ['id', 'title', 'image_url', 'link_url', 'status', 'display_order', 'created_at']
+};
 
 async function getTableColumns(table: string, poolInstance: any): Promise<string[]> {
   const cached = tableColumnsCache[table];

@@ -447,7 +447,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
         description: camelRow.description || '',
         displayOrder: Number(camelRow.displayOrder ?? 1),
         status: camelRow.status || 'Active',
-        showOnHomepage: camelRow.showOnHomepage !== false,
+        showOnHomepage: Boolean(camelRow.showOnHomepage === true || camelRow.showOnHomepage === 1),
         createdAt: Number(camelRow.createdAt) || 0,
         metaTitle: camelRow.metaTitle || '',
         metaDescription: camelRow.metaDescription || '',

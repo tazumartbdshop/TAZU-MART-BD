@@ -319,13 +319,12 @@ export default function AddCategory() {
           featuredProducts: formData.featuredProducts,
           description: formData.description,
           displayOrder: Number(formData.displayOrder) || 1,
-          status: formData.status,
+          status: formData.status as 'Active' | 'Inactive',
           showOnHomepage: formData.showOnHomepage,
           metaTitle: formData.metaTitle,
           metaDescription: formData.metaDescription,
           keywords: formData.keywords,
-          imageUrl: iconUrl,
-          image_url: iconUrl
+          createdAt: Date.now()
         };
 
         console.log("Sending payload to Database Store:", payload);
