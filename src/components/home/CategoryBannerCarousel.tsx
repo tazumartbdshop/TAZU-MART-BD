@@ -11,18 +11,22 @@ export default function CategoryBannerCarousel({ category }: CategoryBannerCarou
     ? category.bannerImages 
     : [category.bannerImage]).filter(Boolean);
 
+  const sliderSettings = category.sliderSettings || { autoScroll: true, interval: 3 };
+  const autoScroll = sliderSettings.autoScroll !== false;
+  const scrollInterval = (Number(sliderSettings.interval) || 3) * 1000;
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto sliding every 3 seconds
+  // Auto sliding based on database settings
   useEffect(() => {
-    if (images.length <= 1) return;
+    if (images.length <= 1 || !autoScroll) return;
 
     const startTimer = () => {
       timerRef.current = setInterval(() => {
         setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
-      }, 3000);
+      }, scrollInterval);
     };
 
     startTimer();
@@ -32,17 +36,17 @@ export default function CategoryBannerCarousel({ category }: CategoryBannerCarou
         clearInterval(timerRef.current);
       }
     };
-  }, [images.length]);
+  }, [images.length, autoScroll, scrollInterval]);
 
   // Reset timer on manual interaction
   const resetTimer = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
-    if (images.length > 1) {
+    if (images.length > 1 && autoScroll) {
       timerRef.current = setInterval(() => {
         setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
-      }, 3000);
+      }, scrollInterval);
     }
   };
 

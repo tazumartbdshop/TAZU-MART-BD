@@ -170,12 +170,13 @@ async function startServer() {
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (origin) {
+      console.log(`[CORS] Request from origin: ${origin} for path: ${req.path}`);
       res.setHeader('Access-Control-Allow-Origin', origin);
     } else {
       res.setHeader('Access-Control-Allow-Origin', '*');
     }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
@@ -413,6 +414,22 @@ async function startServer() {
       res.json({ status: "success" });
     } catch (error) {
       res.status(500).json({ error: "Failed to save config" });
+    }
+  });
+
+  // Admin Customers API
+  app.get("/api/admin/customers", async (req, res) => {
+    try {
+      const { data, error } = await executeProxyQuery({
+        table: 'users',
+        method: 'select',
+        filters: [{ type: 'eq', col: 'role', val: 'customer' }]
+      });
+      if (error) throw error;
+      res.json(data || []);
+    } catch (err: any) {
+      console.error("Fetch customers error:", err);
+      res.status(500).json({ error: err.message || "Failed to fetch customers" });
     }
   });
 

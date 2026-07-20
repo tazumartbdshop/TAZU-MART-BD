@@ -109,9 +109,14 @@ class MySqlBuilder {
   then(onfulfilled?: (value: any) => any, onrejected?: (reason: any) => any) {
     const promise = (async () => {
       try {
+        const apiUrl = getApiUrl('/api/mysql-proxy');
+        console.log(`[MySqlBuilder] Fetching ${apiUrl} with method ${this.method}`);
+        
         const res = await withTimeout(
-          fetch(getApiUrl('/api/mysql-proxy'), {
+          fetch(apiUrl, {
             method: 'POST',
+            mode: 'cors',
+            credentials: 'same-origin',
             headers: {
               'Content-Type': 'application/json'
             },
