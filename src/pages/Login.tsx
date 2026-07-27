@@ -9,8 +9,6 @@ import { useWebsitesStore } from '../store/useWebsitesStore';
 import { useModeratorStore } from '../store/useModeratorStore';
 import { useLoginHistoryStore } from '../store/useLoginHistoryStore';
 import { getSupabase } from '../lib/supabase';
-import { safeFetch } from '../utils/apiUrl';
-
 import { cn } from '../lib/utils';
 import { pixelService } from '../utils/pixelService';
 import { getProviderIcon } from '../components/ProviderIcon';
@@ -81,7 +79,7 @@ export default function Login() {
     setOtpError('');
 
     try {
-      const response = await safeFetch('/api/auth/otp/send', {
+      const response = await fetch('/api/auth/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phoneNumber.trim() })
@@ -124,7 +122,7 @@ export default function Login() {
     setOtpError('');
 
     try {
-      const response = await safeFetch('/api/auth/otp/verify', {
+      const response = await fetch('/api/auth/otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: phoneNumber.trim(), code: token })

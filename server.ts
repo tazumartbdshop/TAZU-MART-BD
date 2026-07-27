@@ -3,20 +3,15 @@ import express from "express";
 import path from "path";
 import fs from "fs/promises";
 import { createServer as createViteServer } from "vite";
-import { executeProxyQuery, testConnection } from "./src/lib/mysql_db.ts";
+import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import fsPromises from "fs/promises";
 
 // Configure storage for local uploads
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: async (req, file, cb) => {
     const dir = path.join(process.cwd(), "public", "uploads");
-    try {
-      const fsSync = require('fs');
-      fsSync.mkdirSync(dir, { recursive: true });
-    } catch (e) {
-      console.error("Failed to create uploads directory:", e);
-    }
+    await fsPromises.mkdir(dir, { recursive: true }).catch(() => {});
     cb(null, dir);
   },
   filename: (req, file, cb) => {
@@ -27,76 +22,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-class MockSupabaseClient {
-  auth = {
-    admin: {
-      listUsers: async () => {
-        const { data, error } = await executeProxyQuery({ table: 'users', method: 'select' });
-        return { data: { users: data || [] }, error };
-      },
-      createUser: async (payload) => {
-        const { data, error } = await executeProxyQuery({ table: 'users', method: 'insert', payload });
-        return { data: { user: data }, error };
-      },
-      updateUserById: async (id, payload) => {
-        const { data, error } = await executeProxyQuery({ table: 'users', method: 'update', payload, filters: [{ type: 'eq', col: 'id', val: id }] });
-        return { data: { user: data }, error };
-      },
-      deleteUser: async (id) => {
-         const { data, error } = await executeProxyQuery({ table: 'users', method: 'delete', filters: [{ type: 'eq', col: 'id', val: id }] });
-         return { data, error };
-      },
-      getUserById: async (id) => {
-        const { data, error } = await executeProxyQuery({ table: 'users', method: 'select', filters: [{ type: 'eq', col: 'id', val: id }] });
-        return { data: { user: data?.[0] }, error };
-      },
-      generateLink: async (params) => {
-        return { data: { properties: { action_link: 'http://localhost:3000/reset-password' } }, error: null };
-      }
-    }
-  };
-
-  from(tableName) {
-    return {
-      select: (cols) => this.buildQuery(tableName, 'select', null),
-      insert: (payload) => this.buildQuery(tableName, 'insert', payload),
-      update: (payload) => this.buildQuery(tableName, 'update', payload),
-      upsert: (payload) => this.buildQuery(tableName, 'upsert', payload),
-      delete: () => this.buildQuery(tableName, 'delete', null)
-    };
-  }
-
-  buildQuery(table, method, payload) {
-    const q: any = { table, method, payload, filters: [], limitCount: null, isSingle: false };
-    const chain = {
-      eq: (col, val) => { q.filters.push({ type: 'eq', col, val }); return chain; },
-      neq: (col, val) => { q.filters.push({ type: 'neq', col, val }); return chain; },
-      like: (col, val) => { q.filters.push({ type: 'like', col, val }); return chain; },
-      ilike: (col, val) => { q.filters.push({ type: 'ilike', col, val }); return chain; },
-      in: (col, val) => { q.filters.push({ type: 'in', col, val }); return chain; },
-      order: (col, opts) => { q.orderBy = { col, ascending: opts?.ascending !== false }; return chain; },
-      limit: (num) => { q.limitCount = num; return chain; },
-      single: () => { q.isSingle = true; return chain; },
-      maybeSingle: () => { q.isMaybeSingle = true; return chain; },
-      then: async (resolve, reject) => {
-        try {
-          const res = await executeProxyQuery(q);
-          const result = { data: res.data, error: res.error, count: res.count };
-          if (resolve) resolve(result);
-          return result;
-        } catch (e) {
-          if (reject) reject(e);
-          return { data: null, error: e, count: 0 };
-        }
-      }
-    };
-    return chain;
-  }
-}
-
-function createClient(...args: any[]) {
-  return new MockSupabaseClient();
-}
 
 import twilio from 'twilio';
 import { getApps, initializeApp, getApp } from 'firebase-admin/app';
@@ -165,24 +90,6 @@ async function getSupabaseCredentialsFromFirestore(): Promise<{ supabaseUrl: str
 async function startServer() {
   const app = express();
   const PORT = 3000;
-
-  // Custom CORS middleware to support cross-origin requests from the client's live domain (tazumartbd.com)
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (origin) {
-      console.log(`[CORS] Request from origin: ${origin} for path: ${req.path}`);
-      res.setHeader('Access-Control-Allow-Origin', origin);
-    } else {
-      res.setHeader('Access-Control-Allow-Origin', '*');
-    }
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
-    }
-    next();
-  });
 
   // Domain Redirection Middleware (www to non-www)
   app.use((req, res, next) => {
@@ -256,38 +163,6 @@ async function startServer() {
   }
 
   // API Routes
-  app.get("/api/db-test", async (req, res) => {
-    try {
-      const start = Date.now();
-      const result = await executeProxyQuery({ table: 'settings', method: 'select', limitCount: 1 });
-      const durationMs = Date.now() - start;
-      if (result.error) {
-        return res.status(500).json({
-          success: false,
-          message: "Database query returned an error.",
-          error: result.error,
-          timestamp: new Date().toISOString()
-        });
-      }
-      res.json({
-        success: true,
-        message: "Successfully connected to the MySQL backend production database!",
-        durationMs,
-        timestamp: new Date().toISOString(),
-        host: 'auth-db2141.hstgr.io',
-        database: 'u103041740_TAZU_MART_BD',
-        count: result.count
-      });
-    } catch (err: any) {
-      res.status(500).json({
-        success: false,
-        message: "Failed to connect to the MySQL database.",
-        error: err.message || err,
-        timestamp: new Date().toISOString()
-      });
-    }
-  });
-
   app.get("/api/supabase-config", async (req, res) => {
     try {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -367,21 +242,6 @@ async function startServer() {
     }
   });
 
-  app.post("/api/mysql-proxy", async (req, res) => {
-    const start = Date.now();
-    try {
-      console.log(`[Proxy Request] Table: ${req.body?.table}, Method: ${req.body?.method}`);
-      const result = await executeProxyQuery(req.body);
-      const duration = Date.now() - start;
-      console.log(`[Proxy Response] Success! Table: ${req.body?.table}, Method: ${req.body?.method}, Duration: ${duration}ms`);
-      res.json(result);
-    } catch (err: any) {
-      const duration = Date.now() - start;
-      console.error(`[Proxy Error] Table: ${req.body?.table}, Method: ${req.body?.method}, Duration: ${duration}ms, Error:`, err);
-      res.status(500).json({ error: err.message || "MySQL proxy execution failed" });
-    }
-  });
-
   // Serve local uploaded files statically at /uploads
   const uploadsPath = path.join(process.cwd(), 'public', 'uploads');
   app.use('/uploads', express.static(uploadsPath));
@@ -414,22 +274,6 @@ async function startServer() {
       res.json({ status: "success" });
     } catch (error) {
       res.status(500).json({ error: "Failed to save config" });
-    }
-  });
-
-  // Admin Customers API
-  app.get("/api/admin/customers", async (req, res) => {
-    try {
-      const { data, error } = await executeProxyQuery({
-        table: 'users',
-        method: 'select',
-        filters: [{ type: 'eq', col: 'role', val: 'customer' }]
-      });
-      if (error) throw error;
-      res.json(data || []);
-    } catch (err: any) {
-      console.error("Fetch customers error:", err);
-      res.status(500).json({ error: err.message || "Failed to fetch customers" });
     }
   });
 
@@ -596,50 +440,43 @@ async function startServer() {
   app.get("/api/homepage-data", async (req, res) => {
     try {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      const client = supabaseServiceRole || supabaseAdmin;
       
+      if (!client) {
+        return res.status(500).json({ error: "Supabase client not initialized" });
+      }
+
       const [bannersRes, categoriesRes, productsRes, settingsRes, reviewsRes] = await Promise.all([
-        executeProxyQuery({
-          table: 'banners',
-          method: 'select',
-          orderBy: { col: 'order', ascending: true }
-        }),
-        executeProxyQuery({
-          table: 'categories',
-          method: 'select'
-        }),
-        executeProxyQuery({
-          table: 'products',
-          method: 'select'
-        }),
-        executeProxyQuery({
-          table: 'settings',
-          method: 'select',
-          filters: [{ type: 'eq', col: 'id', val: 'global' }],
-          limitCount: 1
-        }),
-        executeProxyQuery({
-          table: 'reviews',
-          method: 'select',
-          filters: [{ type: 'eq', col: 'status', val: 'approved' }],
-          orderBy: { col: 'created_at', ascending: false }
-        })
+        client.from('banners').select('*').order('order', { ascending: true }),
+        client.from('categories').select('*'),
+        client.from('products').select('*'),
+        client.from('settings').select('*').eq('id', 'global').limit(1),
+        client.from('reviews').select('*').eq('status', 'approved').order('created_at', { ascending: false })
       ]);
+
+      let bannersList = bannersRes.data || [];
+      if (bannersList.length === 0) {
+        const draftBannersRes = await client.from('banners_draft').select('*').order('order', { ascending: true });
+        if (draftBannersRes.data && draftBannersRes.data.length > 0) {
+          bannersList = draftBannersRes.data.filter((b: any) => b.status === 'active' || !b.status);
+        }
+      }
 
       const firstError = bannersRes.error || categoriesRes.error || productsRes.error || settingsRes.error || reviewsRes.error;
 
       if (firstError) {
-        console.error("[MySQL API Connection Error]", firstError);
+        console.error("[Supabase API Connection Error]", firstError);
       }
 
       res.json({
-        banners: bannersRes.data || [],
+        banners: bannersList,
         categories: categoriesRes.data || [],
         products: productsRes.data || [],
         settings: settingsRes.data || [],
         reviews: reviewsRes.data || [],
         dbError: firstError ? {
           message: typeof firstError === 'string' ? firstError : firstError.message,
-          code: firstError.code || 'MYSQL_ERROR',
+          code: firstError.code || 'SUPABASE_ERROR',
           status: 500,
           isQuotaRestricted: false
         } : null
@@ -658,17 +495,15 @@ async function startServer() {
         return res.status(400).json({ error: "productId parameter is required" });
       }
 
-      const { data, error } = await executeProxyQuery({
-        table: 'reviews',
-        method: 'select',
-        filters: [
-          { type: 'eq', col: 'product_id', val: productId },
-          { type: 'eq', col: 'status', val: 'approved' }
-        ]
-      });
+      const client = supabaseServiceRole || supabaseAdmin;
+      const { data, error } = client ? await client
+        .from('reviews')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('status', 'approved') : { data: null, error: 'Client uninitialized' };
 
       if (error) {
-        console.error("Error fetching reviews for summary from MySQL:", error);
+        console.error("Error fetching reviews for summary from Supabase:", error);
         return res.status(500).json({ error: "Failed to fetch reviews" });
       }
 
@@ -707,27 +542,28 @@ async function startServer() {
   app.get("/api/footer-settings", async (req, res) => {
     try {
       let footerData: any = null;
-      const { data, error } = await executeProxyQuery({
-        table: 'footer_settings',
-        method: 'select',
-        filters: [{ type: 'eq', col: 'id', val: 'global' }],
-        limitCount: 1
-      });
-      
-      if (!error && data && data.length > 0) {
-        footerData = data[0];
-      } else {
-        // Try getting from settings table with id = 'footer_settings'
-        const { data: settingsData, error: settingsError } = await executeProxyQuery({
-          table: 'settings',
-          method: 'select',
-          filters: [{ type: 'eq', col: 'id', val: 'footer_settings' }],
-          limitCount: 1
-        });
+      const client = supabaseServiceRole || supabaseAdmin;
+      if (client) {
+        const { data, error } = await client
+          .from('footer_settings')
+          .select('*')
+          .eq('id', 'global')
+          .limit(1);
         
-        if (!settingsError && settingsData && settingsData.length > 0) {
-          const val = settingsData[0].value;
-          footerData = typeof val === 'string' ? JSON.parse(val) : val;
+        if (!error && data && data.length > 0) {
+          footerData = data[0];
+        } else {
+          // Try getting from settings table with id = 'footer_settings'
+          const { data: settingsData, error: settingsError } = await client
+            .from('settings')
+            .select('*')
+            .eq('id', 'footer_settings')
+            .limit(1);
+          
+          if (!settingsError && settingsData && settingsData.length > 0) {
+            const val = settingsData[0].value;
+            footerData = typeof val === 'string' ? JSON.parse(val) : val;
+          }
         }
       }
 
@@ -964,11 +800,11 @@ async function startServer() {
         });
       }
       
-      const { data: promos, error: promoError } = await executeProxyQuery({
-        table: 'promo_codes',
-        method: 'select',
-        filters: [{ type: 'ilike', col: 'code', val: code.trim() }]
-      });
+      const client = supabaseServiceRole || supabaseAdmin;
+      const { data: promos, error: promoError } = client ? await client
+        .from('promo_codes')
+        .select('*')
+        .ilike('code', code.trim()) : { data: null, error: 'Client uninitialized' };
       
       let matchingPromo: any = null;
       if (promos && promos.length > 0) {
@@ -2709,21 +2545,8 @@ Please ask me your query or select a quick question template below!`;
     });
   }
 
-  app.listen(PORT, "0.0.0.0", async () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server is listening on 0.0.0.0:${PORT}`);
-    
-    // Ping MySQL Production Database on startup to verify connectivity
-    try {
-      console.log("[MySQL Connection Test] Pinging production database on startup...");
-      const dbTest = await executeProxyQuery({ table: 'settings', method: 'select', limitCount: 1 });
-      if (dbTest.error) {
-        console.error("[MySQL Connection Test] ❌ Failed to reach database on startup:", dbTest.error);
-      } else {
-        console.log("[MySQL Connection Test] ✅ Successfully reached production database on startup!");
-      }
-    } catch (err: any) {
-      console.error("[MySQL Connection Test] ❌ Fatal exception during startup database check:", err.message || err);
-    }
   });
 }
 

@@ -3,8 +3,6 @@ import { useProductStore } from '../store/useProductStore';
 import { useBannerStore } from '../store/useBannerStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useReviewStore } from '../store/useReviewStore';
-import { safeFetch } from './apiUrl';
-
 
 function toCamelCase(str: string): string {
   return str.replace(/([-_][a-z])/ig, ($1) => {
@@ -238,7 +236,7 @@ export function preloadImage(url: string): Promise<void> {
 
 export async function preloadHomepageDataAndAssets(): Promise<void> {
   try {
-    const res = await safeFetch('/api/homepage-data');
+    const res = await fetch('/api/homepage-data');
     if (!res.ok) throw new Error("Failed to fetch homepage data");
     const data = await res.json();
 
@@ -280,6 +278,9 @@ export async function preloadHomepageDataAndAssets(): Promise<void> {
 
     // Save to local caches so subsequent views are instant from store initializer
     try {
+      localStorage.setItem('supabase_cached_banners', JSON.stringify(banners));
+      localStorage.setItem('supabase_cached_categories', JSON.stringify(categories));
+      localStorage.setItem('supabase_cached_products', JSON.stringify(products));
       localStorage.setItem('cached_banners', JSON.stringify(banners));
       localStorage.setItem('cached_categories', JSON.stringify(categories));
       localStorage.setItem('cached_products', JSON.stringify(products));

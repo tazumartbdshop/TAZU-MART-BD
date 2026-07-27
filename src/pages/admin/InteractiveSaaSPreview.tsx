@@ -8,7 +8,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { IMAGES } from './demoPages';
 import { useSettingsStore } from '../../store/useSettingsStore';
-import { useCategoryStore } from '../../store/useCategoryStore';
 
 interface TemplateDemoModalProps {
   template: any;
@@ -19,15 +18,6 @@ interface TemplateDemoModalProps {
 
 export function TemplateDemoModal({ template, onClose, onUse, formData }: TemplateDemoModalProps) {
   const settings = useSettingsStore(state => state.settings);
-  const { categories, fetchCategories, isLoaded } = useCategoryStore();
-  
-  useEffect(() => {
-    if (!isLoaded) {
-      fetchCategories();
-    }
-  }, [isLoaded, fetchCategories]);
-  
-  const dbCategoryNames = categories.map(c => c.name).filter(n => n);
   const emailToShow = settings.adminEmail || "admin.tazumartbd@gmail.com";
   const passwordToShow = settings.adminPassword || "8963885522";
 
@@ -41,12 +31,7 @@ export function TemplateDemoModal({ template, onClose, onUse, formData }: Templa
   const primaryColor = formData?.color || '#000000';
   const fontPreset = formData?.font || 'Inter (Sans-serif)';
   const themeType = formData?.theme_type || 'Sharp Corners (Square)';
-  
-  // Use database categories if available, otherwise fallback to defaults
-  const categoriesList = formData?.categories?.length > 0 
-    ? formData.categories 
-    : (dbCategoryNames.length > 0 ? dbCategoryNames.slice(0, 5) : ['Smartphone', 'Fashion', 'Grocery']);
-
+  const categoriesList = formData?.categories?.length > 0 ? formData.categories : ['Smartphone', 'Fashion', 'Grocery'];
   const hotline = formData?.phone || '+8801700000000';
   const currencyCode = formData?.currency || 'BDT';
   const currencySymbol = currencyCode === 'BDT' ? '৳' : '$';

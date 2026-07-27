@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Image as ImageIcon, ChevronLeft, MoreVertical, Check, ExternalLink, Database } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCategoryStore, Category } from '../../store/useCategoryStore';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CategoryList() {
   const navigate = useNavigate();

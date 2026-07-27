@@ -32,7 +32,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useThemeStore, ThemeConfig } from '../../store/useThemeStore';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { ThemePreviewContainer } from '../../components/admin/ThemePreviewContainer';
 import Home from '../../pages/Home';

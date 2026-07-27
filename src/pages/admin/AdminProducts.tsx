@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
 import { Search, Plus, Edit, Trash2, Upload, X, Image as ImageIcon, ChevronLeft, ChevronDown, ChevronRight, Camera, AlertCircle, Loader2, Database } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useProductStore, generateKeywords } from '../../store/useProductStore';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { toast } from 'react-hot-toast';
@@ -612,50 +612,41 @@ function AdminProductAdd() {
     }
 
     try {
-        const toastId = toast.loading("⏳ Initializing product save...");
-        console.log("Saving process started...");
+        const { uploadImage } = await import('../../lib/imageUtils');
+        console.log("Image utils imported.");
 
         // 1. Upload Product Banner if needed
         let finalBannerUrl = bannerImage;
         if (bannerFile) {
-          toast.loading("⏳ Uploading product banner image...", { id: toastId });
           console.log("Uploading product banner...");
           try {
             finalBannerUrl = await uploadImage(bannerFile, 'products', bannerFile.name);
-            console.log("Banner uploaded successfully:", finalBannerUrl);
+            console.log("Banner uploaded.");
           } catch (err) {
             console.error("Banner upload error:", err);
-            toast.error("❌ Failed to upload product banner.", { id: toastId });
             throw new Error("Failed to upload product banner.");
           }
         }
 
-        // 2. Upload any newly selected/modified files
+        // 2. Upload any newly selected/modified files to Firebase Storage
         const finalImageUrls: string[] = [];
         console.log("Uploading product images...");
         
-        for (let i = 0; i < uploadedImages.length; i++) {
-          const img = uploadedImages[i];
-          if (!img) continue;
-          
-          const imgUrl = img.url || '';
-          if (img.file && (imgUrl.startsWith('blob:') || imgUrl.startsWith('data:'))) {
-            toast.loading(`⏳ Uploading product image (${i + 1}/${uploadedImages.length})...`, { id: toastId });
+        for (const img of uploadedImages) {
+          if (img.file && (img.url.startsWith('blob:') || img.url.startsWith('data:'))) {
             try {
-              const downloadUrl = await uploadImage(img.file, 'products', img.name || `image_${i}`);
+              const downloadUrl = await uploadImage(img.file, 'products', img.name);
               finalImageUrls.push(downloadUrl);
-              console.log(`Uploaded image ${i + 1} successfully:`, downloadUrl);
             } catch (uploadErr) {
-              console.error(`Product image upload error for ${img.name}:`, uploadErr);
-              toast.error(`❌ Failed to upload product image: ${img.name || i}`, { id: toastId });
-              throw new Error(`Failed to upload ${img.name || 'image'}. Please try again.`);
+              console.error("Firebase Storage Upload Error:", uploadErr);
+              throw new Error(`Failed to upload ${img.name}. Please try again.`);
             }
-          } else if (imgUrl) {
-            // Keep remote URL as is
-            finalImageUrls.push(imgUrl);
+          } else {
+            // This is already a remote URL, keep it
+            finalImageUrls.push(img.url);
           }
         }
-        console.log("Product images processed:", finalImageUrls);
+        console.log("Product images uploaded.");
 
         const mainImage = finalImageUrls[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60';
 
@@ -701,19 +692,16 @@ function AdminProductAdd() {
           )
         };
 
-        toast.loading("⏳ Writing product record to live MySQL database...", { id: toastId });
-        console.log("Saving payload to Supabase/MySQL database...");
-        
+        console.log("Saving payload to Supabase...");
         if (isEditing && id) {
           await updateProduct(id, payload);
-          console.log("Product updated in live DB.");
+          console.log("Product updated.");
         } else {
           await addProduct(payload);
-          console.log("Product added to live DB.");
+          console.log("Product added.");
         }
         
-        toast.success("✅ Product Saved Successfully to Live Database", {
-          id: toastId,
+        toast.success("✅ Product Saved Successfully", {
           position: "top-center",
           style: {
             background: "#10B981",

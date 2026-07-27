@@ -4,7 +4,6 @@ import { deleteImage } from '../lib/imageUtils';
 import { objectToSnake, objectToCamel } from '../lib/supabaseUtils';
 import { broadcastSync } from '../lib/broadcastSync';
 import { generateSlug } from '../lib/utils';
-import { resolveImageUrl } from '../utils/apiUrl';
 
 // Strict list of actual database columns present in the MySQL `products` table
 export const VALID_PRODUCT_COLUMNS = new Set([
@@ -199,7 +198,6 @@ interface ProductState {
   addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => Promise<void>;
   updateProduct: (id: string, updatedFields: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
-  fetchProducts: () => Promise<void>;
   subscribe: () => () => void;
   autoRankTrending: () => void;
   autoRankBestSellers: () => void;
@@ -436,11 +434,11 @@ const mapDbToProduct = (row: any): Product => {
     price: Number(camelRow.price || 0),
     discountPrice: camelRow.discountPrice,
     stock: Number(camelRow.stock || 0),
-    image: resolveImageUrl(camelRow.image || camelRow.imageUrl || camelRow.featuredImage || ''),
-    imageUrl: resolveImageUrl(camelRow.imageUrl || camelRow.image || ''),
-    featured_image: resolveImageUrl(camelRow.featuredImage || camelRow.image || ''),
-    banner_image: resolveImageUrl(camelRow.bannerImage || ''),
-    images: parsedImages.map(resolveImageUrl),
+    image: camelRow.image || camelRow.imageUrl || camelRow.featuredImage || '',
+    imageUrl: camelRow.imageUrl || camelRow.image || '',
+    featured_image: camelRow.featuredImage || camelRow.image || '',
+    banner_image: camelRow.bannerImage || '',
+    images: parsedImages,
     videoUrl: camelRow.videoUrl || camelRow.mediaUrl || '',
     mediaUrl: camelRow.mediaUrl || camelRow.videoUrl || '',
     rating: Number(camelRow.rating || 4.5),
@@ -725,48 +723,6 @@ export const useProductStore = create<ProductState>((set, get) => ({
       }
     }
   },
-
-  fetchProducts: async () => {
-    const supabase = getSupabase();
-    if (!supabase) {
-        set({ isLoaded: true });
-        return;
-    }
-    
-    const { url } = (window as any).getSupabaseCredentials?.() || {};
-    console.log(`[Supabase Product Sync] Querying 'products' from: ${url || 'Injected Key'}`);
-    
-    const { data, error, status, statusText } = await supabase.from('products').select('*');
-    if (!error && data) {
-        console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products. (HTTP ${status})`, "color: #10b981; font-weight: bold;");
-        try {
-          const mapped = data.map((row, index) => {
-            try {
-              return mapDbToProduct(row);
-            } catch (err) {
-              console.error(`[Supabase Product Sync] Mapping failed for row index ${index}:`, row, err);
-              throw err;
-            }
-          });
-          
-          set({ products: mapped, isLoading: false, isLoaded: true });
-          saveCachedProducts(mapped);
-        } catch (mapErr) {
-          console.error("[Supabase Product Sync] Critical mapping error:", mapErr);
-          set({ isLoaded: true });
-        }
-    } else if (error) {
-        console.error("%c[Supabase Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
-          code: error.code,
-          message: error.message,
-          hint: (error as any).hint,
-          details: (error as any).details,
-          httpStatus: status,
-          httpStatusText: statusText
-        });
-        set({ isLoaded: true });
-    }
-  },
   
   subscribe: () => {
     // Start non-blocking directly from cache
@@ -778,7 +734,43 @@ export const useProductStore = create<ProductState>((set, get) => ({
         return () => {}; // No-op if not configured
     }
     
-    get().fetchProducts();
+    const { url } = (window as any).getSupabaseCredentials?.() || {};
+    console.log(`[Supabase Product Sync] Querying 'products' from: ${url || 'Injected Key'}`);
+    
+    // Direct, fast asynchronous fetch from the live database
+    supabase.from('products').select('*').then(({ data, error, status, statusText }) => {
+        if (!error && data) {
+            console.log(`%c[Supabase Product Sync] SUCCESS: Fetched ${data.length} products. (HTTP ${status})`, "color: #10b981; font-weight: bold;");
+            try {
+              const mapped = data.map((row, index) => {
+                try {
+                  return mapDbToProduct(row);
+                } catch (err) {
+                  console.error(`[Supabase Product Sync] Mapping failed for row index ${index}:`, row, err);
+                  throw err;
+                }
+              });
+              
+              set({ products: mapped, isLoading: false, isLoaded: true });
+              saveCachedProducts(mapped);
+            } catch (mapErr) {
+              console.error("[Supabase Product Sync] Critical mapping error:", mapErr);
+              set({ isLoaded: true });
+            }
+        } else if (error) {
+            console.error("%c[Supabase Product Sync] FETCH ERROR:", "color: #ef4444; font-weight: bold;", {
+              code: error.code,
+              message: error.message,
+              hint: (error as any).hint,
+              details: (error as any).details,
+              httpStatus: status,
+              httpStatusText: statusText
+            });
+            set({ isLoaded: true });
+        }
+    }, (pErr) => {
+        console.error("[Supabase Product Sync] CONNECTION ERROR:", pErr);
+    });
  
     const channel = supabase
       .channel('public:products:' + Math.random().toString(36).substring(2, 9))
@@ -794,7 +786,7 @@ export const useProductStore = create<ProductState>((set, get) => ({
         });
       })
       .subscribe();
-       
+      
     return () => {
       supabase.removeChannel(channel);
     };

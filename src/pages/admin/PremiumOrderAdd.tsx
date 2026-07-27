@@ -35,7 +35,7 @@ import { useProductStore } from '../../store/useProductStore';
 import { useDeliveryStore } from '../../store/useDeliveryStore';
 import { useCustomerStore } from '../../store/useCustomerStore';
 import { formatPrice } from '../../lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface PremiumOrderAddProps {
   editId?: string;

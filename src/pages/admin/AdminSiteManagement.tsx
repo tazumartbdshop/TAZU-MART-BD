@@ -43,17 +43,8 @@ export default function AdminSiteManagement() {
   useEffect(() => {
     if (data) {
       setLocalData(data);
-    } else if (!isLoading && !localData) {
-      // Fallback to default structure if no data and not loading to prevent blank screen
-      setLocalData({
-        developer_button_name: 'Web Developer',
-        developer_status: true,
-        fashion_button_name: 'Visit Fashion Site',
-        fashion_status: true,
-        custom_links: []
-      });
     }
-  }, [data, isLoading, localData]);
+  }, [data]);
 
   const handleSave = async () => {
     try {

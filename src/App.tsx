@@ -51,7 +51,6 @@ import LiveWebsiteGenerator from './pages/generated/LiveWebsiteGenerator';
 import LiveWebsiteAdmin from './pages/generated/LiveWebsiteAdmin';
 import Wishlist from './pages/Wishlist';
 import WebViewViewer from './pages/WebViewViewer';
-import ConnectivityTest from './pages/ConnectivityTest';
 
 import OrderHistoryPage from './pages/orders/OrderHistoryPage';
 import OrderDetailView from './pages/orders/OrderDetailView';
@@ -311,7 +310,6 @@ export default function App() {
           <Route path="search" element={<Search />} />
           <Route path="account" element={<Login />} />
           <Route path="viewer" element={<WebViewViewer />} />
-          <Route path="connectivity-test" element={<ConnectivityTest />} />
           
           <Route path="cart" element={<Cart />} />
           <Route path="login" element={<Login />} />

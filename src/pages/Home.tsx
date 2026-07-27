@@ -57,9 +57,9 @@ export default function Home() {
   const { settings } = useSettingsStore();
 
   const [isPreloaded, setIsPreloaded] = useState(() => {
-    return useCategoryStore.getState().categories.length > 0 &&
-           useProductStore.getState().products.length > 0 &&
-           useBannerStore.getState().banners.length > 0;
+    return useCategoryStore.getState().isLoaded ||
+           useProductStore.getState().isLoaded ||
+           useBannerStore.getState().isLoaded;
   });
 
   useEffect(() => {

@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Upload, Image as ImageIcon, X, Trash2, ArrowRight, Camera, AlertCircle, Eye, Globe } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCategoryStore, Category } from '../../store/useCategoryStore';
-import { getApiUrl } from '../../utils/apiUrl';
 import { cn } from '../../lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { uploadImage } from '../../lib/imageUtils';
 import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';
@@ -256,62 +255,40 @@ export default function AddCategory() {
     setIsLoading(true);
     console.log("handleSubmit started: Uploading images...");
 
-    // Create a safety timeout for the entire operation
-    const safetyTimeout = setTimeout(() => {
-      if (isLoading) {
-        console.error("Critical: Form submission is taking too long (30s+). Forcing loading state to off.");
-        setIsLoading(false);
-        toast.error("⚠️ The operation is taking longer than expected. Please check your internet connection or try again.");
-      }
-    }, 30000);
-
     try {
         
          // Upload thumbnail if changed
         let iconUrl = formData.iconImage;
         if (thumbnailFile) {
           console.log("Uploading thumbnail...");
-          try {
-            iconUrl = await uploadImage(thumbnailFile, 'categories', `icon-${formData.slug}`, 'categories');
-          } catch (uploadErr) {
-            console.warn("Thumbnail upload failed, but continuing with fallback or existing URL", uploadErr);
-          }
-          console.log("Thumbnail step complete, URL:", iconUrl);
+          iconUrl = await uploadImage(thumbnailFile, 'categories', `icon-${formData.slug}`, 'categories');
+          console.log("Thumbnail uploaded, URL:", iconUrl);
         }
 
         // Upload wide banner (16:9) if changed
         let wideBannerUrl = formData.wideBannerImage;
         if (wideBannerFile) {
           console.log("Uploading wide banner...");
-          try {
-            wideBannerUrl = await uploadImage(wideBannerFile, 'categories', `wide-banner-${formData.slug}`, 'categories');
-          } catch (uploadErr) {
-            console.warn("Wide banner upload failed, continuing...", uploadErr);
-          }
-          console.log("Wide banner step complete, URL:", wideBannerUrl);
+          wideBannerUrl = await uploadImage(wideBannerFile, 'categories', `wide-banner-${formData.slug}`, 'categories');
+          console.log("Wide banner uploaded, URL:", wideBannerUrl);
         }
 
         // Upload all new banners
-        console.log("Uploading banners gallery...");
+        console.log("Uploading banners...");
         const finalBannerUrls = await Promise.all(
           bannerFiles.map(async (fileOrUrl) => {
             if (typeof fileOrUrl === 'string') return fileOrUrl;
-            try {
-              return await uploadImage(fileOrUrl, 'categories', `banner-${formData.slug}-${Math.random().toString(36).substring(7)}`, 'categories');
-            } catch (uploadErr) {
-              console.warn("Individual banner upload failed, using fallback", uploadErr);
-              return ''; // Or handle better
-            }
+            return await uploadImage(fileOrUrl, 'categories', `banner-${formData.slug}-${Math.random().toString(36).substring(7)}`, 'categories');
           })
         );
-        console.log("Banners gallery complete, URLs:", finalBannerUrls);
+        console.log("Banners uploaded, URLs:", finalBannerUrls);
 
         const payload = {
           name: formData.name,
           slug: formData.slug || formData.name.toLowerCase().trim().replace(/\s+/g, '-'),
           bannerName: formData.bannerName || formData.name,
           bannerImage: finalBannerUrls[0] || '',
-          bannerImages: finalBannerUrls.filter(u => u !== ''),
+          bannerImages: finalBannerUrls,
           sliderSettings: sliderSettings,
           iconImage: iconUrl,
           wideBannerImage: wideBannerUrl,
@@ -320,24 +297,24 @@ export default function AddCategory() {
           featuredProducts: formData.featuredProducts,
           description: formData.description,
           displayOrder: Number(formData.displayOrder) || 1,
-          status: formData.status as 'Active' | 'Inactive',
+          status: formData.status,
           showOnHomepage: formData.showOnHomepage,
           metaTitle: formData.metaTitle,
           metaDescription: formData.metaDescription,
           keywords: formData.keywords,
-          createdAt: Date.now()
+          imageUrl: iconUrl,
+          image_url: iconUrl
         };
 
-        console.log("Sending payload to Database Store:", payload);
+        console.log("Uploading payload to Supabase...");
         if (isEditing && id) {
           await updateCategory(id, payload);
-          console.log("Database Update Complete.");
+          console.log("Category updated in Supabase.");
         } else {
           await addCategory(payload);
-          console.log("Database Insert Complete.");
+          console.log("Category added to Supabase.");
         }
         
-        clearTimeout(safetyTimeout);
         toast.success(isEditing ? "✅ Category Updated Successfully" : "✅ Category Added Successfully", {
           position: "top-center",
           style: {
@@ -351,14 +328,11 @@ export default function AddCategory() {
         setIsDirty(false);
         navigate('/admin/category-listing');
     } catch (error: any) {
-        clearTimeout(safetyTimeout);
-        console.error("Save Category Final Error:", error);
-        const apiUrl = getApiUrl('/api/mysql-proxy');
-        toast.error(`❌ Connection Error: ${error.message || "Failed to save"}. (Target: ${apiUrl})`);
+        console.error("Save Category Error:", error);
+        toast.error(`❌ Failed to save category: ${error.message || error}`);
     } finally {
         setIsLoading(false);
-        clearTimeout(safetyTimeout);
-        console.log("handleSubmit operation finished.");
+        console.log("handleSubmit finished (finally block).");
     }
   };
 
@@ -484,10 +458,9 @@ export default function AddCategory() {
                         <button
                           type="button"
                           onClick={removeThumbnailImage}
-                          className="absolute -top-3 -right-3 bg-red-600 border-2 border-white text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 cursor-pointer z-10 transition-transform hover:scale-110 active:scale-95"
-                          title="Remove Image"
+                          className="absolute -top-2 -right-2 bg-red-600 border border-zinc-200 text-white p-1 hover:bg-red-700 cursor-pointer"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ) : (
@@ -529,7 +502,7 @@ export default function AddCategory() {
                     {bannerImages.length > 0 && (
                       <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
                         {bannerImages.map((bUrl, idx) => (
-                          <div key={idx} className="relative flex-shrink-0 w-[120px] h-[70px] border border-zinc-200 p-0.5 bg-white group rounded-lg">
+                          <div key={idx} className="relative flex-shrink-0 w-[120px] h-[70px] border border-zinc-200 p-0.5 bg-white group rounded-lg overflow-hidden">
                             <img src={bUrl} alt={`banner ${idx}`} className="w-full h-full object-cover rounded-md" referrerPolicy="no-referrer" />
                             
                             {/* Management Actions */}
@@ -558,14 +531,13 @@ export default function AddCategory() {
                               >
                                 Edit
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => removeBannerImage(idx)}
-                                className="absolute -top-2 -right-2 bg-red-600 border-2 border-white text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 cursor-pointer z-10 transition-transform hover:scale-110 active:scale-95"
-                                title="Remove Banner"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeBannerImage(idx)}
+                                  className="text-white hover:text-red-400 absolute top-1 right-1 bg-red-600/50 p-0.5 rounded"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
                             </div>
                           </div>
                         ))}
@@ -581,49 +553,9 @@ export default function AddCategory() {
                       onChange={(e) => processBannerFiles(e.target.files)} 
                     />
                     {bannerError && (
-                      <p className="text-[10px] text-red-600 font-bold mt-2">{bannerError}</p>
+                      <p className="text-[10px] text-red-650 text-red-650 text-red-600 font-bold mt-2">{bannerError}</p>
                     )}
                   </div>
-                </div>
-
-                {/* 6. Wide Banner (Full width header context) */}
-                <span className="h-px bg-zinc-100 block" />
-                <div className="space-y-4">
-                  <h5 className="text-[10px] font-black text-black uppercase tracking-widest">Wide Page Background Banner</h5>
-                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight -mt-3">A wide horizontal banner used as a header background for this category page.</p>
-                  
-                  {formData.wideBannerImage ? (
-                    <div className="relative w-full h-32 bg-zinc-50 border border-zinc-200 p-2 flex items-center justify-center rounded-lg">
-                      <img src={formData.wideBannerImage} alt="Wide banner" className="w-full h-full object-cover rounded" referrerPolicy="no-referrer" />
-                      <button
-                        type="button"
-                        onClick={removeWideBannerImage}
-                        className="absolute -top-3 -right-3 bg-red-600 border-2 border-white text-white p-1.5 rounded-full shadow-lg hover:bg-red-700 cursor-pointer z-10 transition-transform hover:scale-110 active:scale-95"
-                        title="Remove Wide Banner"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div 
-                      onClick={() => wideBannerInputRef.current?.click()}
-                      className="w-full h-32 border-2 border-dashed border-zinc-200 hover:border-black bg-zinc-50 hover:bg-zinc-100/50 cursor-pointer flex flex-col items-center justify-center gap-2 transition-all rounded-lg"
-                    >
-                      <ImageIcon className="w-6 h-6 text-gray-400" />
-                      <span className="text-[9px] text-gray-400 font-black uppercase tracking-widest">Upload Wide Banner (Recommended 1920x400)</span>
-                    </div>
-                  )}
-                  
-                  <input 
-                    type="file" 
-                    ref={wideBannerInputRef}
-                    className="hidden" 
-                    accept="image/*"
-                    onChange={(e) => processWideBannerFile(e.target.files)}
-                  />
-                  {wideBannerError && (
-                    <p className="text-[10px] text-red-600 font-bold">{wideBannerError}</p>
-                  )}
                 </div>
 
               </div>
@@ -671,7 +603,7 @@ export default function AddCategory() {
                     <p className="text-sm font-bold text-blue-700 hover:underline cursor-pointer">
                       {formData.metaTitle || (formData.name ? `${formData.name} - Tazu Mart BD` : 'Page Title Preview')}
                     </p>
-                    <p className="text-[10px] text-green-600">https://tazumartbd.com/category/{formData.slug || 'category-name'}</p>
+                    <p className="text-[10px] text-green-750 text-green-700">https://tazumartbd.com/category/{formData.slug || 'category-name'}</p>
                     <p className="text-[11px] text-gray-500 font-medium leading-relaxed mt-1">
                       {formData.metaDescription || (formData.description || 'Provide a meta description overview details...')}
                     </p>
@@ -778,7 +710,7 @@ export default function AddCategory() {
                 min="1"
               />
               {displayOrderError && (
-                <p className="text-[10px] text-red-600 font-bold">{displayOrderError}</p>
+                <p className="text-[10px] text-red-650 text-red-650 text-red-600 font-bold">{displayOrderError}</p>
               )}
             </div>
 

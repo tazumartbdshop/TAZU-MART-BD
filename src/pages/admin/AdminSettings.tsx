@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
 import { 
   Store, Palette, MapPin, User, Users, ShoppingBag, 
   Truck, CreditCard, Bell, FileText, Search, Share2, 
   Shield, Monitor, ShoppingCart, HeadphonesIcon, Zap,
   Image as ImageIcon, Database, Menu, X, Plus, Save
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSettingsStore, AppSettings } from '../../store/useSettingsStore';
 import TemplateDraftBar from '../../components/admin/TemplateDraftBar';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useProductStore } from '../../store/useProductStore';
 import { useCustomerStore } from '../../store/useCustomerStore';
 import { useOrderStore } from '../../store/useOrderStore';
-import { getApiUrl } from '../../utils/apiUrl';
 
 const SETTING_MODULES = [
   { id: 'owner', name: 'Business Owner', icon: User, desc: 'Owner Information' },
@@ -46,7 +44,6 @@ export default function AdminSettings() {
   const [formState, setFormState] = useState<AppSettings>(draftSettings);
   const [isSaving, setIsSaving] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  const [showErrorToast, setShowErrorToast] = useState<string | null>(null);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [nextTab, setNextTab] = useState<string | null>(null);
 
@@ -82,7 +79,6 @@ export default function AdminSettings() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    setShowErrorToast(null);
     try {
       updateDraftSettings(formState);
       await useSettingsStore.getState().publishSettings();
@@ -90,12 +86,8 @@ export default function AdminSettings() {
       setTimeout(() => {
         setShowToast(false);
       }, 3000);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to save settings:", err);
-      setShowErrorToast(err?.message || "Failed to save settings. Please try again.");
-      setTimeout(() => {
-        setShowErrorToast(null);
-      }, 5000);
     } finally {
       setIsSaving(false);
     }
@@ -610,8 +602,8 @@ export default function AdminSettings() {
             <h3 className="text-xs font-black uppercase tracking-widest text-[#000000]">System Backups & Control</h3>
             <Toggle label="Auto Backup Database" field="autoBackup" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-               <button type="button" onClick={async () => { let toastId; try { toastId = toast.loading("⏳ Testing connection..."); const res = await fetch(getApiUrl('/api/db-test')); const data = await res.json(); if (data.success) { toast.success(`✅ Connected! (${data.durationMs}ms)`, { id: toastId }); } else { toast.error("❌ Connection failed", { id: toastId }); } } catch (e) { toast.error("❌ Connection error", { id: toastId }); } }} className="bg-black text-white font-bold p-4 text-[10px] uppercase tracking-widest hover:bg-zinc-800 flex items-center justify-center gap-2 border border-black cursor-pointer transition-colors">
-                  <Database className="w-4 h-4 text-purple-400" /> Test Connection
+               <button className="bg-black text-white font-bold p-4 text-[10px] uppercase tracking-widest hover:bg-zinc-800 flex items-center justify-center gap-2 border border-black cursor-pointer transition-colors">
+                  <Database className="w-4 h-4 text-purple-400" /> Export Database
                </button>
                <button className="bg-gray-150 text-gray-700 border border-black font-bold p-4 text-[10px] uppercase tracking-widest hover:bg-gray-200 flex items-center justify-center gap-2 cursor-pointer transition-colors">
                   Restore System Backup
@@ -778,25 +770,6 @@ export default function AdminSettings() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               <span>✓ Saved Successfully</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Error Save Toast */}
-      <AnimatePresence>
-        {showErrorToast && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center w-full max-w-md px-4"
-          >
-            <div className="bg-rose-600 text-white px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 font-semibold text-sm border border-rose-500 font-sans w-full">
-              <svg className="w-5 h-5 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span className="flex-1 text-left">{showErrorToast}</span>
             </div>
           </motion.div>
         )}

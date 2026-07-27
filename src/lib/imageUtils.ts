@@ -1,5 +1,4 @@
 import { getSupabase } from './supabase';
-import { getApiUrl } from '../utils/apiUrl';
 
 // Helper to add timeout to promise
 const withTimeout = <T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> => {
@@ -70,16 +69,10 @@ export const uploadImage = async (
     const formData = new FormData();
     formData.append('file', file, originalName || 'file.jpg');
 
-    const uploadPromise = fetch(getApiUrl('/api/upload'), {
+    const response = await fetch('/api/upload', {
       method: 'POST',
       body: formData,
     });
-
-    const response = await withTimeout(
-      uploadPromise,
-      8000,
-      "Upload request timed out after 8 seconds"
-    );
 
     if (!response.ok) {
       throw new Error(`Upload API returned error status ${response.status}`);

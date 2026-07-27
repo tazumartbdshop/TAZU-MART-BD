@@ -1,7 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { supabase } from './supabase';
-import { getApiUrl } from '../utils/apiUrl';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -18,8 +17,7 @@ export function formatPrice(price: number) {
 
 export async function safeFetchJSON<T = any>(url: string, options?: RequestInit): Promise<T> {
   try {
-    const resolvedUrl = url.startsWith('/api/') ? getApiUrl(url) : url;
-    const response = await fetch(resolvedUrl, options);
+    const response = await fetch(url, options);
     const contentType = response.headers.get("content-type");
 
     if (response.ok && contentType?.includes("application/json")) {

@@ -1,6 +1,4 @@
 import { getSupabase } from '../lib/supabase';
-import { safeFetch } from '../utils/apiUrl';
-
 
 export interface FooterQuickLink {
   name: string;
@@ -157,7 +155,7 @@ export const footerSettingsService = {
     
     // First, try to fetch from Express server proxy API
     try {
-      const response = await safeFetch('/api/footer-settings');
+      const response = await fetch('/api/footer-settings');
       if (response.ok) {
         const data = await response.json();
         if (data && data.id === 'global') {
@@ -219,7 +217,7 @@ export const footerSettingsService = {
     // 1. Save to Express server proxy API
     let apiSuccess = false;
     try {
-      const response = await safeFetch('/api/footer-settings', {
+      const response = await fetch('/api/footer-settings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

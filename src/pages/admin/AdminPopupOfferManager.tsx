@@ -581,9 +581,9 @@ export default function AdminPopupOfferManager() {
                             setCropPreview(null);
                             setBannerUrl('');
                           }}
-                          className="text-[10px] uppercase font-black tracking-wider bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 active:scale-95 flex items-center gap-1.5"
+                          className="text-[10px] uppercase font-black tracking-wider bg-red-100 text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-200 active:scale-95"
                         >
-                          <Trash2 className="w-3 h-3" /> Discard
+                          Discard
                         </button>
                       </div>
                     </div>
@@ -1093,9 +1093,9 @@ export default function AdminPopupOfferManager() {
                     setCropModalOpen(false);
                     setRawImage(null);
                   }}
-                  className="bg-neutral-150 text-neutral-600 font-black text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl flex items-center gap-1.5"
+                  className="bg-neutral-150 text-neutral-600 font-black text-[10px] uppercase tracking-wider py-2 px-4 rounded-xl"
                 >
-                  <Trash2 className="w-3 h-3" /> Discard
+                  Cancel
                 </button>
                 <button
                   type="button"

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { useAuthStore } from '../store/useAuthStore';
 import { LogIn, UserPlus, ArrowRight, Star, ShieldCheck, ShoppingBag, ArrowLeft } from 'lucide-react';
 

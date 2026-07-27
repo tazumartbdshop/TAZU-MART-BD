@@ -1,5 +1,5 @@
 import { Clock, ShieldCheck, Truck, RefreshCcw } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 
 export function TrustSection() {
   const features = [
