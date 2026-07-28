@@ -1,28 +1,20 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Facebook, 
-  Instagram, 
-  ChevronRight,
-  Clock,
-  Send,
-  MessageCircle,
-  PhoneCall,
-  Youtube,
-  Music2
-} from 'lucide-react';
+import { MapPin, Phone, Mail, Facebook, Instagram, Youtube, Send, MessageCircle, Clock } from 'lucide-react';
 import { useFooterSettingsStore } from '../../store/useFooterSettingsStore';
+import { themeSettingsService } from '../../services/themeSettingsService';
 
 export function Footer() {
   const { settings, fetchFooterSettings } = useFooterSettingsStore();
+  const [themeMode, setThemeMode] = useState<'black' | 'white'>('white');
 
   useEffect(() => {
     fetchFooterSettings();
 
-    // Listen to live update event dispatched when admin saves settings
+    themeSettingsService.getThemeMode().then((mode) => {
+      setThemeMode(mode === 'black' ? 'black' : 'white');
+    });
+
     const handleLiveUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail) {
@@ -30,278 +22,217 @@ export function Footer() {
       }
     };
 
+    const handleThemeModeChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setThemeMode(customEvent.detail === 'black' ? 'black' : 'white');
+      }
+    };
+
     window.addEventListener('tazu-footer-updated', handleLiveUpdate);
+    window.addEventListener('tazu-theme-mode-changed', handleThemeModeChange);
     return () => {
       window.removeEventListener('tazu-footer-updated', handleLiveUpdate);
+      window.removeEventListener('tazu-theme-mode-changed', handleThemeModeChange);
     };
   }, []);
 
-  const SocialIcon = ({ platform, className }: { platform: string, className?: string }) => {
-    switch (platform.toLowerCase()) {
-      case 'facebook': return <Facebook className={className} />;
-      case 'messenger': return <Send className={className} />; // clean representation
-      case 'whatsapp': return <MessageCircle className={className} />;
-      case 'instagram': return <Instagram className={className} />;
-      case 'telegram': return <Send className={className} />;
-      case 'youtube': return <Youtube className={className} />;
-      case 'tiktok': return <Music2 className={className} />;
-      default: return null;
-    }
-  };
+  if (!settings) return null;
 
-  // Build list of active, enabled social links from dynamic settings
-  const activeSocials = [];
-  if (settings?.social_facebook_enabled && settings?.social_facebook) {
-    activeSocials.push({ name: 'facebook', url: settings.social_facebook });
-  }
-  if (settings?.social_messenger_enabled && settings?.social_messenger) {
-    activeSocials.push({ name: 'messenger', url: settings.social_messenger });
-  }
-  if (settings?.social_whatsapp_enabled && settings?.social_whatsapp) {
-    activeSocials.push({ name: 'whatsapp', url: settings.social_whatsapp });
-  }
-  if (settings?.social_instagram_enabled && settings?.social_instagram) {
-    activeSocials.push({ name: 'instagram', url: settings.social_instagram });
-  }
-  if (settings?.social_telegram_enabled && settings?.social_telegram) {
-    activeSocials.push({ name: 'telegram', url: settings.social_telegram });
-  }
-  if (settings?.social_youtube_enabled && settings?.social_youtube) {
-    activeSocials.push({ name: 'youtube', url: settings.social_youtube });
-  }
-  if (settings?.social_tiktok_enabled && settings?.social_tiktok) {
-    activeSocials.push({ name: 'tiktok', url: settings.social_tiktok });
-  }
+  const isDark = themeMode === 'black';
 
-  // Safely parse quick_links
-  let quickLinks: any[] = [];
-  if (Array.isArray(settings?.quick_links)) {
-    quickLinks = settings.quick_links;
-  } else if (typeof settings?.quick_links === 'string') {
-    try {
-      quickLinks = JSON.parse(settings.quick_links);
-    } catch (e) {}
-  }
-  if (!Array.isArray(quickLinks)) {
-    quickLinks = [];
-  }
+  const socialLinks = [
+    { key: 'facebook', icon: Facebook, data: settings.facebook },
+    { key: 'instagram', icon: Instagram, data: settings.instagram },
+    { key: 'youtube', icon: Youtube, data: settings.youtube },
+    { key: 'messenger', icon: Send, data: settings.messenger },
+    { key: 'whatsapp', icon: MessageCircle, data: settings.socialWhatsapp },
+    { key: 'tiktok', icon: ({className}: {className?: string}) => <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 15.68a6.34 6.34 0 0 0 6.27 6.32 6.32 6.32 0 0 0 6.27-6.32V10a8.2 8.2 0 0 0 4.46 1.34v-3.45a4.8 4.8 0 0 1-2.41-1.2z"/></svg>, data: settings.tiktok }
+  ].filter(s => s.data && s.data.enabled && s.data.url);
 
-  // Safely parse payment_badges
-  let paymentBadges: string[] = [];
-  if (Array.isArray(settings?.payment_badges)) {
-    paymentBadges = settings.payment_badges;
-  } else if (typeof settings?.payment_badges === 'string') {
-    try {
-      paymentBadges = JSON.parse(settings.payment_badges);
-    } catch (e) {}
-  }
-  if (!Array.isArray(paymentBadges)) {
-    paymentBadges = [];
-  }
+  const activePayments = (settings.paymentMethods || []).filter(p => p.enabled);
 
   return (
-    <footer className="bg-zinc-950 text-zinc-300 border-t border-zinc-900 pt-16 pb-24 md:pb-12 transition-all duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        
-        {/* Four Column Responsive Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+    <footer className={`transition-colors duration-200 border-t ${
+      isDark 
+        ? 'bg-[#0a0a0a] text-white border-zinc-800' 
+        : 'bg-white text-zinc-900 border-zinc-200'
+    }`} data-footer-theme={isDark ? 'dark' : 'light'}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           
-          {/* Column 1: Branding & About */}
-          <div className="space-y-5">
-            {settings.show_footer_logo && (
-              <Link to="/" className="inline-block">
-                {settings.footer_logo ? (
-                  <img 
-                    src={settings.footer_logo} 
-                    alt="Footer Logo" 
-                    style={{ 
-                      width: settings.footer_logo_width ? `${settings.footer_logo_width}px` : '150px',
-                      height: settings.footer_logo_height ? `${settings.footer_logo_height}px` : '40px'
-                    }}
-                    className="object-contain" 
-                    referrerPolicy="no-referrer" 
-                  />
-                ) : (
-                  <span className="font-sans font-black text-lg tracking-widest text-white uppercase">
-                    TAZU MART BD
-                  </span>
-                )}
-              </Link>
-            )}
-
-            {settings.show_about_section && (
-              <div className="space-y-2">
-                {settings.about_title && (
-                  <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">
-                    {settings.about_title}
-                  </h5>
-                )}
-                <p className="text-xs text-zinc-400 leading-relaxed max-w-xs">
-                  {settings.about_description}
+          {/* Column 1: Company Logo & About */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3">
+              {settings.footerLogoUrl && (
+                <img 
+                  src={settings.footerLogoUrl} 
+                  alt={settings.companyName || 'Logo'} 
+                  className="h-10 w-auto object-contain shrink-0" 
+                />
+              )}
+              <h2 className={`text-xl font-black tracking-tight ${isDark ? 'text-white' : 'text-zinc-900'}`}>
+                {settings.companyName || 'TAZU MART'}
+              </h2>
+            </div>
+            
+            <div className="space-y-2">
+              {settings.companyTagline && (
+                <p className={`text-sm font-semibold ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
+                  {settings.companyTagline}
                 </p>
-              </div>
-            )}
+              )}
+              {settings.businessDescription && (
+                <p className={`text-sm leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                  {settings.businessDescription}
+                </p>
+              )}
+            </div>
 
-            {settings.show_social_icons && activeSocials.length > 0 && (
-              <div className="flex flex-wrap gap-3 pt-2">
-                {activeSocials.map((social) => (
-                  <a 
-                    key={social.name}
-                    href={social.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-9 h-9 border border-zinc-800 hover:border-white hover:text-white flex items-center justify-center transition-all bg-zinc-900/40 text-zinc-400"
-                    title={`Follow us on ${social.name}`}
-                  >
-                    <SocialIcon platform={social.name} className="w-4 h-4" />
-                  </a>
-                ))}
+            {socialLinks.length > 0 && (
+              <div className="flex gap-3 pt-2">
+                {socialLinks.map((social) => {
+                  const Icon = social.icon;
+                  return (
+                    <a 
+                      key={social.key} 
+                      href={social.data.url} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className={`w-10 h-10 border flex items-center justify-center transition-colors ${
+                        isDark 
+                          ? 'border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white' 
+                          : 'border-zinc-200 text-zinc-600 hover:bg-zinc-900 hover:text-white hover:border-zinc-900'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </a>
+                  )
+                })}
               </div>
             )}
           </div>
 
           {/* Column 2: Quick Links */}
-          <div>
-            {settings.show_quick_links && (
-              <>
-                <h4 className="font-black uppercase tracking-[0.25em] text-[10px] text-white mb-6 border-l-2 border-white pl-2">
-                  Quick Navigation
-                </h4>
-                <ul className="space-y-3.5">
-                  {quickLinks.map((link, idx) => (
-                    <li key={idx}>
-                      <Link 
-                        to={link.url} 
-                        className="text-xs text-zinc-400 hover:text-white transition-all flex items-center gap-1 group w-max"
-                      >
-                        <ChevronRight className="w-3 h-3 text-zinc-600 group-hover:translate-x-1 transition-transform shrink-0" />
-                        <span className="font-semibold">{link.name}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
+          <div className="space-y-6">
+            <h3 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-zinc-900'}`}>
+              Quick Links
+            </h3>
+            <ul className="space-y-3">
+              {(settings.quickLinks || []).map((link, idx) => (
+                link.label && link.url ? (
+                  <li key={idx}>
+                    <Link to={link.url} className={`text-sm transition-colors font-medium ${
+                      isDark 
+                        ? 'text-zinc-300 hover:text-white' 
+                        : 'text-zinc-500 hover:text-zinc-900'
+                    }`}>
+                      {link.label}
+                    </Link>
+                  </li>
+                ) : null
+              ))}
+            </ul>
           </div>
 
-          {/* Column 3: Contact Info */}
-          <div>
-            {settings.show_contact_info && (
-              <>
-                <h4 className="font-black uppercase tracking-[0.25em] text-[10px] text-white mb-6 border-l-2 border-white pl-2">
-                  Contact Support
-                </h4>
-                <div className="space-y-4">
-                  {settings.contact_address && (
-                    <div className="flex items-start gap-3">
-                      <MapPin className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
-                      <div className="space-y-0.5">
-                        <span className="block text-[8px] font-black uppercase tracking-widest text-zinc-500">Store Address</span>
-                        <p className="text-xs text-zinc-300 font-medium leading-relaxed">{settings.contact_address}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {settings.contact_support_time && (
-                    <div className="flex items-start gap-3">
-                      <Clock className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
-                      <div className="space-y-0.5">
-                        <span className="block text-[8px] font-black uppercase tracking-widest text-zinc-500">Service Hours</span>
-                        <p className="text-xs text-zinc-300 font-semibold">{settings.contact_support_time}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {settings.contact_phone && (
-                    <div className="flex items-start gap-3">
-                      <Phone className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
-                      <div className="space-y-0.5">
-                        <span className="block text-[8px] font-black uppercase tracking-widest text-zinc-500">Direct Phone</span>
-                        <p className="text-xs text-white font-bold tracking-tight">{settings.contact_phone}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {settings.contact_email && (
-                    <div className="flex items-start gap-3">
-                      <Mail className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
-                      <div className="space-y-0.5">
-                        <span className="block text-[8px] font-black uppercase tracking-widest text-zinc-500">Email Address</span>
-                        <p className="text-xs text-zinc-300 font-bold">{settings.contact_email}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+          {/* Column 3: Customer Support / Address */}
+          <div className="space-y-6">
+            <h3 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-zinc-900'}`}>
+              Customer Support
+            </h3>
+            <ul className="space-y-4">
+              {settings.address && (
+                <li className={`flex gap-3 text-sm ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                  <MapPin className={`w-5 h-5 shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-400'}`} />
+                  <span className="leading-relaxed">{settings.address}</span>
+                </li>
+              )}
+              {settings.workingHours && (
+                <li className={`flex gap-3 text-sm ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                  <Clock className={`w-5 h-5 shrink-0 ${isDark ? 'text-zinc-400' : 'text-zinc-400'}`} />
+                  <span>{settings.workingHours}</span>
+                </li>
+              )}
+            </ul>
           </div>
 
-          {/* Column 4: Customer Support Card Widget */}
-          <div>
-            {settings.show_support_card && (
-              <div className="bg-zinc-900 border border-zinc-800 p-5 space-y-4 shadow-xl">
-                <div className="space-y-1">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-white">
-                    {settings.card_title || 'Customer Support'}
-                  </h4>
-                  <p className="text-[10px] font-medium text-zinc-400">
-                    {settings.card_description || settings.card_subtitle || 'Need help? Contact us now!'}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  {settings.card_whatsapp_link && (
-                    <a 
-                      href={settings.card_whatsapp_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="h-9 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-colors w-full"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                      {settings.card_whatsapp_text || 'Chat on WhatsApp'}
-                    </a>
-                  )}
-
-                  {settings.card_call_phone && (
-                    <a 
-                      href={`tel:${settings.card_call_phone}`}
-                      className="h-9 px-4 border border-zinc-700 hover:bg-zinc-800 text-white font-bold uppercase tracking-widest text-[9px] flex items-center justify-center gap-1.5 transition-all w-full"
-                    >
-                      <PhoneCall className="w-3.5 h-3.5 text-zinc-400" />
-                      {settings.card_call_text || 'Call Support'}
-                    </a>
-                  )}
-                </div>
-              </div>
-            )}
+          {/* Column 4: Contact Info */}
+          <div className="space-y-6">
+            <h3 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-zinc-900'}`}>
+              Contact Information
+            </h3>
+            <ul className="space-y-4">
+              {settings.phone && (
+                <li className="flex items-center gap-3">
+                  <div className={`w-10 h-10 flex items-center justify-center ${
+                    isDark ? 'bg-zinc-900' : 'bg-zinc-50'
+                  }`}>
+                    <Phone className={`w-4 h-4 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Phone</span>
+                    <a href={`tel:${settings.phone}`} className={`text-sm font-bold hover:underline ${
+                      isDark ? 'text-white' : 'text-zinc-900'
+                    }`}>{settings.phone}</a>
+                  </div>
+                </li>
+              )}
+              {settings.contactWhatsapp && (
+                <li className="flex items-center gap-3">
+                  <div className={`w-10 h-10 flex items-center justify-center ${
+                    isDark ? 'bg-emerald-950/60' : 'bg-emerald-50'
+                  }`}>
+                    <MessageCircle className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">WhatsApp</span>
+                    <a href={`https://wa.me/${settings.contactWhatsapp}`} target="_blank" rel="noreferrer" className={`text-sm font-bold hover:underline ${
+                      isDark ? 'text-white' : 'text-zinc-900'
+                    }`}>{settings.contactWhatsapp}</a>
+                  </div>
+                </li>
+              )}
+              {settings.email && (
+                <li className="flex items-center gap-3">
+                  <div className={`w-10 h-10 flex items-center justify-center ${
+                    isDark ? 'bg-zinc-900' : 'bg-zinc-50'
+                  }`}>
+                    <Mail className={`w-4 h-4 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Email</span>
+                    <a href={`mailto:${settings.email}`} className={`text-sm font-bold hover:underline ${
+                      isDark ? 'text-white' : 'text-zinc-900'
+                    }`}>{settings.email}</a>
+                  </div>
+                </li>
+              )}
+            </ul>
           </div>
-
         </div>
 
-        {/* Bottom copyright & payment stickers */}
-        {(settings.show_copyright || (settings.show_payment_badges && paymentBadges.length > 0)) && (
-          <div className="border-t border-zinc-900 pt-8 mt-12 flex flex-col md:flex-row items-center justify-between gap-6">
-            {settings.show_copyright && (
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 text-center md:text-left">
-                {settings.copyright_text || '© 2026 TAZU MART BD. All Rights Reserved.'}
-              </p>
-            )}
-
-            {settings.show_payment_badges && paymentBadges.length > 0 && (
-              <div className="flex flex-wrap gap-2 justify-center">
-                {paymentBadges.map((badge, idx) => (
-                  <div 
-                    key={idx} 
-                    className="px-3 py-1 bg-zinc-900 border border-zinc-800 text-[8px] font-black tracking-widest text-zinc-400 uppercase"
-                  >
-                    {badge}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
+        {/* Bottom Section */}
+        <div className={`mt-16 pt-8 border-t flex flex-col md:flex-row items-center justify-between gap-6 ${
+          isDark ? 'border-zinc-800' : 'border-zinc-100'
+        }`}>
+          <p className={`text-sm font-medium text-center md:text-left ${
+            isDark ? 'text-zinc-400' : 'text-zinc-500'
+          }`}>
+            {settings.copyrightText}
+          </p>
+          
+          {activePayments.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {activePayments.map(payment => (
+                <div key={payment.id} className={`px-3 py-1.5 border text-xs font-bold uppercase tracking-wider ${
+                  isDark ? 'border-zinc-800 text-zinc-300 bg-zinc-900' : 'border-zinc-200 text-zinc-600'
+                }`}>
+                  {payment.name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </footer>
   );

@@ -374,7 +374,7 @@ export default function AdminDashboard() {
   }, [sidebarOpen]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="admin-app min-h-screen bg-gray-50 flex">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 

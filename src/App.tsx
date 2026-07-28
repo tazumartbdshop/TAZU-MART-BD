@@ -56,6 +56,12 @@ import OrderHistoryPage from './pages/orders/OrderHistoryPage';
 import OrderDetailView from './pages/orders/OrderDetailView';
 
 import AdminContentPages from './pages/admin/AdminContentPages';
+import BrandsInformationPage from './pages/BrandsInformationPage';
+import AboutUsPage from './pages/AboutUsPage';
+import ContactUsPage from './pages/ContactUsPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsConditionsPage from './pages/TermsConditionsPage';
+import RefundPolicyPage from './pages/RefundPolicyPage';
 import DynamicLinkPage from './pages/DynamicLinkPage';
 import { useSiteManagementStore } from './store/useSiteManagementStore';
 import { useWebsitesStore } from './store/useWebsitesStore';
@@ -327,6 +333,12 @@ export default function App() {
 
           <Route path="admin/link-pages" element={<AdminContentPages />} />
           {/* Dynamic Link Pages */}
+          <Route path="brands" element={<BrandsInformationPage />} />
+          <Route path="about-us" element={<AboutUsPage />} />
+          <Route path="contact-us" element={<ContactUsPage />} />
+          <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="terms-and-conditions" element={<TermsConditionsPage />} />
+          <Route path="refund-policy" element={<RefundPolicyPage />} />
           <Route path=":slug" element={<DynamicLinkPage />} />
 
           <Route element={<ProtectedRoute />}>

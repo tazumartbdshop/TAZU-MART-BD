@@ -1,6 +1,8 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { Header } from './Header';
 import { Footer } from './Footer';
+import { FooterBanner } from './FooterBanner';
+import { FeatureTicker } from './FeatureTicker';
 import { BrandShowcase } from './BrandShowcase';
 import { MobileBottomNav } from './MobileBottomNav';
 import { ShieldAlert } from 'lucide-react';
@@ -52,7 +54,7 @@ export function UserLayout() {
     location.pathname === '/account/dashboard';
   
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="user-app min-h-screen flex flex-col">
       {dbError && dbError.isQuotaRestricted && (
         <div className="w-full bg-amber-500 text-neutral-950 font-sans px-4 py-3.5 border-b border-amber-600 shadow-lg relative z-[99999] animate-in slide-in-from-top duration-300">
           <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
@@ -87,7 +89,13 @@ export function UserLayout() {
         <Outlet />
       </main>
       
-      {isHome && <Footer />}
+      {isHome && (
+        <>
+          <FooterBanner />
+          <FeatureTicker />
+          <Footer />
+        </>
+      )}
       {isBrandShowcasePage && <BrandShowcase />}
       <MobileBottomNav />
       <StorefrontPopup />

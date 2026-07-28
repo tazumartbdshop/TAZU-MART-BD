@@ -96,19 +96,9 @@ export const ThemeInitializer: React.FC = () => {
     root.style.setProperty('--footer-link', theme.footerLinkColor);
     root.style.setProperty('--footer-icon', theme.footerIconColor);
 
-    // Mode
-    if (theme.mode === 'dark') {
-      root.classList.add('dark');
-    } else if (theme.mode === 'light') {
-      root.classList.remove('dark');
-    } else {
-      // Auto
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    }
+    // Mode - isolated to Footer
+    root.classList.remove('dark');
+    root.setAttribute('data-footer-theme', theme.mode === 'dark' ? 'dark' : 'light');
   }, [theme]);
 
   // Apply typography fonts dynamically

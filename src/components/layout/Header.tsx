@@ -13,6 +13,8 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useSiteManagementStore } from '../../store/useSiteManagementStore';
 import { useBrandingStore } from '../../store/useBrandingStore';
+import { useThemeStore } from '../../store/useThemeStore';
+import { themeSettingsService } from '../../services/themeSettingsService';
 import { cn } from '../../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import LogoutModal from '../ui/LogoutModal';
@@ -26,7 +28,8 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchDrawerOpen, setIsSearchDrawerOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { theme } = useThemeStore();
+  const isDarkMode = theme.mode === 'dark';
   const [isBangla, setIsBangla] = useState(false);
   const [logoError, setLogoError] = useState(false);
   const cartCount = useCartStore((state) => state.getCartCount());
@@ -70,17 +73,11 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Sync dark mode class
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
   const toggleLanguage = () => setIsBangla(!isBangla);
-  const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
+  const toggleDarkMode = async () => {
+    const nextMode = isDarkMode ? 'white' : 'black';
+    await themeSettingsService.saveThemeMode(nextMode);
+  };
 
   const t = {
     menu: isBangla ? 'মেনু' : 'Menu',

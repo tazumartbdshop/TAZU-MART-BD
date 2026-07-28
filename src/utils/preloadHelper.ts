@@ -228,9 +228,21 @@ export function preloadImage(url: string): Promise<void> {
       return;
     }
     const img = new Image();
+    
+    const timeoutId = setTimeout(() => {
+      resolve();
+    }, 1500);
+    
+    img.onload = () => {
+      clearTimeout(timeoutId);
+      resolve();
+    };
+    img.onerror = () => {
+      clearTimeout(timeoutId);
+      resolve(); // Resolve anyway so we don't block app rendering
+    };
+    
     img.src = url;
-    img.onload = () => resolve();
-    img.onerror = () => resolve(); // Resolve anyway so we don't block app rendering
   });
 }
 

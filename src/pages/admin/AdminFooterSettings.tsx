@@ -1,761 +1,525 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Save, 
-  Loader2, 
-  Check, 
-  AlertTriangle,
-  RotateCcw
-} from 'lucide-react';
+import { Save, Loader2, Edit3, ImagePlus, X, Settings2, AlertTriangle, CheckCircle, Copy, Check } from 'lucide-react';
 import { useFooterSettingsStore } from '../../store/useFooterSettingsStore';
-import { FooterSettings, FooterQuickLink } from '../../services/footerSettingsService';
+import { FooterSettings, FooterQuickLink, PaymentMethodSetting } from '../../services/footerSettingsService';
+import { themeSettingsService, ThemeMode } from '../../services/themeSettingsService';
+import { flutterSettingsDbService, FlutterSettingsDbResult } from '../../services/flutterSettingsDbService';
 import { uploadImage } from '../../lib/imageUtils';
+import { ThemeSettingsSection } from '../../components/admin/ThemeSettingsSection';
 
 export default function AdminFooterSettings() {
-  const { settings, isLoading, fetchFooterSettings } = useFooterSettingsStore();
+  const { settings, isLoading, fetchFooterSettings, updateFooterSettings } = useFooterSettingsStore();
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
 
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
+  // Database verification feedback state
+  const [dbMessage, setDbMessage] = useState<string | null>(null);
+  const [dbErrorType, setDbErrorType] = useState<'TABLE_MISSING' | 'COLUMNS_MISSING' | 'SAVE_FAILED' | null>(null);
+  const [dbSqlInstruction, setDbSqlInstruction] = useState<string | null>(null);
+  const [copiedSql, setCopiedSql] = useState(false);
 
-  // Local Form States
-  const [footerLogo, setFooterLogo] = useState('');
-  const [footerLogoWidth, setFooterLogoWidth] = useState(150);
-  const [footerLogoHeight, setFooterLogoHeight] = useState(40);
+  // Theme Settings state
+  const [selectedTheme, setSelectedTheme] = useState<ThemeMode>('white');
 
-  const [aboutTitle, setAboutTitle] = useState('');
-  const [aboutDescription, setAboutDescription] = useState('');
+  // When editMode is false, inputs are locked
+  const [editMode, setEditMode] = useState(true);
 
-  const [socialFacebook, setSocialFacebook] = useState('');
-  const [socialMessenger, setSocialMessenger] = useState('');
-  const [socialWhatsapp, setSocialWhatsapp] = useState('');
-  const [socialInstagram, setSocialInstagram] = useState('');
-  const [socialTelegram, setSocialTelegram] = useState('');
-  const [socialYoutube, setSocialYoutube] = useState('');
-  const [socialTiktok, setSocialTiktok] = useState('');
+  // Local Form State
+  const [localSettings, setLocalSettings] = useState<FooterSettings | null>(null);
 
-  const [quickLinks, setQuickLinks] = useState<FooterQuickLink[]>([]);
-
-  const [contactAddress, setContactAddress] = useState('');
-  const [contactSupportTime, setContactSupportTime] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-
-  const [cardTitle, setCardTitle] = useState('');
-  const [cardDescription, setCardDescription] = useState('');
-  const [cardWhatsappText, setCardWhatsappText] = useState('');
-  const [cardWhatsappLink, setCardWhatsappLink] = useState('');
-  const [cardCallText, setCardCallText] = useState('');
-  const [cardCallPhone, setCardCallPhone] = useState('');
-
-  const [copyrightText, setCopyrightText] = useState('');
-  const [paymentBadges, setPaymentBadges] = useState<string[]>([]);
-  const [newBadgeText, setNewBadgeText] = useState('');
-
-  // Form Submission Validation Flag to highlight empty fields
-  const [hasSubmittedAttempt, setHasSubmittedAttempt] = useState(false);
-
-  // Initialize
   useEffect(() => {
     fetchFooterSettings();
+    themeSettingsService.getThemeMode().then((mode) => {
+      setSelectedTheme(mode);
+      themeSettingsService.applyThemeModeToApp(mode);
+    });
   }, []);
 
-  // Sync state with store values (Populates fields on initial load)
+  const handleSelectTheme = (theme: ThemeMode) => {
+    setSelectedTheme(theme);
+    themeSettingsService.applyThemeModeToApp(theme);
+  };
+
   useEffect(() => {
     if (settings) {
-      setFooterLogo(settings.footer_logo || '');
-      setFooterLogoWidth(settings.footer_logo_width || 150);
-      setFooterLogoHeight(settings.footer_logo_height || 40);
-
-      setAboutTitle(settings.about_title || '');
-      setAboutDescription(settings.about_description || '');
-
-      setCardTitle(settings.card_title || '');
-      setCardDescription(settings.card_description || settings.card_subtitle || '');
-      setCardWhatsappText(settings.card_whatsapp_text || '');
-      setCardWhatsappLink(settings.card_whatsapp_link || '');
-      setCardCallText(settings.card_call_text || '');
-      setCardCallPhone(settings.card_call_phone || '');
-
-      setSocialFacebook(settings.social_facebook || '');
-      setSocialMessenger(settings.social_messenger || '');
-      setSocialWhatsapp(settings.social_whatsapp || '');
-      setSocialInstagram(settings.social_instagram || '');
-      setSocialTelegram(settings.social_telegram || '');
-      setSocialYoutube(settings.social_youtube || '');
-      setSocialTiktok(settings.social_tiktok || '');
-
-      setQuickLinks(settings.quick_links || []);
-
-      setContactAddress(settings.contact_address || '');
-      setContactSupportTime(settings.contact_support_time || '');
-      setContactPhone(settings.contact_phone || '');
-      setContactEmail(settings.contact_email || '');
-
-      setCopyrightText(settings.copyright_text || '');
-      setPaymentBadges(settings.payment_badges || []);
+      setLocalSettings(settings);
+      setEditMode(false); // Locked by default when loaded
     }
   }, [settings]);
 
-  // Save changes
   const handleSave = async () => {
-    setHasSubmittedAttempt(true);
-    setValidationError(null);
-    setDbErrorMessage(null);
-
+    if (!localSettings) return;
     setSaveStatus('saving');
+    setDbMessage(null);
+    setDbErrorType(null);
+    setDbSqlInstruction(null);
 
     try {
-      const payload: FooterSettings = {
-        id: 'global',
-        footer_logo: footerLogo,
-        footer_logo_width: Number(footerLogoWidth) || 150,
-        footer_logo_height: Number(footerLogoHeight) || 40,
-        about_title: aboutTitle,
-        about_description: aboutDescription,
-        card_title: cardTitle,
-        card_subtitle: cardDescription, // sync with subtitle for legacy rendering fallback
-        card_description: cardDescription,
-        card_whatsapp_text: cardWhatsappText,
-        card_whatsapp_link: cardWhatsappLink,
-        card_call_text: cardCallText,
-        card_call_phone: cardCallPhone,
-        social_facebook: socialFacebook,
-        social_messenger: socialMessenger,
-        social_whatsapp: socialWhatsapp,
-        social_instagram: socialInstagram,
-        social_telegram: socialTelegram,
-        social_youtube: socialYoutube,
-        social_tiktok: socialTiktok,
-        social_facebook_enabled: !!socialFacebook,
-        social_messenger_enabled: !!socialMessenger,
-        social_whatsapp_enabled: !!socialWhatsapp,
-        social_instagram_enabled: !!socialInstagram,
-        social_telegram_enabled: !!socialTelegram,
-        social_youtube_enabled: !!socialYoutube,
-        social_tiktok_enabled: !!socialTiktok,
-        quick_links: quickLinks,
-        contact_address: contactAddress,
-        contact_support_time: contactSupportTime,
-        contact_phone: contactPhone,
-        contact_email: contactEmail,
-        copyright_text: copyrightText,
-        payment_badges: paymentBadges,
-        show_footer_logo: !!footerLogo,
-        show_about_section: !!aboutTitle || !!aboutDescription,
-        show_social_icons: !!(socialFacebook || socialMessenger || socialWhatsapp || socialInstagram || socialTelegram || socialYoutube || socialTiktok),
-        show_quick_links: quickLinks.length > 0,
-        show_contact_info: !!(contactAddress || contactSupportTime || contactPhone || contactEmail),
-        show_support_card: !!cardTitle || !!cardDescription,
-        show_copyright: !!copyrightText,
-        show_payment_badges: paymentBadges.length > 0
-      };
+      const dbResult = await flutterSettingsDbService.verifyAndSaveFlutterSettings(
+        localSettings,
+        selectedTheme
+      );
 
-      // Perform strict database write request
-      const response = await fetch('/api/footer-settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP error code ${response.status}`);
+      if (!dbResult.success) {
+        setDbMessage(dbResult.message);
+        setDbErrorType(dbResult.errorType || 'SAVE_FAILED');
+        setDbSqlInstruction(dbResult.sqlInstruction || null);
+        setSaveStatus('error');
+        return;
       }
 
-      const resData = await response.json();
-      if (resData.success) {
-        // Reload values from the database and sync the global store
-        await fetchFooterSettings();
-        setSaveStatus('success');
-        setHasSubmittedAttempt(false);
-        setTimeout(() => setSaveStatus('idle'), 5000);
-      } else {
-        throw new Error("Failed to verify saved values against the database after saving.");
-      }
+      await Promise.all([
+        updateFooterSettings(localSettings),
+        themeSettingsService.saveThemeMode(selectedTheme)
+      ]);
+
+      setDbMessage('Flutter settings saved successfully.');
+      setSaveStatus('success');
+      setEditMode(false);
+      setTimeout(() => setSaveStatus('idle'), 4000);
     } catch (e: any) {
-      console.error("Detailed error while saving footer settings:", e);
-      setDbErrorMessage(e.message || "Failed to save footer settings. Please try again.");
+      console.error(e);
+      setDbMessage(e.message || 'An error occurred while saving.');
       setSaveStatus('error');
     }
   };
 
-  // Reset Form back to empty/default blank state
-  const handleReset = () => {
-    if (window.confirm("Are you sure you want to clear the form? This will reset all local text inputs to empty. (Your database records will not change until you click Save Changes).")) {
-      setFooterLogo('');
-      setFooterLogoWidth(150);
-      setFooterLogoHeight(40);
-      setAboutTitle('');
-      setAboutDescription('');
-      setSocialFacebook('');
-      setSocialMessenger('');
-      setSocialWhatsapp('');
-      setSocialInstagram('');
-      setSocialTelegram('');
-      setSocialYoutube('');
-      setSocialTiktok('');
-      setQuickLinks([]);
-      setContactAddress('');
-      setContactSupportTime('');
-      setContactPhone('');
-      setContactEmail('');
-      setCardTitle('');
-      setCardDescription('');
-      setCardWhatsappText('');
-      setCardWhatsappLink('');
-      setCardCallText('');
-      setCardCallPhone('');
-      setCopyrightText('');
-      setPaymentBadges([]);
-      setValidationError(null);
-      setDbErrorMessage(null);
-      setHasSubmittedAttempt(false);
-      setSaveStatus('idle');
-    }
+  const handleCopySql = () => {
+    if (!dbSqlInstruction) return;
+    navigator.clipboard.writeText(dbSqlInstruction);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2000);
   };
 
-  // Logo handlers
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !localSettings) return;
 
     setUploadingLogo(true);
     try {
       const url = await uploadImage(file, 'footer', `footer_logo_${Date.now()}`);
       if (url) {
-        setFooterLogo(url);
+        setLocalSettings({ ...localSettings, footerLogoUrl: url });
       }
     } catch (err) {
-      console.error(err);
-      alert('Failed to upload image.');
+      alert('Failed to upload logo.');
     } finally {
       setUploadingLogo(false);
     }
   };
 
-  // Quick Links handlers
-  const handleAddLink = () => {
-    setQuickLinks([...quickLinks, { name: '', url: '' }]);
-  };
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !localSettings) return;
 
-  const handleUpdateLink = (index: number, field: keyof FooterQuickLink, value: string) => {
-    const updated = [...quickLinks];
-    updated[index] = { ...updated[index], [field]: value };
-    setQuickLinks(updated);
-  };
-
-  const handleDeleteLink = (index: number) => {
-    setQuickLinks(quickLinks.filter((_, i) => i !== index));
-  };
-
-  // Payment Badges handlers
-  const handleAddBadge = () => {
-    if (!newBadgeText.trim()) return;
-    const cleanBadge = newBadgeText.trim().toUpperCase();
-    if (paymentBadges.includes(cleanBadge)) {
-      setNewBadgeText('');
-      return;
+    setUploadingBanner(true);
+    try {
+      const url = await uploadImage(file, 'footer', `footer_banner_${Date.now()}`);
+      if (url) {
+        setLocalSettings({ ...localSettings, footerBannerUrl: url });
+      }
+    } catch (err) {
+      alert('Failed to upload banner.');
+    } finally {
+      setUploadingBanner(false);
     }
-    setPaymentBadges([...paymentBadges, cleanBadge]);
-    setNewBadgeText('');
   };
 
-  const handleDeleteBadge = (badgeName: string) => {
-    setPaymentBadges(paymentBadges.filter(b => b !== badgeName));
+  const updateField = (section: keyof FooterSettings, field: string, value: any) => {
+    if (!localSettings) return;
+    if (section === 'socialWhatsapp') {
+      setLocalSettings({ ...localSettings, socialWhatsapp: { ...localSettings.socialWhatsapp, [field]: value } });
+    } else if (['facebook', 'instagram', 'youtube', 'tiktok', 'messenger'].includes(section)) {
+      setLocalSettings({ ...localSettings, [section]: { ...(localSettings as any)[section], [field]: value } });
+    } else {
+      setLocalSettings({ ...localSettings, [section]: value });
+    }
   };
 
-  if (isLoading && !settings) {
+  const handleUpdateQuickLink = (index: number, field: keyof FooterQuickLink, value: string) => {
+    if (!localSettings) return;
+    const links = [...localSettings.quickLinks];
+    links[index] = { ...links[index], [field]: value };
+    setLocalSettings({ ...localSettings, quickLinks: links });
+  };
+
+  const handleAddQuickLink = () => {
+    if (!localSettings) return;
+    setLocalSettings({
+      ...localSettings,
+      quickLinks: [...localSettings.quickLinks, { label: '', url: '' }]
+    });
+  };
+
+  const handleDeleteQuickLink = (index: number) => {
+    if (!localSettings) return;
+    const links = localSettings.quickLinks.filter((_, i) => i !== index);
+    setLocalSettings({ ...localSettings, quickLinks: links });
+  };
+
+  const handleTogglePaymentMethod = (id: string) => {
+    if (!localSettings) return;
+    const methods = localSettings.paymentMethods.map(m => 
+      m.id === id ? { ...m, enabled: !m.enabled } : m
+    );
+    setLocalSettings({ ...localSettings, paymentMethods: methods });
+  };
+
+  if (isLoading || !localSettings) {
     return (
       <div className="bg-white min-h-screen flex items-center justify-center font-sans">
-        <div className="flex items-center gap-3 text-zinc-600">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span className="text-xs uppercase tracking-widest font-black">Loading configurations...</span>
-        </div>
+        <Loader2 className="w-5 h-5 animate-spin text-zinc-600" />
       </div>
     );
   }
 
   return (
     <div className="bg-white min-h-screen py-10 px-4 sm:px-6 md:px-8 font-sans text-zinc-950 overflow-x-hidden">
-      <div className="max-w-2xl mx-auto space-y-6 w-full overflow-hidden">
+      <div className="max-w-4xl mx-auto space-y-8 w-full">
         
-        {/* Header Title */}
-        <div className="border-y border-zinc-200 py-6 mb-8 text-center">
-          <h1 className="text-lg font-black tracking-widest text-zinc-900 uppercase">Footer Management</h1>
+        {/* Header */}
+        <div className="border-b border-zinc-200 pb-4 mb-8">
+          <h1 className="text-2xl font-black tracking-tight text-zinc-900">Footer</h1>
+          <p className="text-sm text-zinc-500 mt-1">Footer Information</p>
         </div>
 
-        {validationError && (
-          <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800 font-semibold">
-            {validationError}
-          </div>
-        )}
-
-        {dbErrorMessage && (
-          <div className="border-l-2 border-red-500 bg-red-50 p-3 text-xs text-red-800 font-semibold">
-            {dbErrorMessage}
-          </div>
-        )}
-
-        {saveStatus === 'success' && (
-          <div className="border-l-2 border-emerald-500 bg-emerald-50 p-3 text-xs text-emerald-800 font-bold">
-            ✅ Footer settings saved successfully.
-          </div>
-        )}
-
-        {/* Footer Logo Section */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Footer Logo</label>
-          <div className="flex gap-2">
-            <label className="flex-1 h-11 px-3 border border-zinc-300 hover:border-black flex items-center justify-between text-sm bg-white cursor-pointer transition-colors">
-              <span className="text-zinc-500 truncate text-xs">
-                {uploadingLogo ? 'Uploading logo image...' : 'Choose Logo File'}
-              </span>
-              <span className="text-xs font-bold uppercase text-zinc-800 border-l border-zinc-200 pl-3 shrink-0">Upload Logo</span>
-              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploadingLogo} />
-            </label>
-            {footerLogo && (
-              <button 
-                type="button" 
-                onClick={() => setFooterLogo('')} 
-                className="h-11 px-4 border border-zinc-300 hover:border-red-500 text-zinc-500 hover:text-red-500 transition-colors text-xs font-bold uppercase shrink-0"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-          {footerLogo && (
-            <div className="mt-2 p-2 border border-zinc-200 bg-zinc-900 inline-block">
-              <img 
-                src={footerLogo} 
-                alt="Logo Preview" 
-                style={{ width: `${footerLogoWidth}px`, height: `${footerLogoHeight}px` }} 
-                className="object-contain max-w-full h-auto"
-                referrerPolicy="no-referrer"
+        {/* Section 1: Company Information */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-800 border-b border-zinc-100 pb-2">Section 1: Company Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-zinc-600 uppercase">Company Name</label>
+              <input 
+                type="text" 
+                value={localSettings.companyName}
+                onChange={(e) => updateField('companyName', '', e.target.value)}
+                disabled={!editMode}
+                className="w-full h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
               />
             </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-zinc-600 uppercase">Company Tagline</label>
+              <input 
+                type="text" 
+                value={localSettings.companyTagline}
+                onChange={(e) => updateField('companyTagline', '', e.target.value)}
+                disabled={!editMode}
+                className="w-full h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-bold text-zinc-600 uppercase">Business Description</label>
+              <textarea 
+                value={localSettings.businessDescription}
+                onChange={(e) => updateField('businessDescription', '', e.target.value)}
+                disabled={!editMode}
+                rows={3}
+                className="w-full p-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500 resize-none"
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-bold text-zinc-600 uppercase">Copyright Text</label>
+              <input 
+                type="text" 
+                value={localSettings.copyrightText}
+                onChange={(e) => updateField('copyrightText', '', e.target.value)}
+                disabled={!editMode}
+                className="w-full h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2: Contact Information */}
+        <div className="space-y-4 pt-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-800 border-b border-zinc-100 pb-2">Section 2: Contact Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-zinc-600 uppercase">Phone Number</label>
+              <input 
+                type="text" 
+                value={localSettings.phone}
+                onChange={(e) => updateField('phone', '', e.target.value)}
+                disabled={!editMode}
+                className="w-full h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-zinc-600 uppercase">WhatsApp Number</label>
+              <input 
+                type="text" 
+                value={localSettings.contactWhatsapp}
+                onChange={(e) => updateField('contactWhatsapp', '', e.target.value)}
+                disabled={!editMode}
+                className="w-full h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-zinc-600 uppercase">Email</label>
+              <input 
+                type="email" 
+                value={localSettings.email}
+                onChange={(e) => updateField('email', '', e.target.value)}
+                disabled={!editMode}
+                className="w-full h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-zinc-600 uppercase">Working Hours</label>
+              <input 
+                type="text" 
+                value={localSettings.workingHours}
+                onChange={(e) => updateField('workingHours', '', e.target.value)}
+                disabled={!editMode}
+                className="w-full h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-bold text-zinc-600 uppercase">Business Address</label>
+              <input 
+                type="text" 
+                value={localSettings.address}
+                onChange={(e) => updateField('address', '', e.target.value)}
+                disabled={!editMode}
+                className="w-full h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3: Quick Links */}
+        <div className="space-y-4 pt-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-800 border-b border-zinc-100 pb-2">Section 3: Quick Links</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {localSettings.quickLinks.map((link, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                <input 
+                  type="text" 
+                  value={link.label}
+                  onChange={(e) => handleUpdateQuickLink(idx, 'label', e.target.value)}
+                  disabled={!editMode}
+                  placeholder="Link Title"
+                  className="w-1/2 h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
+                />
+                <input 
+                  type="text" 
+                  value={link.url}
+                  onChange={(e) => handleUpdateQuickLink(idx, 'url', e.target.value)}
+                  disabled={!editMode}
+                  placeholder="URL"
+                  className="w-1/2 h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-50 disabled:text-zinc-500"
+                />
+                {editMode && (
+                  <button onClick={() => handleDeleteQuickLink(idx)} className="p-2 text-red-500 hover:bg-red-50">
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {editMode && (
+            <button onClick={handleAddQuickLink} className="text-xs font-bold uppercase tracking-wider text-zinc-900 border border-zinc-300 px-4 py-2 hover:bg-zinc-50">
+              + Add Quick Link
+            </button>
           )}
         </div>
 
-        {/* Footer Logo Width */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Footer Logo Width</label>
-          <input 
-            type="number" 
-            value={footerLogoWidth} 
-            onChange={(e) => setFooterLogoWidth(Number(e.target.value) || 0)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. 150"
-          />
-        </div>
-
-        {/* Footer Logo Height */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Footer Logo Height</label>
-          <input 
-            type="number" 
-            value={footerLogoHeight} 
-            onChange={(e) => setFooterLogoHeight(Number(e.target.value) || 0)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. 40"
-          />
-        </div>
-
-        {/* About Title */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            About Title
-          </label>
-          <input 
-            type="text" 
-            value={aboutTitle} 
-            onChange={(e) => setAboutTitle(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. About Tazu Mart"
-          />
-        </div>
-
-        {/* About Description */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            About Description
-          </label>
-          <textarea 
-            value={aboutDescription} 
-            onChange={(e) => setAboutDescription(e.target.value)} 
-            rows={3}
-            className="w-full p-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white resize-none"
-            placeholder="e.g. Browse and shop premium collections with our secure offline / online experience..."
-          />
-        </div>
-
-        {/* Facebook URL */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Facebook URL</label>
-          <input 
-            type="text" 
-            value={socialFacebook} 
-            onChange={(e) => setSocialFacebook(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. https://facebook.com/tazumartbd"
-          />
-        </div>
-
-        {/* Messenger URL */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Messenger URL</label>
-          <input 
-            type="text" 
-            value={socialMessenger} 
-            onChange={(e) => setSocialMessenger(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. https://m.me/tazumartbd"
-          />
-        </div>
-
-        {/* WhatsApp URL */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">WhatsApp URL</label>
-          <input 
-            type="text" 
-            value={socialWhatsapp} 
-            onChange={(e) => setSocialWhatsapp(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. https://wa.me/8801700000000"
-          />
-        </div>
-
-        {/* Instagram URL */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Instagram URL</label>
-          <input 
-            type="text" 
-            value={socialInstagram} 
-            onChange={(e) => setSocialInstagram(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. https://instagram.com/tazumartbd"
-          />
-        </div>
-
-        {/* Telegram URL */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Telegram URL</label>
-          <input 
-            type="text" 
-            value={socialTelegram} 
-            onChange={(e) => setSocialTelegram(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. https://t.me/tazumartbd"
-          />
-        </div>
-
-        {/* YouTube URL */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">YouTube URL</label>
-          <input 
-            type="text" 
-            value={socialYoutube} 
-            onChange={(e) => setSocialYoutube(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. https://youtube.com/tazumartbd"
-          />
-        </div>
-
-        {/* TikTok URL */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">TikTok URL</label>
-          <input 
-            type="text" 
-            value={socialTiktok} 
-            onChange={(e) => setSocialTiktok(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. https://tiktok.com/@tazumartbd"
-          />
-        </div>
-
-        {/* Quick Links Group */}
-        {quickLinks.map((link, idx) => {
-          return (
-            <div key={idx} className="space-y-3 pt-3 pb-3 border-b border-zinc-100 relative">
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-                    Quick Link {idx + 1} Name
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteLink(idx)}
-                    className="text-[10px] text-red-600 hover:text-red-800 font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                  >
-                    Delete Link
-                  </button>
+        {/* Section 4: Social Media */}
+        <div className="space-y-4 pt-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-800 border-b border-zinc-100 pb-2">Section 4: Social Media</h2>
+          <div className="grid grid-cols-1 gap-4">
+            {['facebook', 'instagram', 'youtube', 'tiktok', 'messenger', 'socialWhatsapp'].map((platform) => {
+              const displayLabel = platform === 'socialWhatsapp' ? 'WhatsApp' : platform.charAt(0).toUpperCase() + platform.slice(1);
+              const data = localSettings[platform as keyof FooterSettings] as any;
+              return (
+                <div key={platform} className="flex gap-4 items-center bg-zinc-50 p-3 border border-zinc-200">
+                  <div className="w-24 shrink-0">
+                    <span className="text-sm font-bold text-zinc-700">{displayLabel}</span>
+                  </div>
+                  <input 
+                    type="text"
+                    value={data.url}
+                    onChange={(e) => updateField(platform as keyof FooterSettings, 'url', e.target.value)}
+                    disabled={!editMode}
+                    placeholder={`Enter ${displayLabel} URL`}
+                    className="flex-1 h-11 px-3 border border-zinc-300 rounded-none focus:border-black focus:ring-0 text-sm disabled:bg-zinc-100 disabled:text-zinc-500"
+                  />
+                  <div className="flex items-center gap-2 w-24">
+                    <input 
+                      type="checkbox"
+                      checked={data.enabled}
+                      onChange={(e) => updateField(platform as keyof FooterSettings, 'enabled', e.target.checked)}
+                      disabled={!editMode}
+                      className="w-5 h-5 border-zinc-300 rounded-none text-zinc-900 focus:ring-black"
+                    />
+                    <span className="text-xs font-bold uppercase text-zinc-600">Enable</span>
+                  </div>
                 </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Section 5: Payment Methods */}
+        <div className="space-y-4 pt-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-800 border-b border-zinc-100 pb-2">Section 5: Payment Methods</h2>
+          <div className="flex flex-wrap gap-4">
+            {localSettings.paymentMethods.map(method => (
+              <label key={method.id} className={`flex items-center gap-3 p-3 border ${method.enabled ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200'} cursor-pointer`}>
                 <input 
-                  type="text" 
-                  value={link.name} 
-                  onChange={(e) => handleUpdateLink(idx, 'name', e.target.value)} 
-                  className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-                  placeholder="Link Display Name"
+                  type="checkbox"
+                  checked={method.enabled}
+                  onChange={() => editMode && handleTogglePaymentMethod(method.id)}
+                  disabled={!editMode}
+                  className="w-5 h-5 border-zinc-300 rounded-none text-zinc-900 focus:ring-black"
                 />
-              </div>
-              
-              <div className="space-y-1">
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-                  Quick Link {idx + 1} URL
-                </label>
-                <input 
-                  type="text" 
-                  value={link.url} 
-                  onChange={(e) => handleUpdateLink(idx, 'url', e.target.value)} 
-                  className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-                  placeholder="Link URL (e.g. /all-products)"
-                />
-              </div>
-            </div>
-          );
-        })}
-
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={handleAddLink}
-            className="text-xs font-bold text-zinc-900 hover:text-zinc-600 transition-colors cursor-pointer"
-          >
-            (+ Add New Link)
-          </button>
-        </div>
-
-        {/* Store Address */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Store Address
-          </label>
-          <input 
-            type="text" 
-            value={contactAddress} 
-            onChange={(e) => setContactAddress(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. Dhaka, Bangladesh"
-          />
-        </div>
-
-        {/* Support Time */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Support Time
-          </label>
-          <input 
-            type="text" 
-            value={contactSupportTime} 
-            onChange={(e) => setContactSupportTime(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. 10 AM - 10 PM (Everyday)"
-          />
-        </div>
-
-        {/* Phone Number */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Phone Number
-          </label>
-          <input 
-            type="text" 
-            value={contactPhone} 
-            onChange={(e) => setContactPhone(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. +8801700000000"
-          />
-        </div>
-
-        {/* Email Address */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Email Address
-          </label>
-          <input 
-            type="email" 
-            value={contactEmail} 
-            onChange={(e) => setContactEmail(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. support@tazumartbd.com"
-          />
-        </div>
-
-        {/* Customer Support Title */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Customer Support Title
-          </label>
-          <input 
-            type="text" 
-            value={cardTitle} 
-            onChange={(e) => setCardTitle(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. Customer Support"
-          />
-        </div>
-
-        {/* Customer Support Description */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Customer Support Description
-          </label>
-          <input 
-            type="text" 
-            value={cardDescription} 
-            onChange={(e) => setCardDescription(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. Need help? Contact us now!"
-          />
-        </div>
-
-        {/* WhatsApp Button Text */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">WhatsApp Button Text</label>
-          <input 
-            type="text" 
-            value={cardWhatsappText} 
-            onChange={(e) => setCardWhatsappText(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. Chat on WhatsApp"
-          />
-        </div>
-
-        {/* WhatsApp Number */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">WhatsApp Number</label>
-          <input 
-            type="text" 
-            value={cardWhatsappLink} 
-            onChange={(e) => setCardWhatsappLink(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. https://wa.me/8801700000000"
-          />
-        </div>
-
-        {/* Call Button Text */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Call Button Text</label>
-          <input 
-            type="text" 
-            value={cardCallText} 
-            onChange={(e) => setCardCallText(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. Call Support"
-          />
-        </div>
-
-        {/* Call Number */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Call Number</label>
-          <input 
-            type="text" 
-            value={cardCallPhone} 
-            onChange={(e) => setCardCallPhone(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. +8801700000000"
-          />
-        </div>
-
-        {/* Copyright Text */}
-        <div className="space-y-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-            Copyright Text
-          </label>
-          <input 
-            type="text" 
-            value={copyrightText} 
-            onChange={(e) => setCopyrightText(e.target.value)} 
-            className="w-full h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white"
-            placeholder="e.g. © 2026 TAZU MART BD. All Rights Reserved."
-          />
-        </div>
-
-        {/* Payment Badges Group */}
-        {paymentBadges.map((badge, idx) => (
-          <div key={idx} className="space-y-1">
-            <div className="flex justify-between items-center">
-              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">
-                Payment Badge {idx + 1}
+                <span className="text-sm font-bold text-zinc-700">{method.name}</span>
               </label>
-              <button
-                type="button"
-                onClick={() => handleDeleteBadge(badge)}
-                className="text-[10px] text-red-600 hover:text-red-800 font-bold uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Remove Badge
-              </button>
-            </div>
-            <input 
-              type="text" 
-              value={badge} 
-              disabled
-              className="w-full h-11 px-3 border border-zinc-200 bg-zinc-50 text-sm font-semibold text-zinc-500 uppercase cursor-not-allowed"
-            />
-          </div>
-        ))}
-
-        <div className="space-y-1 pt-1">
-          <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Add Payment Badge</label>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              value={newBadgeText} 
-              onChange={(e) => setNewBadgeText(e.target.value)} 
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddBadge())}
-              className="flex-1 h-11 px-3 border border-zinc-300 focus:border-black focus:ring-0 focus:outline-none text-sm transition-colors bg-white uppercase"
-              placeholder="e.g. SSL, COD, VISA"
-            />
-            <button
-              type="button"
-              onClick={handleAddBadge}
-              className="h-11 px-4 border border-zinc-950 text-zinc-950 hover:bg-zinc-50 font-bold uppercase tracking-wider text-xs transition-colors shrink-0 cursor-pointer"
-            >
-              Add Badge
-            </button>
+            ))}
           </div>
         </div>
 
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={handleAddBadge}
-            className="text-xs font-bold text-zinc-900 hover:text-zinc-600 transition-colors cursor-pointer"
-          >
-            (+ Add Badge)
-          </button>
-        </div>
+        {/* Section 6: Theme Settings */}
+        <ThemeSettingsSection 
+          sectionTitle="Section 6: Theme Settings" 
+          selectedTheme={selectedTheme}
+          onSelectTheme={handleSelectTheme}
+          disabled={!editMode}
+        />
 
-        {/* Save & Reset Changes Buttons */}
-        <div className="border-t border-zinc-200 pt-8 mt-10 flex flex-col sm:flex-row gap-3">
-          <button
-            type="button"
-            onClick={handleReset}
-            className="flex-1 h-12 border border-zinc-300 hover:border-black text-zinc-800 hover:text-black font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer bg-white"
-          >
-            <RotateCcw className="w-4 h-4" />
-            RESET FORM
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saveStatus === 'saving'}
-            className="flex-[2] h-12 bg-zinc-950 hover:bg-zinc-800 disabled:bg-zinc-200 disabled:text-zinc-400 text-white font-black uppercase tracking-widest text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:cursor-not-allowed"
-          >
-            {saveStatus === 'saving' ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                SAVING CHANGES...
-              </>
-            ) : saveStatus === 'success' ? (
-              'SAVED SUCCESSFULLY!'
+        {/* Section 7: Footer Logo */}
+        <div className="space-y-4 pt-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-800 border-b border-zinc-100 pb-2">Section 7: Footer Logo</h2>
+          <div className="flex items-center gap-4">
+            {localSettings.footerLogoUrl ? (
+              <div className="relative border border-zinc-200 p-2 bg-zinc-900">
+                <img src={localSettings.footerLogoUrl} alt="Footer Logo" className="h-12 object-contain" />
+                {editMode && (
+                  <button 
+                    onClick={() => setLocalSettings({...localSettings, footerLogoUrl: ''})}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             ) : (
-              'SAVE CHANGES'
+              <div className="h-12 w-32 border border-dashed border-zinc-300 flex items-center justify-center text-zinc-400 text-xs">
+                No Logo
+              </div>
             )}
-          </button>
+            
+            {editMode && (
+              <label className="h-11 px-4 border border-zinc-300 flex items-center gap-2 cursor-pointer hover:bg-zinc-50">
+                <ImagePlus className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase">Upload Logo</span>
+                <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={uploadingLogo} />
+              </label>
+            )}
+          </div>
+        </div>
+
+        {/* Section 8: Footer Banner (Optional) */}
+        <div className="space-y-4 pt-4">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-800 border-b border-zinc-100 pb-2">Section 8: Footer Banner (Optional)</h2>
+          <div className="flex flex-col gap-4">
+            {localSettings.footerBannerUrl ? (
+              <div className="relative border border-zinc-200">
+                <img src={localSettings.footerBannerUrl} alt="Footer Banner" className="w-full max-h-48 object-cover" />
+                {editMode && (
+                  <button 
+                    onClick={() => setLocalSettings({...localSettings, footerBannerUrl: ''})}
+                    className="absolute top-2 right-2 bg-red-500 text-white p-2"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="h-24 border border-dashed border-zinc-300 flex items-center justify-center text-zinc-400 text-xs">
+                No Banner Uploaded
+              </div>
+            )}
+
+            {editMode && (
+              <label className="h-11 px-4 border border-zinc-300 inline-flex items-center gap-2 cursor-pointer hover:bg-zinc-50 w-max">
+                <ImagePlus className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase">Upload Banner</span>
+                <input type="file" accept="image/*" onChange={handleBannerUpload} className="hidden" disabled={uploadingBanner} />
+              </label>
+            )}
+          </div>
+        </div>
+
+        {/* Database Verification Feedback Banners */}
+        {dbMessage && (
+          <div className={`p-4 border rounded-none transition-all ${
+            saveStatus === 'success' 
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-900' 
+              : 'bg-amber-50 border-amber-300 text-amber-950'
+          }`}>
+            <div className="flex items-start gap-3">
+              {saveStatus === 'success' ? (
+                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1 space-y-2">
+                <p className="text-sm font-bold leading-relaxed">{dbMessage}</p>
+                
+                {dbSqlInstruction && (
+                  <div className="mt-3 pt-3 border-t border-amber-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-extrabold uppercase text-amber-800 tracking-wider">
+                        Required SQL Query for Supabase SQL Editor:
+                      </span>
+                      <button
+                        onClick={handleCopySql}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-900 text-white text-xs font-bold uppercase hover:bg-black transition-colors"
+                      >
+                        {copiedSql ? (
+                          <><Check className="w-3.5 h-3.5 text-emerald-400" /> COPIED</>
+                        ) : (
+                          <><Copy className="w-3.5 h-3.5" /> COPY SQL</>
+                        )}
+                      </button>
+                    </div>
+                    <pre className="bg-zinc-900 text-amber-300 p-3 text-xs font-mono overflow-x-auto rounded-none border border-zinc-800 select-all leading-relaxed">
+                      {dbSqlInstruction}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="pt-10 border-t border-zinc-200 pb-20">
+          {!editMode ? (
+            <button 
+              onClick={() => setEditMode(true)}
+              className="w-full h-14 bg-zinc-900 hover:bg-black text-white flex items-center justify-center gap-2 text-sm font-black tracking-widest uppercase rounded-none transition-colors"
+            >
+              <Edit3 className="w-5 h-5" />
+              EDIT
+            </button>
+          ) : (
+            <button 
+              onClick={handleSave}
+              disabled={saveStatus === 'saving'}
+              className="w-full h-14 bg-zinc-950 hover:bg-black disabled:bg-zinc-400 text-white flex items-center justify-center gap-2 text-sm font-black tracking-widest uppercase rounded-none transition-colors"
+            >
+              {saveStatus === 'saving' ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> SAVING...</>
+              ) : saveStatus === 'success' ? (
+                'SAVED!'
+              ) : (
+                <><Save className="w-5 h-5" /> SAVE</>
+              )}
+            </button>
+          )}
         </div>
 
       </div>

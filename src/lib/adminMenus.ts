@@ -111,7 +111,7 @@ export const defaultNavItems: NavItem[] = [
     ]
   },
   {
-    name: 'Footer Management',
+    name: 'Footer',
     path: '/admin/management/footer',
     icon: SlidersHorizontal,
     moduleId: 'dashboard'

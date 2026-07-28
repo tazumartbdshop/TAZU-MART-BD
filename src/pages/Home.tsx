@@ -56,24 +56,8 @@ export default function Home() {
   const { banners: storeBanners, isLoaded: isBannerStoreLoaded } = useBannerStore();
   const { settings } = useSettingsStore();
 
-  const [isPreloaded, setIsPreloaded] = useState(() => {
-    return useCategoryStore.getState().isLoaded ||
-           useProductStore.getState().isLoaded ||
-           useBannerStore.getState().isLoaded;
-  });
-
   useEffect(() => {
-    let active = true;
-    async function startPreload() {
-      await preloadHomepageDataAndAssets();
-      if (active) {
-        setIsPreloaded(true);
-      }
-    }
-    startPreload();
-    return () => {
-      active = false;
-    };
+    preloadHomepageDataAndAssets();
   }, []);
 
   const [activeSlide, setActiveSlide] = useState(0);
@@ -198,10 +182,6 @@ export default function Home() {
       </div>
     );
   };
-
-  if (!isPreloaded) {
-    return <div className="bg-neutral-50/50 min-h-screen" />;
-  }
 
   const whatsappNumber = (settings.contactNumber || "8801314541738").replace(/[^0-9]/g, '');
   const hotlineNumber = settings.contactNumber || "+8801314541738";
@@ -366,7 +346,7 @@ export default function Home() {
             </div>
             
             {/* Live Countdown Timer in the middle */}
-            <div className="flex justify-start sm:justify-center flex-1 sm:px-4">
+            <div className="flex justify-center flex-1 w-full sm:w-auto my-3 sm:my-0 sm:px-4">
               <FlashSaleTimer />
             </div>
 

@@ -43,44 +43,21 @@ export default function FlashSaleTimer() {
   }
 
   return (
-    <>
-      {/* Desktop Layout */}
-      <div className="hidden sm:flex items-center gap-4 bg-gradient-to-r from-red-600 via-rose-700 to-black text-white px-5 py-2 rounded-2xl shadow-[0_4px_15px_rgba(220,38,38,0.25)] border border-white/10 select-none">
-        <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-red-100">
+    <div className="flex items-center h-[40px] sm:h-[44px] rounded-[10px] sm:rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden select-none w-fit mx-auto border border-neutral-200">
+      {/* Left Section - Solid Red */}
+      <div className="h-full bg-gradient-to-r from-red-600 to-red-700 flex items-center justify-center px-3 sm:px-4 shrink-0 border-r border-red-800/50">
+        <div className="flex items-center gap-1.5 font-black uppercase tracking-wider text-white">
           <span className="text-sm animate-pulse">⏰</span>
-          <span>Ends In:</span>
-        </div>
-        <div className="flex items-center gap-2 font-mono">
-          <div className="flex flex-col items-center">
-            <span className="bg-black/40 px-2.5 py-1.5 rounded-lg text-sm font-black tracking-normal min-w-[34px] text-center border border-white/5">{formatNumber(timeLeft.days)}</span>
-            <span className="text-[7.5px] text-red-200 font-extrabold uppercase tracking-widest mt-1">Days</span>
-          </div>
-          <span className="text-red-300 font-black text-xs -mt-4">:</span>
-          <div className="flex flex-col items-center">
-            <span className="bg-black/40 px-2.5 py-1.5 rounded-lg text-sm font-black tracking-normal min-w-[34px] text-center border border-white/5">{formatNumber(timeLeft.hours)}</span>
-            <span className="text-[7.5px] text-red-200 font-extrabold uppercase tracking-widest mt-1">Hours</span>
-          </div>
-          <span className="text-red-300 font-black text-xs -mt-4">:</span>
-          <div className="flex flex-col items-center">
-            <span className="bg-black/40 px-2.5 py-1.5 rounded-lg text-sm font-black tracking-normal min-w-[34px] text-center border border-white/5">{formatNumber(timeLeft.minutes)}</span>
-            <span className="text-[7.5px] text-red-200 font-extrabold uppercase tracking-widest mt-1">Minutes</span>
-          </div>
-          <span className="text-red-300 font-black text-xs -mt-4">:</span>
-          <div className="flex flex-col items-center">
-            <span className="bg-black/40 px-2.5 py-1.5 rounded-lg text-sm font-black tracking-normal min-w-[34px] text-center border border-white/5">{formatNumber(timeLeft.seconds)}</span>
-            <span className="text-[7.5px] text-red-200 font-extrabold uppercase tracking-widest mt-1">Seconds</span>
-          </div>
+          <span className="text-[10px] sm:text-xs">ENDS IN</span>
         </div>
       </div>
-
-      {/* Mobile Compact Layout */}
-      <div className="sm:hidden flex items-center gap-2 bg-gradient-to-r from-red-600 via-rose-700 to-black text-white px-3.5 py-1.5 rounded-full shadow-[0_3px_10px_rgba(220,38,38,0.2)] border border-white/10 select-none">
-        <span className="text-xs animate-pulse">⏰</span>
-        <span className="text-[9.5px] font-black uppercase tracking-wider text-red-100 shrink-0">Ends In:</span>
-        <span className="font-mono text-[10px] font-black bg-black/40 px-2 py-0.5 rounded-full text-red-300 tracking-wider">
-          {formatNumber(timeLeft.days)}D {formatNumber(timeLeft.hours)}H {formatNumber(timeLeft.minutes)}M {formatNumber(timeLeft.seconds)}S
+      
+      {/* Right Section - Solid Black */}
+      <div className="h-full bg-neutral-900 flex items-center justify-center px-3 sm:px-4 shrink-0 border-l border-neutral-800">
+        <span className="font-mono text-xs sm:text-sm font-bold text-white tracking-[0.15em]">
+          {formatNumber(timeLeft.days)}:{formatNumber(timeLeft.hours)}:{formatNumber(timeLeft.minutes)}:{formatNumber(timeLeft.seconds)}
         </span>
       </div>
-    </>
+    </div>
   );
 }

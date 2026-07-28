@@ -96,6 +96,7 @@ interface ThemeState {
   draftTheme: ThemeConfig;
   isLoaded: boolean;
   subscribe: () => () => void;
+  setThemeModeState: (mode: 'dark' | 'light') => void;
   updateTheme: (updates: Partial<ThemeConfig>) => void;
   updateDraftTheme: (updates: Partial<ThemeConfig>) => void;
   updateButton: (type: keyof ThemeConfig['buttons'], updates: Partial<ButtonConfig>) => void;
@@ -185,29 +186,74 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     if (!supabase) return () => {};
 
     const loadTheme = async () => {
+        let isBlackMode = false;
+        try {
+          const { data: appSettings } = await supabase.from('app_settings').select('theme_mode').eq('id', 'theme_config').limit(1);
+          if (appSettings && appSettings.length > 0 && appSettings[0].theme_mode) {
+            const val = String(appSettings[0].theme_mode).toLowerCase();
+            isBlackMode = val === 'black' || val === 'dark';
+          }
+        } catch (e) {
+          console.warn("Failed to fetch app_settings theme_mode:", e);
+        }
+
+        const modeStr: 'dark' | 'light' = isBlackMode ? 'dark' : 'light';
+        const root = document.documentElement;
+        root.classList.remove('dark');
+        root.setAttribute('data-footer-theme', isBlackMode ? 'dark' : 'light');
+
         const { data, error } = await supabase.from('settings').select('*').eq('id', 'theme').limit(1);
         if (!error && data && data.length > 0) {
             const dataObj = data[0];
-            const mergedSettings = { ...defaultConfig, ...dataObj };
+            const mergedSettings = { 
+              ...defaultConfig, 
+              ...dataObj, 
+              mode: modeStr
+            };
             set({ theme: mergedSettings, draftTheme: mergedSettings, isLoaded: true });
         } else if (!error && data && data.length === 0) {
             supabase.from('settings').upsert([{ id: 'theme', ...defaultConfig }]).then(({error}) => error && console.warn(error));
-            set({ theme: defaultConfig, draftTheme: defaultConfig, isLoaded: true });
+            const mergedSettings = {
+              ...defaultConfig,
+              mode: modeStr
+            };
+            set({ theme: mergedSettings, draftTheme: mergedSettings, isLoaded: true });
         }
     };
     
     loadTheme();
     
-    const channel = supabase
+    const channel1 = supabase
       .channel('public:settings:theme')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.theme' }, () => {
          loadTheme();
       })
       .subscribe();
 
+    const channel2 = supabase
+      .channel('public:app_settings:theme_config')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings', filter: 'id=eq.theme_config' }, () => {
+         loadTheme();
+      })
+      .subscribe();
+
     return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(channel1);
+        supabase.removeChannel(channel2);
     };
+  },
+  setThemeModeState: (mode: 'dark' | 'light') => {
+    const isBlack = mode === 'dark';
+    const root = document.documentElement;
+    root.classList.remove('dark');
+    root.setAttribute('data-footer-theme', isBlack ? 'dark' : 'light');
+
+    const currentTheme = get().theme;
+    const updated = {
+      ...currentTheme,
+      mode
+    };
+    set({ theme: updated, draftTheme: updated });
   },
   updateTheme: (updates) => {
     const newTheme = { ...get().theme, ...updates };

@@ -52,18 +52,19 @@ export const useFooterSettingsStore = create<FooterSettingsState>((set, get) => 
     if (!supabase) return () => {};
 
     const channel = supabase
-      .channel('public:footer_settings')
+      .channel('public:settings:footer_config_v2')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'footer_settings',
-          filter: 'id=eq.global'
+          table: 'settings',
+          filter: "id=eq.footer_config_v2"
         },
-        (payload) => {
-          if (payload.new) {
-            const newSettings = { ...DEFAULT_FOOTER_SETTINGS, ...payload.new } as FooterSettings;
+        (payload: any) => {
+          if (payload.new && payload.new.value) {
+            const parsed = typeof payload.new.value === 'string' ? JSON.parse(payload.new.value) : payload.new.value;
+            const newSettings = { ...DEFAULT_FOOTER_SETTINGS, ...parsed } as FooterSettings;
             set({ settings: newSettings });
             window.dispatchEvent(new CustomEvent('tazu-footer-updated', { detail: newSettings }));
           }
