@@ -37,7 +37,7 @@ export default function Login() {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isAuthenticated, user } = useAuthStore();
+  const { login, isAuthenticated, isInitializing, user } = useAuthStore();
 
   const searchParams = new URLSearchParams(location.search);
   const redirectPath = searchParams.get('redirect');
@@ -57,14 +57,14 @@ export default function Login() {
   }, [timer]);
 
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
+    if (!isInitializing && isAuthenticated && !isLoading) {
       if (user?.role === 'admin') {
         navigate(adminFrom, { replace: true });
       } else {
         navigate(from, { replace: true });
       }
     }
-  }, [isAuthenticated, navigate, user, isLoading]);
+  }, [isAuthenticated, isInitializing, navigate, user, isLoading, from, adminFrom]);
 
   const handleSendOTP = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -334,53 +334,53 @@ export default function Login() {
   if (isAuthenticated) return null;
 
   return (
-    <div className="w-full min-h-[calc(100vh-64px)] bg-neutral-50/50 flex flex-col items-center justify-start px-4 pt-6 pb-8 font-sans text-neutral-900">
+    <div className="w-full min-h-[calc(100vh-64px)] bg-white flex flex-col items-center justify-start px-4 pt-4 pb-6 font-sans text-neutral-900">
       <motion.div
         initial={{ opacity: 0, scale: 0.98, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="w-full max-w-[440px] bg-white px-6 py-5 md:px-8 md:py-6 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.02)] border border-neutral-150"
+        className="w-full max-w-[420px] bg-white px-5 py-4 md:px-6 md:py-5 rounded-[6px] border border-neutral-200 shadow-sm"
       >
-        <div className="text-center mb-6">
-          <Link to="/" className="flex flex-col items-center gap-2 mb-3">
+        <div className="text-center mb-5">
+          <Link to="/" className="flex flex-col items-center gap-2 mb-2">
             <div className="flex items-center justify-center select-none leading-none">
               {(settings.storeLogo || branding.primary_logo || branding.login_logo || branding.desktop_logo) && (
                 <img 
                   src={settings.storeLogo || branding.primary_logo || branding.login_logo || branding.desktop_logo} 
                   alt={settings.storeName || 'Logo'} 
-                  className="h-12 max-w-[160px] object-contain" 
+                  className="h-10 max-w-[150px] object-contain" 
                   referrerPolicy="no-referrer" 
                 />
               )}
             </div>
-            <h1 className="text-lg font-black tracking-tight text-neutral-950 uppercase leading-none">
+            <h1 className="text-base font-black tracking-tight text-neutral-950 uppercase leading-none">
               {settings.storeName || 'TAZU MART BD'}
             </h1>
           </Link>
-          <p className="text-[13px] md:text-[14px] text-[#6B7280] text-center leading-[1.3] px-2 max-w-[400px] mx-auto">
+          <p className="text-[12px] text-neutral-500 text-center leading-[1.3] px-1 max-w-[380px] mx-auto">
             Sign in to unlock exclusive deals, faster checkout & member rewards.
           </p>
         </div>
 
         {message && (
-          <div className="mb-5 p-3.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-medium border border-amber-100 flex items-start gap-2.5">
+          <div className="mb-4 p-3 rounded-[6px] bg-amber-50 text-amber-700 text-xs font-medium border border-amber-100 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
             <div>{message}</div>
           </div>
         )}
 
         {error && (
-          <div className="mb-5 p-3.5 rounded-xl bg-red-50 text-red-700 text-xs font-medium border border-red-100 flex items-start gap-2.5">
+          <div className="mb-4 p-3 rounded-[6px] bg-red-50 text-red-700 text-xs font-medium border border-red-100 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
             <div>{error}</div>
           </div>
         )}
 
         {/* Login Tabs */}
-        <div className="flex bg-neutral-100 p-1 rounded-2xl mb-6">
+        <div className="flex bg-neutral-100 p-1 rounded-[6px] mb-5">
           <button
             onClick={() => setLoginTab('email')}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all",
+              "flex-1 flex items-center justify-center gap-2 py-2 rounded-[6px] text-xs font-bold transition-all",
               loginTab === 'email' ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-700"
             )}
           >
@@ -390,7 +390,7 @@ export default function Login() {
           <button
             onClick={() => setLoginTab('phone')}
             className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold transition-all",
+              "flex-1 flex items-center justify-center gap-2 py-2 rounded-[6px] text-xs font-bold transition-all",
               loginTab === 'phone' ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-700"
             )}
           >
@@ -401,8 +401,8 @@ export default function Login() {
 
         {isEmailPasswordEnabled && loginTab === 'email' && (
           <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Email Address</label>
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-neutral-600 uppercase tracking-wider ml-1">Email Address</label>
               <div className="relative">
                 <input 
                   id="login-identifier"
@@ -411,17 +411,17 @@ export default function Login() {
                   onChange={(e) => setIdentifier(e.target.value)}
                   autoComplete="email"
                   required 
-                  className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
+                  className="w-full h-[46px] bg-white border border-neutral-300 text-neutral-900 pl-11 pr-4 rounded-[6px] focus:outline-none focus:border-black text-sm font-semibold" 
                   placeholder="Enter your email"
                 />
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <div className="flex items-center justify-between ml-1">
-                <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Password</label>
-                <Link to="/forgot-password" size="sm" className="text-[11px] font-bold text-neutral-400 hover:text-black">Forgot Password?</Link>
+                <label className="block text-[11px] font-bold text-neutral-600 uppercase tracking-wider">Password</label>
+                <Link to="/forgot-password" className="text-[11px] font-bold text-neutral-500 hover:text-black">Forgot Password?</Link>
               </div>
               <div className="relative">
                 <input 
@@ -431,7 +431,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
                   required 
-                  className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-11 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
+                  className="w-full h-[46px] bg-white border border-neutral-300 text-neutral-900 pl-11 pr-11 rounded-[6px] focus:outline-none focus:border-black text-sm font-semibold" 
                   placeholder="Enter Password"
                 />
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-neutral-400" />
@@ -448,9 +448,9 @@ export default function Login() {
             <button 
               type="submit"
               disabled={isLoading}
-              className="w-full h-[54px] bg-neutral-950 text-white rounded-[14px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2"
+              className="w-full h-[46px] bg-neutral-950 text-white rounded-[6px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2"
             >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SIGN IN'}
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
             </button>
           </form>
         )}
@@ -458,7 +458,7 @@ export default function Login() {
         {loginTab === 'phone' && (
           <div className="space-y-4">
             {otpError && (
-              <div className="p-3 rounded-xl bg-red-50 text-red-700 text-[11px] font-medium border border-red-100 flex items-start gap-2">
+              <div className="p-3 rounded-[6px] bg-red-50 text-red-700 text-[11px] font-medium border border-red-100 flex items-start gap-2">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <div>{otpError}</div>
               </div>
@@ -466,15 +466,15 @@ export default function Login() {
 
             {phoneStep === 'input' ? (
               <form onSubmit={handleSendOTP} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider ml-1">Phone Number</label>
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-bold text-neutral-600 uppercase tracking-wider ml-1">Phone Number</label>
                   <div className="relative">
                     <input 
                       type="tel" 
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       required 
-                      className="w-full h-[52px] bg-white border border-[#E5E5E5] text-neutral-900 pl-11 pr-4 rounded-[14px] focus:outline-none focus:border-black focus:ring-1 focus:ring-black text-sm font-semibold" 
+                      className="w-full h-[46px] bg-white border border-neutral-300 text-neutral-900 pl-11 pr-4 rounded-[6px] focus:outline-none focus:border-black text-sm font-semibold" 
                       placeholder="e.g. 017XXXXXXXX"
                     />
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-lg">📱</div>
@@ -483,18 +483,18 @@ export default function Login() {
                 <button 
                   type="submit"
                   disabled={isSendingOtp}
-                  className="w-full h-[54px] bg-neutral-950 text-white rounded-[14px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2"
+                  className="w-full h-[46px] bg-neutral-950 text-white rounded-[6px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2"
                 >
-                  {isSendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : 'SEND OTP'}
+                  {isSendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send OTP'}
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleVerifyOTP} className="space-y-6">
+              <form onSubmit={handleVerifyOTP} className="space-y-5">
                 <div className="text-center">
-                  <p className="text-xs text-neutral-500 mb-4">
+                  <p className="text-xs text-neutral-500 mb-3">
                     Enter the 6-digit code sent to <span className="text-black font-bold">{phoneNumber}</span>
                   </p>
-                  <div className="flex justify-between gap-2 max-w-[320px] mx-auto">
+                  <div className="flex justify-between gap-2 max-w-[300px] mx-auto">
                     {otpCode.map((digit, idx) => (
                       <input
                         key={idx}
@@ -504,7 +504,7 @@ export default function Login() {
                         value={digit}
                         onChange={(e) => handleOtpChange(idx, e.target.value)}
                         onKeyDown={(e) => handleKeyDown(idx, e)}
-                        className="w-full aspect-square text-center text-xl font-black bg-neutral-50 border-2 border-neutral-150 rounded-xl focus:border-black focus:bg-white focus:outline-none transition-all"
+                        className="w-full aspect-square text-center text-xl font-black bg-white border border-neutral-300 rounded-[6px] focus:border-black focus:outline-none transition-all"
                       />
                     ))}
                   </div>
@@ -514,12 +514,12 @@ export default function Login() {
                   <button 
                     type="submit"
                     disabled={isLoading || otpCode.some(d => !d)}
-                    className="w-full h-[54px] bg-neutral-950 text-white rounded-[14px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2 disabled:bg-neutral-300"
+                    className="w-full h-[46px] bg-neutral-950 text-white rounded-[6px] font-bold uppercase tracking-wider text-xs hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center gap-2 disabled:bg-neutral-300"
                   >
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'VERIFY & LOGIN'}
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify OTP'}
                   </button>
                   
-                  <div className="flex flex-col items-center gap-3">
+                  <div className="flex flex-col items-center gap-2">
                     {timer > 0 ? (
                       <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
                         Resend OTP in {timer}s
@@ -553,9 +553,9 @@ export default function Login() {
         )}
 
         {activeProviders.length > 0 && (
-          <div className="mt-6">
+          <div className="mt-5">
             {isEmailPasswordEnabled && (
-              <div className="relative mb-6">
+              <div className="relative mb-5">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-neutral-200"></div>
                 </div>
@@ -574,7 +574,7 @@ export default function Login() {
                   key={p.id}
                   onClick={() => handleOAuthLogin(p.id)}
                   disabled={!!oauthLoading}
-                  className="group h-[48px] bg-white rounded-[14px] border border-neutral-200 flex items-center justify-center gap-2.5 font-semibold text-[13px] text-neutral-700 shadow-[0_2px_8px_rgb(0,0,0,0.02)] transition-all hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-50"
+                  className="group h-[46px] bg-white rounded-[6px] border border-neutral-300 flex items-center justify-center gap-2.5 font-semibold text-[13px] text-neutral-700 shadow-sm transition-all hover:bg-neutral-50 active:scale-[0.98] disabled:opacity-50"
                 >
                   {oauthLoading === p.id ? (
                     <Loader2 className="w-4.5 h-4.5 animate-spin" />
@@ -588,7 +588,7 @@ export default function Login() {
           </div>
         )}
 
-        <div className="mt-6 text-center pt-5 border-t border-neutral-100">
+        <div className="mt-5 text-center pt-4 border-t border-neutral-100">
           <p className="text-xs text-neutral-500">
             Don't have an account? <Link to="/register" className="text-neutral-950 font-bold hover:underline">Create Account</Link>
           </p>

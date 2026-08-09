@@ -12,9 +12,17 @@ export default function TermsConditionsPage() {
   const [data, setData] = useState<PolicyData | null>(null);
 
   useEffect(() => {
-    businessPagesService.getPageData<PolicyData>('terms', { sections: [] }).then(res => {
-      if (res && res.sections && res.sections.length > 0) setData(res);
-    });
+    let isMounted = true;
+    businessPagesService.getPageData<PolicyData>('terms', { sections: [] })
+      .then(res => {
+        if (isMounted && res && res.sections && res.sections.length > 0) {
+          setData(res);
+        }
+      })
+      .catch(err => {
+        console.warn('Terms & conditions fetch warning:', err);
+      });
+    return () => { isMounted = false; };
   }, []);
 
   return (

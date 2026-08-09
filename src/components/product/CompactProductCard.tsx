@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Star, Heart, Coins, X, CheckCircle2, Eye } from 'lucide-react';
+import { Star, Heart, Coins, X, CheckCircle2, Eye, ShoppingCart } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { useReviewStore } from '../../store/useReviewStore';
@@ -31,6 +31,7 @@ interface CompactProductCardProps {
 export function CompactProductCard({ product, rank }: any) {
   const navigate = useNavigate();
   const addItem = useCartStore(state => state.addItem);
+  const clearCart = useCartStore(state => state.clearCart);
   const { toggleWishlist, isInWishlist } = useWishlistStore();
   const isSavedInWishlist = product ? isInWishlist(product.id) : false;
   const { reviews } = useReviewStore();
@@ -70,140 +71,177 @@ export function CompactProductCard({ product, rank }: any) {
 
   return (
     <>
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className={`group bg-card-bg rounded-[var(--card-radius)] overflow-hidden border border-theme-border hover:shadow-theme transition-all flex flex-col p-2 relative h-full bg-white select-none ${
-          isOutOfStock ? 'opacity-50' : 'hover:border-black'
+      <div 
+        className={`group bg-white rounded-[4px] border border-[#eeeeee] flex flex-col relative h-full select-none overflow-hidden transition-colors ${
+          isOutOfStock ? 'opacity-70' : ''
         }`}
-        style={{ boxShadow: 'var(--card-shadow)' }}
       >
         {rank !== undefined && (
-          <div className="absolute top-2.5 left-2.5 z-10 w-5 h-5 bg-theme-secondary text-theme-bg rounded-md flex items-center justify-center text-[10px] font-black shadow-sm">
+          <div className="absolute top-1 left-1 z-20 w-4 h-4 bg-black text-white rounded-[2px] flex items-center justify-center text-[8px] font-black shadow-none">
             {rank}
           </div>
         )}
-        <div className="absolute top-2.5 right-2.5 z-10 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button 
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/product/${product.slug || product.id}`); }}
-            className="bg-white/90 backdrop-blur p-1.5 rounded-full shadow-sm text-gray-500 hover:text-black transition-colors"
-            title="Quick View"
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </button>
-          <button 
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(product); }}
-            className={`bg-white/90 backdrop-blur p-1.5 rounded-full shadow-sm transition-colors ${isSavedInWishlist ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
-            title="Wishlist"
-          >
-            <Heart className="w-3.5 h-3.5" fill={isSavedInWishlist ? "currentColor" : "none"} />
-          </button>
-        </div>
+
+        {/* Wishlist Button - Top Left overlay */}
+        <button 
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWishlist(product); }}
+          className="absolute top-1 left-1 z-20 w-6 h-6 bg-white/90 backdrop-blur-xs rounded-full border border-neutral-100 flex items-center justify-center text-neutral-500 hover:text-red-500 hover:bg-white transition-all active:scale-90"
+          title="Wishlist"
+        >
+          <Heart fill={isSavedInWishlist ? "#E11D48" : "none"} className={`w-3.5 h-3.5 ${isSavedInWishlist ? "text-rose-600" : ""}`} />
+        </button>
+
+        {/* Quick View Button - Top Left overlay */}
+        <button 
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/product/${product.slug || product.id}`); }}
+          className="absolute top-8 left-1 z-20 w-6 h-6 bg-white/90 backdrop-blur-xs rounded-full border border-neutral-100 flex items-center justify-center text-neutral-500 hover:text-black hover:bg-white transition-all active:scale-90 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          title="Quick View"
+        >
+          <Eye className="w-3.5 h-3.5" />
+        </button>
         
+        {/* Image Container with 1:1 Aspect Ratio - Edge to Edge 100% Width */}
         <Link 
           to={`/product/${product.slug || product.id}`} 
-          className={`block relative aspect-square overflow-hidden rounded-lg bg-gray-50 mb-2 ${
-            isOutOfStock ? 'filter blur-[1px]' : ''
+          className={`block relative aspect-square overflow-hidden bg-neutral-50 w-full shrink-0 border-b border-[#eeeeee] ${
+            isOutOfStock ? 'filter blur-[0.5px]' : ''
           }`}
         >
           <img 
             src={product.imageUrl || product.featured_image || product.image || undefined} 
             loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
             alt={product.name} 
             referrerPolicy="no-referrer" 
           />
           
-          {/* Top Right Sold Count Badge - Flush Design (Top and Right edge flush, bottom-left rounded) */}
-          <span className="absolute top-0 right-0 bg-[#C40000] text-white text-[9px] font-extrabold px-2 py-1 rounded-bl-lg shadow-sm flex items-center gap-0.5 select-none z-10">
+          {/* Top Right Sold Count Badge - Flush Design */}
+          <span className="absolute top-0 right-0 bg-[#C40000] text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded-bl-[4px] shadow-none flex items-center gap-0.5 select-none z-10">
             🔥 {formatSoldCount(product.soldCount || 150)}
           </span>
 
           {/* Center Out of Stock Banner inside image */}
           {isOutOfStock && (
-            <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-              <span className="bg-[#C40000] text-white text-[9px] font-black px-2.5 py-1 tracking-widest uppercase shadow-md border border-red-700">
+            <div className="absolute inset-0 bg-black/10 flex items-center justify-center z-10 pointer-events-none">
+              <span className="bg-[#C40000] text-white text-[8px] font-black px-1.5 py-0.5 tracking-wider uppercase">
                 OUT OF STOCK
               </span>
             </div>
           )}
-          
-          {/* Overlay Badge */}
-          {isCoinEnabled && (
-            <div className="absolute top-2 left-2 flex items-center gap-1 bg-white/90 backdrop-blur px-1.5 py-0.5 rounded-full shadow-sm border border-orange-100 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Coins className="w-2.5 h-2.5 text-orange-500" />
-              <span className="text-[7px] font-black text-black">+{rewardCoins} Coins</span>
-            </div>
-          )}
         </Link>
         
-        <div className="flex flex-col flex-grow justify-between pl-3">
+        {/* Info & Metadata Details - Tight Compact Spacing */}
+        <div className="flex flex-col flex-grow justify-between px-[6px] pt-[6px] pb-[6px]">
           <div>
-            <Link to={`/product/${product.slug || product.id}`} className="text-[11px] font-bold text-neutral-800 line-clamp-2 hover:opacity-80 leading-tight mb-1 uppercase tracking-tight">
+            <Link 
+              to={`/product/${product.slug || product.id}`} 
+              className="block text-[11px] font-bold text-neutral-900 leading-[1.25] uppercase tracking-tight h-[27px] overflow-hidden line-clamp-2 hover:text-neutral-600"
+              title={product.name}
+            >
               {product.name}
             </Link>
 
-            {/* SKU, Coins and Rating Block */}
-            <div className="flex flex-col mt-1 mb-1.5 select-none">
-              {/* SKU Code */}
-              {(product.sku_code || product.sku) && (
-                <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-0.5">
-                  {product.sku_code || product.sku}
+            {/* Product SKU Code - 3px top spacing */}
+            {(product.sku_code || product.sku || product.productCode) && (
+              <div className="text-[9px] font-medium text-neutral-400 uppercase tracking-wider mt-[3px]">
+                CODE: {product.sku_code || product.sku || product.productCode}
+              </div>
+            )}
+
+            {/* Rating & Coins Section - 3px top spacing */}
+            <div className="flex items-center gap-1.5 text-[9px] text-neutral-600 mt-[3px] flex-wrap min-h-[14px]">
+              {showRating && (
+                <div className="flex items-center gap-0.5 font-bold text-neutral-800">
+                  <span>⭐</span>
+                  <span>{liveAverageRating.toFixed(1)}</span>
+                  <span className="text-neutral-400 font-semibold text-[8px]">({liveReviewsCount})</span>
                 </div>
               )}
-
-              {/* Coins Section */}
+              {showRating && isCoinEnabled && <span className="text-neutral-300">|</span>}
               {isCoinEnabled && (
                 <button 
+                  type="button"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     setShowCoinInfo(true);
                   }}
-                  className="flex items-center gap-1 bg-orange-50/50 hover:bg-orange-100 transition-colors px-1.5 py-0.5 rounded border border-orange-100/50 w-fit mb-0.5 group/coin shrink-0 overflow-hidden font-mono"
+                  className="flex items-center gap-0.5 text-orange-600 font-extrabold hover:text-orange-700 transition-colors shrink-0"
                 >
-                  <span className="text-[8px]">🪙</span>
-                  <span className="text-[7px] font-bold uppercase text-orange-700">+{rewardCoins} Coins</span>
+                  <span>🪙</span>
+                  <span>+{rewardCoins} Coins</span>
                 </button>
-              )}
-
-              {/* Rating Section */}
-              {showRating && (
-                <div className="flex items-center gap-1 mt-0.5 text-black font-bold text-xs">
-                  <span>⭐</span>
-                  <span>{liveAverageRating.toFixed(1)}</span>
-                  <span className="text-gray-500 font-semibold text-[10px]">({liveReviewsCount})</span>
-                </div>
               )}
             </div>
           </div>
           
-          {/* Pricing & Checkout Operations block */}
-          <div className="mt-2 pt-2 border-t border-gray-50 flex flex-col gap-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {/* Selling Price - Pure Black, Bolder and Cleaner (no text shadow) */}
-              <span className="text-neutral-950 font-[800] text-[16px] tracking-tight whitespace-nowrap">
-                BDT {(product.discountPrice || product.price || 0).toLocaleString()}
-              </span>
-              {product.discountPrice && (
-                <span className="text-[#777] text-[13px] font-semibold line-through tracking-tight whitespace-nowrap">
-                  BDT {(product.price || 0).toLocaleString()}
+          {/* Pricing & Actions Block - 5px top spacing */}
+          <div className="mt-[5px] pt-[4px] border-t border-[#f0f0f0] flex items-end justify-between gap-1">
+            <div className="flex flex-col min-w-0 justify-end">
+              {/* Sale Price & Discount Percent on same line */}
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-neutral-950 font-[800] text-[12.5px] tracking-tight leading-none whitespace-nowrap">
+                  ৳{(product.discountPrice || product.price || 0).toLocaleString()}
                 </span>
-              )}
-              {/* Discount Badge */}
-              {discountPercent > 0 && (
-                <span className="bg-[#C40000] text-white text-[9px] font-bold px-1.5 py-0.5 tracking-wider uppercase select-none rounded-none whitespace-nowrap shadow-sm ml-auto sm:ml-0">
-                  -{discountPercent}% OFF
+                {discountPercent > 0 && (
+                  <span className="text-[#C40000] text-[8.5px] font-black leading-none bg-red-50 px-1 py-0.5 rounded-[2px] shrink-0">
+                    -{discountPercent}%
+                  </span>
+                )}
+              </div>
+              {/* Original/Old Strike Price */}
+              {product.discountPrice && (
+                <span className="text-neutral-400 text-[9.5px] font-medium line-through leading-none mt-[2px] whitespace-nowrap">
+                  ৳{(product.price || 0).toLocaleString()}
                 </span>
               )}
             </div>
 
-            <div className="w-full font-mono">
+            {/* Action Buttons: Buy Now + Add to Cart (6-8px gap) */}
+            <div className="flex items-center gap-1.5 shrink-0">
               <button 
                 type="button"
+                disabled={isOutOfStock}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (isOutOfStock) {
+                    toast.error("Product is currently out of stock");
+                    return;
+                  }
+                  if (!product) {
+                    toast.error("Product details not found");
+                    return;
+                  }
+                  try {
+                    clearCart();
+                    addItem({ 
+                      id: product.id,
+                      name: product.name,
+                      price: product.discountPrice || product.price,
+                      originalPrice: product.price,
+                      image: product.imageUrl || product.featured_image || product.image || '/placeholder.png', 
+                      quantity: 1,
+                      slug: product.slug || product.id,
+                      sku: product.sku || ''
+                    } as any);
+                    navigate('/checkout');
+                  } catch (err) {
+                    console.error("[Buy Now Error]", err);
+                    toast.error("Failed to process Buy Now request");
+                  }
+                }}
+                className="h-7 px-2 rounded-[4px] bg-amber-500 hover:bg-amber-600 disabled:bg-neutral-100 text-white disabled:text-neutral-400 text-[9.5px] font-extrabold uppercase tracking-wider flex items-center justify-center shrink-0 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                title="Buy Now"
+              >
+                Buy Now
+              </button>
+
+              <button 
+                type="button"
+                disabled={isOutOfStock}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -215,14 +253,15 @@ export function CompactProductCard({ product, rank }: any) {
                   } as any);
                   toast.success("Product added to cart successfully");
                 }}
-                className="w-full py-2 bg-black hover:bg-neutral-800 text-white border border-black text-[10px] font-black uppercase tracking-wider text-center cursor-pointer transition-all"
+                className="w-7 h-7 rounded-[4px] bg-neutral-950 hover:bg-black disabled:bg-neutral-100 text-white disabled:text-neutral-400 flex items-center justify-center shrink-0 transition-all active:scale-95 cursor-pointer"
+                title="Add to Cart"
               >
-                {isOutOfStock ? 'OUT OF STOCK' : 'Add To Cart'}
+                <ShoppingCart className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Coin Info Popup/Bottom Sheet */}
       <AnimatePresence>

@@ -42,18 +42,28 @@ export const ThemeInitializer: React.FC = () => {
 
   useEffect(() => {
     const root = document.documentElement;
+    const isDark = theme.mode === 'dark';
 
     // Global Colors
     root.style.setProperty('--primary-color', theme.primaryColor);
-    root.style.setProperty('--secondary-color', theme.secondaryColor);
-    root.style.setProperty('--background-color', theme.backgroundColor);
-    root.style.setProperty('--text-color', theme.textColor);
-    root.style.setProperty('--border-color', theme.borderColor);
-    root.style.setProperty('--shadow-color', theme.shadowColor);
+    root.style.setProperty('--secondary-color', isDark ? '#ffffff' : theme.secondaryColor);
+    root.style.setProperty('--background-color', isDark ? '#0a0a0a' : theme.backgroundColor);
+    root.style.setProperty('--text-color', isDark ? '#f3f4f6' : theme.textColor);
+    root.style.setProperty('--border-color', isDark ? '#27272a' : theme.borderColor);
+    root.style.setProperty('--shadow-color', isDark ? 'rgba(0,0,0,0.4)' : theme.shadowColor);
 
     // Navbar
-    root.style.setProperty('--navbar-bg', theme.navbarBg);
-    root.style.setProperty('--navbar-text', theme.navbarTextColor);
+    root.style.setProperty('--navbar-bg', isDark ? '#000000' : theme.navbarBg);
+    root.style.setProperty('--navbar-text', isDark ? '#f3f4f6' : theme.navbarTextColor);
+
+    // Global layout & element CSS variables
+    root.style.setProperty('--bg-primary', isDark ? '#0a0a0a' : '#ffffff');
+    root.style.setProperty('--bg-secondary', isDark ? '#121212' : '#f9fafb');
+    root.style.setProperty('--text-primary', isDark ? '#f3f4f6' : '#111111');
+    root.style.setProperty('--text-secondary', isDark ? '#9ca3af' : '#4b5563');
+    root.style.setProperty('--card-bg', isDark ? '#121212' : theme.cardBg);
+    root.style.setProperty('--input-bg', isDark ? '#18181b' : '#ffffff');
+    root.style.setProperty('--border-theme', isDark ? '#27272a' : '#eeeeee');
 
     // Buttons
     Object.entries(theme.buttons).forEach(([key, config]) => {
@@ -76,9 +86,8 @@ export const ThemeInitializer: React.FC = () => {
     root.style.setProperty('--base-font-size', sizes[theme.fontSize]);
 
     // Product Card
-    root.style.setProperty('--card-bg', theme.cardBg);
     root.style.setProperty('--card-radius', `${theme.cardRadius}px`);
-    root.style.setProperty('--card-name-color', theme.productNameColor);
+    root.style.setProperty('--card-name-color', isDark ? '#f3f4f6' : theme.productNameColor);
     root.style.setProperty('--card-price-color', theme.priceColor);
     root.style.setProperty('--card-shadow', theme.cardShadow);
     root.style.setProperty('--wishlist-icon-color', theme.wishlistIconColor);
@@ -91,14 +100,18 @@ export const ThemeInitializer: React.FC = () => {
     root.style.setProperty('--banner-button', theme.bannerButtonColor);
 
     // Footer
-    root.style.setProperty('--footer-bg', theme.footerBg);
-    root.style.setProperty('--footer-text', theme.footerText);
-    root.style.setProperty('--footer-link', theme.footerLinkColor);
-    root.style.setProperty('--footer-icon', theme.footerIconColor);
+    root.style.setProperty('--footer-bg', isDark ? '#000000' : theme.footerBg);
+    root.style.setProperty('--footer-text', isDark ? '#ffffff' : theme.footerText);
+    root.style.setProperty('--footer-link', isDark ? '#9ca3af' : theme.footerLinkColor);
+    root.style.setProperty('--footer-icon', isDark ? '#ffffff' : theme.footerIconColor);
 
-    // Mode - isolated to Footer
-    root.classList.remove('dark');
-    root.setAttribute('data-footer-theme', theme.mode === 'dark' ? 'dark' : 'light');
+    // Mode - global and footer
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    root.setAttribute('data-footer-theme', isDark ? 'dark' : 'light');
   }, [theme]);
 
   // Apply typography fonts dynamically

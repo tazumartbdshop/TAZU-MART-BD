@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  X, Search, TrendingUp, Zap, Star, 
+  X, Search, TrendingUp, Zap, Star, Camera,
   ChevronRight, ArrowLeft, History, 
   ShoppingBag, Sparkles, Flame, Clock
 } from 'lucide-react';
@@ -205,7 +205,7 @@ export default function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="I am looking for..."
-                  className="w-full h-11 bg-white rounded-full pl-11 pr-20 text-sm font-semibold outline-none border border-neutral-200 focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/5 transition-all text-neutral-900"
+                  className="w-full h-11 bg-white rounded-full pl-11 pr-24 text-sm font-semibold outline-none border border-neutral-200 focus:border-neutral-400 focus:ring-4 focus:ring-neutral-900/5 transition-all text-neutral-900"
                 />
                 
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -219,8 +219,15 @@ export default function SearchDrawer({ isOpen, onClose }: SearchDrawerProps) {
                     </button>
                   )}
                   <button 
+                    type="button"
+                    title="Camera Search"
+                    className="p-1.5 hover:bg-neutral-100 rounded-full text-neutral-400 hover:text-neutral-900 transition-all"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
+                  <button 
                     type="submit"
-                    className="h-8 px-4 bg-black text-white text-[10px] font-black uppercase tracking-wider rounded-full hover:bg-neutral-800 transition-colors"
+                    className="h-8 px-3.5 bg-black text-white text-[10px] font-black uppercase tracking-wider rounded-full hover:bg-neutral-800 transition-colors"
                   >
                     Search
                   </button>

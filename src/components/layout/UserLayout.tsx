@@ -85,18 +85,14 @@ export function UserLayout() {
 
       <Header />
       
-      <main className={`flex-1 bg-white ${isHome ? 'pb-0' : 'pb-16 md:pb-0'}`}>
+      <main className="flex-1 bg-bg-primary text-text-primary pb-16 md:pb-0 transition-colors duration-200">
         <Outlet />
       </main>
       
-      {isHome && (
-        <>
-          <FooterBanner />
-          <FeatureTicker />
-          <Footer />
-        </>
-      )}
-      {isBrandShowcasePage && <BrandShowcase />}
+      <FooterBanner />
+      <FeatureTicker />
+      <Footer />
+      
       <MobileBottomNav />
       <StorefrontPopup />
     </div>

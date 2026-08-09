@@ -32,8 +32,15 @@
   --color-theme-text: var(--text-color, #000000);
   --color-theme-border: var(--border-color, #EEEEEE);
 
+  --color-bg-primary: var(--bg-primary, #ffffff);
+  --color-bg-secondary: var(--bg-secondary, #f9fafb);
+  --color-text-primary: var(--text-primary, #111111);
+  --color-text-secondary: var(--text-secondary, #4b5563);
   --color-card-bg: var(--card-bg, #ffffff);
   --color-card-text: var(--card-name-color, #000000);
+  --color-input-bg: var(--input-bg, #ffffff);
+  --color-border-theme: var(--border-theme, #eeeeee);
+
   --color-price: var(--card-price-color, #9333ea);
   --color-navbar-bg: var(--navbar-bg, #ffffff);
   --color-navbar-text: var(--navbar-text, #000000);
@@ -54,9 +61,121 @@
   :root {
     --primary-color: #9333ea;
     --secondary-color: #000000;
+    --background-color: #ffffff;
+    --text-color: #111111;
+    --border-color: #eeeeee;
+    
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --text-primary: #111111;
+    --text-secondary: #4b5563;
+    --card-bg: #ffffff;
+    --input-bg: #ffffff;
+    --border-theme: #eeeeee;
+
+    --navbar-bg: #ffffff;
+    --navbar-text: #000000;
+    --card-name-color: #000000;
+
+    --home-active-bg: #000000;
+    --home-active-text: #ffffff;
+
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
+  }
+
+  /* Core dark theme definitions to enforce on root */
+  .dark {
+    --background-color: #0a0a0a;
+    --text-color: #f3f4f6;
+    --border-color: #27272a;
+    
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #121212;
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --card-bg: #121212;
+    --input-bg: #18181b;
+    --border-theme: #27272a;
+
+    --navbar-bg: #000000;
+    --navbar-text: #f3f4f6;
+    --card-name-color: #f3f4f6;
+    --shadow-color: rgba(0, 0, 0, 0.4);
+
+    --home-active-bg: #ffffff;
+    --home-active-text: #000000;
+
+    /* Background overrides */
+    .bg-white,
+    .bg-neutral-50,
+    .bg-neutral-100,
+    .bg-slate-50,
+    .bg-gray-50,
+    .bg-gray-100,
+    .bg-zinc-50 {
+      background-color: var(--bg-primary, #0a0a0a) !important;
+    }
+
+    .bg-neutral-50\/50,
+    .bg-neutral-50\/60,
+    .bg-neutral-50\/80,
+    .bg-neutral-100\/50,
+    .bg-neutral-100\/80,
+    .bg-slate-50\/50,
+    .bg-gray-50\/50 {
+      background-color: var(--bg-secondary, #121212) !important;
+    }
+
+    /* Text color overrides */
+    .text-neutral-900,
+    .text-neutral-800,
+    .text-black,
+    .text-zinc-900,
+    .text-slate-900,
+    .text-gray-900,
+    .text-neutral-950 {
+      color: var(--text-primary, #f3f4f6) !important;
+    }
+
+    .text-neutral-700,
+    .text-neutral-600,
+    .text-zinc-700,
+    .text-zinc-600,
+    .text-slate-700,
+    .text-gray-700 {
+      color: var(--text-secondary, #9ca3af) !important;
+    }
+
+    /* Border overrides */
+    .border-neutral-100,
+    .border-neutral-200,
+    .border-zinc-200,
+    .border-zinc-300,
+    .border-slate-200,
+    .border-gray-200,
+    .border-theme-border,
+    .border-neutral-200\/60,
+    .border-neutral-100\/60 {
+      border-color: var(--border-theme, #27272a) !important;
+    }
+
+    /* Inputs/select elements styling */
+    input, select, textarea {
+      background-color: var(--input-bg, #18181b) !important;
+      color: var(--text-primary, #f3f4f6) !important;
+      border-color: var(--border-theme, #27272a) !important;
+    }
+
+    /* Dropdown / Modal elements */
+    .dropdown-menu,
+    .modal-content,
+    .popup-content {
+      background-color: var(--bg-secondary, #121212) !important;
+      color: var(--text-primary, #f3f4f6) !important;
+      border-color: var(--border-theme, #27272a) !important;
+    }
   }
 
   html, body {
@@ -180,12 +299,14 @@
 }
 
 /* Hide Scrollbar helper class */
-.scrollbar-hide, .no-scrollbar {
+.scrollbar-hide, .no-scrollbar, .hide-scrollbar {
   -ms-overflow-style: none !important;  /* IE and Edge */
   scrollbar-width: none !important;  /* Firefox */
 }
-.scrollbar-hide::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar {
+.scrollbar-hide::-webkit-scrollbar, .no-scrollbar::-webkit-scrollbar, .hide-scrollbar::-webkit-scrollbar {
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* Smooth Marquee Keyframes */

@@ -21,6 +21,9 @@ export default function AdminPaymentMethods() {
   
   // Database integration state
   const [loading, setLoading] = useState<boolean>(true);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const [sqlGuide, setSqlGuide] = useState<string | null>(null);
+  const [showSqlGuide, setShowSqlGuide] = useState<boolean>(false);
 
   // Local state for configs - empty by default!
   const [configs, setConfigs] = useState({
@@ -71,13 +74,25 @@ export default function AdminPaymentMethods() {
     card: 'https://cdn-icons-png.flaticon.com/512/349/349228.png',
   };
 
-  // 1. Fetch saved methods on mount
+  // 1. Fetch saved methods & schema check on mount
   useEffect(() => {
     const initAndFetch = async () => {
       setLoading(true);
       try {
+        // Fetch schema state
+        const schemaRes = await safeFetchJSON('/api/admin/payment-methods/schema-check');
+        if (schemaRes?.schemaState?.payment_settings?.sqlGuide) {
+          setSqlGuide(schemaRes.schemaState.payment_settings.sqlGuide);
+        }
+
         // Fetch actual values
         const data = await safeFetchJSON('/api/admin/payment-methods');
+        if (data.dbWarning) {
+          setDbError(data.dbWarning);
+        } else {
+          setDbError(null);
+        }
+
         if (data.status === 'success' && data.methods) {
           const updated = {
             cod: { enabled: false, name: '', logo: '', number: '', instruction: '' },
@@ -88,22 +103,23 @@ export default function AdminPaymentMethods() {
           };
 
           data.methods.forEach((m: any) => {
-            const code = m.payment_code;
+            const code = m.payment_key || m.payment_code || m.id;
             if (code in updated) {
               (updated as any)[code] = {
-                enabled: m.enabled ?? false,
+                enabled: m.is_active ?? m.enabled ?? false,
                 name: m.payment_name || '',
                 logo: m.logo_url || '',
                 number: m.account_number || '',
-                instruction: m.instruction || '',
+                instruction: m.instructions || m.instruction || '',
                 gatewayLink: m.gateway_link || ''
               };
             }
           });
           setConfigs(updated);
         }
-      } catch (err) {
-        console.error("Failed to load DB payment methods:", err);
+      } catch (err: any) {
+        console.error("Failed to load DB payment settings:", err);
+        setDbError(err.message || "Failed to load payment settings");
       } finally {
         setLoading(false);
       }
@@ -158,12 +174,15 @@ export default function AdminPaymentMethods() {
         body: JSON.stringify({
           method: {
             id: methodId,
+            payment_key: methodId,
             payment_type: 'personal',
             payment_code: methodId,
             payment_name: data.name,
             account_number: data.number,
+            instructions: data.instruction,
             instruction: data.instruction,
             logo_url: data.logo,
+            is_active: data.enabled,
             enabled: data.enabled,
             gateway_link: (data as any).gatewayLink || ''
           }
@@ -171,7 +190,8 @@ export default function AdminPaymentMethods() {
       });
 
       if (result.status === 'success') {
-        toast.success(`${data.name || methodId.toUpperCase()} settings saved successfully.`);
+        toast.success("Payment settings saved successfully");
+        setDbError(null);
         
         // Sync to legacy global state to maintain checkout compatibility
         const updates: any = {};
@@ -208,16 +228,21 @@ export default function AdminPaymentMethods() {
         }
         updateSettings(updates);
       } else {
-        toast.error(result.error || "Failed to save settings");
+        const errorMsg = result.error || "Failed to save payment settings";
+        setDbError(errorMsg);
+        toast.error(errorMsg);
       }
     } catch (err: any) {
-      toast.error("Network error: " + err.message);
+      const errorMsg = "Network error: " + (err.message || err);
+      setDbError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
   // Global Save All Settings
   const handleSaveAll = async () => {
     let successCount = 0;
+    let firstErrorMessage: string | null = null;
     const methods = ['cod', 'bkash', 'nagad', 'rocket', 'card'] as const;
 
     for (const mId of methods) {
@@ -229,19 +254,31 @@ export default function AdminPaymentMethods() {
           body: JSON.stringify({
             method: {
               id: mId,
+              payment_key: mId,
               payment_type: 'personal',
               payment_code: mId,
               payment_name: data.name,
               account_number: data.number,
+              instructions: data.instruction,
               instruction: data.instruction,
               logo_url: data.logo,
+              is_active: data.enabled,
               enabled: data.enabled,
               gateway_link: (data as any).gatewayLink || ''
             }
           })
         });
-        if (resJson.status === 'success') successCount++;
-      } catch (err) {}
+
+        if (resJson.status === 'success') {
+          successCount++;
+        } else if (!firstErrorMessage) {
+          firstErrorMessage = resJson.error || "Database operation failed";
+        }
+      } catch (err: any) {
+        if (!firstErrorMessage) {
+          firstErrorMessage = err.message || "Failed to reach server";
+        }
+      }
     }
 
     // Sync to global memory fallback
@@ -279,9 +316,12 @@ export default function AdminPaymentMethods() {
     updateSettings(updates);
 
     if (successCount === 5) {
-      toast.success("All personal payment settings saved successfully to Supabase!");
+      toast.success("Payment settings saved successfully");
+      setDbError(null);
     } else {
-      toast.error(`Saved ${successCount}/5 payment settings to Supabase. Please check database connectivity.`);
+      const actualError = firstErrorMessage || `Failed to write settings to Supabase (${successCount}/5 succeeded)`;
+      setDbError(actualError);
+      toast.error(actualError);
     }
   };
 
@@ -536,6 +576,52 @@ export default function AdminPaymentMethods() {
           </button>
         </div>
       </div>
+
+      {/* Database Error / SQL Setup Helper */}
+      {dbError && (
+        <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-xs uppercase tracking-wide">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+              <span>Supabase Database Connection Notice</span>
+            </div>
+            {sqlGuide && (
+              <button
+                type="button"
+                onClick={() => setShowSqlGuide(!showSqlGuide)}
+                className="text-[10px] font-black uppercase text-purple-800 bg-purple-100 hover:bg-purple-200 px-3 py-1 rounded transition-colors"
+              >
+                {showSqlGuide ? "Hide SQL Setup Guide" : "View Supabase SQL Guide"}
+              </button>
+            )}
+          </div>
+
+          <p className="text-xs text-amber-850 font-semibold leading-relaxed">
+            {dbError.includes("table_missing") || dbError.includes("relation") || dbError.includes("does not exist")
+              ? "The 'payment_settings' table is not yet created in your Supabase database. Settings are currently using local fallback storage. Click the button above to copy the table creation SQL for Supabase SQL Editor."
+              : `Supabase status: ${dbError}`}
+          </p>
+
+          {sqlGuide && showSqlGuide && (
+            <div className="mt-3 bg-neutral-950 text-emerald-400 p-4 rounded-md text-[11px] font-mono space-y-3 overflow-x-auto shadow-inner">
+              <div className="flex items-center justify-between text-neutral-300 pb-2 border-b border-neutral-800">
+                <span className="font-bold uppercase text-[10px] text-amber-400">Copy & Run in Supabase SQL Editor:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(sqlGuide);
+                    toast.success("SQL script copied to clipboard!");
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-black px-3 py-1 rounded uppercase tracking-wider transition-colors"
+                >
+                  Copy SQL Script
+                </button>
+              </div>
+              <pre className="whitespace-pre-wrap text-[10.5px] text-emerald-300 leading-relaxed">{sqlGuide}</pre>
+            </div>
+          )}
+        </div>
+      )}
 
       {!settings.paymentPersonalActive && (
         <div className="bg-rose-50/70 border border-rose-150 p-4 text-rose-800 text-xs font-mono uppercase tracking-wide">

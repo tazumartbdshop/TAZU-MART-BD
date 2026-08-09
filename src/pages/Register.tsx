@@ -373,14 +373,14 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50/50 flex flex-col items-center justify-center p-4 py-12 font-sans text-neutral-900">
+    <div className="min-h-screen bg-white flex flex-col items-center justify-start p-4 py-6 font-sans text-neutral-900">
       <motion.div 
         initial={{ opacity: 0, scale: 0.98, y: 12 }} 
         animate={{ opacity: 1, scale: 1, y: 0 }} 
-        className="w-full max-w-[550px] bg-white p-6 md:p-8 rounded-[24px] border border-neutral-200 shadow-sm"
+        className="w-full max-w-[480px] bg-white p-5 md:p-6 rounded-[6px] border border-neutral-200 shadow-sm"
       >
-        <div className="text-center mb-6">
-          <Link to="/" className="inline-flex items-center gap-2 mb-4">
+        <div className="text-center mb-5">
+          <Link to="/" className="inline-flex items-center gap-2 mb-2">
             <div className="h-8 flex items-center justify-center select-none">
               {(settings.storeLogo || branding.primary_logo || branding.signup_logo || branding.desktop_logo) && (
                 <img 
@@ -397,27 +397,27 @@ export default function Register() {
               </span>
             )}
           </Link>
-          <h2 className="text-xl font-black tracking-tight uppercase">Create Account</h2>
-          <p className="text-xs text-neutral-500 mt-1">Join us to start secure shopping with premium service.</p>
+          <h2 className="text-lg font-black tracking-tight uppercase">Create Account</h2>
+          <p className="text-xs text-neutral-500 mt-0.5">Join us to start secure shopping with premium service.</p>
         </div>
 
         {error && (
-          <div className="mb-5 p-3.5 rounded-xl bg-red-50 text-red-700 text-xs font-semibold border border-red-100 flex items-start gap-2.5">
+          <div className="mb-4 p-3 rounded-[6px] bg-red-50 text-red-700 text-xs font-semibold border border-red-100 flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <div>{error}</div>
           </div>
         )}
 
-        <form onSubmit={handleRegister} className="space-y-5">
+        <form onSubmit={handleRegister} className="space-y-4">
           
-          {/* 3. Profile Picture Box (1:1 Square) */}
-          <div className="flex flex-col items-center space-y-2 mb-4">
-            <label className="block text-[11px] font-extrabold text-neutral-500 uppercase tracking-wider">
+          {/* Profile Picture Box (Square) */}
+          <div className="flex flex-col items-center space-y-1.5 mb-3">
+            <label className="block text-[11px] font-extrabold text-neutral-600 uppercase tracking-wider">
               Profile Picture
             </label>
             <div 
               onClick={handleImageClick}
-              className="relative w-28 h-28 rounded-2xl border-2 border-dashed border-neutral-200 hover:border-black bg-neutral-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 group shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
+              className="relative w-24 h-24 rounded-[6px] border-2 border-dashed border-neutral-300 hover:border-black bg-neutral-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 group"
             >
               {profileImage ? (
                 <>
@@ -428,10 +428,9 @@ export default function Register() {
                   </div>
                 </>
               ) : (
-                <div className="flex flex-col items-center text-center p-3 text-neutral-400 group-hover:text-neutral-600 transition-colors">
+                <div className="flex flex-col items-center text-center p-2 text-neutral-400 group-hover:text-neutral-600 transition-colors">
                   <Camera className="w-5 h-5 mb-1 text-neutral-400 group-hover:text-black transition-colors" />
-                  <Upload className="w-3.5 h-3.5 text-neutral-300 group-hover:text-black transition-colors mb-1.5" />
-                  <span className="text-[9px] font-extrabold uppercase tracking-widest leading-none">Tap to Upload</span>
+                  <span className="text-[9px] font-extrabold uppercase tracking-widest leading-none">Upload Photo</span>
                 </div>
               )}
               <input 

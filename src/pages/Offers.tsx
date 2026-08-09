@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  ShoppingBag, Eye, Percent, Sparkles, Clock, ChevronRight, X, Plus, Star, Gift, Tag, Calendar
+  ShoppingBag, Eye, Percent, Sparkles, Clock, ChevronRight, X, Plus, Star, Gift, Tag, Calendar, ArrowLeft
 } from 'lucide-react';
 import { formatPrice, cn } from '../lib/utils';
 import { useProductStore, Product } from '../store/useProductStore';
 import { useCartStore } from '../store/useCartStore';
 import { useOfferStore, Offer } from '../store/useOfferStore';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function Offers() {
   const { products } = useProductStore();
   const { addItem } = useCartStore();
   const { offers } = useOfferStore();
+  const goBack = useSmartBack('/');
 
   // Selected Campaign Banner Id
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
@@ -101,6 +103,15 @@ export default function Offers() {
       {/* Top Banner Navigation/Tabs Catalog */}
       <div className="bg-white border-b border-neutral-100 py-6 mb-8 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3 mb-4">
+            <button 
+              onClick={() => goBack('/')} 
+              className="p-1 px-2.5 bg-white hover:bg-neutral-50 border border-neutral-200 text-neutral-900 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all select-none"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Back</span>
+            </button>
+          </div>
           <div className="text-center space-y-2 mb-6">
             <span className="inline-flex items-center gap-1 bg-red-55 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-red-600 rounded">
               <Gift className="w-3.5 h-3.5" /> EXCLUSIVE CAMPAIGNS

@@ -4,19 +4,44 @@ import { BrandsData } from './admin/content-pages/AdminBrandsEditor';
 import { CheckCircle2, Shield, Globe, Award, MessageCircle, Mail, Phone } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+const DEFAULT_BRANDS_DATA: BrandsData = {
+  logo: '',
+  banner: '',
+  companyName: 'TAZU MART BD',
+  ourStory: 'TAZU MART BD is a leading luxury ecommerce platform in Bangladesh providing premier authentic products.',
+  mission: 'To make authentic shopping effortless and reliable.',
+  vision: 'To be the most trusted online retail destination.',
+  whyChooseUs: ['100% Authentic Products', 'Fast Express Delivery', 'Dedicated Customer Support'],
+  brandValues: ['Integrity', 'Quality', 'Customer First'],
+  productCategories: [],
+  statistics: [],
+  gallery: [],
+  certifications: [],
+  customerTrust: '',
+  websiteLink: '',
+  whatsapp: '',
+  email: '',
+  call: '',
+  socialLinks: []
+};
+
 export default function BrandsProfile() {
-  const [data, setData] = useState<BrandsData | null>(null);
+  const [data, setData] = useState<BrandsData>(DEFAULT_BRANDS_DATA);
 
   useEffect(() => {
-    businessPagesService.getPageData<BrandsData>('brands', {
-      logo: '', banner: '', companyName: '', ourStory: '', mission: '', vision: '',
-      whyChooseUs: [], brandValues: [], productCategories: [], statistics: [],
-      gallery: [], certifications: [], customerTrust: '', websiteLink: '',
-      whatsapp: '', email: '', call: '', socialLinks: []
-    }).then(setData);
-  }, []);
+    let isMounted = true;
+    businessPagesService.getPageData<BrandsData>('brands', DEFAULT_BRANDS_DATA)
+      .then((res) => {
+        if (isMounted && res) {
+          setData(res);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load brands profile:', err);
+      });
 
-  if (!data) return <div className="min-h-screen bg-white" />;
+    return () => { isMounted = false; };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 pb-20 font-sans">

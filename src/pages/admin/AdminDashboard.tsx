@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -112,9 +112,11 @@ import AdminPushNotifications from './AdminPushNotifications';
 import AdminSearchListing from './AdminSearchListing';
 import AdminOffers from './AdminOffers';
 import AdminFlutterBanner from './AdminFlutterBanner';
+import AdminNotificationsPage from './AdminNotificationsPage';
 
 import { useProductStore } from '../../store/useProductStore';
 import { useBannerStore } from '../../store/useBannerStore';
+import { useSupportStore } from '../../store/useSupportStore';
 import MainHeroCarousel from '../../components/home/MainHeroCarousel';
 
 const RevenueChartTooltip = ({ active, payload, label, salesData }: any) => {
@@ -209,6 +211,35 @@ export default function AdminDashboard() {
   const { logout, user } = useAuthStore();
   const { setUnlocked } = useModeratorStore();
   const { settings } = useSettingsStore();
+  const { sessions = [], tickets = [] } = useSupportStore();
+
+  const unreadNotifCount = useMemo(() => {
+    let count = 0;
+    let readIds: string[] = [];
+    try {
+      const saved = localStorage.getItem('tazu_admin_read_notifs');
+      if (saved) readIds = JSON.parse(saved);
+    } catch {
+      readIds = [];
+    }
+
+    sessions.forEach((s) => {
+      if (s.id === 'TAZU-MART-BD-OFFICIAL') return;
+      const notifId = `chat-${s.id}`;
+      if (readIds.includes(notifId)) return;
+      const lastMsg = s.messages && s.messages.length > 0 ? s.messages[s.messages.length - 1] : null;
+      const isUnread = (s.unreadCount || 0) > 0 || (lastMsg && lastMsg.sender === 'customer' && !lastMsg.seen);
+      if (isUnread) count++;
+    });
+
+    tickets.forEach((t) => {
+      const notifId = `ticket-${t.id}`;
+      if (readIds.includes(notifId)) return;
+      if (t.status === 'Open') count++;
+    });
+
+    return count;
+  }, [sessions, tickets]);
 
   const handleLogout = () => {
     setUnlocked(false);
@@ -317,15 +348,27 @@ export default function AdminDashboard() {
 
   const getBadgeStyle = (name: string) => {
     if (name === 'Orders' || name === 'Incomplete Orders' || name === 'Complete Orders') {
-      return 'bg-rose-500 text-white shadow-sm';
+      return 'bg-rose-500 text-white font-extrabold text-[11px] h-5 min-w-[22px] px-2 rounded-[8px] inline-flex items-center justify-center shadow-2xs';
     }
     if (name === 'Customers' || name === 'Customer Listing' || name === 'Add Customer') {
-      return 'bg-purple-500 text-white shadow-sm';
+      return 'bg-[#6C3BFF] text-white font-extrabold text-[11px] h-5 min-w-[22px] px-2 rounded-[8px] inline-flex items-center justify-center shadow-2xs';
     }
     if (name === 'Search Listing') {
-      return 'bg-cyan-500 text-white shadow-sm';
+      return 'bg-cyan-600 text-white font-extrabold text-[11px] h-5 min-w-[22px] px-2 rounded-[8px] inline-flex items-center justify-center shadow-2xs';
     }
-    return 'bg-rose-500 text-white shadow-sm';
+    return 'bg-rose-500 text-white font-extrabold text-[11px] h-5 min-w-[22px] px-2 rounded-[8px] inline-flex items-center justify-center shadow-2xs';
+  };
+
+  const getSectionCategory = (itemName: string): string => {
+    const name = itemName.toLowerCase();
+    if (name.includes('dashboard')) return 'MAIN';
+    if (name.includes('order')) return 'ORDERS';
+    if (name.includes('customer')) return 'CUSTOMERS';
+    if (name.includes('product') || name.includes('categorie') || name.includes('offer') || name.includes('stock')) return 'CATALOG';
+    if (name.includes('footer') || name.includes('banner') || name.includes('campaign') || name.includes('showcase')) return 'CONTENT';
+    if (name.includes('marketing') || name.includes('promo') || name.includes('push') || name.includes('search')) return 'MARKETING';
+    if (name.includes('review') || name.includes('support') || name.includes('tracking') || name.includes('game') || name.includes('coin') || name.includes('bar')) return 'ENGAGEMENT';
+    return 'SYSTEM';
   };
 
   const navItems = getSortedNavItems();
@@ -378,16 +421,16 @@ export default function AdminDashboard() {
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-[95] md:hidden transition-opacity"
+          className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[95] md:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside 
-        className={`fixed md:sticky top-0 bottom-0 left-0 z-[100] h-screen admin-sidebar bg-white text-[#222222] border-r border-[#EEEEEE] shadow-xl transition-all duration-300 ease-in-out overflow-hidden
-          ${sidebarOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full md:translate-x-0'}
-          ${!sidebarOpen && !isSidebarCollapsed ? 'md:w-72' : 'md:w-20'}
+        className={`fixed md:sticky top-0 bottom-0 left-0 z-[100] h-screen admin-sidebar bg-white text-[#222222] border-r border-[#EAECEF] shadow-sm transition-all duration-300 ease-in-out overflow-hidden
+          ${sidebarOpen ? 'translate-x-0 w-[280px] sm:w-[290px]' : '-translate-x-full md:translate-x-0'}
+          ${!sidebarOpen && !isSidebarCollapsed ? 'md:w-[280px]' : 'md:w-20'}
         `}
       >
         <div 
@@ -395,135 +438,163 @@ export default function AdminDashboard() {
           className="h-full flex flex-col overflow-y-auto overscroll-contain custom-scrollbar"
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         >
-            <div className={`p-6 flex items-start transition-all duration-300 ${isSidebarCollapsed && !sidebarOpen ? 'justify-center p-4' : 'justify-between'} border-b border-[#EEEEEE] mb-4`}>
-              <div className={`${isSidebarCollapsed && !sidebarOpen ? 'hidden' : 'block'}`}>
-                <h2 className="text-xl font-sans font-black tracking-widest uppercase text-[#111111] mb-1">TAZU MART</h2>
-                <span className="text-[10px] font-black text-[#777777] tracking-[0.1em] uppercase">Admin Core</span>
-              </div>
-              <button onClick={() => setSidebarOpen(false)} className="md:hidden text-[#444444] hover:text-black mt-1">
-                <X className="w-5 h-5" />
-              </button>
+          {/* Sidebar Header */}
+          <div className={`px-5 py-4 flex items-center transition-all duration-300 ${isSidebarCollapsed && !sidebarOpen ? 'justify-center px-2' : 'justify-between'} border-b border-[#EAECEF]`}>
+            <div className={`${isSidebarCollapsed && !sidebarOpen ? 'hidden' : 'block'}`}>
+              <h2 className="text-xl font-black tracking-wider uppercase text-[#111111] leading-none mb-1">TAZU MART</h2>
+              <span className="text-[10px] font-extrabold text-[#8A8F98] tracking-[1.5px] uppercase">Admin Core</span>
             </div>
+            <button 
+              onClick={() => setSidebarOpen(false)} 
+              className="md:hidden w-9 h-9 rounded-lg hover:bg-neutral-100 flex items-center justify-center text-neutral-500 hover:text-black transition-colors"
+              aria-label="Close Sidebar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
           
-          <nav className="space-y-1.5 flex-grow px-3">
-            {filteredNavItems.map((item) => {
-              const active = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
-              const hasSubmenu = item.subItems && item.subItems.length > 0;
-              const isExpanded = openMenu === item.name;
-              const showLabels = !isSidebarCollapsed || sidebarOpen;
+          <nav className="space-y-1 flex-grow px-3 py-3">
+            {(() => {
+              let lastCategory = '';
+              return filteredNavItems.map((item) => {
+                const active = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
+                const hasSubmenu = item.subItems && item.subItems.length > 0;
+                const isExpanded = openMenu === item.name;
+                const showLabels = !isSidebarCollapsed || sidebarOpen;
+                const category = getSectionCategory(item.name);
 
-              return (
-                <div key={item.name} className="flex flex-col gap-1">
-                  {hasSubmenu ? (
-                    <button
-                      onClick={() => {
-                        if (!showLabels) {
-                          setIsSidebarCollapsed(false);
-                          setOpenMenu(item.name);
-                        } else {
-                          toggleSubmenu(item.name);
-                        }
-                      }}
-                      className={`flex items-center group px-[18px] py-[14px] rounded-[12px] transition-all duration-200 w-full relative
-                        ${active && !isExpanded ? 'bg-[#F4EEFF] text-black font-semibold' : 'text-[#222222] hover:bg-[#F8F8F8]'}
-                        ${!showLabels ? 'justify-center px-0' : 'justify-between'}
-                      `}
-                    >
-                      {active && !isExpanded && showLabels && (
-                        <div className="absolute left-0 top-3 bottom-3 w-[4px] bg-[#7C3AED] rounded-r-full" />
-                      )}
-                      <div className={`flex items-center ${!showLabels ? 'justify-center' : 'gap-4'}`}>
-                        <item.icon className={`w-[20px] h-[20px] transition-all duration-300 ${active && !isExpanded ? 'text-[#7C3AED] scale-110' : 'text-[#444444] group-hover:text-black'}`} />
-                        {showLabels && (
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[15px] tracking-tight ${active && !isExpanded ? 'font-semibold' : 'font-medium'}`}>{item.name}</span>
-                            {getMainItemCount(item.name) > 0 && (
-                              <span className={`px-2 py-0.5 text-[9px] font-black text-white rounded-full ${getBadgeStyle(item.name)}`}>
-                                {getMainItemCount(item.name)}
-                              </span>
+                let renderCategoryHeader = false;
+                if (showLabels && category !== lastCategory) {
+                  renderCategoryHeader = true;
+                  lastCategory = category;
+                }
+
+                return (
+                  <React.Fragment key={item.name}>
+                    {renderCategoryHeader && (
+                      <div className="pt-4 pb-1 px-3.5 first:pt-1">
+                        <span className="text-[10px] font-bold uppercase tracking-[1px] text-[#8A8F98]">
+                          {category}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-0.5">
+                      {hasSubmenu ? (
+                        <button
+                          onClick={() => {
+                            if (!showLabels) {
+                              setIsSidebarCollapsed(false);
+                              setOpenMenu(item.name);
+                            } else {
+                              toggleSubmenu(item.name);
+                            }
+                          }}
+                          className={`flex items-center group px-3.5 py-2.5 rounded-[10px] transition-all duration-150 w-full relative
+                            ${active && !isExpanded ? 'bg-[#F4EEFF] text-[#111111] font-bold' : 'text-[#333333] hover:bg-[#F5F6F8] hover:text-[#111111]'}
+                            ${!showLabels ? 'justify-center px-0' : 'justify-between'}
+                          `}
+                        >
+                          {active && !isExpanded && showLabels && (
+                            <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#6C3BFF] rounded-r-full" />
+                          )}
+                          <div className={`flex items-center ${!showLabels ? 'justify-center' : 'gap-3'}`}>
+                            <item.icon className={`w-[20px] h-[20px] shrink-0 transition-colors duration-150 ${active && !isExpanded ? 'text-[#6C3BFF]' : 'text-[#666666] group-hover:text-[#111111]'}`} />
+                            {showLabels && (
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[14px] tracking-tight ${active && !isExpanded ? 'font-bold text-[#111111]' : 'font-medium'}`}>{item.name}</span>
+                                {getMainItemCount(item.name) > 0 && (
+                                  <span className={getBadgeStyle(item.name)}>
+                                    {getMainItemCount(item.name)}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                      {showLabels && (
-                        <ChevronDown className={`w-3.5 h-3.5 text-[#999999] transition-transform duration-300 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
-                      )}
-                    </button>
-                  ) : (
-                    <Link 
-                      to={item.path || '#'}
-                      onClick={() => {
-                        if (window.innerWidth < 768) setSidebarOpen(false);
-                      }}
-                      className={`flex items-center group px-[18px] py-[14px] rounded-[12px] transition-all duration-200 relative
-                        ${active ? 'bg-[#F4EEFF] text-black font-semibold' : 'text-[#222222] hover:bg-[#F8F8F8]'}
-                        ${!showLabels ? 'justify-center px-0' : 'justify-between'}
-                      `}
-                    >
-                      {active && showLabels && (
-                        <div className="absolute left-0 top-3 bottom-3 w-[4px] bg-[#7C3AED] rounded-r-full" />
-                      )}
-                      <div className={`flex items-center ${!showLabels ? 'justify-center' : 'gap-4'}`}>
-                        <item.icon className={`w-[20px] h-[20px] transition-all duration-300 ${active ? 'text-[#7C3AED] scale-110' : 'text-[#444444] group-hover:text-black'}`} />
-                        {showLabels && (
-                          <div className="flex items-center gap-2">
-                             <span className={`text-[15px] tracking-tight ${active ? 'font-semibold' : 'font-medium'}`}>{item.name}</span>
-                             {getMainItemCount(item.name) > 0 && (
-                               <span className={`px-2 py-0.5 text-[9px] font-black text-white rounded-full ${getBadgeStyle(item.name)}`}>
-                                 {getMainItemCount(item.name)}
-                               </span>
-                             )}
+                          {showLabels && (
+                            <ChevronDown className={`w-4 h-4 text-[#8A8F98] transition-transform duration-200 ease-in-out ${isExpanded ? 'rotate-180' : 'rotate-0'}`} />
+                          )}
+                        </button>
+                      ) : (
+                        <Link 
+                          to={item.path || '#'}
+                          onClick={() => {
+                            if (window.innerWidth < 768) setSidebarOpen(false);
+                          }}
+                          className={`flex items-center group px-3.5 py-2.5 rounded-[10px] transition-all duration-150 relative
+                            ${active ? 'bg-[#F4EEFF] text-[#111111] font-bold' : 'text-[#333333] hover:bg-[#F5F6F8] hover:text-[#111111]'}
+                            ${!showLabels ? 'justify-center px-0' : 'justify-between'}
+                          `}
+                        >
+                          {active && showLabels && (
+                            <div className="absolute left-0 top-2 bottom-2 w-[3px] bg-[#6C3BFF] rounded-r-full" />
+                          )}
+                          <div className={`flex items-center ${!showLabels ? 'justify-center' : 'gap-3'}`}>
+                            <item.icon className={`w-[20px] h-[20px] shrink-0 transition-colors duration-150 ${active ? 'text-[#6C3BFF]' : 'text-[#666666] group-hover:text-[#111111]'}`} />
+                            {showLabels && (
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[14px] tracking-tight ${active ? 'font-bold text-[#111111]' : 'font-medium'}`}>{item.name}</span>
+                                {getMainItemCount(item.name) > 0 && (
+                                  <span className={getBadgeStyle(item.name)}>
+                                    {getMainItemCount(item.name)}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      {showLabels && item.name === '🛠 Admin Management' && (
-                        <ChevronRight className="w-3.5 h-3.5 text-[#999999] opacity-40" />
+                          {showLabels && item.name === '🛠 Admin Management' && (
+                            <ChevronRight className="w-3.5 h-3.5 text-[#8A8F98] opacity-60" />
+                          )}
+                        </Link>
                       )}
-                    </Link>
-                  )}
 
-                  {hasSubmenu && showLabels && (
-                    <div 
-                       className="overflow-hidden transition-all duration-300 ease-in-out"
-                       style={{ maxHeight: isExpanded ? `${item.subItems!.length * 50 + 20}px` : '0px', opacity: isExpanded ? 1 : 0 }}
-                    >
-                      <div className="pl-4 py-2 flex flex-col gap-1 ml-10 mt-1 mb-2 border-l border-[#EEEEEE]">
-                        {item.subItems!.map(subItem => {
-                          const subActive = location.pathname === subItem.path;
-                          return (
-                            <Link
-                              key={subItem.name}
-                              to={subItem.path}
-                              onClick={() => {
-                                if (window.innerWidth < 768) setSidebarOpen(false);
-                              }}
-                              className={`flex items-center gap-3 px-4 py-2 rounded-[8px] text-[13px] transition-all group/sub ${subActive ? 'text-[#7C3AED] font-semibold bg-[#F4EEFF]' : 'text-[#666666] hover:text-black hover:bg-[#F8F8F8]'}`}
-                            >
-                              <span className="flex-1">{subItem.name}</span>
-                              {getSubItemCount(subItem.name) > 0 && (
-                                <span className={`px-2 py-0.5 text-[8px] font-black text-white rounded-full ${getBadgeStyle(subItem.name)}`}>
-                                  {getSubItemCount(subItem.name)}
-                                </span>
-                              )}
-                            </Link>
-                          );
-                        })}
-                      </div>
+                      {hasSubmenu && showLabels && (
+                        <div 
+                          className="overflow-hidden transition-all duration-200 ease-in-out"
+                          style={{ maxHeight: isExpanded ? `${item.subItems!.length * 48 + 16}px` : '0px', opacity: isExpanded ? 1 : 0 }}
+                        >
+                          <div className="ml-6 pl-3 py-1 flex flex-col gap-1 my-1 border-l border-[#EAECEF]">
+                            {item.subItems!.map(subItem => {
+                              const subActive = location.pathname === subItem.path;
+                              return (
+                                <Link
+                                  key={subItem.name}
+                                  to={subItem.path}
+                                  onClick={() => {
+                                    if (window.innerWidth < 768) setSidebarOpen(false);
+                                  }}
+                                  className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[13px] transition-all ${subActive ? 'text-[#6C3BFF] font-bold bg-[#F4EEFF]/70' : 'text-[#555555] hover:text-[#111111] hover:bg-[#F5F6F8]'}`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    {subActive && <span className="w-1.5 h-1.5 rounded-full bg-[#6C3BFF] shrink-0" />}
+                                    <span className="truncate">{subItem.name}</span>
+                                  </div>
+                                  {getSubItemCount(subItem.name) > 0 && (
+                                    <span className={getBadgeStyle(subItem.name)}>
+                                      {getSubItemCount(subItem.name)}
+                                    </span>
+                                  )}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              );
-            })}
+                  </React.Fragment>
+                );
+              });
+            })()}
           </nav>
           
-          <div className={`mt-auto p-6 flex flex-col gap-4 border-t border-[#EEEEEE] transition-all ${isSidebarCollapsed && !sidebarOpen ? 'px-0 items-center' : ''}`}>
-             <Link to="/" className={`text-[#666666] hover:text-black flex items-center gap-4 text-[13px] font-medium transition-all ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
-                <Monitor className="w-5 h-5 text-[#444444]" />
-                {(!isSidebarCollapsed || sidebarOpen) && "Back to Store"}
+          <div className={`mt-auto p-4 flex flex-col gap-2 border-t border-[#EAECEF] transition-all bg-white ${isSidebarCollapsed && !sidebarOpen ? 'px-0 items-center' : ''}`}>
+             <Link to="/" className={`text-[#666666] hover:text-[#111111] hover:bg-[#F5F6F8] px-3 py-2 rounded-lg flex items-center gap-3 text-[13px] font-medium transition-colors ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
+                <Monitor className="w-4 h-4 text-[#666666]" />
+                {(!isSidebarCollapsed || sidebarOpen) && <span>Back to Store</span>}
              </Link>
-             <button onClick={handleLogout} className={`text-red-500 hover:text-red-600 flex items-center gap-4 text-[13px] font-medium transition-all text-left ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
-                <LogOut className="w-5 h-5" />
-                {(!isSidebarCollapsed || sidebarOpen) && "End Session"}
+             <button onClick={handleLogout} className={`text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-lg flex items-center gap-3 text-[13px] font-medium transition-colors text-left ${isSidebarCollapsed && !sidebarOpen ? 'w-full justify-center px-0' : ''}`}>
+                <LogOut className="w-4 h-4 text-rose-500" />
+                {(!isSidebarCollapsed || sidebarOpen) && <span>End Session</span>}
              </button>
           </div>
         </div>
@@ -545,9 +616,18 @@ export default function AdminDashboard() {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-gray-400 hover:text-[#000000] hover:bg-gray-50 rounded-none transition-colors focus:outline-none">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-none border-2 border-white"></span>
+            <button 
+              onClick={() => navigate('/admin/notifications')}
+              className="relative p-2.5 text-gray-700 hover:text-black hover:bg-gray-100 rounded-full transition-all focus:outline-none flex items-center justify-center group cursor-pointer"
+              aria-label="Notifications"
+              title="Open Notifications Page"
+            >
+              <Bell className="w-5 h-5 transition-transform group-hover:scale-105" />
+              {unreadNotifCount > 0 && (
+                <span className="absolute top-1 right-1 bg-red-600 text-white text-[10px] font-black min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full border-2 border-white shadow-xs animate-pulse">
+                  {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                </span>
+              )}
             </button>
             <div className="text-right hidden sm:block">
                <p className="text-sm font-bold text-[#000000]">{user?.name || 'Admin User'}</p>
@@ -564,23 +644,23 @@ export default function AdminDashboard() {
         </header>
 
         {/* Mobile Top Navigation */}
-        <div className="md:hidden bg-white border-b border-[#EEEEEE] px-4 py-3 flex gap-2 overflow-x-auto justify-between hide-scrollbar shrink-0 shadow-sm">
-           <Link to="/admin/products" className={`flex-1 flex flex-col items-center justify-center py-2 px-3 rounded-[12px] transition-colors ${location.pathname.startsWith('/admin/products') ? 'bg-[#000000] text-white shadow-md' : 'bg-gray-50 text-[#666666] hover:bg-gray-100'}`}>
-             <Package className="w-5 h-5 mb-1" />
-             <span className="text-[10px] font-bold uppercase tracking-wider">Products</span>
+        <div className="md:hidden bg-white border-b border-[#EEEEEE] px-3 py-1 h-[44px] flex items-center gap-2.5 justify-between hide-scrollbar shrink-0 shadow-sm">
+           <Link to="/admin/products" className={`flex-1 h-8 flex items-center justify-center gap-1.5 px-2 rounded-[10px] transition-colors ${location.pathname.startsWith('/admin/products') ? 'bg-[#000000] text-white shadow-sm' : 'bg-gray-100/80 text-[#666666] hover:bg-gray-100'}`}>
+             <Package className="w-[18px] h-[18px] shrink-0" />
+             <span className="text-[10px] font-black uppercase tracking-wider">Products</span>
            </Link>
-           <Link to="/admin" className={`flex-1 flex flex-col items-center justify-center py-2 px-3 rounded-[12px] transition-colors ${location.pathname === '/admin' ? 'bg-[#000000] text-white shadow-md' : 'bg-gray-50 text-[#666666] hover:bg-gray-100'}`}>
-             <LayoutDashboard className="w-5 h-5 mb-1" />
-             <span className="text-[10px] font-bold uppercase tracking-wider">Dashboard</span>
+           <Link to="/admin" className={`flex-1 h-8 flex items-center justify-center gap-1.5 px-2 rounded-[10px] transition-colors ${location.pathname === '/admin' ? 'bg-[#000000] text-white shadow-sm' : 'bg-gray-100/80 text-[#666666] hover:bg-gray-100'}`}>
+             <LayoutDashboard className="w-[18px] h-[18px] shrink-0" />
+             <span className="text-[10px] font-black uppercase tracking-wider">Dashboard</span>
            </Link>
-           <Link to="/admin/orders" className={`flex-1 flex flex-col items-center justify-center py-2 px-3 rounded-[12px] transition-colors ${location.pathname === '/admin/orders' ? 'bg-[#000000] text-white shadow-md' : 'bg-gray-50 text-[#666666] hover:bg-gray-100'}`}>
-             <ShoppingBag className="w-5 h-5 mb-1" />
-             <span className="text-[10px] font-bold uppercase tracking-wider">Orders</span>
+           <Link to="/admin/orders" className={`flex-1 h-8 flex items-center justify-center gap-1.5 px-2 rounded-[10px] transition-colors ${location.pathname === '/admin/orders' ? 'bg-[#000000] text-white shadow-sm' : 'bg-gray-100/80 text-[#666666] hover:bg-gray-100'}`}>
+             <ShoppingBag className="w-[18px] h-[18px] shrink-0" />
+             <span className="text-[10px] font-black uppercase tracking-wider">Orders</span>
            </Link>
         </div>
 
         {/* Dashboard Content */}
-        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
+        <div className="flex-1 overflow-auto p-1.5 sm:p-4 lg:p-6 space-y-4 lg:space-y-6">
            <Routes>
               <Route path="/" element={<PermissionGate moduleId="dashboard"><Overview /></PermissionGate>} />
               <Route path="/categories/*" element={<PermissionGate moduleId="categories"><AdminCategories /></PermissionGate>} />
@@ -589,8 +669,9 @@ export default function AdminDashboard() {
               <Route path="/product-listing/*" element={<PermissionGate moduleId="products"><AdminProducts /></PermissionGate>} />
               <Route path="/products/*" element={<PermissionGate moduleId="products"><AdminProducts /></PermissionGate>} />
               <Route path="/offers/*" element={<PermissionGate moduleId="products"><AdminOffers /></PermissionGate>} />
-              <Route path="/orders/*" element={<PermissionGate moduleId="orders"><AdminOrders /></PermissionGate>} />
               <Route path="/orders/incomplete" element={<PermissionGate moduleId="orders"><AdminIncompleteOrders /></PermissionGate>} />
+              <Route path="/orders/complete" element={<PermissionGate moduleId="orders"><AdminOrders /></PermissionGate>} />
+              <Route path="/orders/*" element={<PermissionGate moduleId="orders"><AdminOrders /></PermissionGate>} />
               <Route path="/live-tracking" element={<PermissionGate moduleId="dashboard"><AdminLiveTracking /></PermissionGate>} />
               <Route path="/customers/*" element={<PermissionGate moduleId="users"><AdminCustomers /></PermissionGate>} />
               <Route path="/management/stock" element={<PermissionGate moduleId="roles"><AdminStock /></PermissionGate>} />
@@ -622,6 +703,7 @@ export default function AdminDashboard() {
               <Route path="/management/footer" element={<PermissionGate moduleId="dashboard"><AdminFooterSettings /></PermissionGate>} />
               <Route path="/management/support-banner" element={<PermissionGate moduleId="dashboard"><AdminSupportBanner /></PermissionGate>} />
               <Route path="/support" element={<PermissionGate moduleId="support"><AdminSupport /></PermissionGate>} />
+              <Route path="/notifications" element={<PermissionGate moduleId="support"><AdminNotificationsPage /></PermissionGate>} />
               <Route path="/ai-control-center" element={<PermissionGate moduleId="settings"><AdminAIControlCenter /></PermissionGate>} />
               <Route path="/reviews" element={<PermissionGate moduleId="dashboard"><AdminReviewList /></PermissionGate>} />
               <Route path="/reviews/add" element={<PermissionGate moduleId="dashboard"><AdminReviewAdd /></PermissionGate>} />
@@ -635,7 +717,9 @@ export default function AdminDashboard() {
               <Route path="/management/bar-management" element={<PermissionGate moduleId="settings"><AdminMenuManagement /></PermissionGate>} />
               <Route path="/management/review-monitoring" element={<PermissionGate moduleId="dashboard"><AdminReviews /></PermissionGate>} />
               <Route path="/management/promo-codes" element={<PermissionGate moduleId="dashboard"><AdminPromoCodes /></PermissionGate>} />
-              <Route path="/management/push-notifications" element={<PermissionGate moduleId="dashboard"><AdminPushNotifications /></PermissionGate>} />
+              <Route path="/management/push-notifications" element={<PermissionGate moduleId="dashboard"><AdminPushNotifications activeTab="create" /></PermissionGate>} />
+              <Route path="/campaigns/create" element={<PermissionGate moduleId="dashboard"><AdminPushNotifications activeTab="create" /></PermissionGate>} />
+              <Route path="/campaigns/history" element={<PermissionGate moduleId="dashboard"><AdminPushNotifications activeTab="history" /></PermissionGate>} />
               <Route path="/management/banner-management" element={<PermissionGate moduleId="banners"><AdminBanners /></PermissionGate>} />
               <Route path="/management/popup-management" element={<PermissionGate moduleId="dashboard"><AdminPopupManagement /></PermissionGate>} />
               <Route path="/delivery/courier-api" element={<PermissionGate moduleId="orders"><AdminCourierAPI /></PermissionGate>} />

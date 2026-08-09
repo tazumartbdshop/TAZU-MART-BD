@@ -43,19 +43,17 @@ export default function FlashSaleSection({ products, isLoading }: FlashSaleSecti
     <section id="flash-sale" className="pt-0 pb-3 bg-white border-b border-neutral-100 overflow-hidden">
       <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4 border-b border-neutral-100 pb-3 relative">
-          <div className="flex items-center gap-2">
-             <div className="p-1.5 bg-red-600 rounded-lg shadow-[0_0_12px_rgba(220,38,38,0.3)] animate-pulse">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-3 border-b border-neutral-100 pb-2.5 relative">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+             <div className="p-1.5 bg-red-600 rounded-lg shadow-[0_0_12px_rgba(220,38,38,0.3)] animate-pulse shrink-0">
                 <Zap className="w-4 h-4 text-white fill-white" />
              </div>
-             <div>
-                <h2 className="text-lg font-black text-neutral-900 uppercase tracking-tighter">Flash Sale</h2>
-                <div className="mt-0.5 scale-90 origin-left">
-                   <FlashSaleTimer />
-                </div>
-             </div>
+             <h2 className="text-sm sm:text-lg font-black text-neutral-900 uppercase tracking-tighter shrink-0 leading-none">
+               Flash Sale
+             </h2>
+             <FlashSaleTimer />
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
              <Link 
                to="/offers#offer-flash-sale" 
                className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-red-600 hover:text-red-700 transition-colors shrink-0"

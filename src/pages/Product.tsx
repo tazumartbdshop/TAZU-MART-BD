@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'react-hot-toast';
@@ -6,7 +6,7 @@ import {
   ArrowLeft, Share2, Heart, Star, Minus, Plus, 
   ShieldCheck, Truck, RotateCcw, Box, Eye, Flame, 
   ChevronLeft, ChevronRight, CheckCircle2, ShoppingBag, 
-  Info, Sparkles, Loader2, ArrowRight, Coins, Play, X
+  Info, Sparkles, Loader2, ArrowRight, Coins, Play, X, ZoomIn, Download
 } from 'lucide-react';
 import { formatPrice } from '../lib/utils';
 import { useCartStore } from '../store/useCartStore';
@@ -20,6 +20,7 @@ import ProductCard from '../components/ui/ProductCard';
 import ProductReviews from '../components/product/ProductReviews';
 import BannerSlider from '../components/common/BannerSlider';
 import { pixelService } from '../utils/pixelService';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 const ALL_FALLBACK_PRODUCTS = [
   {
@@ -244,6 +245,7 @@ export default function Product() {
   const { slug: urlParam } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const { addItem, clearCart } = useCartStore();
   const { products } = useProductStore();
   const { offers } = useOfferStore();
@@ -318,6 +320,195 @@ export default function Product() {
   const isWishlisted = isInWishlist(product?.id || '');
   const [isShareSuccess, setIsShareSuccess] = useState(false);
   const [wishlistToast, setWishlistToast] = useState<'added' | 'removed' | null>(null);
+
+  // Hover-to-Zoom states & handlers
+  const [zoomStyle, setZoomStyle] = useState<React.CSSProperties>({});
+  const [isZooming, setIsZooming] = useState(false);
+  const mainImageContainerRef = useRef<HTMLDivElement>(null);
+
+  // Fullscreen Lightbox states
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxActiveIndex, setLightboxActiveIndex] = useState(0);
+  const [lightboxZoomStyle, setLightboxZoomStyle] = useState<React.CSSProperties>({});
+  const [isLightboxZooming, setIsLightboxZooming] = useState(false);
+  const lightboxContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!mainImageContainerRef.current) return;
+    const { left, top, width, height } = mainImageContainerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - left) / width) * 100;
+    const y = ((e.clientY - top) / height) * 100;
+    
+    setZoomStyle({
+      transformOrigin: `${x}% ${y}%`,
+      transform: 'scale(2.2)',
+    });
+    setIsZooming(true);
+  };
+
+  const handleMouseLeave = () => {
+    setZoomStyle({
+      transformOrigin: 'center',
+      transform: 'scale(1)',
+    });
+    setIsZooming(false);
+  };
+
+  const handleTouchMoveMain = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length > 1) return; // ignore multi-touch
+    if (!mainImageContainerRef.current) return;
+    
+    const touch = e.touches[0];
+    const { left, top, width, height } = mainImageContainerRef.current.getBoundingClientRect();
+    const x = ((touch.clientX - left) / width) * 100;
+    const y = ((touch.clientY - top) / height) * 100;
+    
+    const boundedX = Math.max(0, Math.min(100, x));
+    const boundedY = Math.max(0, Math.min(100, y));
+    
+    setZoomStyle({
+      transformOrigin: `${boundedX}% ${boundedY}%`,
+      transform: 'scale(2.2)',
+    });
+    setIsZooming(true);
+  };
+
+  const handleTouchEndMain = (e: React.TouchEvent<HTMLDivElement>) => {
+    setZoomStyle({
+      transformOrigin: 'center',
+      transform: 'scale(1)',
+    });
+    setIsZooming(false);
+    
+    // Call original swipe navigation handler
+    handleTouchEnd(e);
+  };
+
+  // Synchronize lightbox index when lightbox opens and lock/unlock body scrolling
+  useEffect(() => {
+    if (isLightboxOpen) {
+      setLightboxActiveIndex(activeImage);
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isLightboxOpen, activeImage]);
+
+  const handleLightboxMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!lightboxContainerRef.current) return;
+    const { left, top, width, height } = lightboxContainerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - left) / width) * 100;
+    const y = ((e.clientY - top) / height) * 100;
+    
+    setLightboxZoomStyle({
+      transformOrigin: `${x}% ${y}%`,
+      transform: 'scale(2.5)',
+    });
+    setIsLightboxZooming(true);
+  };
+
+  const handleLightboxMouseLeave = () => {
+    setLightboxZoomStyle({
+      transformOrigin: 'center',
+      transform: 'scale(1)',
+    });
+    setIsLightboxZooming(false);
+  };
+
+  const handleLightboxTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length > 1) return;
+    if (!lightboxContainerRef.current) return;
+    
+    const touch = e.touches[0];
+    const { left, top, width, height } = lightboxContainerRef.current.getBoundingClientRect();
+    const x = ((touch.clientX - left) / width) * 100;
+    const y = ((touch.clientY - top) / height) * 100;
+    
+    const boundedX = Math.max(0, Math.min(100, x));
+    const boundedY = Math.max(0, Math.min(100, y));
+    
+    setLightboxZoomStyle({
+      transformOrigin: `${boundedX}% ${boundedY}%`,
+      transform: 'scale(2.5)',
+    });
+    setIsLightboxZooming(true);
+  };
+
+  const handleLightboxTouchEnd = () => {
+    setLightboxZoomStyle({
+      transformOrigin: 'center',
+      transform: 'scale(1)',
+    });
+    setIsLightboxZooming(false);
+  };
+
+  const handleDownload = async () => {
+    const currentItem = galleryItems[activeImage];
+    if (!currentItem || currentItem.type === 'video') {
+      toast.error("Cannot download: This item is not a downloadable image.");
+      return;
+    }
+    const imageUrl = currentItem.url;
+    if (!imageUrl) {
+      toast.error("Image URL not found.");
+      return;
+    }
+
+    const toastId = toast.loading("Preparing download...");
+    try {
+      // Fetch the image as a blob
+      const response = await fetch(imageUrl, {
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      if (!response.ok) throw new Error("Network response was not ok");
+      const blob = await response.blob();
+      
+      // Create local object URL
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Trigger download
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      const sanitizedName = product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      
+      let extension = 'jpg';
+      const cleanUrl = imageUrl.split('?')[0].split('#')[0];
+      const matches = cleanUrl.match(/\.(jpeg|jpg|png|gif|webp|svg)/i);
+      if (matches) {
+        extension = matches[1].toLowerCase();
+      }
+      
+      link.download = `${sanitizedName}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      
+      toast.success("Image downloaded successfully!", { id: toastId });
+    } catch (error) {
+      console.error("Error downloading image:", error);
+      // Fallback: open in new tab if blob fetch fails (e.g. CORS)
+      try {
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.download = `${product.name}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Opening image in new tab for download.", { id: toastId });
+      } catch (err) {
+        toast.error("Failed to download image automatically.", { id: toastId });
+      }
+    }
+  };
 
   // Dynamic gallery image setup
   const images = useMemo(() => {
@@ -656,29 +847,46 @@ export default function Product() {
   };
 
   const handleBuyNow = () => {
-    const variantString = Object.entries(selectedVariants).map(([k,v]) => `${k}: ${v}`).join(', ');
-    const cartItemId = `${product.id}-${Object.values(selectedVariants).join('-')}`;
-    const cartItemName = `${product.name}${variantString ? ` - ${variantString}` : ''}`;
-    
-    addItem({
-      id: cartItemId,
-      name: cartItemName,
-      price: currentPrice,
-      originalPrice: originalTotal,
-      image: product.imageUrl || product.featured_image || product.image,
-      slug: product.slug,
-      sku: product.sku,
-      quantity: quantity,
-    });
+    if (isOutOfStock) {
+      toast.error("Product is currently out of stock");
+      return;
+    }
+    if (!product) {
+      toast.error("Product details not found");
+      return;
+    }
 
-    pixelService.trackAddToCart({
-      id: product.id,
-      name: product.name,
-      price: currentPrice,
-      quantity: quantity
-    });
+    try {
+      const variantString = Object.entries(selectedVariants).map(([k,v]) => `${k}: ${v}`).join(', ');
+      const variantKeySuffix = Object.values(selectedVariants).length > 0 ? `-${Object.values(selectedVariants).join('-')}` : '';
+      const cartItemId = `${product.id}${variantKeySuffix}`;
+      const cartItemName = `${product.name}${variantString ? ` - (${variantString})` : ''}`;
+      
+      clearCart();
 
-    navigate('/checkout');
+      addItem({
+        id: cartItemId,
+        name: cartItemName,
+        price: currentPrice,
+        originalPrice: originalTotal,
+        image: product.imageUrl || product.featured_image || product.image || '/placeholder.png',
+        slug: product.slug || product.id,
+        sku: product.sku || '',
+        quantity: quantity,
+      });
+
+      pixelService.trackAddToCart({
+        id: product.id,
+        name: product.name,
+        price: currentPrice,
+        quantity: quantity
+      });
+
+      navigate('/checkout');
+    } catch (err) {
+      console.error("[Buy Now Error]", err);
+      toast.error("Failed to process Buy Now request");
+    }
   };
 
   const handleShare = async () => {
@@ -769,7 +977,7 @@ export default function Product() {
       <div className="sticky top-[72px] md:top-[72px] z-30 bg-white/90 backdrop-blur-md border-b border-neutral-200 py-3 px-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <button 
-            onClick={() => navigate(-1)} 
+            onClick={() => goBack('/')} 
             className="p-1 px-2.5 bg-white hover:bg-neutral-50 border border-neutral-250 text-neutral-900 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all select-none"
           >
             <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -787,6 +995,13 @@ export default function Product() {
               className="p-2 border border-neutral-200 hover:bg-neutral-50 text-neutral-900 active:scale-90 transition-all"
             >
               <Share2 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleDownload}
+              title="Download Image"
+              className="p-2 border border-neutral-200 hover:bg-neutral-50 text-neutral-900 active:scale-90 transition-all"
+            >
+              <Download className="w-4 h-4" />
             </button>
             <button 
               onClick={() => {
@@ -819,9 +1034,18 @@ export default function Product() {
           {/* IMAGE GALLERY SECTION (Col-Span-6) - Compact Balanced Visuals */}
           <div className="lg:col-span-6 space-y-3">
             <div 
+              ref={mainImageContainerRef}
               onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
-              className="relative aspect-square max-w-[390px] mx-auto w-full bg-neutral-50/50 border border-neutral-200/60 rounded-xl overflow-hidden flex items-center justify-center select-none p-2.5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.015)] transition-all group"
+              onTouchEnd={handleTouchEndMain}
+              onTouchMove={handleTouchMoveMain}
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+              onClick={() => {
+                if (galleryItems[activeImage]?.type !== 'video') {
+                  setIsLightboxOpen(true);
+                }
+              }}
+              className="relative aspect-square max-w-full md:max-w-xl mx-auto w-full bg-neutral-50 border border-neutral-200/60 rounded-xl overflow-hidden flex items-center justify-center select-none p-0 hover:shadow-md transition-all group cursor-zoom-in"
             >
               {/* Overlay Tags */}
               <div className="absolute top-3.5 left-3.5 z-10 flex flex-col gap-1.5 pointer-events-none">
@@ -841,6 +1065,14 @@ export default function Product() {
                   </span>
                 )}
               </div>
+
+              {/* Floating Zoom tip overlay */}
+              {galleryItems[activeImage]?.type !== 'video' && !isZooming && (
+                <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-white/95 backdrop-blur-sm border border-neutral-200/80 p-1 px-2.5 rounded-full shadow-sm text-[9px] font-black uppercase tracking-widest text-neutral-800 pointer-events-none transition-all duration-300 md:opacity-75 group-hover:opacity-100">
+                  <ZoomIn className="w-3 h-3 text-red-600" />
+                  <span>ZOOM</span>
+                </div>
+              )}
 
               {/* Central Premium Main Display Image with smooth hover scaling */}
               <AnimatePresence mode="wait">
@@ -880,7 +1112,11 @@ export default function Product() {
                     transition={{ duration: 0.25 }}
                     src={galleryItems[activeImage]?.url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60'} 
                     alt={product.name} 
-                    className="w-full h-full object-contain p-1 transition-transform duration-500 group-hover:scale-[1.03]"
+                    style={{
+                      ...zoomStyle,
+                      transition: isZooming ? 'transform 0.08s ease-out' : 'transform 0.3s ease-out'
+                    }}
+                    className="w-full h-full object-contain"
                     referrerPolicy="no-referrer"
                   />
                 )}
@@ -891,15 +1127,21 @@ export default function Product() {
                 <>
                   <button 
                     type="button"
-                    onClick={() => setActiveImage((prev) => (galleryItems.length > 0 ? (prev - 1 + galleryItems.length) % galleryItems.length : 0))}
-                    className="absolute left-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImage((prev) => (galleryItems.length > 0 ? (prev - 1 + galleryItems.length) % galleryItems.length : 0));
+                    }}
+                    className="absolute left-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm z-10"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
                   <button 
                     type="button"
-                    onClick={() => setActiveImage((prev) => (galleryItems.length > 0 ? (prev + 1) % galleryItems.length : 0))}
-                    className="absolute right-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImage((prev) => (galleryItems.length > 0 ? (prev + 1) % galleryItems.length : 0));
+                    }}
+                    className="absolute right-2.5 w-7.5 h-7.5 rounded-full bg-white/95 border border-neutral-200 flex items-center justify-center text-neutral-900 hover:bg-neutral-50 active:scale-90 transition-all shadow-sm z-10"
                   >
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
@@ -911,7 +1153,11 @@ export default function Product() {
                 {galleryItems.map((_, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setActiveImage(idx)}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveImage(idx);
+                    }}
                     className={`h-1.5 transition-all outline-none rounded-full ${activeImage === idx ? 'w-3 text-black bg-black' : 'w-1.5 bg-neutral-300'}`}
                   />
                 ))}
@@ -920,7 +1166,7 @@ export default function Product() {
             
             {/* Dynamic Multi-Image Mini Strips - Comfortable Gallery Alignment */}
             {galleryItems.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto justify-center pb-1 scrollbar-thin max-w-[390px] mx-auto">
+              <div className="flex gap-2 overflow-x-auto justify-center pb-1 scrollbar-thin max-w-full md:max-w-xl mx-auto">
                 {galleryItems.map((item, idx) => (
                   <button 
                     key={idx}
@@ -1427,6 +1673,111 @@ export default function Product() {
 
         </div>
       </div>
+
+      {/* Lightbox Modal for Fullscreen Zoom View (Premium mobile / desktop view) */}
+      <AnimatePresence>
+        {isLightboxOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/95 z-[9999] flex flex-col justify-between p-4 md:p-6 select-none"
+          >
+            {/* Top Bar Controls */}
+            <div className="flex items-center justify-between w-full text-white pb-3 border-b border-white/10">
+              <div className="flex flex-col text-left">
+                <span className="text-xs text-white/60 font-bold uppercase tracking-wider">{product.category}</span>
+                <h4 className="text-sm font-black uppercase tracking-tight text-white line-clamp-1">{product.name}</h4>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] bg-white/10 px-2.5 py-1 rounded-full text-white/80 font-black tracking-wider uppercase">
+                  {lightboxActiveIndex + 1} / {galleryItems.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsLightboxOpen(false)}
+                  className="p-2 bg-white/15 hover:bg-white/25 text-white rounded-full transition-all active:scale-90"
+                  aria-label="Close Lightbox"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Middle Zoomable Image Content */}
+            <div className="relative flex-1 flex items-center justify-center overflow-hidden my-4">
+              <div 
+                ref={lightboxContainerRef}
+                onMouseMove={handleLightboxMouseMove}
+                onMouseLeave={handleLightboxMouseLeave}
+                onTouchMove={handleLightboxTouchMove}
+                onTouchEnd={handleLightboxTouchEnd}
+                className="relative w-full max-w-xl aspect-square overflow-hidden flex items-center justify-center cursor-zoom-in"
+              >
+                <img 
+                  src={galleryItems[lightboxActiveIndex]?.url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60'} 
+                  alt={product.name} 
+                  style={{
+                    ...lightboxZoomStyle,
+                    transition: isLightboxZooming ? 'transform 0.08s ease-out' : 'transform 0.3s ease-out'
+                  }}
+                  className="max-w-full max-h-[75vh] object-contain select-none"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              {/* Slider Arrows (only if multi-image) */}
+              {galleryItems.length > 1 && (
+                <>
+                  <button 
+                    type="button"
+                    onClick={() => setLightboxActiveIndex((prev) => (galleryItems.length > 0 ? (prev - 1 + galleryItems.length) % galleryItems.length : 0))}
+                    className="absolute left-1 md:left-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center active:scale-90 transition-all border border-white/10"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setLightboxActiveIndex((prev) => (galleryItems.length > 0 ? (prev + 1) % galleryItems.length : 0))}
+                    className="absolute right-1 md:right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center active:scale-90 transition-all border border-white/10"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Bottom Tip / Instructions */}
+            <div className="flex flex-col items-center gap-2 text-white pb-2">
+              <p className="text-[10px] text-white/50 uppercase tracking-widest font-black text-center">
+                {isLightboxZooming ? 'Drag or move to explore details' : 'Move cursor or Drag/Hold to zoom'}
+              </p>
+              
+              {/* Mini gallery strips for easy navigation inside Lightbox */}
+              {galleryItems.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto justify-center pb-1 scrollbar-thin max-w-full">
+                  {galleryItems.map((item, idx) => (
+                    <button 
+                      key={idx}
+                      type="button"
+                      onClick={() => setLightboxActiveIndex(idx)}
+                      className={`relative w-10 h-10 rounded-md overflow-hidden shrink-0 border transition-all bg-neutral-900 flex items-center justify-center p-0.5 ${lightboxActiveIndex === idx ? 'border-white ring-1 ring-white' : 'border-white/20 hover:border-white/50'}`}
+                    >
+                      <img 
+                        src={item.thumbnail} 
+                        alt={`Lightbox Thumbnail ${idx + 1}`} 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

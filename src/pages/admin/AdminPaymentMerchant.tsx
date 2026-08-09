@@ -44,7 +44,7 @@ export default function AdminPaymentMerchant() {
         if (data.status === 'success' && data.methods) {
           const m = data.methods.find((x: any) => x.id === 'merchant' || x.payment_type === 'merchant');
           if (m) {
-            setMerchantGateway(m.payment_code || 'sslcommerz');
+            setMerchantGateway(m.payment_key || m.payment_code || 'sslcommerz');
             setMerchantName(m.payment_name || '');
             setMerchantNumber(m.account_number || '');
             setMerchantApiKey(m.api_key || '');
@@ -77,6 +77,7 @@ export default function AdminPaymentMerchant() {
         body: JSON.stringify({
           method: {
             id: 'merchant',
+            payment_key: merchantGateway,
             payment_type: 'merchant',
             payment_code: merchantGateway,
             payment_name: merchantName,
@@ -89,13 +90,14 @@ export default function AdminPaymentMerchant() {
             callback_url: merchantCallbackUrl,
             success_url: merchantSuccessUrl,
             cancel_url: merchantCancelUrl,
+            is_active: settings.paymentMerchantActive,
             enabled: settings.paymentMerchantActive
           }
         })
       });
 
       if (result.status === 'success') {
-        toast.success("⚡ Merchant gateway parameters saved successfully to Supabase!");
+        toast.success("Payment settings saved successfully");
         
         // Sync to legacy settings store to maintain checkout compatibility
         updateSettings({
@@ -112,7 +114,7 @@ export default function AdminPaymentMerchant() {
           merchantCancelUrl,
         });
       } else {
-        toast.error(result.error || "Failed to save settings");
+        toast.error(result.error || "Failed to save payment settings");
       }
     } catch (err: any) {
       toast.error("Network error: " + err.message);

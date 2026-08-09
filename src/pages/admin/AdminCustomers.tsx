@@ -95,6 +95,8 @@ function AdminCustomerList() {
           case 'premium': return (c.totalSpend || 0) >= 20000 || c.status === 'VIP';
           case 'returning': return (c.totalOrders || 0) >= 2;
           case 'new': return new Date(c.createdAt).toDateString() === new Date().toDateString();
+          case 'google': return c.loginProvider === 'Google';
+          case 'facebook': return c.loginProvider === 'Facebook';
           default: return true;
         }
       })
@@ -114,10 +116,12 @@ function AdminCustomerList() {
       });
   }, [customers, activeFilter, searchQuery]);
 
-  // Summary Stats 8 cards
+  // Summary Stats 10 cards
   const stats = {
     total: customers.length,
     active: customers.filter(c => c.status === 'Active').length,
+    google: customers.filter(c => c.loginProvider === 'Google').length,
+    facebook: customers.filter(c => c.loginProvider === 'Facebook').length,
     today: customers.filter(c => new Date(c.createdAt).toDateString() === new Date().toDateString()).length,
     blocked: customers.filter(c => c.status === 'Blocked').length,
     suspended: customers.filter(c => c.status === 'Suspended').length,
@@ -127,12 +131,14 @@ function AdminCustomerList() {
   };
 
   return (
-    <div className="text-[#111111] space-y-8 max-w-7xl mx-auto p-4 md:p-6 font-sans">
-      {/* 1. Statistics Cards - 8 Total */}
-      <div className="flex overflow-x-auto no-scrollbar gap-4 pb-2 snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0">
+    <div className="text-[#111111] space-y-4 max-w-7xl mx-auto p-3 md:p-4 font-sans">
+      {/* 1. Statistics Cards - 10 Total */}
+      <div className="flex overflow-x-auto no-scrollbar gap-3 pb-1 snap-x snap-mandatory -mx-3 px-3 md:mx-0 md:px-0">
         {[
           { label: 'Total Customers', value: stats.total, icon: Search, color: 'bg-white text-zinc-900 border-zinc-200' },
           { label: 'Active Accounts', value: stats.active, icon: Check, color: 'bg-white text-emerald-600 border-emerald-200' },
+          { label: 'Google Accounts', value: stats.google, icon: Sparkles, color: 'bg-white text-rose-600 border-rose-200' },
+          { label: 'Facebook Accounts', value: stats.facebook, icon: Sparkles, color: 'bg-white text-blue-600 border-blue-200' },
           { label: 'New Today', value: stats.today, icon: Plus, color: 'bg-white text-blue-600 border-blue-200' },
           { label: 'Blocked Accounts', value: stats.blocked, icon: X, color: 'bg-white text-rose-600 border-rose-200' },
           { label: 'Suspended Accounts', value: stats.suspended, icon: EyeOff, color: 'bg-white text-orange-600 border-orange-200' },
@@ -143,26 +149,28 @@ function AdminCustomerList() {
           <div 
             key={idx} 
             className={cn(
-              "flex-none w-[240px] md:w-[280px] snap-start p-5 border rounded-xl shadow-sm flex flex-col justify-between h-32 transition-all hover:shadow-md", 
+              "flex-none w-[220px] md:w-[250px] snap-start p-4 border rounded-lg shadow-sm flex flex-col justify-between h-24 transition-all hover:shadow-md", 
               item.color
             )}
           >
              <div className="flex justify-between items-start">
-               <span className="text-[11px] font-black uppercase tracking-widest leading-none opacity-70">{item.label}</span>
-               {typeof item.icon === 'function' ? <item.icon className="w-5 h-5 opacity-40 shrink-0" /> : <div className="scale-75 opacity-70"><item.icon /></div>}
+               <span className="text-[10px] font-black uppercase tracking-widest leading-none opacity-70">{item.label}</span>
+               {typeof item.icon === 'function' ? <item.icon className="w-4 h-4 opacity-40 shrink-0" /> : <div className="scale-75 opacity-70"><item.icon /></div>}
              </div>
-             <span className="text-3xl font-black tracking-tight">{item.value.toLocaleString()}</span>
+             <span className="text-2xl font-black tracking-tight">{item.value.toLocaleString()}</span>
           </div>
         ))}
       </div>
 
       {/* 2. Controls Section (Filters & Search) */}
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         {/* Horizontal Scroll Filter Bar */}
-        <div className="bg-white border-b border-zinc-100 pb-2">
-          <div className="flex overflow-x-auto no-scrollbar gap-2 flex-nowrap scroll-smooth py-1 px-1">
+        <div className="bg-white border-b border-zinc-100 pb-1.5">
+          <div className="flex overflow-x-auto no-scrollbar gap-1.5 flex-nowrap scroll-smooth py-0.5 px-0.5">
             {[
               { id: 'all', label: 'All Statuses' },
+              { id: 'google', label: 'Google Accounts' },
+              { id: 'facebook', label: 'Facebook Accounts' },
               { id: 'active', label: 'Active Accounts' },
               { id: 'blocked', label: 'Blocked Accounts' },
               { id: 'suspended', label: 'Suspended Accounts' },
@@ -175,9 +183,9 @@ function AdminCustomerList() {
                 key={filter.id}
                 onClick={() => setActiveFilter(filter.id)}
                 className={cn(
-                  "flex-none h-[42px] px-5 text-[10px] font-black uppercase tracking-widest rounded-lg border transition-all whitespace-nowrap active:scale-95",
+                  "flex-none h-8 px-3 text-[9px] font-black uppercase tracking-widest rounded border transition-all whitespace-nowrap active:scale-95",
                   activeFilter === filter.id 
-                    ? "bg-black text-white border-black shadow-md" 
+                    ? "bg-black text-white border-black shadow-sm" 
                     : "bg-white text-zinc-500 border-zinc-200 hover:border-zinc-400"
                 )}
               >
@@ -188,19 +196,19 @@ function AdminCustomerList() {
         </div>
 
         {/* Search Bar & Actions */}
-        <div className="bg-white border border-zinc-200 rounded-lg p-4 shadow-sm flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-300" />
+        <div className="bg-white border border-zinc-200 rounded-lg p-2.5 shadow-sm flex flex-col md:flex-row gap-2.5 items-center">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <input 
               type="text"
               placeholder="Search by Name, Email, Phone or Customer ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-12 pl-12 pr-6 bg-zinc-50 border-none rounded-lg text-sm font-medium focus:ring-2 focus:ring-black transition-all placeholder:text-zinc-400"
+              className="w-full h-9 pl-10 pr-4 bg-zinc-50 border border-zinc-200 rounded text-xs font-medium focus:ring-1 focus:ring-black transition-all placeholder:text-zinc-400"
             />
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
             {hasDemoData && (
               <button
                 onClick={() => {
@@ -208,25 +216,25 @@ function AdminCustomerList() {
                     clearDemoCustomers();
                   }
                 }}
-                className="h-12 px-4 bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-rose-100 hover:bg-rose-600 hover:text-white transition-all flex items-center gap-2"
+                className="h-9 px-3 bg-rose-50 text-rose-600 text-[9px] font-black uppercase tracking-widest rounded border border-rose-100 hover:bg-rose-600 hover:text-white transition-all flex items-center gap-1.5 shrink-0"
               >
-                <Trash2 className="w-4 h-4" /> Purge Demo
+                <Trash2 className="w-3.5 h-3.5" /> Purge Demo
               </button>
             )}
             <Link 
               to="/admin/customers/add"
-              className="h-12 px-6 bg-black text-white rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-zinc-800 transition-all shadow-sm"
+              className="h-9 px-4 bg-black text-white rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-zinc-800 transition-all shadow-sm shrink-0"
             >
-              <Plus className="w-4 h-4 text-purple-400" /> Enroll
+              <Plus className="w-3.5 h-3.5 text-purple-400" /> Enroll
             </Link>
           </div>
         </div>
       </div>
 
       {/* 3. Customer Listing */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between px-2">
-           <h2 className="text-xl font-black uppercase tracking-tight text-zinc-900">Customer Listing</h2>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+           <h2 className="text-base font-black uppercase tracking-tight text-zinc-900">Customer Listing</h2>
         </div>
 
         {customers.length === 0 ? (

@@ -13,6 +13,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { uploadImage } from '../lib/imageUtils';
 import { useRecentlyViewedStore } from '../store/useRecentlyViewedStore';
 import { useNotificationStore } from '../store/useNotificationStore';
+import { useSmartBack } from '../hooks/useSmartBack';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { getSupabase } from '../lib/supabase';
 import { bdAddressData, divisions } from '../data/addressData';
@@ -435,6 +436,7 @@ function UpdatesNotificationsView({ themeMode, triggerToast, navigate }: Updates
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/account/dashboard');
   const location = useLocation();
   const { user, updateUser, logout } = useAuthStore();
   const settings = useSettingsStore(state => state.settings);
@@ -991,7 +993,7 @@ For customer support, call 09612-TAZU-MART.
             <button 
               onClick={() => {
                 if (activeTab) setActiveTab(null);
-                else navigate('/account/dashboard');
+                else goBack('/account/dashboard');
               }}
               className={cn(
                 "p-2.5 bg-gray-50 text-black hover:bg-black hover:text-white rounded-full transition-all cursor-pointer",

@@ -13,6 +13,7 @@ import { formatPrice } from '../lib/utils';
 import { CompactProductCard } from '../components/product/CompactProductCard';
 import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
 import FlashSaleTimer from '../components/home/FlashSaleTimer';
+import { CategorySection } from '../components/home/CategorySection';
 import { motion, AnimatePresence } from 'motion/react';
 import { preloadHomepageDataAndAssets } from '../utils/preloadHelper';
 
@@ -303,33 +304,10 @@ export default function Home() {
         </section>
       )}
 
-      {/* 2. CATEGORY SECTION (Circular shape, completely database-driven) */}
+      {/* 2. CATEGORY SECTION (Circular shape, auto-scrolling Swiper slider with pause on drag & 10s resume) */}
       {homeCategories.length > 0 && (
-        <section className="bg-white py-6 border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
-          <div className="container mx-auto px-3">
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 mx-auto max-w-3xl">
-              {homeCategories.map((cat, i) => (
-                <Link 
-                  key={i} 
-                  to={cat.link}
-                  className="flex flex-col items-center group select-none text-center"
-                >
-                  <div className="relative w-[16vw] h-[16vw] max-w-[100px] max-h-[100px] min-w-[64px] min-h-[64px] rounded-full overflow-hidden border border-neutral-100 bg-neutral-50 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-black/25 group-hover:shadow-md">
-                    <img 
-                      src={getOptimizedImageUrl(cat.image, 200)} 
-                      alt={cat.name} 
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                    />
-                  </div>
-                  <span className="text-[10px] sm:text-xs font-black uppercase text-neutral-800 tracking-wider mt-2.5 transition-colors group-hover:text-black leading-tight">
-                    {cat.name}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
+        <section className="bg-white border-b border-neutral-100 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
+            <CategorySection categories={homeCategories} />
         </section>
       )}
 
@@ -339,18 +317,16 @@ export default function Home() {
       {/* 1) Flash Sale Section */}
       {settings.flashSaleEnabled && !isFlashSaleExpired && flashSaleProducts.length > 0 && (
         <section className="py-4 md:py-6 container mx-auto px-3 border-b border-neutral-100 last:border-b-0">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 md:mb-6 pb-3 border-b border-neutral-100/60">
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-pulse" />
-              <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">FLASH SALE</h2>
-            </div>
-            
-            {/* Live Countdown Timer in the middle */}
-            <div className="flex justify-center flex-1 w-full sm:w-auto my-3 sm:my-0 sm:px-4">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3 md:mb-5 pb-2.5 border-b border-neutral-100/60">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0 animate-pulse" />
+                <h2 className="text-sm md:text-lg font-black uppercase tracking-wider text-neutral-900 font-display">FLASH SALE</h2>
+              </div>
               <FlashSaleTimer />
             </div>
 
-            <div className="flex items-center justify-end shrink-0">
+            <div className="flex items-center justify-end shrink-0 ml-auto">
               <Link 
                 to="/search?q=flash_sale" 
                 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"

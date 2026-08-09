@@ -4,9 +4,10 @@ import { useProductStore } from '../store/useProductStore';
 import { useCartStore } from '../store/useCartStore';
 import { useSearchStore } from '../store/useSearchStore';
 import { filterProductsSmart, extractIntentAndQuery, isFuzzyMatch } from '../utils/fuzzySearch';
-import { ShoppingBag, Search as SearchIcon, Star, ShoppingCart } from 'lucide-react';
+import { ShoppingBag, Search as SearchIcon, Star, ShoppingCart, ArrowLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { pixelService } from '../utils/pixelService';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function Search() {
   const [searchParams] = useSearchParams();
@@ -15,6 +16,7 @@ export default function Search() {
   const { addSearch } = useSearchStore();
   const { addItem } = useCartStore();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   
   // Clean products list to process
   const activeProducts = useMemo(() => {
@@ -39,7 +41,7 @@ export default function Search() {
   useEffect(() => {
     if (filteredProducts.length === 1 && query.trim()) {
       const match = filteredProducts[0];
-      navigate(`/product/${match.slug || match.id}`, { replace: true });
+      navigate(`/product/${match.slug || match.id}`);
       toast.success(`Direct Match: "${match.name}"`);
     }
   }, [filteredProducts, query, navigate]);
@@ -90,6 +92,18 @@ export default function Search() {
   return (
     <div className="min-h-screen bg-white pt-20 pb-16 font-sans px-4">
       <div className="max-w-7xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <button 
+            onClick={() => goBack('/')} 
+            className="p-1 px-2.5 bg-white hover:bg-neutral-50 border border-neutral-200 text-neutral-900 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all select-none"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Back</span>
+          </button>
+          <h1 className="text-lg font-black uppercase tracking-tight text-neutral-900">
+            Search Results {query ? `for "${query}"` : ''}
+          </h1>
+        </div>
         
         {filteredProducts.length > 0 ? (
           /* Products Grid Layout - Starts directly after the search bar (which is in the Header) */

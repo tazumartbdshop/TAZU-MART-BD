@@ -44,6 +44,8 @@ export interface Customer {
   deviceType?: string;
   paymentMethods?: PaymentMethod[];
   createdAt: number;
+  googleId?: string;
+  facebookId?: string;
   loginProvider?: 'Email' | 'Google' | 'Facebook';
   lastLoginAt?: string;
   isRead?: boolean;
@@ -252,12 +254,10 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
   })),
   fetchCustomers: async () => {
     try {
-      console.log("[Customer Store] Fetching customers from API...");
       const response = await fetch('/api/admin/customers');
       const contentType = response.headers.get("content-type");
       if (response.ok && contentType?.includes("application/json")) {
         const data = await response.json();
-        console.log("[Customer Store] API Response:", data);
         if (Array.isArray(data)) {
           set({ customers: data });
           return;
@@ -265,30 +265,21 @@ export const useCustomerStore = create<CustomerState>((set, get) => ({
           set({ customers: data.customers });
           return;
         }
-      } else {
-        console.warn("[Customer Store] API response not OK:", response.status);
       }
     } catch (err) {
-      console.error("[Customer Store] fetchCustomers API failed, falling back to Supabase:", err);
+      console.debug("[Customer Store] API fetch skipped, trying Supabase direct fetch:", err);
     }
 
     try {
-      console.log("[Customer Store] Falling back to Supabase fetch...");
       const supabase = getSupabase();
-      if (!supabase) {
-        console.warn("[Customer Store] Supabase client not available for fallback");
-        return;
-      }
+      if (!supabase) return;
       
       const { data, error } = await supabase.from('customers').select('*');
-      if (error) {
-        console.error("[Customer Store] Supabase fallback error:", error);
-      } else if (data) {
-        console.log("[Customer Store] Supabase fallback data:", data);
+      if (!error && data) {
         set({ customers: (data as any[]).map(row => objectToCamel(row)) as Customer[] });
       }
     } catch (fallbackErr) {
-      console.error("[Customer Store] Supabase fallback failed critically:", fallbackErr);
+      console.debug("[Customer Store] Supabase fetch skipped:", fallbackErr);
     }
   },
   subscribe: () => {

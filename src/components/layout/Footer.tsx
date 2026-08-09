@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { MapPin, Phone, Mail, Facebook, Instagram, Youtube, Send, MessageCircle, Clock } from 'lucide-react';
 import { useFooterSettingsStore } from '../../store/useFooterSettingsStore';
 import { themeSettingsService } from '../../services/themeSettingsService';
+import { useTranslation } from '../../store/useLanguageStore';
 
 export function Footer() {
+  const { t } = useTranslation();
   const { settings, fetchFooterSettings } = useFooterSettingsStore();
   const [themeMode, setThemeMode] = useState<'black' | 'white'>('white');
 
@@ -116,7 +118,7 @@ export function Footer() {
           {/* Column 2: Quick Links */}
           <div className="space-y-6">
             <h3 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-zinc-900'}`}>
-              Quick Links
+              {t.quickLinks}
             </h3>
             <ul className="space-y-3">
               {(settings.quickLinks || []).map((link, idx) => (
@@ -138,7 +140,7 @@ export function Footer() {
           {/* Column 3: Customer Support / Address */}
           <div className="space-y-6">
             <h3 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-zinc-900'}`}>
-              Customer Support
+              {t.customerSupport}
             </h3>
             <ul className="space-y-4">
               {settings.address && (
@@ -159,7 +161,7 @@ export function Footer() {
           {/* Column 4: Contact Info */}
           <div className="space-y-6">
             <h3 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-zinc-900'}`}>
-              Contact Information
+              {t.contactInfo}
             </h3>
             <ul className="space-y-4">
               {settings.phone && (
@@ -170,7 +172,7 @@ export function Footer() {
                     <Phone className={`w-4 h-4 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Phone</span>
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{t.phone}</span>
                     <a href={`tel:${settings.phone}`} className={`text-sm font-bold hover:underline ${
                       isDark ? 'text-white' : 'text-zinc-900'
                     }`}>{settings.phone}</a>
@@ -200,7 +202,7 @@ export function Footer() {
                     <Mail className={`w-4 h-4 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Email</span>
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{t.email}</span>
                     <a href={`mailto:${settings.email}`} className={`text-sm font-bold hover:underline ${
                       isDark ? 'text-white' : 'text-zinc-900'
                     }`}>{settings.email}</a>

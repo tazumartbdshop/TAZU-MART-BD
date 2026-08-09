@@ -2,10 +2,12 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { useCategoryStore, resolveCategoryThumbnail } from '../store/useCategoryStore';
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon, ArrowLeft } from 'lucide-react';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function Categories() {
   const { categories, isLoaded } = useCategoryStore();
+  const goBack = useSmartBack('/');
 
   console.log("[Categories Page Debug] Total categories in store:", categories.length, "Items:", categories);
   const activeCategories = [...categories]
@@ -20,6 +22,16 @@ export default function Categories() {
   return (
     <div className="bg-white min-h-screen pb-32">
       <div className="p-4">
+        <div className="flex items-center gap-3 mb-4">
+          <button 
+            onClick={() => goBack('/')} 
+            className="p-1 px-2.5 bg-white hover:bg-neutral-50 border border-neutral-200 text-neutral-900 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all select-none"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Back</span>
+          </button>
+          <h1 className="text-lg font-black uppercase tracking-tight text-neutral-900">All Categories</h1>
+        </div>
         {/* Loading State Floor */}
         {!isLoaded && (
           <div className="grid grid-cols-2 gap-4 animate-pulse pt-4">

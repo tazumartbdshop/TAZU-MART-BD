@@ -38,6 +38,8 @@ export interface User {
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
+  isInitializing: boolean;
+  setInitializing: (isInitializing: boolean) => void;
   login: (user: User) => void;
   logout: () => void;
   updateUser: (updatedUser: Partial<User>) => void;
@@ -48,8 +50,10 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       isAuthenticated: false,
+      isInitializing: true,
+      setInitializing: (isInitializing) => set({ isInitializing }),
       login: (user) => {
-        set({ user, isAuthenticated: true });
+        set({ user, isAuthenticated: true, isInitializing: false });
         // Sync customer data
         setTimeout(() => {
           useCustomerStore.getState().syncCustomerFromAuth(user);
@@ -60,7 +64,7 @@ export const useAuthStore = create<AuthState>()(
         if (supabase) {
           supabase.auth.signOut().catch((err) => console.error("Supabase signOut failed:", err));
         }
-        set({ user: null, isAuthenticated: false });
+        set({ user: null, isAuthenticated: false, isInitializing: false });
       },
       updateUser: (updatedUser) => {
         set((state) => {
@@ -87,6 +91,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'luxemart-auth',
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
     }
   )
 );

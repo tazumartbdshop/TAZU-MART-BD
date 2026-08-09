@@ -35,26 +35,26 @@ export default function FlashSaleTimer() {
 
   if (timeLeft.isEnded) {
     return (
-      <div className="flex items-center gap-2 px-3.5 py-1.5 bg-neutral-100 text-neutral-500 rounded-full text-[10px] font-black uppercase tracking-wider border border-neutral-200 select-none">
-        <span className="text-neutral-400">⚡</span>
+      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-neutral-100 text-neutral-500 rounded-md text-[9px] font-black uppercase tracking-wider border border-neutral-200 select-none shrink-0">
+        <span className="text-neutral-400 text-xs">⚡</span>
         <span>Flash Sale Ended</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center h-[40px] sm:h-[44px] rounded-[10px] sm:rounded-[12px] shadow-[0_4px_12px_rgba(0,0,0,0.15)] overflow-hidden select-none w-fit mx-auto border border-neutral-200">
+    <div className="flex items-center h-7 sm:h-8 rounded-lg shadow-sm overflow-hidden select-none w-fit border border-neutral-200 shrink-0">
       {/* Left Section - Solid Red */}
-      <div className="h-full bg-gradient-to-r from-red-600 to-red-700 flex items-center justify-center px-3 sm:px-4 shrink-0 border-r border-red-800/50">
-        <div className="flex items-center gap-1.5 font-black uppercase tracking-wider text-white">
-          <span className="text-sm animate-pulse">⏰</span>
-          <span className="text-[10px] sm:text-xs">ENDS IN</span>
+      <div className="h-full bg-gradient-to-r from-red-600 to-red-700 flex items-center justify-center px-2 sm:px-3 shrink-0 border-r border-red-800/50">
+        <div className="flex items-center gap-1 font-black uppercase tracking-wider text-white">
+          <span className="text-[11px] sm:text-xs animate-pulse">⏰</span>
+          <span className="text-[9px] sm:text-[10px] leading-none">ENDS IN</span>
         </div>
       </div>
       
       {/* Right Section - Solid Black */}
-      <div className="h-full bg-neutral-900 flex items-center justify-center px-3 sm:px-4 shrink-0 border-l border-neutral-800">
-        <span className="font-mono text-xs sm:text-sm font-bold text-white tracking-[0.15em]">
+      <div className="h-full bg-neutral-900 flex items-center justify-center px-2 sm:px-3 shrink-0 border-l border-neutral-800">
+        <span className="font-mono text-[11px] sm:text-xs font-bold text-white tracking-wider leading-none">
           {formatNumber(timeLeft.days)}:{formatNumber(timeLeft.hours)}:{formatNumber(timeLeft.minutes)}:{formatNumber(timeLeft.seconds)}
         </span>
       </div>

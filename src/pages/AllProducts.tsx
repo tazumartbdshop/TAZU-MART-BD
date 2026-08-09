@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useProductStore } from '../store/useProductStore';
 import { ArrowLeft } from 'lucide-react';
 import { CompactProductCard } from '../components/product/CompactProductCard';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function AllProducts() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const { products } = useProductStore();
 
   const sortedProducts = useMemo(() => {
@@ -21,7 +23,7 @@ export default function AllProducts() {
       <header className="bg-white sticky top-0 z-50 border-b border-gray-100 shadow-sm">
         <div className="flex items-center h-14 px-4 gap-3 max-w-7xl mx-auto w-full">
           <button 
-            onClick={() => navigate(-1)}
+            onClick={() => goBack('/')}
             className="p-2 -ml-2 hover:bg-gray-50 rounded-full transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-gray-700" />

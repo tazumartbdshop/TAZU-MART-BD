@@ -165,6 +165,15 @@ export const defaultNavItems: NavItem[] = [
       { name: 'Banner List', path: '/admin/banner/list', icon: LayoutGrid }
     ]
   },
+  { 
+    name: 'Campaigns',
+    icon: Megaphone,
+    moduleId: 'dashboard',
+    subItems: [
+      { name: 'Create Campaign', path: '/admin/campaigns/create', icon: PlusCircle },
+      { name: 'Campaign History', path: '/admin/campaigns/history', icon: History }
+    ]
+  },
   {
     name: 'Flutter Banner',
     path: '/admin/flutter-banner',
@@ -277,8 +286,7 @@ export const defaultNavItems: NavItem[] = [
     icon: Puzzle,
     moduleId: 'dashboard',
     subItems: [
-      { name: 'Inventory Calculation', path: '/admin/management/calculation', icon: DollarSign },
-      { name: 'Push Notifications', path: '/admin/management/push-notifications', icon: Bell }
+      { name: 'Inventory Calculation', path: '/admin/management/calculation', icon: DollarSign }
     ]
   }
 ];

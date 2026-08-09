@@ -19,16 +19,20 @@ export default function ProductReviews() {
   const navigate = useNavigate();
   
   // Dynamic Stores
-  const { reviews, addReview, fetchReviews, isLoading } = useReviewStore();
+  const { reviews, addReview, fetchReviews, fetchReviewsForProduct, isLoading } = useReviewStore();
   const { products } = useProductStore();
   const { user, isAuthenticated } = useAuthStore();
   const { settings } = useSettingsStore();
 
-  React.useEffect(() => {
-    fetchReviews();
-  }, []);
-  
   const product = products.find(p => String(p.id) === String(urlParam) || (p.slug && p.slug === urlParam));
+
+  React.useEffect(() => {
+    if (product?.id) {
+      fetchReviewsForProduct(product.id);
+    } else {
+      fetchReviews();
+    }
+  }, [product?.id]);
 
   // Filter & Form States
   const [activeFilter, setActiveFilter] = useState<FilterType>('Latest');
@@ -309,7 +313,7 @@ export default function ProductReviews() {
         anonymous: anonymousToggle,
         email: user?.email,
         phone: user?.phone,
-        status: 'pending' // Default status is now Pending
+        status: 'approved'
       });
 
       setIsSubmitting(false);

@@ -3,13 +3,16 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useOrderStore } from '../store/useOrderStore';
 import { useCartStore } from '../store/useCartStore';
 import { useProductStore } from '../store/useProductStore';
-import { CheckCircle2, Printer, Home, HelpCircle, Package } from 'lucide-react';
+import { CheckCircle2, Printer, Home, HelpCircle, Package, Download, ArrowLeft } from 'lucide-react';
 import { formatPrice } from '../lib/utils';
+import { generateInvoicePDF } from '../utils/pdfGenerator';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function OrderSuccess() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const goBack = useSmartBack('/');
   const { orders } = useOrderStore();
   const { clearCart } = useCartStore();
   const { products } = useProductStore();
@@ -20,17 +23,7 @@ export default function OrderSuccess() {
   useEffect(() => {
     clearCart();
     window.scrollTo(0, 0);
-    // Prevent going back to checkout
-    window.history.pushState(null, '', window.location.href);
-    const handlePopState = () => {
-      window.history.pushState(null, '', window.location.href);
-      navigate('/', { replace: true });
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [navigate, clearCart]);
+  }, [clearCart]);
 
   if (!order) {
     return (
@@ -56,7 +49,16 @@ export default function OrderSuccess() {
   return (
     <div className="min-h-screen bg-white font-sans text-black pb-24">
       {/* Top Section */}
-      <div className="container mx-auto max-w-4xl px-4 pt-16 pb-12 text-center border-b border-[#E5E5E5]">
+      <div className="container mx-auto max-w-4xl px-4 pt-12 pb-12 text-center border-b border-[#E5E5E5] relative">
+        <div className="flex justify-start mb-4">
+          <button
+            onClick={() => goBack('/')}
+            className="p-1 px-3 bg-white hover:bg-neutral-50 border border-neutral-200 text-neutral-900 text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all select-none cursor-pointer rounded-[4px]"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Back</span>
+          </button>
+        </div>
         <CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-6" />
         <h1 className="text-[32px] md:text-[40px] font-bold uppercase tracking-tight mb-4">Order Confirmed</h1>
         <p className="text-[14px] text-[#666666] max-w-lg mx-auto">
@@ -214,10 +216,10 @@ export default function OrderSuccess() {
         {/* Action Buttons */}
         <div className="flex flex-wrap justify-center gap-4 pt-8 border-t border-[#E5E5E5]">
           <button 
-            onClick={() => navigate(`/checkout/invoice/${order.orderId}`)}
-            className="flex items-center gap-2 px-6 py-3 bg-black text-white text-[13px] font-bold uppercase tracking-wider rounded-[6px] hover:bg-[#222222] transition-colors"
+            onClick={() => generateInvoicePDF(order)}
+            className="flex items-center gap-2 px-6 py-3 bg-black text-white text-[13px] font-bold uppercase tracking-wider rounded-[6px] hover:bg-[#222222] active:scale-95 transition-all shadow-sm cursor-pointer"
           >
-            <Printer className="w-4 h-4" /> Download Invoice
+            <Download className="w-4 h-4 text-amber-400" /> Download PDF Invoice
           </button>
           <button 
             onClick={() => navigate('/orders')}

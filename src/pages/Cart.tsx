@@ -1,12 +1,14 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Minus, Plus, Trash2, ArrowRight, ShoppingBag, Heart, Star, CheckCircle2 } from 'lucide-react';
+import { Minus, Plus, Trash2, ArrowRight, ShoppingBag, Heart, Star, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { useCartStore } from '../store/useCartStore';
 import { formatPrice } from '../lib/utils';
 import { useState } from 'react';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function Cart() {
   const { items, removeItem, updateQuantity, getCartTotal } = useCartStore();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const [couponCode, setCouponCode] = useState('');
   
   const subtotal = getCartTotal();
@@ -39,7 +41,16 @@ export default function Cart() {
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-7xl">
-      <h1 className="text-2xl md:text-[24px] font-bold text-black mb-8 uppercase tracking-wide">Shopping Cart</h1>
+      <div className="flex items-center gap-3 mb-8">
+        <button 
+          onClick={() => goBack('/')} 
+          className="p-1 px-2.5 bg-white hover:bg-neutral-50 border border-neutral-200 text-neutral-900 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all select-none"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+          <span>Back</span>
+        </button>
+        <h1 className="text-2xl md:text-[24px] font-bold text-black uppercase tracking-wide">Shopping Cart</h1>
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">

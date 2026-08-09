@@ -487,6 +487,34 @@ async function startServer() {
     }
   });
 
+  // Product Reviews API Endpoint
+  app.get("/api/products/:productId/reviews", async (req, res) => {
+    try {
+      const { productId } = req.params;
+      const client = supabaseServiceRole || supabaseAdmin;
+      if (!client) {
+        return res.status(500).json({ error: "Supabase client not initialized" });
+      }
+
+      const { data, error } = await client
+        .from('reviews')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching reviews for product from Supabase:", error);
+        return res.status(500).json({ error: "Failed to fetch product reviews" });
+      }
+
+      res.json(data || []);
+    } catch (err: any) {
+      console.error("Product reviews endpoint error:", err);
+      res.status(500).json({ error: "Failed to fetch product reviews" });
+    }
+  });
+
   // Review Summary API Endpoint
   app.get("/api/reviews/summary", async (req, res) => {
     try {
@@ -994,6 +1022,47 @@ async function startServer() {
     }
   });
 
+  app.get("/api/health/status", async (req, res) => {
+    try {
+      const apiKey = process.env.UPTIMEROBOT_READ_ONLY_API_KEY || process.env.UPTIMEROBOT_MAIN_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: "UptimeRobot API Key missing" });
+
+      const response = await fetch("https://api.uptimerobot.com/v2/getMonitors", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          api_key: apiKey,
+          format: "json",
+          logs: "1",
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.stat !== "ok") {
+        return res.status(500).json({ error: "Failed to fetch status from UptimeRobot" });
+      }
+
+      const overallUptime = data.monitors.reduce((acc: number, m: any) => acc + parseFloat(m.custom_uptime_ranges.split('-')[0]), 0) / data.monitors.length;
+
+      res.json({
+        monitors: data.monitors.map((m: any) => ({
+          id: m.id,
+          friendly_name: m.friendly_name,
+          status: m.status,
+          url: m.url
+        })),
+        overallUptime: overallUptime.toFixed(2),
+        lastCheck: new Date().toISOString()
+      });
+    } catch (err: any) {
+      console.error("Health check error:", err);
+      res.status(500).json({ error: "Failed to check system health" });
+    }
+  });
+
   // AI Chat Assistant Orchestrator endpoint
   app.post("/api/ai/chat", async (req, res) => {
     try {
@@ -1277,59 +1346,287 @@ Please ask me your query or select a quick question template below!`;
     }
   });
 
+  // Order Management API Endpoints
+  app.post("/api/orders/create", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      const orderPayload = req.body;
+      if (!orderPayload) {
+        return res.status(400).json({ error: "Order payload is required" });
+      }
+
+      const nextOrderNum = Math.floor(10000000 + Math.random() * 90000000);
+      const nextBillNum = Math.floor(100000 + Math.random() * 900000);
+      const orderId = orderPayload.orderId || `TMB-${nextOrderNum}`;
+      const now = new Date().toISOString();
+      const id = orderPayload.id || Math.random().toString(36).substring(2, 9);
+
+      const dbPayload: any = {
+        id,
+        order_id: orderId,
+        bill_id: orderPayload.billId || `BILL-${nextBillNum}`,
+        product_link: orderPayload.productLink || `https://luxemart.bd/order/${orderId}`,
+        customer_name: orderPayload.customerName || 'Customer',
+        mobile_number: (orderPayload.mobileNumber || '').toString(),
+        full_address: orderPayload.fullAddress || '',
+        city_area: orderPayload.cityArea || '',
+        delivery_mode: orderPayload.deliveryMode || 'Standard Delivery',
+        payment_method: orderPayload.paymentMethod || 'Cash on Delivery',
+        status: orderPayload.status || 'Confirmed',
+        order_status: orderPayload.status || 'Pending',
+        status_history: Array.isArray(orderPayload.statusHistory) ? orderPayload.statusHistory : [{ status: orderPayload.status || 'Confirmed', timestamp: now, updatedBy: 'Customer' }],
+        status_updated_at: now,
+        subtotal: Number(orderPayload.subtotal || 0),
+        delivery_charge: Number(orderPayload.deliveryCharge || 0),
+        discount: typeof orderPayload.discount === 'object' ? Number(orderPayload.discount?.amount || 0) : Number(orderPayload.discount || 0),
+        total: Number(orderPayload.total || 0),
+        total_amount: Number(orderPayload.total || 0),
+        payment_status: orderPayload.paymentStatus || 'Cash on Delivery',
+        paid_amount: Number(orderPayload.paidAmount || 0),
+        due_amount: Number(orderPayload.dueAmount || 0),
+        is_read: false,
+        items: Array.isArray(orderPayload.items) ? orderPayload.items : [],
+        date: now,
+        created_at: now,
+        notes: orderPayload.notes || '',
+        tax_percent: Number(orderPayload.tax?.percent || 5),
+        tax_amount: Number(orderPayload.tax?.amount || 0),
+        promo_code_used: orderPayload.promoCodeUsed || null,
+        type: 'Online'
+      };
+
+      if (clientToUse) {
+        const { data: orderData, error: orderErr } = await clientToUse.from('orders').insert([dbPayload]).select();
+        if (orderErr) {
+          console.error("[Backend Order Create] Insert error into orders table:", orderErr);
+          return res.status(500).json({ error: orderErr.message });
+        }
+
+        // Insert items into order_items table
+        if (Array.isArray(orderPayload.items) && orderPayload.items.length > 0) {
+          const itemsToInsert = orderPayload.items.map((item: any) => ({
+            id: Math.random().toString(36).substring(2, 9),
+            order_id: id,
+            product_id: item.productId || item.id || '',
+            product_name: item.name || 'Product',
+            product_price: Number(item.price || 0),
+            quantity: Number(item.quantity || 1),
+            product_image: item.image || '',
+            created_at: now
+          }));
+          try {
+            await clientToUse.from('order_items').insert(itemsToInsert);
+          } catch (itemErr: any) {
+            console.warn("[Backend Order Create] order_items insert warning:", itemErr.message);
+          }
+        }
+
+        // Auto-delete lead from leads table if leadId is provided or lead matches order id
+        if (orderPayload.leadId) {
+          try {
+            await clientToUse.from('leads').delete().eq('id', orderPayload.leadId);
+          } catch (e) {
+            console.warn("[Backend Order Create] Failed to delete lead by leadId:", e);
+          }
+        }
+        try {
+          await clientToUse.from('leads').delete().eq('id', id);
+        } catch (e) {
+          console.warn("[Backend Order Create] Failed to delete lead by order id:", e);
+        }
+
+        return res.json({ status: "success", order: orderData ? orderData[0] : dbPayload });
+      } else {
+        return res.status(500).json({ error: "Database client is not configured on server" });
+      }
+    } catch (err: any) {
+      console.error("[Backend Order Create] Exception:", err);
+      return res.status(500).json({ error: err.message || "Failed to create order" });
+    }
+  });
+
+  // Leads / Incomplete Orders Endpoints
+  app.get("/api/leads", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (!clientToUse) return res.status(500).json({ error: "Database client is not configured" });
+
+      const { data, error } = await clientToUse
+        .from('leads')
+        .select('*')
+        .order('last_updated', { ascending: false });
+
+      if (error) {
+        console.error("[Backend Leads Fetch] Error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+      return res.json({ leads: data || [] });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Failed to fetch leads" });
+    }
+  });
+
+  app.post("/api/leads/upsert", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (!clientToUse) return res.status(500).json({ error: "Database client is not configured" });
+
+      const leadPayload = req.body;
+      if (!leadPayload || !leadPayload.id) {
+        return res.status(400).json({ error: "Lead payload with ID is required" });
+      }
+
+      const now = new Date().toISOString();
+      const dbPayload = {
+        id: leadPayload.id,
+        name: leadPayload.name || '',
+        phone: leadPayload.phone || '',
+        email: leadPayload.email || '',
+        address: leadPayload.address || '',
+        items: Array.isArray(leadPayload.items) ? leadPayload.items : [],
+        total: Number(leadPayload.total || 0),
+        last_updated: now,
+        status: 'Abandoned',
+        is_read: leadPayload.is_read || false
+      };
+
+      const { data, error } = await clientToUse
+        .from('leads')
+        .upsert(dbPayload, { onConflict: 'id' })
+        .select();
+
+      if (error) {
+        console.error("[Backend Lead Upsert] Error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+      return res.json({ status: "success", lead: data ? data[0] : dbPayload });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Failed to upsert lead" });
+    }
+  });
+
+  app.post("/api/leads/delete", async (req, res) => {
+    try {
+      res.setHeader('Content-Type', 'application/json');
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (!clientToUse) return res.status(500).json({ error: "Database client is not configured" });
+
+      const { id } = req.body;
+      if (!id) return res.status(400).json({ error: "Lead ID is required" });
+
+      const { error } = await clientToUse
+        .from('leads')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error("[Backend Lead Delete] Error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+      return res.json({ status: "success", deletedId: id });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Failed to delete lead" });
+    }
+  });
+
   // Admin Customer Management Endpoints
   app.get("/api/admin/customers", async (req, res) => {
     try {
       res.setHeader('Content-Type', 'application/json');
       
-      if (!supabaseServiceRole) {
-        console.warn("[Get Customers API] Supabase Service Role key is NOT configured.");
-        return res.status(500).json({ error: "Supabase Service Role key is not configured. Please set SUPABASE_SERVICE_ROLE_KEY." });
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      if (!clientToUse) {
+        console.warn("[Get Customers API] Supabase client is NOT configured.");
+        return res.json({ customers: [] });
       }
 
-      console.log("[Get Customers API] Fetching from Supabase Auth...");
-      const { data, error } = await supabaseServiceRole.auth.admin.listUsers();
-      if (error) {
-        console.error("[Get Customers] List users error:", error);
-        return res.status(500).json({ error: error.message });
+      // Try Auth listUsers first if Service Role key is available
+      if (supabaseServiceRole) {
+        try {
+          const { data, error } = await supabaseServiceRole.auth.admin.listUsers();
+          if (!error && data && data.users) {
+            const mappedCustomers = data.users
+              .filter((u: any) => {
+                const meta = u.user_metadata || {};
+                return meta.role === 'customer' || !meta.role;
+              })
+              .map((u: any) => {
+                const meta = u.user_metadata || {};
+                const phone = meta.phone || u.phone || '';
+                const identities = u.identities || [];
+                const googleIdentity = identities.find((i: any) => i.provider === 'google');
+                const facebookIdentity = identities.find((i: any) => i.provider === 'facebook');
+                const isGoogle = !!googleIdentity || u.app_metadata?.provider === 'google' || u.app_metadata?.providers?.includes('google') || (meta.iss && meta.iss.includes('google'));
+                const isFacebook = !!facebookIdentity || u.app_metadata?.provider === 'facebook' || u.app_metadata?.providers?.includes('facebook') || (meta.iss && meta.iss.includes('facebook'));
+                const loginProvider = isGoogle ? 'Google' : (isFacebook ? 'Facebook' : (meta.login_provider || meta.loginProvider || 'Email'));
+
+                return {
+                  id: u.id,
+                  name: meta.name || meta.fullName || u.email?.split('@')[0] || (isFacebook ? 'Facebook Customer' : 'User'),
+                  phone: phone,
+                  email: u.email || '',
+                  address: {
+                    country: meta.country || 'Bangladesh',
+                    division: meta.division || '',
+                    district: meta.district || '',
+                    upazila: meta.upazila || '',
+                    zipCode: meta.zipCode || '',
+                    street: meta.street || meta.address || ''
+                  },
+                  profileImage: meta.avatar_url || meta.picture || meta.profileImage || '',
+                  gender: meta.gender || '',
+                  status: meta.status || 'Active',
+                  customerType: meta.customerType || 'Regular',
+                  loginProvider: loginProvider,
+                  googleId: googleIdentity?.id || (isGoogle ? u.id : undefined),
+                  facebookId: facebookIdentity?.id || (isFacebook ? u.id : undefined),
+                  totalOrders: meta.totalOrders || 0,
+                  totalSpend: meta.totalSpend || 0,
+                  createdAt: Date.parse(u.created_at) || Date.now()
+                };
+              });
+
+            return res.json({ customers: mappedCustomers });
+          }
+        } catch (authErr) {
+          console.warn("[Get Customers API] Auth listUsers failed, falling back to DB query:", authErr);
+        }
       }
 
-      const mappedCustomers = data.users
-        .filter((u: any) => {
-          const meta = u.user_metadata || {};
-          return meta.role === 'customer' || !meta.role;
-        })
-        .map((u: any) => {
-          const meta = u.user_metadata || {};
-          const phone = meta.phone || u.phone || '';
-          
-          return {
-            id: u.id,
-            name: meta.name || meta.fullName || u.email?.split('@')[0] || 'User',
-            phone: phone,
-            email: u.email || '',
-            address: {
-              country: meta.country || 'Bangladesh',
-              division: meta.division || '',
-              district: meta.district || '',
-              upazila: meta.upazila || '',
-              zipCode: meta.zipCode || '',
-              street: meta.street || meta.address || ''
-            },
-            profileImage: meta.profileImage || '',
-            gender: meta.gender || '',
-            status: meta.status || 'Active',
-            customerType: meta.customerType || 'Regular',
-            totalOrders: meta.totalOrders || 0,
-            totalSpend: meta.totalSpend || 0,
-            createdAt: Date.parse(u.created_at) || Date.now()
-          };
-        });
+      // Fallback: Query 'customers' table from Supabase DB
+      try {
+        const { data: dbData, error: dbError } = await clientToUse.from('customers').select('*');
+        if (!dbError && dbData) {
+          const mappedDb = dbData.map((row: any) => ({
+            id: row.id,
+            name: row.name || row.full_name || 'Customer',
+            phone: row.phone || '',
+            email: row.email || '',
+            address: typeof row.address === 'object' ? row.address : { country: 'Bangladesh', street: row.address || '' },
+            profileImage: row.profile_image || row.profileImage || '',
+            gender: row.gender || '',
+            status: row.status || 'Active',
+            customerType: row.customer_type || 'Regular',
+            loginProvider: row.login_provider || row.loginProvider || (row.facebook_id ? 'Facebook' : (row.google_id ? 'Google' : 'Email')),
+            googleId: row.google_id || row.googleId,
+            facebookId: row.facebook_id || row.facebookId,
+            totalOrders: row.total_orders || 0,
+            totalSpend: row.total_spend || 0,
+            createdAt: row.created_at ? Date.parse(row.created_at) : Date.now()
+          }));
+          return res.json({ customers: mappedDb });
+        }
+      } catch (dbErr) {
+        console.warn("[Get Customers API] DB query fallback failed:", dbErr);
+      }
 
-      return res.json({ customers: mappedCustomers });
+      return res.json({ customers: [] });
     } catch (err: any) {
       console.error("[Get Customers] Fatal Error:", err);
-      return res.status(500).json({ error: "Internal Server Error fetching customers" });
+      return res.json({ customers: [] });
     }
   });
 
@@ -2249,11 +2546,11 @@ Please ask me your query or select a quick question template below!`;
     }
   });
 
-  // --- Payment Methods Schema & Endpoints ---
+  // --- Payment Methods & Settings Schema & Endpoints ---
   const REQUIRED_PAYMENT_COLUMNS = [
-    'id', 'payment_type', 'payment_code', 'payment_name', 'account_name', 'account_number',
-    'merchant_id', 'api_key', 'secret_key', 'instruction', 'logo_url', 'enabled',
-    'gateway_link', 'username', 'password', 'callback_url', 'success_url', 'cancel_url',
+    'id', 'payment_type', 'payment_key', 'payment_code', 'payment_name', 'account_name', 'account_number',
+    'merchant_id', 'api_key', 'secret_key', 'instructions', 'instruction', 'logo_url', 'is_active', 'enabled',
+    'gateway_link', 'username', 'password', 'callback_url', 'success_url', 'cancel_url', 'sort_order',
     'created_at', 'updated_at'
   ];
 
@@ -2262,9 +2559,9 @@ Please ask me your query or select a quick question template below!`;
   async function savePaymentFallback(methods: any[]) {
     try {
       await fs.writeFile(PAYMENT_FALLBACK_FILE, JSON.stringify(methods, null, 2), 'utf-8');
-      console.log("[Payment Fallback] Saved payment methods to local file.");
+      console.log("[Payment Fallback] Saved payment settings to local file.");
     } catch (err) {
-      console.error("[Payment Fallback] Failed to save payment methods fallback:", err);
+      console.error("[Payment Fallback] Failed to save payment settings fallback:", err);
     }
   }
 
@@ -2284,23 +2581,83 @@ Please ask me your query or select a quick question template below!`;
         return res.json({ 
           status: "success", 
           schemaState: { 
-            payment_methods: { exists: false, missingColumns: REQUIRED_PAYMENT_COLUMNS, error: "Supabase client not initialized" } 
+            payment_settings: { exists: false, missingColumns: REQUIRED_PAYMENT_COLUMNS, error: "Supabase client not initialized" } 
           } 
         });
       }
 
-      const tableCheck = await checkTableSchema('payment_methods', REQUIRED_PAYMENT_COLUMNS);
-      let sqlGuide = "";
-      if (!tableCheck.exists || tableCheck.missingColumns.length > 0) {
-        sqlGuide = `-- 📂 Database Table: public.payment_methods\n-- ❌ Status: Table or columns missing!\n\n-- 💡 Solution:\n-- Please execute the following code in your Supabase SQL Editor to create the table:\n\nCREATE TABLE IF NOT EXISTS public.payment_methods (\n  id TEXT PRIMARY KEY,\n  payment_type TEXT NOT NULL,\n  payment_code TEXT NOT NULL,\n  payment_name TEXT,\n  account_name TEXT,\n  account_number TEXT,\n  merchant_id TEXT,\n  api_key TEXT,\n  secret_key TEXT,\n  instruction TEXT,\n  logo_url TEXT,\n  enabled BOOLEAN DEFAULT false,\n  gateway_link TEXT,\n  username TEXT,\n  password TEXT,\n  callback_url TEXT,\n  success_url TEXT,\n  cancel_url TEXT,\n  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL\n);\n\n-- RLS disable to allow backend operations:\nALTER TABLE public.payment_methods DISABLE ROW LEVEL SECURITY;`;
-      }
+      const tableCheckPs = await checkTableSchema('payment_settings', REQUIRED_PAYMENT_COLUMNS);
+      const tableCheckPm = await checkTableSchema('payment_methods', REQUIRED_PAYMENT_COLUMNS);
+      
+      const sqlGuide = `-- 📂 Database Table: public.payment_settings
+-- 💡 Execute the following SQL in your Supabase SQL Editor:
+
+CREATE TABLE IF NOT EXISTS public.payment_settings (
+  id TEXT PRIMARY KEY,
+  payment_key TEXT NOT NULL,
+  payment_name TEXT,
+  is_active BOOLEAN DEFAULT false,
+  instructions TEXT,
+  account_number TEXT,
+  account_name TEXT,
+  logo_url TEXT,
+  payment_type TEXT DEFAULT 'personal',
+  sort_order INT DEFAULT 0,
+  gateway_link TEXT,
+  merchant_id TEXT,
+  api_key TEXT,
+  secret_key TEXT,
+  username TEXT,
+  password TEXT,
+  callback_url TEXT,
+  success_url TEXT,
+  cancel_url TEXT,
+  enabled BOOLEAN DEFAULT false,
+  payment_code TEXT,
+  instruction TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Disable Row Level Security (RLS) to ensure smooth full-stack CRUD:
+ALTER TABLE public.payment_settings DISABLE ROW LEVEL SECURITY;
+
+-- Also create legacy public.payment_methods table for maximum cross-compatibility:
+CREATE TABLE IF NOT EXISTS public.payment_methods (
+  id TEXT PRIMARY KEY,
+  payment_type TEXT NOT NULL,
+  payment_code TEXT NOT NULL,
+  payment_name TEXT,
+  account_name TEXT,
+  account_number TEXT,
+  merchant_id TEXT,
+  api_key TEXT,
+  secret_key TEXT,
+  instruction TEXT,
+  instructions TEXT,
+  logo_url TEXT,
+  enabled BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT false,
+  gateway_link TEXT,
+  username TEXT,
+  password TEXT,
+  callback_url TEXT,
+  success_url TEXT,
+  cancel_url TEXT,
+  payment_key TEXT,
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.payment_methods DISABLE ROW LEVEL SECURITY;`;
 
       res.json({ 
         status: "success", 
         schemaState: { 
-          payment_methods: { 
-            exists: tableCheck.exists, 
-            missingColumns: tableCheck.missingColumns,
+          payment_settings: { 
+            exists: tableCheckPs.exists || tableCheckPm.exists, 
+            missingColumns: tableCheckPs.missingColumns,
             sqlGuide
           } 
         } 
@@ -2317,21 +2674,41 @@ Please ask me your query or select a quick question template below!`;
       let dbWarning = null;
 
       if (clientToUse) {
-        const { data, error } = await clientToUse.from('payment_methods').select('*');
-        if (error) {
-          console.warn("[Get Payment Methods] Supabase error:", error.message);
-          dbWarning = "table_missing";
-          methods = await getPaymentFallback();
-        } else if (data) {
-          methods = data;
+        // Try payment_settings first
+        let { data: psData, error: psErr } = await clientToUse.from('payment_settings').select('*');
+        if (!psErr && psData && psData.length > 0) {
+          methods = psData;
+        } else {
+          // Try payment_methods table as fallback
+          let { data: pmData, error: pmErr } = await clientToUse.from('payment_methods').select('*');
+          if (!pmErr && pmData && pmData.length > 0) {
+            methods = pmData;
+          } else {
+            if (psErr || pmErr) {
+              dbWarning = psErr?.message || pmErr?.message || "table_missing";
+            }
+            methods = await getPaymentFallback();
+          }
         }
       } else {
         methods = await getPaymentFallback();
       }
 
-      // Decrypt credentials
+      // Decrypt credentials and standardize field names
       const decryptedMethods = methods.map((m: any) => ({
         ...m,
+        payment_key: m.payment_key || m.payment_code || m.id,
+        payment_code: m.payment_code || m.payment_key || m.id,
+        payment_name: m.payment_name || '',
+        is_active: m.is_active ?? m.enabled ?? false,
+        enabled: m.enabled ?? m.is_active ?? false,
+        instructions: m.instructions || m.instruction || '',
+        instruction: m.instruction || m.instructions || '',
+        account_number: m.account_number || '',
+        account_name: m.account_name || '',
+        logo_url: m.logo_url || '',
+        payment_type: m.payment_type || 'personal',
+        sort_order: m.sort_order ?? 0,
         api_key: m.api_key ? decryptMarketingToken(m.api_key) : '',
         secret_key: m.secret_key ? decryptMarketingToken(m.secret_key) : '',
         password: m.password ? decryptMarketingToken(m.password) : ''
@@ -2352,19 +2729,27 @@ Please ask me your query or select a quick question template below!`;
         return res.status(400).json({ error: "Method payload with valid ID is required." });
       }
 
+      const isEnabled = method.is_active ?? method.enabled ?? false;
+      const instructionText = method.instructions || method.instruction || '';
+      const paymentKey = method.payment_key || method.payment_code || method.paymentCode || method.id;
+
       const dbPayload = {
         id: method.id,
-        payment_type: method.payment_type || method.paymentType || 'personal',
-        payment_code: method.payment_code || method.paymentCode || method.id,
+        payment_key: paymentKey,
+        payment_code: paymentKey,
         payment_name: method.payment_name || method.paymentName || '',
+        is_active: isEnabled,
+        enabled: isEnabled,
+        instructions: instructionText,
+        instruction: instructionText,
         account_name: method.account_name || method.accountName || '',
         account_number: method.account_number || method.accountNumber || '',
+        logo_url: method.logo_url || method.logoUrl || '',
+        payment_type: method.payment_type || method.paymentType || 'personal',
+        sort_order: method.sort_order ?? 0,
         merchant_id: method.merchant_id || method.merchantId || '',
         api_key: (method.api_key || method.apiKey) ? encryptMarketingToken(method.api_key || method.apiKey) : '',
         secret_key: (method.secret_key || method.secretKey) ? encryptMarketingToken(method.secret_key || method.secretKey) : '',
-        instruction: method.instruction || '',
-        logo_url: method.logo_url || method.logoUrl || '',
-        enabled: method.enabled ?? false,
         gateway_link: method.gateway_link || method.gatewayLink || '',
         username: method.username || '',
         password: method.password ? encryptMarketingToken(method.password) : '',
@@ -2374,7 +2759,7 @@ Please ask me your query or select a quick question template below!`;
         updated_at: new Date().toISOString()
       };
 
-      // Save to fallback first
+      // Always save to fallback JSON file first
       const existingFallback = await getPaymentFallback();
       const idx = existingFallback.findIndex((m: any) => m.id === method.id);
       if (idx !== -1) {
@@ -2385,12 +2770,30 @@ Please ask me your query or select a quick question template below!`;
       await savePaymentFallback(existingFallback);
 
       if (clientToUse) {
-        const { error } = await clientToUse.from('payment_methods').upsert([dbPayload]);
-        if (error) {
-          console.error("[Save Payment Method] DB Upsert error:", error.message);
+        let dbSuccess = false;
+        let lastErrorMsg = "";
+
+        // 1. Try upserting to payment_settings table
+        const { error: psErr } = await clientToUse.from('payment_settings').upsert([dbPayload]);
+        if (!psErr) {
+          dbSuccess = true;
+        } else {
+          lastErrorMsg = psErr.message;
+        }
+
+        // 2. Try upserting to payment_methods table
+        const { error: pmErr } = await clientToUse.from('payment_methods').upsert([dbPayload]);
+        if (!pmErr) {
+          dbSuccess = true;
+        } else if (!lastErrorMsg) {
+          lastErrorMsg = pmErr.message;
+        }
+
+        if (!dbSuccess) {
+          console.error("[Save Payment Method] DB Upsert error:", lastErrorMsg);
           return res.json({ 
             status: "error", 
-            error: `Database write failed: ${error.message}. Fallback saved locally.` 
+            error: `Database write failed: ${lastErrorMsg}. Settings saved locally.` 
           });
         }
       }
@@ -2398,7 +2801,7 @@ Please ask me your query or select a quick question template below!`;
       res.json({ status: "success", method: dbPayload });
     } catch (err: any) {
       console.error("[Save Payment Method] Error:", err);
-      res.status(500).json({ error: "Failed to save payment method" });
+      res.status(500).json({ error: "Failed to save payment method: " + err.message });
     }
   });
 

@@ -4,9 +4,11 @@ import { useWishlistStore } from '../store/useWishlistStore';
 import { useProductStore } from '../store/useProductStore';
 import ProductCard from '../components/ui/ProductCard';
 import { Heart, ArrowLeft, ShoppingBag } from 'lucide-react';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function Wishlist() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/');
   const { wishlistIds, clearWishlist } = useWishlistStore();
   const { products } = useProductStore();
 
@@ -19,7 +21,7 @@ export default function Wishlist() {
         <div className="flex items-center justify-between pb-6 border-b border-neutral-150 mb-8 flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => goBack('/')}
               className="p-1 px-2.5 bg-white hover:bg-neutral-50 border border-neutral-200 text-neutral-900 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all select-none"
             >
               <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />

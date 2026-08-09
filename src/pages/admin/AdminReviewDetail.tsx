@@ -50,7 +50,7 @@ export default function AdminReviewDetail() {
       setEditRating(review.rating);
       setEditText(review.reviewText);
       setEditStatus(review.status);
-      setEditMedia(review.mediaUrls || []);
+      setEditMedia(Array.isArray(review.mediaUrls) ? review.mediaUrls : []);
       setEditReply(review.adminReply || '');
       setEditProductId(review.productId);
     }
@@ -79,7 +79,7 @@ export default function AdminReviewDetail() {
       rating: editRating,
       reviewText: editText.trim(),
       status: editStatus,
-      mediaUrls: editMedia,
+      mediaUrls: Array.isArray(editMedia) ? editMedia : [],
       adminReply: editReply.trim() || undefined,
       productId: editProductId
     } as any);
@@ -105,7 +105,7 @@ export default function AdminReviewDetail() {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {
-          setEditMedia(prev => [...prev, reader.result as string]);
+          setEditMedia(prev => [...(Array.isArray(prev) ? prev : []), reader.result as string]);
         }
       };
       reader.readAsDataURL(file);
@@ -113,7 +113,8 @@ export default function AdminReviewDetail() {
   };
 
   const removeMedia = (idx: number) => {
-    setEditMedia(editMedia.filter((_, i) => i !== idx));
+    const current = Array.isArray(editMedia) ? editMedia : [];
+    setEditMedia(current.filter((_, i) => i !== idx));
   };
 
   const isVideo = (url: string) => url.match(/\.(mp4|webm|mov)$/i) || url.startsWith('data:video');
@@ -446,7 +447,7 @@ export default function AdminReviewDetail() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {editMedia.map((url, i) => (
+              {(Array.isArray(editMedia) ? editMedia : []).map((url, i) => (
                 <div key={i} className="relative aspect-square rounded-lg overflow-hidden border border-zinc-100 bg-zinc-50 group">
                   {isVideo(url) ? (
                     <div className="w-full h-full bg-zinc-950 flex items-center justify-center relative">
@@ -482,7 +483,7 @@ export default function AdminReviewDetail() {
                   )}
                 </div>
               ))}
-              {editMedia.length === 0 && (
+              {(!Array.isArray(editMedia) || editMedia.length === 0) && (
                 <div className="col-span-full py-12 flex flex-col items-center justify-center text-center space-y-2 bg-zinc-50/50 rounded-lg border border-dashed border-zinc-200">
                   <ImageIcon className="w-8 h-8 text-zinc-200" />
                   <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">No media attached to this review</p>

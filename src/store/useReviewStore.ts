@@ -40,6 +40,7 @@ interface ReviewState {
   
   // Actions
   fetchReviews: (silent?: boolean) => Promise<void>;
+  fetchReviewsForProduct: (productId: string) => Promise<void>;
   recalculateProductStats: (productId: string) => Promise<void>;
   addReview: (review: Omit<ProductReview, 'reviewId' | 'createdAt' | 'status'> & { status?: 'pending' | 'approved' | 'hidden' | 'rejected', createdAt?: string }) => Promise<void>;
   updateReview: (reviewId: string, updates: Partial<Omit<ProductReview, 'reviewId' | 'productId' | 'customerId' | 'createdAt'>>) => Promise<void>;
@@ -95,6 +96,69 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     } catch (error: any) {
       console.error('Error fetching reviews:', error);
       if (!silent) toast.error('Failed to load reviews');
+      set({ isLoading: false });
+    }
+  },
+
+  fetchReviewsForProduct: async (productId: string) => {
+    set({ isLoading: true });
+    try {
+      const response = await fetch(`/api/products/${productId}/reviews`);
+      if (!response.ok) {
+        const { data, error } = await supabase
+          .from('reviews')
+          .select('*')
+          .eq('product_id', productId)
+          .eq('status', 'approved')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        const formattedReviews: ProductReview[] = (data || []).map(r => ({
+          reviewId: r.id,
+          productId: r.product_id,
+          customerId: r.user_id,
+          customerName: r.customer_name,
+          rating: r.rating,
+          reviewText: r.review_text,
+          mediaUrls: r.media_urls || [],
+          adminReply: r.admin_reply,
+          status: r.status,
+          verified: r.verified,
+          createdAt: r.created_at,
+          phone: r.phone,
+          email: r.email,
+          orderId: r.order_id,
+          deviceIP: r.device_ip,
+          anonymous: r.anonymous,
+          isPinned: r.is_pinned,
+          rejectionReason: r.rejection_reason
+        }));
+        set({ reviews: formattedReviews, isLoading: false });
+        return;
+      }
+      const data = await response.json();
+      const formattedReviews: ProductReview[] = (data || []).map((r: any) => ({
+        reviewId: r.id,
+        productId: r.product_id,
+        customerId: r.user_id,
+        customerName: r.customer_name,
+        rating: r.rating,
+        reviewText: r.review_text,
+        mediaUrls: r.media_urls || [],
+        adminReply: r.admin_reply,
+        status: r.status,
+        verified: r.verified,
+        createdAt: r.created_at,
+        phone: r.phone,
+        email: r.email,
+        orderId: r.order_id,
+        deviceIP: r.device_ip,
+        anonymous: r.anonymous,
+        isPinned: r.is_pinned,
+        rejectionReason: r.rejection_reason
+      }));
+      set({ reviews: formattedReviews, isLoading: false });
+    } catch (error: any) {
+      console.error('Error fetching product reviews:', error);
       set({ isLoading: false });
     }
   },

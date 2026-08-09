@@ -12,9 +12,17 @@ export default function RefundPolicyPage() {
   const [data, setData] = useState<PolicyData | null>(null);
 
   useEffect(() => {
-    businessPagesService.getPageData<PolicyData>('refund', { sections: [] }).then(res => {
-      if (res && res.sections && res.sections.length > 0) setData(res);
-    });
+    let isMounted = true;
+    businessPagesService.getPageData<PolicyData>('refund', { sections: [] })
+      .then(res => {
+        if (isMounted && res && res.sections && res.sections.length > 0) {
+          setData(res);
+        }
+      })
+      .catch(err => {
+        console.warn('Refund policy fetch warning:', err);
+      });
+    return () => { isMounted = false; };
   }, []);
 
   return (

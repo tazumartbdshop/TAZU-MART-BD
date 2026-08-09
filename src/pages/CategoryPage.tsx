@@ -4,10 +4,12 @@ import { useProductStore } from '../store/useProductStore';
 import { CompactProductCard } from '../components/product/CompactProductCard';
 import CategoryBannerCarousel from '../components/home/CategoryBannerCarousel';
 import { motion } from 'motion/react';
-import { ChevronRight, ShoppingBag } from 'lucide-react';
+import { ChevronRight, ShoppingBag, ArrowLeft } from 'lucide-react';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function CategoryPage() {
   const { id } = useParams();
+  const goBack = useSmartBack('/categories');
   const { categories, isLoaded } = useCategoryStore();
   const { products } = useProductStore();
 
@@ -81,11 +83,20 @@ export default function CategoryPage() {
     <div className="bg-gray-50/50 min-h-screen pb-20">
       {/* 1. Breadcrumbs */}
       <div className="bg-white border-b border-gray-100 mb-6">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400">
-            <Link to="/" className="hover:text-black transition-colors">Home</Link>
-            <ChevronRight className="w-3 h-3" />
-            <span className="text-black">{category.name}</span>
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => goBack('/categories')}
+              className="p-1 px-2.5 bg-white hover:bg-neutral-50 border border-neutral-200 text-neutral-900 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all select-none"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Back</span>
+            </button>
+            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-gray-400">
+              <Link to="/" className="hover:text-black transition-colors">Home</Link>
+              <ChevronRight className="w-3 h-3" />
+              <span className="text-black">{category.name}</span>
+            </div>
           </div>
         </div>
       </div>

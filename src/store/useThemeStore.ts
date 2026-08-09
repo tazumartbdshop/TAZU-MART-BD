@@ -162,7 +162,7 @@ const defaultConfig: ThemeConfig = {
   productFont: 'Inter',
   fontSize: 'medium',
 
-  mode: 'light',
+  mode: typeof window !== 'undefined' ? (localStorage.getItem('tazu_theme_mode') as 'light' | 'dark') || 'light' : 'light',
 
   smoothAnimation: true,
   glassEffect: true,
@@ -186,12 +186,13 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     if (!supabase) return () => {};
 
     const loadTheme = async () => {
-        let isBlackMode = false;
+        let isBlackMode = typeof window !== 'undefined' ? localStorage.getItem('tazu_theme_mode') === 'dark' : false;
         try {
           const { data: appSettings } = await supabase.from('app_settings').select('theme_mode').eq('id', 'theme_config').limit(1);
           if (appSettings && appSettings.length > 0 && appSettings[0].theme_mode) {
             const val = String(appSettings[0].theme_mode).toLowerCase();
             isBlackMode = val === 'black' || val === 'dark';
+            localStorage.setItem('tazu_theme_mode', isBlackMode ? 'dark' : 'light');
           }
         } catch (e) {
           console.warn("Failed to fetch app_settings theme_mode:", e);
@@ -199,7 +200,11 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
         const modeStr: 'dark' | 'light' = isBlackMode ? 'dark' : 'light';
         const root = document.documentElement;
-        root.classList.remove('dark');
+        if (isBlackMode) {
+          root.classList.add('dark');
+        } else {
+          root.classList.remove('dark');
+        }
         root.setAttribute('data-footer-theme', isBlackMode ? 'dark' : 'light');
 
         const { data, error } = await supabase.from('settings').select('*').eq('id', 'theme').limit(1);
@@ -245,8 +250,13 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
   setThemeModeState: (mode: 'dark' | 'light') => {
     const isBlack = mode === 'dark';
     const root = document.documentElement;
-    root.classList.remove('dark');
+    if (isBlack) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
     root.setAttribute('data-footer-theme', isBlack ? 'dark' : 'light');
+    localStorage.setItem('tazu_theme_mode', mode);
 
     const currentTheme = get().theme;
     const updated = {

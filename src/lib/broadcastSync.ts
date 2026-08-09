@@ -5,6 +5,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useBrandShowcaseStore } from '../store/useBrandShowcaseStore';
 import { useOfferStore } from '../store/useOfferStore';
 import { useMenuSortStore } from '../store/useMenuSortStore';
+import { useNotificationStore } from '../store/useNotificationStore';
 
 let channel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -55,6 +56,11 @@ export const broadcastSync = {
           
         case 'menuSort':
           useMenuSortStore.setState({ ...data, isLoaded: true });
+          break;
+
+        case 'notifications':
+          useNotificationStore.setState({ notifications: data });
+          try { localStorage.setItem('tazu-promotional-notifications', JSON.stringify({ state: { notifications: data } })); } catch(e) {}
           break;
       }
     };

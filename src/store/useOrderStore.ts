@@ -134,76 +134,48 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       isRead: false,
     };
 
-    const supabase = getSupabase();
-    if (supabase) {
-      console.log("[Supabase Sync] addOrder Payload (pre-snake):", newOrder);
-      const dbPayload = objectToSnake(newOrder);
-      // Fix numeric discount type mapping for database insert
-      dbPayload.discount = newOrder.discount?.amount || 0;
-
-      // Map tax object to flat columns for DB
-      if (newOrder.tax) {
-        dbPayload.tax_percent = newOrder.tax.percent;
-        dbPayload.tax_amount = newOrder.tax.amount;
-      }
-
-      // Map items correctly to the JSONB column
-      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items : [];
-      
-      // Ensure status_history is a valid JSON array
-      dbPayload.status_history = Array.isArray(dbPayload.status_history) ? dbPayload.status_history : [];
-
-      // Ensure mobile_number is a string for the TEXT column in DB
-      if (dbPayload.mobile_number) {
-        dbPayload.mobile_number = dbPayload.mobile_number.toString();
-      }
-
-      // Filter payload to only include columns that exist in the database schema
-      const allowedColumns = [
-        'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
-        'mobile_number', 'email', 'full_address', 'city_area', 'postal_code', 
-        'delivery_mode', 'payment_method', 'status', 'status_history', 
-        'status_updated_at', 'edited_by_admin', 'last_edit_time', 
-        'customer_image', 'subtotal', 'delivery_charge', 'discount', 
-        'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
-        'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
-        'promo_code_used', 'type', 'user_id'
-      ];
-
-      const cleanPayload: any = {};
-      allowedColumns.forEach(col => {
-        if (dbPayload[col] !== undefined) {
-          cleanPayload[col] = dbPayload[col];
+    // Trigger backend API for server-role order insert
+    fetch('/api/orders/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newOrder)
+    }).then(res => res.json()).then(data => {
+      console.log("[useOrderStore] addOrder backend API result:", data);
+    }).catch(err => {
+      console.warn("[useOrderStore] addOrder backend API fallback to client insert:", err);
+      const supabase = getSupabase();
+      if (supabase) {
+        const dbPayload = objectToSnake(newOrder);
+        dbPayload.discount = newOrder.discount?.amount || 0;
+        if (newOrder.tax) {
+          dbPayload.tax_percent = newOrder.tax.percent;
+          dbPayload.tax_amount = newOrder.tax.amount;
         }
-      });
-      
-      console.log("[Supabase Sync] addOrder cleanPayload to Supabase:", cleanPayload);
-      supabase.from('orders').insert([cleanPayload]).then(({error}) => {
-        if (error) console.warn("[Supabase Sync Error] orders insert:", error);
-      });
+        dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items : [];
+        dbPayload.status_history = Array.isArray(dbPayload.status_history) ? dbPayload.status_history : [];
+        if (dbPayload.mobile_number) dbPayload.mobile_number = dbPayload.mobile_number.toString();
 
-      // Update sold_count and stock for each item
-      newOrder.items.forEach(async (item) => {
-        try {
-          const { data: prod, error: prodErr } = await supabase
-            .from('products')
-            .select('sold_count, stock')
-            .eq('id', item.productId)
-            .single();
-          if (!prodErr && prod) {
-            await supabase
-              .from('products')
-              .update({
-                sold_count: Number(prod.sold_count || 0) + Number(item.quantity || 1),
-                stock: Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1))
-              })
-              .eq('id', item.productId);
-          }
-        } catch (err) {
-          console.error("Failed to update product stats in addOrder:", err);
-        }
-      });
-    }
+        const allowedColumns = [
+          'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
+          'mobile_number', 'full_address', 'landmark', 'city_area', 'devision', 
+          'district', 'upazila', 'save_address', 'notes', 'delivery_mode', 
+          'payment_method', 'status', 'order_status', 'status_history', 
+          'status_updated_at', 'subtotal', 'discount', 'reword_coins', 
+          'delivery_charge', 'tax', 'tax_percent', 'tax_amount', 'total', 
+          'total_amount', 'payment_status', 'paid_amount', 'due_amount', 
+          'is_read', 'items', 'date', 'created_at', 'promo_code_used', 'type'
+        ];
+
+        const cleanPayload: any = {};
+        allowedColumns.forEach(col => {
+          if (dbPayload[col] !== undefined) cleanPayload[col] = dbPayload[col];
+        });
+
+        supabase.from('orders').insert([cleanPayload]).then(({ error }) => {
+          if (error) console.error("[Supabase Sync Error] orders insert:", error);
+        });
+      }
+    });
 
     set((state) => ({ orders: [newOrder, ...state.orders] }));
     return newOrder;
@@ -227,111 +199,122 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       isRead: false,
     };
 
-    const supabase = getSupabase();
-    if (supabase) {
-      console.log("[Supabase Sync] addOrderAsync Payload (pre-snake):", newOrder);
-      const dbPayload = objectToSnake(newOrder);
-      // Convert nested discount object to simple numeric amount for the database column
-      dbPayload.discount = newOrder.discount?.amount || 0;
-      
-      // Map tax object to flat columns for DB
-      if (newOrder.tax) {
-        dbPayload.tax_percent = newOrder.tax.percent;
-        dbPayload.tax_amount = newOrder.tax.amount;
+    let apiSuccess = false;
+
+    // 1. Try server API route first (uses Service Role to guarantee DB save bypasses RLS)
+    try {
+      const apiRes = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrder)
+      });
+      if (apiRes.ok) {
+        const resData = await apiRes.json();
+        if (resData.status === 'success') {
+          console.log("[Supabase Sync] Order inserted successfully via backend API!");
+          apiSuccess = true;
+        }
       }
+    } catch (apiErr) {
+      console.warn("[Supabase Sync] Backend API order creation failed, falling back to client-side Supabase insert:", apiErr);
+    }
 
-      // Save full items array to the JSONB column
-      dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items : [];
-      
-      // Ensure status_history is a valid JSON array
-      dbPayload.status_history = Array.isArray(dbPayload.status_history) ? dbPayload.status_history : [];
+    // 2. Client-side Supabase insert fallback if backend API was not reached
+    if (!apiSuccess) {
+      const supabase = getSupabase();
+      if (supabase) {
+        console.log("[Supabase Sync] addOrderAsync Payload (pre-snake):", newOrder);
+        const dbPayload = objectToSnake(newOrder);
+        dbPayload.discount = newOrder.discount?.amount || 0;
+        
+        if (newOrder.tax) {
+          dbPayload.tax_percent = newOrder.tax.percent;
+          dbPayload.tax_amount = newOrder.tax.amount;
+        }
 
-      // Ensure mobile_number is string format for the TEXT column
-      if (dbPayload.mobile_number) {
-        dbPayload.mobile_number = dbPayload.mobile_number.toString();
+        dbPayload.items = Array.isArray(newOrder.items) ? newOrder.items : [];
+        dbPayload.status_history = Array.isArray(dbPayload.status_history) ? dbPayload.status_history : [];
+
+        if (dbPayload.mobile_number) {
+          dbPayload.mobile_number = dbPayload.mobile_number.toString();
+        }
+
+        const allowedColumns = [
+          'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
+          'mobile_number', 'full_address', 'landmark', 'city_area', 'devision', 
+          'district', 'upazila', 'save_address', 'notes', 'delivery_mode', 
+          'payment_method', 'status', 'order_status', 'status_history', 
+          'status_updated_at', 'subtotal', 'discount', 'reword_coins', 
+          'delivery_charge', 'tax', 'tax_percent', 'tax_amount', 'total', 
+          'total_amount', 'payment_status', 'paid_amount', 'due_amount', 
+          'is_read', 'items', 'date', 'created_at', 'promo_code_used', 'type'
+        ];
+
+        const cleanPayload: any = {};
+        allowedColumns.forEach(col => {
+          if (dbPayload[col] !== undefined) {
+            cleanPayload[col] = dbPayload[col];
+          }
+        });
+
+        console.log("[Supabase Sync] addOrderAsync cleanPayload to Supabase:", cleanPayload);
+        const { error } = await supabase.from('orders').insert([cleanPayload]);
+        
+        if (error) {
+          console.error("[Supabase Sync] Failed to insert order into Supabase:", error);
+        } else {
+          console.log("[Supabase Sync] Order inserted successfully into orders table via client.");
+        }
+
+        // Order items table insertion
+        try {
+          const orderItemsPayload = newOrder.items.map(item => ({
+            id: Math.random().toString(36).substring(2, 9),
+            order_id: id,
+            product_id: item.productId,
+            product_name: item.name,
+            product_price: item.price,
+            quantity: item.quantity,
+            product_image: item.image || '',
+            created_at: now
+          }));
+          
+          supabase.from('order_items').insert(orderItemsPayload).then(({ error: itemsError }) => {
+            if (itemsError) {
+              console.warn("[Supabase Sync] order_items insert warning:", itemsError.message);
+            } else {
+              console.log("[Supabase Sync] Order items inserted successfully into order_items table.");
+            }
+          });
+        } catch (itemErr) {
+          console.error("[Supabase Sync] Exception saving products to order_items:", itemErr);
+        }
       }
+    }
 
-      // Filter payload to only include columns that exist in the database schema
-      const allowedColumns = [
-        'id', 'order_id', 'bill_id', 'product_link', 'customer_name', 
-        'mobile_number', 'email', 'full_address', 'city_area', 'postal_code', 
-        'delivery_mode', 'payment_method', 'status', 'status_history', 
-        'status_updated_at', 'edited_by_admin', 'last_edit_time', 
-        'customer_image', 'subtotal', 'delivery_charge', 'discount', 
-        'total', 'payment_status', 'is_read', 'items', 'date', 'utm_params',
-        'notes', 'tax_percent', 'tax_amount', 'paid_amount', 'due_amount', 
-        'promo_code_used', 'type', 'user_id'
-      ];
-
-      const cleanPayload: any = {};
-      allowedColumns.forEach(col => {
-        if (dbPayload[col] !== undefined) {
-          // Safety: omit 'type' if it is 'Online' to avoid numeric syntax errors in some DB configurations
-          if (col === 'type' && dbPayload[col] === 'Online') return;
-          cleanPayload[col] = dbPayload[col];
+    // Update product sold_count and stock in Supabase
+    const supabaseClient = getSupabase();
+    if (supabaseClient) {
+      newOrder.items.forEach(async (item) => {
+        try {
+          const { data: prod, error: prodErr } = await supabaseClient
+            .from('products')
+            .select('sold_count, stock')
+            .eq('id', item.productId)
+            .single();
+          if (!prodErr && prod) {
+            await supabaseClient
+              .from('products')
+              .update({
+                sold_count: Number(prod.sold_count || 0) + Number(item.quantity || 1),
+                stock: Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1))
+              })
+              .eq('id', item.productId);
+          }
+        } catch (err) {
+          console.error("Failed to update product stats in addOrderAsync:", err);
         }
       });
-
-      console.log("[Supabase Sync] addOrderAsync cleanPayload to Supabase:", cleanPayload);
-      // Insert without select to speed up response time
-      const { error } = await supabase.from('orders').insert([cleanPayload]);
-      
-      if (error) {
-        console.error("[Supabase Sync] Failed to insert order into Supabase:", error);
-        // throw error; // Bypassed to allow local order placement if DB is down
-      }
-      
-      console.log("[Supabase Sync] Order inserted successfully into orders table.");
-
-      // Now attempt order items table insertion (Redundant if the on_order_sync trigger is active in Supabase, but kept for compatibility)
-      try {
-        const orderItemsPayload = newOrder.items.map(item => ({
-          id: Math.random().toString(36).substring(2, 9),
-          order_id: id, // Link using the same random string ID used for the orders record
-          product_id: item.productId,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          variant: item.variant || 'Default',
-          image: item.image || '',
-          slug: item.slug || '',
-          created_at: now
-        }));
-        
-        console.log("[Supabase Sync] Attempting insertion into order_items table:", orderItemsPayload);
-        // Fire and forget items insertion
-        supabase.from('order_items').insert(orderItemsPayload).then(({ error: itemsError }) => {
-          if (itemsError) {
-            console.error("[Supabase Sync] Failed to insert items into order_items (Manual fallback):", itemsError);
-          } else {
-            console.log("[Supabase Sync] Order items inserted successfully into order_items table.");
-          }
-        });
-
-        // Update sold_count and stock for each item in Supabase
-        newOrder.items.forEach(async (item) => {
-          try {
-            const { data: prod, error: prodErr } = await supabase
-              .from('products')
-              .select('sold_count, stock')
-              .eq('id', item.productId)
-              .single();
-            if (!prodErr && prod) {
-              await supabase
-                .from('products')
-                .update({
-                  sold_count: Number(prod.sold_count || 0) + Number(item.quantity || 1),
-                  stock: Math.max(0, Number(prod.stock || 0) - Number(item.quantity || 1))
-                })
-                .eq('id', item.productId);
-            }
-          } catch (err) {
-            console.error("Failed to update product stats in addOrderAsync:", err);
-          }
-        });
-      } catch (itemErr) {
-        console.error("[Supabase Sync] Exception saving products to order_items:", itemErr);
-      }
     }
 
     set((state) => ({ orders: [newOrder, ...state.orders] }));
@@ -588,9 +571,17 @@ export const useOrderStore = create<OrderState>((set, get) => ({
                  }
                }
                
-               if (typeof parsed.items === 'number' || !parsed.items) {
-                 // Fallback if no items found in order_items
-                 parsed.items = [];
+               if (typeof parsed.items === 'number' || !parsed.items || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+                 // Fallback if no items found in order_items: parse from row.items
+                 if (row.items) {
+                   if (typeof row.items === 'string') {
+                     try { parsed.items = JSON.parse(row.items); } catch(e) { parsed.items = []; }
+                   } else if (Array.isArray(row.items)) {
+                     parsed.items = row.items;
+                   }
+                 } else {
+                   parsed.items = [];
+                 }
                }
 
                return parsed;

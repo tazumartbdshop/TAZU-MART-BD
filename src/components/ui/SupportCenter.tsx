@@ -40,6 +40,7 @@ import { usePromoStore } from '../../store/usePromoStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { formatPrice } from '../../lib/utils';
+import { LiveOrderTracker } from '../orders/LiveOrderTracker';
 
 // Web Audio API Synthesizer for pleasant, offline-friendly notification sound feedback
 const playTone = (type: 'send' | 'receive' | 'open') => {
@@ -624,40 +625,42 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
   };
 
   return (
-    <div className={`font-sans leading-relaxed text-slate-900 bg-slate-50 border border-slate-200 shadow-xl overflow-hidden rounded-2xl flex flex-col ${isModal ? 'h-[80vh] max-h-[750px] w-full max-w-4xl' : 'min-h-[85vh] w-full max-w-6xl mx-auto'}`} id="support-desk-system-card">
+    <div className={`font-sans leading-relaxed text-slate-900 flex flex-col ${isModal ? 'bg-slate-50 border border-slate-200 shadow-2xl overflow-hidden rounded-2xl h-[80vh] max-h-[750px] w-full max-w-4xl' : 'w-full min-h-screen bg-white'}`} id="support-desk-system-card">
       
       {/* 24/7 SUPPORT BANNER HEADER */}
-      <div className="bg-slate-950 text-white p-5 md:p-6 shrink-0 relative flex items-center justify-between border-b border-slate-800" id="support-center-banner-header">
-        <div className="flex items-center gap-3.5 text-left">
-          <div className="w-12 h-12 bg-white/10 hover:bg-white/20 transition-all text-amber-400 flex items-center justify-center rounded-2xl border border-white/10 shrink-0">
-            <Headset className="w-6 h-6 animate-pulse" />
+      <div className="bg-slate-950 text-white p-5 md:px-8 md:py-6 shrink-0 relative border-b border-slate-800 w-full" id="support-center-banner-header">
+        <div className="flex items-center justify-between max-w-7xl mx-auto w-full">
+          <div className="flex items-center gap-3.5 text-left">
+            <div className="w-12 h-12 bg-white/10 hover:bg-white/20 transition-all text-amber-400 flex items-center justify-center rounded-xl border border-white/10 shrink-0">
+              <Headset className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <h1 className="text-lg md:text-xl font-black uppercase tracking-wider flex items-center gap-1.5 leading-none">
+                TAZU Support Desk <span className="text-[10px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded tracking-widest uppercase animate-pulse">24/7 LIVE</span>
+              </h1>
+              <p className="text-[10.5px] text-zinc-400 font-extrabold uppercase mt-1 tracking-widest flex items-center gap-1.5">
+                <span>● Professional Customer Care</span>
+                <span className="text-zinc-600">|</span>
+                <span className="text-emerald-400">Response Speed: Premium Fast</span>
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg md:text-xl font-black uppercase tracking-wider flex items-center gap-1.5 leading-none">
-              TAZU Support Desk <span className="text-[10px] bg-red-600 text-white font-black px-1.5 py-0.5 rounded tracking-widest uppercase animate-pulse">24/7 LIVE</span>
-            </h1>
-            <p className="text-[10.5px] text-zinc-400 font-extrabold uppercase mt-1 tracking-widest flex items-center gap-1.5">
-              <span>● Professional Customer Care</span>
-              <span className="text-zinc-600">|</span>
-              <span className="text-emerald-400">Response Speed: Premium Fast</span>
-            </p>
-          </div>
-        </div>
 
-        {isModal && onClose && (
-          <button 
-            onClick={onClose}
-            className="p-2 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl transition-all cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
+          {isModal && onClose && (
+            <button 
+              onClick={onClose}
+              className="p-2 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white rounded-xl transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="flex-1 overflow-hidden flex flex-col md:flex-row bg-white relative">
+      <div className="flex-1 w-full bg-white relative">
         
         {/* WORKSPACE & CHAT FORMS CENTER */}
-        <div className="flex-1 flex flex-col border-r border-slate-100 overflow-hidden relative">
+        <div className="w-full flex flex-col relative">
           
           <AnimatePresence mode="wait">
             {!chatType ? (
@@ -667,96 +670,99 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
-                className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col space-y-6 max-w-2xl mx-auto w-full no-scrollbar"
+                className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6 no-scrollbar"
               >
-                <div className="text-center">
+                <div className="border-b border-slate-100 pb-4 text-left">
                   <h2 className="text-xl md:text-2xl font-black uppercase tracking-wider text-slate-950">How can we help today?</h2>
-                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-1.5">
+                  <p className="text-[11px] text-zinc-500 font-bold uppercase tracking-wider mt-1">
                     যেকোনো সমস্যা, অর্ডার, পেমেন্ট, ডেলিভারি অথবা অ্যাকাউন্ট সংক্রান্ত সাহায্যের জন্য যোগাযোগ করুন।
                   </p>
                 </div>
 
-                <div className="space-y-4">
-                  {/* 1. HUMAN SUPPORT CARD */}
-                  <div 
-                    onClick={() => { setChatType('human'); playTone('open'); }}
-                    className="group border border-slate-200 hover:border-slate-900 p-5 rounded-2xl bg-white hover:shadow-xl transition-all cursor-pointer flex items-center gap-4"
-                  >
-                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 group-hover:bg-slate-950 group-hover:text-white rounded-xl flex items-center justify-center transition-colors shrink-0">
-                      <Headset className="w-6 h-6" />
+                <div className="space-y-6">
+                  {/* 1 & 2. HUMAN SUPPORT & AI SUPPORT ASSISTANT (2 Columns on Desktop) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* HUMAN SUPPORT CARD */}
+                    <div 
+                      onClick={() => { setChatType('human'); playTone('open'); }}
+                      className="group border border-slate-200 hover:border-slate-950 p-5 bg-slate-50/60 hover:bg-white transition-all cursor-pointer flex items-center gap-4 text-left"
+                    >
+                      <div className="w-12 h-12 bg-indigo-50 text-indigo-600 group-hover:bg-slate-950 group-hover:text-white flex items-center justify-center transition-colors shrink-0">
+                        <Headset className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <h3 className="text-sm font-black uppercase text-slate-900 leading-none">Human Support Chat</h3>
+                        <p className="text-[10px] text-zinc-500 font-bold mt-1.5 leading-tight uppercase">
+                          লাইভ মডারেটরের সাথে সরাসরি চ্যাট করুন
+                        </p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
                     </div>
-                    <div className="flex-1 text-left">
-                      <h3 className="text-sm font-black uppercase text-slate-900 leading-none">Human Support Chat</h3>
-                      <p className="text-[10px] text-zinc-400 font-bold mt-1 leading-tight uppercase">
-                        লাইভ মডারেটরের সাথে সরাসরি চ্যাট করুন
-                      </p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
-                  </div>
 
-                  {/* 2. AI SUPPORT ASSISTANT CARD */}
-                  <div 
-                    onClick={() => { setChatType('ai'); playTone('open'); }}
-                    className="group border border-slate-200 hover:border-slate-900 p-5 rounded-2xl bg-white hover:shadow-xl transition-all cursor-pointer flex items-center gap-4"
-                  >
-                    <div className="w-12 h-12 bg-amber-50 text-amber-600 group-hover:bg-slate-950 group-hover:text-white rounded-xl flex items-center justify-center transition-colors shrink-0">
-                      <Bot className="w-6 h-6" />
+                    {/* AI SUPPORT ASSISTANT CARD */}
+                    <div 
+                      onClick={() => { setChatType('ai'); playTone('open'); }}
+                      className="group border border-slate-200 hover:border-slate-950 p-5 bg-slate-50/60 hover:bg-white transition-all cursor-pointer flex items-center gap-4 text-left"
+                    >
+                      <div className="w-12 h-12 bg-amber-50 text-amber-600 group-hover:bg-slate-950 group-hover:text-white flex items-center justify-center transition-colors shrink-0">
+                        <Bot className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <h3 className="text-sm font-black uppercase text-slate-900 leading-none">AI Support Assistant</h3>
+                        <p className="text-[10px] text-zinc-500 font-bold mt-1.5 leading-tight uppercase">
+                          তাৎক্ষণিক উত্তর ও গাইডের জন্য চ্যাট করুন
+                        </p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
                     </div>
-                    <div className="flex-1 text-left">
-                      <h3 className="text-sm font-black uppercase text-slate-900 leading-none">AI Support Assistant</h3>
-                      <p className="text-[10px] text-zinc-400 font-bold mt-1 leading-tight uppercase">
-                        তাৎক্ষণিক উত্তর ও গাইডের জন্য চ্যাট করুন
-                      </p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
                   </div>
 
                   {/* 3. WHATSAPP & HOTLINE CARDS (Side by Side) */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* WHATSAPP BOX */}
                     <a 
                       href={`https://wa.me/${dynamicWhatsAppNumber}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="group border border-slate-200 hover:border-green-600 p-5 rounded-2xl bg-white hover:shadow-lg transition-all text-center flex flex-col items-center justify-center space-y-2"
+                      className="group border border-slate-200 hover:border-green-600 p-5 bg-slate-50/60 hover:bg-white transition-all text-center flex flex-col items-center justify-center space-y-2"
                     >
-                      <div className="w-10 h-10 bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white rounded-xl flex items-center justify-center transition-all">
+                      <div className="w-10 h-10 bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white flex items-center justify-center transition-all">
                         <MessageCircle className="w-5 h-5" />
                       </div>
                       <div>
                         <h4 className="text-[11px] font-black uppercase text-slate-900">WhatsApp Support</h4>
                         <p className="text-[10px] font-bold text-zinc-500 mt-0.5">{dynamicPhoneRaw}</p>
                       </div>
-                      <span className="inline-block px-3 py-1 bg-green-50 text-green-600 text-[9px] font-black uppercase tracking-tighter rounded-lg group-hover:bg-green-600 group-hover:text-white transition-all">Open WhatsApp</span>
+                      <span className="inline-block px-3 py-1 bg-green-50 text-green-600 text-[9px] font-black uppercase tracking-tighter group-hover:bg-green-600 group-hover:text-white transition-all">Open WhatsApp</span>
                     </a>
 
                     {/* HOTLINE BOX */}
                     <a 
                       href={`tel:${dynamicPhoneRaw}`}
-                      className="group border border-slate-200 hover:border-slate-900 p-5 rounded-2xl bg-white hover:shadow-lg transition-all text-center flex flex-col items-center justify-center space-y-2"
+                      className="group border border-slate-200 hover:border-slate-900 p-5 bg-slate-50/60 hover:bg-white transition-all text-center flex flex-col items-center justify-center space-y-2"
                     >
-                      <div className="w-10 h-10 bg-slate-50 text-slate-900 group-hover:bg-slate-950 group-hover:text-white rounded-xl flex items-center justify-center transition-all">
+                      <div className="w-10 h-10 bg-slate-100 text-slate-900 group-hover:bg-slate-950 group-hover:text-white flex items-center justify-center transition-all">
                         <Phone className="w-5 h-5" />
                       </div>
                       <div>
                         <h4 className="text-[11px] font-black uppercase text-slate-900">Hotline Support</h4>
                         <p className="text-[10px] font-bold text-zinc-500 mt-0.5">{dynamicPhoneRaw}</p>
                       </div>
-                      <span className="inline-block px-3 py-1 bg-slate-50 text-slate-900 text-[9px] font-black uppercase tracking-tighter rounded-lg group-hover:bg-slate-950 group-hover:text-white transition-all">Call Now</span>
+                      <span className="inline-block px-3 py-1 bg-slate-100 text-slate-900 text-[9px] font-black uppercase tracking-tighter group-hover:bg-slate-950 group-hover:text-white transition-all">Call Now</span>
                     </a>
                   </div>
 
-                  {/* 4. OFFICIAL SUPPORT EMAILS (Expandable Card) */}
-                  <div id="email-support-section" className="border border-slate-200 bg-white rounded-2xl overflow-hidden transition-all">
+                  {/* 4. OFFICIAL SUPPORT EMAILS (Expandable Section) */}
+                  <div id="email-support-section" className="border border-slate-200 bg-slate-50/40 transition-all">
                     <button 
                       onClick={() => {
                         setShowEmails(!showEmails);
                         playTone('open');
                       }}
-                      className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors"
+                      className="w-full flex items-center justify-between p-5 hover:bg-white transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center">
+                        <div className="w-10 h-10 bg-slate-100 text-slate-600 flex items-center justify-center">
                           <Mail className="w-5 h-5" />
                         </div>
                         <div className="text-left">
@@ -773,9 +779,9 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
-                          className="border-t border-slate-100 bg-slate-50/50 overflow-hidden"
+                          className="border-t border-slate-200 bg-white overflow-hidden"
                         >
-                          <div className="p-4 space-y-3">
+                          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             {[
                               { label: 'Super Admin', email: 'admin@tazumartbd.com' },
                               { label: 'Moderator Team', email: 'moderator@tazumartbd.com' },
@@ -786,13 +792,13 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                               <a 
                                 key={idx}
                                 href={`mailto:${item.email}`}
-                                className="flex items-center justify-between p-3 bg-white border border-slate-150 rounded-xl hover:border-slate-900 transition-all group"
+                                className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 hover:border-slate-900 transition-all group"
                               >
                                 <div className="text-left">
                                   <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest block leading-none mb-1">{item.label}</span>
                                   <span className="text-[11px] font-bold text-slate-900">{item.email}</span>
                                 </div>
-                                <Mail className="w-3.5 h-3.5 text-zinc-200 group-hover:text-slate-900 transition-colors" />
+                                <Mail className="w-3.5 h-3.5 text-zinc-300 group-hover:text-slate-900 transition-colors" />
                               </a>
                             ))}
                           </div>
@@ -801,31 +807,34 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                     </AnimatePresence>
                   </div>
 
-                  {/* 5. PROBLEM SOLVER CENTER / SUPPORT TICKET */}
-                  <div className="border border-slate-200 bg-white rounded-2xl overflow-hidden transition-all shadow-sm hover:shadow-md">
-                    <div className="p-5 flex flex-col space-y-4">
-                      <div className="flex items-center gap-3 text-left">
-                        <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center">
-                          <ShieldCheck className="w-5 h-5" />
+                  {/* 5 & 6. PROBLEM SOLVER CENTER & TRACK ORDER (2 Columns on Desktop) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* PROBLEM SOLVER CENTER / SUPPORT TICKET */}
+                    <div className="border border-slate-200 bg-slate-50/40 p-5 flex flex-col justify-between space-y-4">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3 text-left">
+                          <div className="w-10 h-10 bg-rose-50 text-rose-600 flex items-center justify-center">
+                            <ShieldCheck className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-black uppercase text-slate-900 leading-none">Problem Solver Center</h4>
+                            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mt-1">Submit a support ticket for faster resolution</p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-[11px] font-black uppercase text-slate-900 leading-none">Problem Solver Center</h4>
-                          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mt-1">Submit a support ticket for faster resolution</p>
-                        </div>
+                        
+                        <p className="text-[11px] text-zinc-500 font-medium text-left leading-relaxed">
+                          আপনার সমস্যার বিস্তারিত তথ্য দিন। আমাদের টিম দ্রুত সমাধান করবে।
+                        </p>
                       </div>
-                      
-                      <p className="text-[11px] text-zinc-500 font-medium text-left leading-relaxed">
-                        আপনার সমস্যার বিস্তারিত তথ্য দিন। আমাদের টিম দ্রুত সমাধান করবে।
-                      </p>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-3 pt-2">
                         <button 
                           onClick={() => {
                             setChatType('ticket_form');
                             playTone('open');
                             setTicketSuccess(null);
                           }}
-                          className="bg-slate-950 text-white py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"
+                          className="bg-slate-950 text-white py-2.5 text-[9px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2"
                         >
                           Submit Ticket
                         </button>
@@ -834,139 +843,24 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                             setChatType('ticket_history');
                             playTone('open');
                           }}
-                          className="bg-white border border-slate-200 text-slate-950 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                          className="bg-white border border-slate-200 text-slate-950 py-2.5 text-[9px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                         >
                           Ticket History
                         </button>
                       </div>
                     </div>
-                  </div>
-                  <div className="border border-slate-200 bg-white rounded-2xl p-5 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-                        <Search className="w-5 h-5" />
-                      </div>
-                      <div className="text-left">
-                        <h4 className="text-[11px] font-black uppercase text-slate-900 tracking-wider">Track Your Order</h4>
-                        <p className="text-[10px] font-bold text-zinc-400 leading-tight">
-                          মোবাইল নাম্বার বা অর্ডার নাম্বার দিয়ে স্ট্যাটাস দেখুন।
-                        </p>
-                      </div>
+
+                    {/* TRACK YOUR ORDER SECTION */}
+                    <div className="pt-2">
+                      <LiveOrderTracker compactMode />
                     </div>
-
-                    <div className="flex gap-2">
-                       <input 
-                         type="text" 
-                         placeholder="ORD-XXXXX or Mobile"
-                         className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-bold text-slate-900 focus:bg-white focus:border-slate-900 outline-none transition-all"
-                         value={trackingInput}
-                         onChange={(e) => {
-                           setTrackingInput(e.target.value);
-                           if (hasSearched) setHasSearched(false);
-                         }}
-                         onKeyDown={(e) => e.key === 'Enter' && handleTrackOrder()}
-                       />
-                       <button 
-                         onClick={handleTrackOrder}
-                         className="bg-slate-950 text-white px-5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black active:scale-95 transition-all shadow-sm"
-                       >
-                         Track
-                       </button>
-                    </div>
-
-                    {/* TRACKING RESULT AREA */}
-                    <AnimatePresence mode="wait">
-                      {hasSearched && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          className="pt-2"
-                        >
-                          {trackedOrder ? (
-                            <div className="bg-slate-50 border border-slate-150 rounded-xl p-4 space-y-4 text-left">
-                              <div className="flex justify-between items-start">
-                                 <div>
-                                   <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest block mb-1">Order Tracking Found</span>
-                                   <h5 className="text-sm font-black text-slate-950 uppercase">#{trackedOrder.orderId}</h5>
-                                 </div>
-                                 <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                                   trackedOrder.paymentStatus === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 
-                                   trackedOrder.paymentStatus === 'Partial' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-                                 }`}>
-                                   {trackedOrder.paymentStatus}
-                                 </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-3">
-                                 <div>
-                                   <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest block">Customer</span>
-                                   <span className="text-[10px] font-bold text-slate-700 uppercase">{trackedOrder.customerName}</span>
-                                 </div>
-                                 <div>
-                                   <span className="text-[8px] font-black uppercase text-zinc-400 tracking-widest block">Product</span>
-                                   <span className="text-[10px] font-bold text-slate-700 truncate block">{trackedOrder.items?.[0]?.name || 'Direct Order'}</span>
-                                 </div>
-                              </div>
-
-                              {/* TRACKING TIMELINE V2 */}
-                              <div className="pt-4 space-y-3">
-                                 <h6 className="text-[9px] font-black uppercase text-slate-900 tracking-widest mb-4">Journey Roadmap</h6>
-                                 <div className="relative">
-                                    {/* Vertical Line */}
-                                    <div className="absolute left-[7px] top-0 bottom-0 w-[2px] bg-slate-200" />
-                                    
-                                    <div className="space-y-5 relative">
-                                       {[
-                                         { label: 'Placed', info: 'Order successfully received.' },
-                                         { label: 'Confirmed', info: 'Verified by moderating team.' },
-                                         { label: 'Packaging', info: 'Products being wrapped securely.' },
-                                         { label: 'Shipping', info: 'In transit with delivery partner.' },
-                                         { label: 'Delivered', info: 'Handed over successfully.' }
-                                       ].map((step, idx) => {
-                                         const stages = ['Placed', 'Confirmed', 'Packaging', 'Shipping', 'Delivered'];
-                                         const currentStageIdx = stages.indexOf(trackedOrder.status);
-                                         const isCompleted = currentStageIdx >= idx;
-                                         const isCurrent = trackedOrder.status === step.label;
-
-                                         return (
-                                           <div key={idx} className="flex gap-4 items-start relative pl-0">
-                                              <div className={`w-3.5 h-3.5 rounded-full border-2 z-10 transition-all duration-500 mt-1 ${
-                                                isCompleted ? 'bg-slate-950 border-slate-950 shadow-sm' : 'bg-white border-slate-200'
-                                              }`}>
-                                                {isCompleted && <div className="w-1.5 h-1.5 bg-white rounded-full m-0.5 animate-pulse" />}
-                                              </div>
-                                              <div>
-                                                 <h6 className={`text-[10px] font-black uppercase tracking-wide leading-none ${isCompleted ? 'text-slate-950' : 'text-zinc-300'}`}>
-                                                   {step.label}
-                                                 </h6>
-                                                 {isCurrent && (
-                                                   <p className="text-[9px] font-bold text-indigo-600 mt-1 uppercase italic">Current Status: {step.info}</p>
-                                                 )}
-                                              </div>
-                                           </div>
-                                         );
-                                       })}
-                                    </div>
-                                 </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
-                              <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">No matching order found</p>
-                              <p className="text-[9px] font-bold text-red-400 mt-1">Please check your Order ID or Mobile Number.</p>
-                            </div>
-                          )}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </div>
-                </div>
 
-                <div className="pt-4 text-center">
-                  <p className="text-[9px] font-black uppercase text-zinc-400 tracking-widest flex items-center justify-center gap-1.5 opacity-50">
-                    <ShieldCheck className="w-3 h-3" /> Secure Support Environment
-                  </p>
+                  <div className="pt-4 text-center">
+                    <p className="text-[9px] font-black uppercase text-zinc-400 tracking-widest flex items-center justify-center gap-1.5 opacity-50">
+                      <ShieldCheck className="w-3 h-3" /> Secure Support Environment
+                    </p>
+                  </div>
                 </div>
               </motion.div>
             ) : chatType === 'ticket_form' ? (

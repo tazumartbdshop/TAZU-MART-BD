@@ -16,7 +16,7 @@ import {
   Info,
   X
 } from 'lucide-react';
-import { useLeadStore, Lead } from '../../store/useLeadStore';
+import { useLeadStore } from '../../store/useLeadStore';
 import { formatPrice } from '../../lib/utils';
 import { toast } from 'react-hot-toast';
 
@@ -42,7 +42,7 @@ export default function AdminIncompleteOrders() {
   };
 
   const handleDeleteLead = async (id: string) => {
-    if (window.confirm('Are you sure you want to permanently delete this lead record from the database?')) {
+    if (window.confirm('Are you sure you want to permanently delete this record?')) {
       try {
         await deleteLead(id);
         toast.success('Record removed successfully');
@@ -94,43 +94,61 @@ CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH
 
   if (loading && leads.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <Loader2 className="w-10 h-10 text-black animate-spin" />
-        <p className="text-sm font-black uppercase tracking-widest text-neutral-400">Loading Leads...</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+        <Loader2 className="w-8 h-8 text-neutral-800 animate-spin" />
+        <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">Loading Records...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-full font-sans text-black bg-[#f8f8f8]">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 border-b border-gray-200 pb-6 bg-white -mx-8 px-8 pt-2 gap-4">
-        <div className="flex items-center gap-4">
+    <div className="flex flex-col min-h-full font-sans text-neutral-900 bg-[#f8f9fa] p-4 sm:p-6 md:p-8 rounded-2xl">
+      {/* Header Structure */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-5 border-b border-gray-200">
+        <div className="flex items-center gap-3">
           <button 
             onClick={() => navigate('/admin/orders')}
-            className="p-2 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 transition-colors"
+            className="p-2.5 border border-gray-200 rounded-xl bg-white hover:bg-gray-50 text-neutral-700 transition-colors shadow-2xs cursor-pointer"
+            title="Back to Orders"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div>
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-red-500" />
-              <h3 className="text-2xl font-black uppercase tracking-tight">Incomplete Orders</h3>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500 shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-neutral-900">
+                Incomplete Orders
+              </h1>
             </div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Captured Leads from Abandoned Checkouts</p>
+            <p className="text-xs font-semibold text-neutral-500 mt-1 pl-0.5">
+              Customers who left checkout without completing their order
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-3 self-end sm:self-auto">
           <button 
             onClick={() => setShowDbGuide(true)}
-            className="bg-neutral-100 text-neutral-600 px-4 py-2.5 rounded-xl border border-neutral-200 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:bg-neutral-200 transition-colors"
+            className="bg-white text-neutral-600 px-3.5 py-2 rounded-xl border border-neutral-200 font-bold text-xs flex items-center gap-1.5 hover:bg-neutral-50 transition-colors shadow-2xs cursor-pointer"
           >
-            <Database className="w-3.5 h-3.5" />
+            <Database className="w-3.5 h-3.5 text-neutral-400" />
             Database Setup
           </button>
-          <div className="bg-red-50 text-red-600 px-5 py-2.5 rounded-xl border border-red-100 font-black text-[11px] uppercase tracking-widest flex items-center gap-2">
-            <span className="text-lg">{displayLeads.length}</span> Records Found
-          </div>
+        </div>
+      </div>
+
+      {/* Summary Area */}
+      <div className="bg-white rounded-xl border border-gray-200/80 p-4 mb-6 shadow-2xs flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-xs sm:text-sm font-bold text-neutral-800 uppercase tracking-wider">
+            Incomplete Orders
+          </span>
+        </div>
+        <div className="bg-red-50 text-red-600 px-3.5 py-1.5 rounded-lg border border-red-100 font-extrabold text-xs tracking-wide">
+          {displayLeads.length} Records Found
         </div>
       </div>
 
@@ -150,7 +168,7 @@ CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH
               </div>
               <button 
                 onClick={() => setShowDbGuide(false)}
-                className="p-2 hover:bg-neutral-200 rounded-full transition-colors"
+                className="p-2 hover:bg-neutral-200 rounded-full transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -172,7 +190,7 @@ CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH
                     navigator.clipboard.writeText(dbSchemaSql);
                     toast.success('SQL copied to clipboard');
                   }}
-                  className="absolute top-3 right-3 px-3 py-1.5 bg-neutral-800 text-white rounded-lg text-[9px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity border border-neutral-700"
+                  className="absolute top-3 right-3 px-3 py-1.5 bg-neutral-800 text-white rounded-lg text-[9px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity border border-neutral-700 cursor-pointer"
                 >
                   Copy SQL
                 </button>
@@ -200,7 +218,7 @@ CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH
             <div className="p-6 bg-neutral-50 border-t border-neutral-100 flex justify-end">
               <button 
                 onClick={() => setShowDbGuide(false)}
-                className="bg-black text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-neutral-800 transition-all shadow-md active:scale-95"
+                className="bg-black text-white px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-neutral-800 transition-all shadow-md active:scale-95 cursor-pointer"
               >
                 Close Guide
               </button>
@@ -209,141 +227,163 @@ CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH
         </div>
       )}
 
-      {/* Accordion List View */}
-      <div className="grid gap-4">
-        {displayLeads.map((lead, index) => {
+      {/* Order / Customer Cards */}
+      <div className="grid grid-cols-1 gap-4">
+        {displayLeads.map((lead) => {
           const isExpanded = expandedId === lead.id;
-          const customerDisplayName = lead.name && lead.name.trim() !== '' ? lead.name : `Guest Customer`;
+          const customerDisplayName = lead.name && lead.name.trim() !== '' ? lead.name : 'Guest Customer';
 
           return (
             <div 
               key={lead.id}
-              className={`bg-white rounded-2xl border transition-all duration-300 overflow-hidden ${
-                lead.is_read ? 'border-neutral-100 shadow-sm opacity-90' : 'border-red-200 shadow-md ring-1 ring-red-50'
+              className={`bg-white rounded-2xl border transition-all duration-200 overflow-hidden ${
+                lead.is_read 
+                  ? 'border-gray-200/80 shadow-2xs' 
+                  : 'border-red-200 shadow-xs ring-1 ring-red-100'
               }`}
             >
-              {/* Compact View */}
+              {/* Card Header & Compact Info */}
               <div 
                 onClick={() => toggleExpand(lead.id)}
-                className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-neutral-50 transition-colors"
+                className="p-4 sm:p-5 cursor-pointer hover:bg-neutral-50/60 transition-colors"
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                    lead.is_read ? 'bg-neutral-100' : 'bg-red-50'
-                  }`}>
-                    {lead.is_read ? (
-                      <CheckCircle className="w-6 h-6 text-neutral-400" />
-                    ) : (
-                      <AlertCircle className="w-6 h-6 text-red-500" />
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-black text-black text-lg uppercase leading-none mb-1.5">
-                      {customerDisplayName}
-                    </h4>
-                    <div className="flex flex-wrap items-center gap-3 text-[10px] text-neutral-500 font-black uppercase tracking-widest">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {getTimeAgo(lead.last_updated)}
-                      </span>
-                      {lead.phone && (
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {lead.phone}
-                        </span>
-                      )}
-                      {!lead.is_read && (
-                        <span className="bg-red-500 text-white px-2 py-0.5 rounded-md text-[8px]">NEW</span>
+                <div className="flex items-start justify-between gap-3">
+                  {/* Status Icon + Customer Name & Contact */}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                      lead.is_read ? 'bg-neutral-100 text-neutral-400' : 'bg-red-50 text-red-500'
+                    }`}>
+                      {lead.is_read ? (
+                        <CheckCircle className="w-5 h-5" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5" />
                       )}
                     </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-extrabold text-neutral-900 text-base sm:text-lg truncate">
+                          {customerDisplayName}
+                        </h4>
+                        {!lead.is_read && (
+                          <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                            NEW
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-y-1.5 gap-x-4 text-xs font-medium text-neutral-500 mt-1.5">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                          {getTimeAgo(lead.last_updated)}
+                        </span>
+                        {lead.phone && (
+                          <span className="flex items-center gap-1.5 font-bold text-neutral-800">
+                            <Phone className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                            {lead.phone}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right side checkout/order-related icon */}
+                  <div className={`p-2 rounded-xl transition-all shrink-0 ${
+                    isExpanded ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700'
+                  }`}>
+                    <ShoppingBag className="w-4.5 h-4.5" />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-0 pt-3 md:pt-0">
-                  <div className="text-right">
-                    <p className="text-[9px] text-neutral-400 font-black uppercase tracking-widest mb-0.5">Potential Total</p>
-                    <p className="font-black text-red-600 text-xl font-mono">
-                      {lead.total ? formatPrice(lead.total) : '---'}
-                    </p>
-                  </div>
-                  <div className={`p-2 rounded-xl transition-colors ${
-                    isExpanded ? 'bg-black text-white' : 'bg-neutral-50 text-neutral-400'
-                  }`}>
-                    <ShoppingBag className="w-5 h-5" />
-                  </div>
+                {/* Subtle Divider */}
+                <div className="border-t border-gray-100 my-3.5" />
+
+                {/* Bottom: Potential Total */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                    Potential Total
+                  </span>
+                  <span className="text-base sm:text-lg font-black text-red-600 font-mono">
+                    {lead.total ? formatPrice(lead.total) : 'BDT 0'}
+                  </span>
                 </div>
               </div>
 
               {/* Expandable Details */}
               {isExpanded && (
-                <div className="px-6 pb-6 pt-2 bg-neutral-50 border-t border-neutral-100 animate-in slide-in-from-top-2 duration-300">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    
-                    {/* Customer Info */}
-                    <div className="space-y-5">
-                      <h5 className="text-[11px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-200 pb-2">Customer Intelligence</h5>
-                      <div className="space-y-4">
-                        <div className="flex items-start gap-3">
-                          <MapPin className="w-4 h-4 text-neutral-400 mt-1" />
+                <div className="px-5 pb-5 pt-3 bg-neutral-50/80 border-t border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Customer Captured Details */}
+                    <div className="space-y-4">
+                      <h5 className="text-[11px] font-black text-neutral-400 uppercase tracking-widest border-b border-gray-200/80 pb-1.5">
+                        Captured Information
+                      </h5>
+                      <div className="space-y-3 text-xs">
+                        <div className="flex items-start gap-2.5">
+                          <MapPin className="w-4 h-4 text-neutral-400 shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-[10px] font-black text-neutral-400 uppercase">Shipping Address</p>
-                            <p className="text-sm font-bold text-black leading-tight mt-0.5">
-                              {lead.address || "No address captured yet"}
+                            <p className="text-[10px] font-black text-neutral-400 uppercase">Address</p>
+                            <p className="font-semibold text-neutral-800 mt-0.5">
+                              {lead.address || "No address entered"}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-start gap-3">
-                          <Phone className="w-4 h-4 text-neutral-400 mt-1" />
+
+                        <div className="flex items-start gap-2.5">
+                          <Phone className="w-4 h-4 text-neutral-400 shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-[10px] font-black text-neutral-400 uppercase">Contact Number</p>
-                            <p className="text-sm font-bold text-black mt-0.5">
-                              {lead.phone || "No phone provided"}
+                            <p className="text-[10px] font-black text-neutral-400 uppercase">Phone</p>
+                            <p className="font-semibold text-neutral-800 mt-0.5">
+                              {lead.phone || "No phone entered"}
                             </p>
                           </div>
                         </div>
+
                         {lead.email && (
-                          <div className="flex items-start gap-3">
-                            <Mail className="w-4 h-4 text-neutral-400 mt-1" />
+                          <div className="flex items-start gap-2.5">
+                            <Mail className="w-4 h-4 text-neutral-400 shrink-0 mt-0.5" />
                             <div>
-                              <p className="text-[10px] font-black text-neutral-400 uppercase">Email Address</p>
-                              <p className="text-sm font-bold text-black mt-0.5">{lead.email}</p>
+                              <p className="text-[10px] font-black text-neutral-400 uppercase">Email</p>
+                              <p className="font-semibold text-neutral-800 mt-0.5">{lead.email}</p>
                             </div>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Cart Info & Actions */}
-                    <div className="space-y-5">
-                      <h5 className="text-[11px] font-black text-neutral-400 uppercase tracking-widest border-b border-neutral-200 pb-2">Abandoned Items</h5>
+                    {/* Cart Items & Actions */}
+                    <div className="space-y-4">
+                      <h5 className="text-[11px] font-black text-neutral-400 uppercase tracking-widest border-b border-gray-200/80 pb-1.5">
+                        Cart Items
+                      </h5>
                       <div className="space-y-3">
                         {lead.items && lead.items.length > 0 ? (
                           <div className="grid gap-2">
                             {lead.items.map((item, i) => (
-                              <div key={i} className="flex items-center justify-between p-3 bg-white border border-neutral-200 rounded-xl">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-8 bg-neutral-50 rounded-lg flex items-center justify-center text-[10px] font-black text-neutral-400">
+                              <div key={i} className="flex items-center justify-between p-2.5 bg-white border border-gray-200/80 rounded-xl">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="w-6 h-6 bg-neutral-100 rounded-md flex items-center justify-center text-[10px] font-black text-neutral-600">
                                     {item.quantity}x
-                                  </div>
-                                  <p className="text-sm font-bold text-black">{item.name}</p>
+                                  </span>
+                                  <p className="text-xs font-bold text-neutral-900">{item.name}</p>
                                 </div>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <div className="p-4 bg-white border border-dashed border-neutral-300 rounded-xl text-center">
-                            <p className="text-xs font-bold text-neutral-400 uppercase">No items recorded</p>
+                          <div className="p-3 bg-white border border-dashed border-gray-200 rounded-xl text-center">
+                            <p className="text-xs font-semibold text-neutral-400">No items recorded</p>
                           </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-3 pt-4">
+                        <div className="grid grid-cols-2 gap-3 pt-2">
                           <button 
                             onClick={(e) => {
                               e.stopPropagation();
                               handleWhatsApp(lead.phone);
                             }}
-                            className="bg-[#25D366] text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-sm"
                             disabled={!lead.phone}
+                            className="bg-[#25D366] text-white py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-all shadow-2xs disabled:opacity-50 cursor-pointer"
                           >
                             <MessageSquare className="w-4 h-4" />
                             WhatsApp
@@ -353,7 +393,7 @@ CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH
                               e.stopPropagation();
                               handleDeleteLead(lead.id);
                             }}
-                            className="bg-white border border-red-200 text-red-600 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                            className="bg-white border border-red-200 text-red-600 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-red-600 hover:text-white transition-all shadow-2xs cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />
                             Delete
@@ -370,17 +410,20 @@ CREATE POLICY "Leads access" ON public.leads FOR ALL TO public USING (true) WITH
         })}
 
         {displayLeads.length === 0 && (
-          <div className="py-32 text-center bg-white border border-dashed border-gray-200 rounded-2xl">
-             <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-8 h-8 text-red-300" />
-             </div>
-             <h3 className="text-sm font-black uppercase tracking-widest text-black mb-2">No Incomplete Orders</h3>
-             <p className="text-xs text-gray-400 font-bold uppercase tracking-widest max-w-[240px] mx-auto leading-relaxed">
-                Leads from abandoned checkouts will be captured here automatically
-             </p>
+          <div className="py-20 text-center bg-white border border-dashed border-gray-200 rounded-2xl">
+            <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-3">
+              <AlertCircle className="w-6 h-6 text-red-400" />
+            </div>
+            <h3 className="text-sm font-bold uppercase tracking-wider text-neutral-900 mb-1">
+              No Incomplete Orders
+            </h3>
+            <p className="text-xs text-neutral-400 font-medium max-w-xs mx-auto leading-relaxed">
+              When customers leave checkout without placing an order, their information will appear here.
+            </p>
           </div>
         )}
       </div>
     </div>
   );
 }
+

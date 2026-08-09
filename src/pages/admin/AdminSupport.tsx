@@ -328,124 +328,51 @@ export default function AdminSupport() {
   const openSupportTickets = tickets ? tickets.filter(t => t.status !== 'Closed' && t.status !== 'Resolved').length : 2;
 
   return (
-    <div className="py-6 px-4 md:px-8 max-w-[1550px] w-full mx-auto space-y-6 font-sans text-left">
+    <div className="py-1 px-3 md:px-4 max-w-[1550px] w-full mx-auto space-y-2 font-sans text-left overflow-x-hidden">
       
       {/* Top Section / Header Title */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
          <div>
-            <h1 className="text-2xl font-bold uppercase tracking-tight text-gray-900 flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-bold uppercase tracking-tight text-gray-900 flex items-center gap-2">
               Support Control Center
             </h1>
-            <p className="text-[12px] text-gray-400 font-medium uppercase tracking-wider mt-0.5">
+            <p className="text-[11px] text-gray-400 font-medium uppercase tracking-wider mt-0.5">
               Manage Customer Conversations, Support Requests & Live Messaging
             </p>
          </div>
 
-         {/* Admin Control tabs - Elegant SaaS Style */}
-         <div className="flex gap-1.5 bg-gray-50 border border-gray-200 p-1 rounded-xl shadow-xs self-stretch md:self-auto justify-between md:justify-start">
+         {/* Admin Control tabs - Compact equal width and height (36-40px) */}
+         <div className="flex gap-2 bg-gray-50 border border-gray-200 p-1 rounded-xl shadow-xs self-stretch md:self-auto justify-between md:justify-start">
             <button 
               onClick={() => setActiveTab('chats')}
-              className={`flex-1 md:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'chats' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`flex-1 h-[38px] px-4 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center ${activeTab === 'chats' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
             >
                Live Inbox 💬
             </button>
             <button 
               onClick={() => setActiveTab('tickets')}
-              className={`flex-1 md:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'tickets' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`flex-1 h-[38px] px-4 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center ${activeTab === 'tickets' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
             >
                Tickets 🏷 ({tickets.length})
             </button>
             <button 
               onClick={() => setActiveTab('settings')}
-              className={`flex-1 md:flex-none px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'settings' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`flex-1 h-[38px] px-4 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center ${activeTab === 'settings' ? 'bg-black text-white shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
             >
                Settings ⚙️
             </button>
          </div>
       </div>
 
-      {/* NEW TOP ACTION BAR - 4 CARDS SINGLE ROW EQUAL WIDTH */}
-      <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full" id="quick-action-cards-grid">
-        {/* CARD 1 */}
-        <div 
-          onClick={() => setActiveTab('chats')}
-          className={`h-[90px] rounded-[14px] bg-white border border-gray-150 p-2 sm:p-3 flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-all cursor-pointer select-none min-w-0 ${activeTab === 'chats' ? 'border-purple-300 ring-1 ring-purple-100' : ''}`}
-          id="quick-card-chats"
-        >
-          <div className="flex justify-between items-start w-full min-w-0">
-            <span className="text-[16px] sm:text-[18px] md:text-[20px]">💬</span>
-            <span className="bg-purple-100 text-purple-700 text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none shrink-0">
-              {totalUnreadChats}
-            </span>
-          </div>
-          <div className="text-left mt-1 min-w-0 w-full">
-            <h4 className="text-[11px] sm:text-[12px] md:text-[13px] font-bold text-gray-800 leading-none break-words whitespace-normal [word-break:break-word] [overflow-wrap:anywhere]">Chats</h4>
-            <p className="text-[9px] sm:text-[10px] text-gray-400 font-medium leading-tight mt-0.5 break-words whitespace-normal [word-break:break-word] [overflow-wrap:anywhere]">All Messages</p>
-          </div>
-        </div>
 
-        {/* CARD 2 */}
-        <div 
-          onClick={() => setActiveTab('settings')}
-          className="h-[90px] rounded-[14px] bg-white border border-gray-150 p-2 sm:p-3 flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-all cursor-pointer select-none min-w-0"
-          id="quick-card-announcements"
-        >
-          <div className="flex justify-between items-start w-full min-w-0">
-            <span className="text-[16px] sm:text-[18px] md:text-[20px]">📢</span>
-            <span className="bg-gray-100 text-gray-700 text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none shrink-0">
-              {activeAnnouncementsCount}
-            </span>
-          </div>
-          <div className="text-left mt-1 min-w-0 w-full">
-            <h4 className="text-[11px] sm:text-[12px] md:text-[13px] font-bold text-gray-800 leading-none break-words whitespace-normal [word-break:break-word] [overflow-wrap:anywhere]">Announcements</h4>
-            <p className="text-[9px] sm:text-[10px] text-gray-400 font-medium leading-tight mt-0.5 break-words whitespace-normal [word-break:break-word] [overflow-wrap:anywhere]">Updates & News</p>
-          </div>
-        </div>
-
-        {/* CARD 3 */}
-        <div 
-          onClick={() => setActiveTab('settings')}
-          className="h-[90px] rounded-[14px] bg-white border border-gray-150 p-2 sm:p-3 flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-all cursor-pointer select-none min-w-0"
-          id="quick-card-offers"
-        >
-          <div className="flex justify-between items-start w-full min-w-0">
-            <span className="text-[16px] sm:text-[18px] md:text-[20px]">🏷️</span>
-            <span className="bg-gray-100 text-gray-700 text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none shrink-0">
-              {runningOffersCount}
-            </span>
-          </div>
-          <div className="text-left mt-1 min-w-0 w-full">
-            <h4 className="text-[11px] sm:text-[12px] md:text-[13px] font-bold text-gray-800 leading-none break-words whitespace-normal [word-break:break-word] [overflow-wrap:anywhere]">Offers</h4>
-            <p className="text-[9px] sm:text-[10px] text-gray-400 font-medium leading-tight mt-0.5 break-words whitespace-normal [word-break:break-word] [overflow-wrap:anywhere]">Special Offers</p>
-          </div>
-        </div>
-
-        {/* CARD 4 */}
-        <div 
-          onClick={() => setActiveTab('tickets')}
-          className="h-[90px] rounded-[14px] bg-white border border-gray-150 p-2 sm:p-3 flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-all cursor-pointer select-none min-w-0"
-          id="quick-card-support"
-        >
-          <div className="flex justify-between items-start w-full min-w-0">
-            <span className="text-[16px] sm:text-[18px] md:text-[20px]">🎧</span>
-            <span className="bg-rose-50 text-rose-700 border border-rose-100 text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none shrink-0">
-              {openSupportTickets}
-            </span>
-          </div>
-          <div className="text-left mt-1 min-w-0 w-full">
-            <h4 className="text-[11px] sm:text-[12px] md:text-[13px] font-bold text-gray-800 leading-none break-words whitespace-normal [word-break:break-word] [overflow-wrap:anywhere]">Support</h4>
-            <p className="text-[9px] sm:text-[10px] text-gray-400 font-medium leading-tight mt-0.5 break-words whitespace-normal [word-break:break-word] [overflow-wrap:anywhere]">Help & Support</p>
-          </div>
-        </div>
-      </div>
 
       {/* CHATS TAB (MAIN INBOX WORKSPACE) */}
       {activeTab === 'chats' && (
-        <div className="w-full flex h-[720px] bg-transparent border-t border-b border-gray-200 select-none animate-fade-in" id="messenger-layout-container">
+        <div className="w-full max-w-full flex h-[720px] bg-transparent border-t border-b border-gray-200 select-none animate-fade-in overflow-x-hidden box-border" id="messenger-layout-container">
            
            {/* LEFT COLUMN: Customer Chats Inbox & Support Banner */}
            <div 
-             className={`${activeSessionId ? 'hidden md:flex' : 'flex'} w-full md:w-[360px] lg:w-[410px] shrink-0 border-r border-gray-200 flex-col bg-transparent h-full`}
+             className={`${activeSessionId ? 'hidden md:flex' : 'flex'} w-full md:w-[360px] lg:w-[410px] shrink-0 border-r border-gray-200 flex-col bg-transparent h-full overflow-x-hidden`}
               id="chats-sidebar-panel"
             >
               {/* Inbox Header & Search Bar with Status Filters */}
@@ -616,13 +543,13 @@ export default function AdminSupport() {
             </div>
 
            {/* RIGHT COLUMN: Active Chat Frame / Dynamic Messenger Screen */}
-           <div className={`${activeSessionId ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full bg-white relative`} id="chat-stream-workspace">
+           <div className={`${activeSessionId ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full bg-white relative overflow-x-hidden max-w-full box-border`} id="chat-stream-workspace">
               
               {currentChat ? (
-                <div className="flex flex-row h-full w-full bg-white min-w-0" id="messenger-dual-pane-system">
+                <div className="flex flex-row h-full w-full max-w-full bg-white min-w-0 overflow-x-hidden box-border" id="messenger-dual-pane-system">
                    
                    {/* LEFT CHAT CHANNELS STREAM */}
-                   <div className="flex-1 flex flex-col h-full min-w-0 relative bg-white border-r border-zinc-200">
+                   <div className="flex-1 flex flex-col h-full min-w-0 max-w-full relative bg-white border-r border-zinc-200 overflow-x-hidden box-border">
                    
                    {/* DYNAMIC TOP BAR HEADER */}
                    <div className="px-5 py-3.5 bg-white border-b border-gray-150 flex items-center justify-between shrink-0" id="chat-panel-top-bar">

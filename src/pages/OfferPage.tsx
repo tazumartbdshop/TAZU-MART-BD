@@ -5,15 +5,18 @@ import { useProductStore } from '../store/useProductStore';
 import { useCartStore } from '../store/useCartStore';
 import { ArrowLeft, Percent } from 'lucide-react';
 import { formatPrice } from '../lib/utils';
+import { useSmartBack } from '../hooks/useSmartBack';
+import { toast } from 'react-hot-toast';
 
 export default function OfferPage() {
   const [searchParams] = useSearchParams();
   const broadcastId = searchParams.get('id');
   const navigate = useNavigate();
+  const goBack = useSmartBack('/offers');
   
   const { broadcasts } = useSupportStore();
   const { products } = useProductStore();
-  const { addItem } = useCartStore();
+  const { addItem, clearCart } = useCartStore();
 
   const broadcast = useMemo(() => {
     return broadcasts.find(b => b.id === broadcastId);
@@ -115,8 +118,30 @@ export default function OfferPage() {
   };
 
   const handleBuyNow = (e: React.MouseEvent, product: any) => {
-    handleAddToCart(e, product);
-    navigate('/checkout');
+    e.preventDefault();
+    e.stopPropagation();
+    if (!product) {
+      toast.error("Product details not found");
+      return;
+    }
+    try {
+      clearCart();
+      addItem({
+        id: product.id,
+        name: product.title || product.name,
+        price: product.offerPrice || product.price,
+        originalPrice: product.regularPrice || product.price,
+        image: product.featured_image || product.image || product.imageUrl || '/placeholder.png',
+        quantity: 1,
+        isOfferItem: true,
+        campaignId: broadcast?.id || 'GLOBAL_CAMPAIGN',
+        campaignDiscountPercent: product.discountPercent
+      });
+      navigate('/checkout');
+    } catch (err) {
+      console.error("[Buy Now Error]", err);
+      toast.error("Failed to process Buy Now request");
+    }
   };
 
   const handleProductClick = (productId: string) => {
@@ -127,7 +152,7 @@ export default function OfferPage() {
     <div className="bg-[#fcfcfc] min-h-screen pb-24 font-sans selection:bg-black selection:text-white">
       <div className="bg-black text-white pt-10 pb-6 px-4 relative flex flex-col items-center justify-center text-center">
         <button 
-          onClick={() => navigate(-1)}
+          onClick={() => goBack('/offers')}
           className="absolute left-4 top-10 p-2 hover:bg-neutral-800 rounded-full transition-all cursor-pointer text-white"
         >
           <ArrowLeft className="w-5 h-5" />

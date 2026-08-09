@@ -36,6 +36,7 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 import { useOrderStore, Order } from '../../store/useOrderStore';
+import { useCustomerStore } from '../../store/useCustomerStore';
 import { useProductStore } from '../../store/useProductStore';
 import { formatPrice } from '../../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -141,12 +142,37 @@ const TrackingSheet = ({
 export default function AdminOrdersCardView() {
   const navigate = useNavigate();
   const { orders, updateOrderStatus } = useOrderStore();
+  const { customers, fetchCustomers } = useCustomerStore();
   const { products } = useProductStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewType, setViewType] = useState<'Online' | 'Offline' | 'All'>('All');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
+
+  const getCustomerInfo = (order: Order) => {
+    const matched = customers.find(c => 
+      (order.userId && (c.id === order.userId || c.googleId === order.userId || c.facebookId === order.userId)) ||
+      (c.phone && order.mobileNumber && c.phone.replace(/\D/g, '') === order.mobileNumber.replace(/\D/g, '')) ||
+      (c.email && order.email && c.email.trim().toLowerCase() === order.email.trim().toLowerCase())
+    );
+
+    const profileImage = matched?.profileImage || order.customerImage || null;
+    const displayName = order.customerName || matched?.name || 'Customer';
+    const firstLetter = displayName.trim().charAt(0).toUpperCase() || 'C';
+
+    return {
+      matchedCustomer: matched,
+      profileImage,
+      displayName,
+      firstLetter,
+      phone: order.mobileNumber || matched?.phone || ''
+    };
+  };
 
   const getProductImage = (item: any) => {
     if (item?.image) return item.image;
@@ -341,56 +367,56 @@ export default function AdminOrdersCardView() {
               </div>
 
               {/* Card Body */}
-              <div className="p-4 flex gap-4">
-                {/* Product Image */}
-                <div className="w-20 h-20 bg-gray-50 border border-[#EEEEEE] shrink-0 overflow-hidden relative group-hover:border-black/20 transition-colors">
-                  {order.items[0] && getProductImage(order.items[0]) ? (
-                    <img src={getProductImage(order.items[0])} className="w-full h-full object-cover" alt="" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="w-6 h-6 text-gray-200" />
-                    </div>
-                  )}
-                  <div className="absolute top-0 right-0 bg-black text-white text-[8px] font-black px-1.5 py-0.5">
-                    #{order.orderId.split('-').pop()}
-                  </div>
+              <div className="p-4 flex gap-3.5">
+                {/* Square Profile Box */}
+                <div className="w-12 h-12 rounded-xl border border-gray-200 overflow-hidden bg-purple-50 text-purple-700 flex items-center justify-center shrink-0 shadow-2xs">
+                  {(() => {
+                    const custInfo = getCustomerInfo(order);
+                    return custInfo.profileImage ? (
+                      <img src={custInfo.profileImage} alt={custInfo.displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="font-extrabold text-base uppercase text-purple-700">{custInfo.firstLetter}</span>
+                    );
+                  })()}
                 </div>
 
                 {/* Information */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                    <h4 className="text-sm font-black uppercase tracking-tight text-black truncate leading-none">
+                    <h4 className="text-sm font-extrabold text-neutral-900 truncate leading-tight">
                       {order.customerName}
                     </h4>
                     {getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName }) >= 5 && <VerifiedTick />}
                   </div>
 
-                  <div className="mb-2">
+                  <div className="mb-1.5">
                     <LoyaltyBadge count={getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName })} />
                   </div>
 
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
-                      <Phone className="w-3 h-3 shrink-0" />
-                      {order.mobileNumber}
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800">
+                      <Phone className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      {order.mobileNumber || 'No Phone'}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
-                      <Package className="w-3 h-3 shrink-0" />
-                      {order.items.reduce((acc, i) => acc + i.quantity, 0)} Items
+                    <div className="flex items-center gap-1.5 text-xs text-neutral-500 font-medium">
+                      <Package className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      {order.items.reduce((acc, i) => acc + (i.quantity || 1), 0)} Items · Order #{order.orderId || order.id}
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 truncate">
-                      <MapPin className="w-3 h-3 shrink-0" />
-                      {order.fullAddress}
-                    </div>
+                    {(order.cityArea || order.fullAddress) && (
+                      <div className="flex items-center gap-1.5 text-xs text-neutral-500 font-normal truncate">
+                        <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                        <span className="truncate">{order.cityArea ? `Location: ${order.cityArea}` : order.fullAddress}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Amount */}
                 <div className="text-right flex flex-col justify-between shrink-0">
-                  <div className="text-xs font-black text-black">
+                  <div className="text-sm font-black font-mono text-neutral-900">
                      {formatPrice(order.total)}
                   </div>
-                  <div className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">
+                  <div className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest">
                     Total Amt
                   </div>
                 </div>

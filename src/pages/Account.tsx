@@ -131,6 +131,8 @@ export default function Account() {
   }, [userOrders, activeFilter]);
 
   const accountOptions = [
+    { label: 'COUPONS & OFFERS 🎁', icon: Ticket, path: '/coupons' },
+    { label: 'NOTIFICATIONS 🔔', icon: Bell, path: '/notifications' },
     { label: 'TAZU MART GAMES', icon: Gamepad2, path: '/games' },
     { label: 'HELP CENTER 🎧', icon: HelpCircle, path: '/support' },
     { label: 'MY REVIEWS', icon: Star, path: '/my-reviews' },

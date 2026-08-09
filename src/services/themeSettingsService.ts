@@ -175,8 +175,12 @@ export const themeSettingsService = {
     const root = document.documentElement;
     const isBlack = themeMode === 'black';
 
-    // Remove global dark class to keep header, body, banners and product cards in default light mode
-    root.classList.remove('dark');
+    // Toggle global dark class dynamically
+    if (isBlack) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
     root.setAttribute('data-footer-theme', isBlack ? 'dark' : 'light');
 
     // Broadcast event so Footer component updates in real-time

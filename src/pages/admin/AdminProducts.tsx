@@ -19,6 +19,16 @@ function AdminProductList() {
   const { categories: categoryList } = useCategoryStore();
   const categories = ['All', ...Array.from(new Set(categoryList.map(c => c.name)))];
 
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>(() => {
+    return (localStorage.getItem('tazu_admin_product_sort') as 'newest' | 'oldest') || 'newest';
+  });
+
+  const toggleSort = () => {
+    const next = sortOrder === 'newest' ? 'oldest' : 'newest';
+    setSortOrder(next);
+    localStorage.setItem('tazu_admin_product_sort', next);
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -31,93 +41,122 @@ function AdminProductList() {
                           product.sku.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = activeTab === 'All' || product.category === activeTab;
     return matchesSearch && matchesCategory;
+  }).sort((a, b) => {
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    if (sortOrder === 'newest') {
+      return timeB - timeA; // Descending: latest first
+    } else {
+      return timeA - timeB; // Ascending: oldest first
+    }
   });
 
+  // Calculate published/in-stock count for distinct second metric
+  const publishedProductsCount = products.filter(p => (p.stock ?? 0) > 0).length;
+
   return (
-    <div className="flex flex-col min-h-full space-y-6">
+    <div className="flex flex-col min-h-full space-y-4 sm:space-y-5">
       {toastMessage && (
         <div className="fixed bottom-6 right-6 bg-black text-white px-6 py-3 text-xs uppercase tracking-widest font-bold border border-zinc-800 z-50 shadow-2xl">
           {toastMessage}
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-8 py-2">
-        <div className="flex items-center gap-4">
+      {/* Header section with Title & Add Product Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1 border-b border-zinc-100">
+        <div className="flex items-center gap-3">
           <button 
             onClick={() => navigate('/admin')}
-            className="p-3 border border-neutral-200 rounded-none bg-white hover:bg-neutral-50 transition-all hover:border-black active:scale-95 group shadow-sm"
+            className="p-2.5 border border-neutral-200 rounded-none bg-white hover:bg-neutral-50 transition-all hover:border-black active:scale-95 group shadow-sm"
           >
             <ChevronLeft className="w-5 h-5 text-black group-hover:-translate-x-0.5 transition-transform" />
           </button>
           <div>
-            <h3 className="text-2xl font-black text-[#0a0a0a] uppercase tracking-tighter">Product Listing</h3>
-            <div className="text-[10px] text-neutral-400 font-bold uppercase tracking-[0.2em] mt-1 flex items-center gap-2">
-              <div className="w-1 h-3 bg-purple-600 rounded-full"></div> Inventory & Stock Intelligence
+            <h3 className="text-xl sm:text-2xl font-black text-[#0a0a0a] uppercase tracking-tighter">Product Listing</h3>
+            <div className="text-[10px] text-neutral-400 font-bold uppercase tracking-[0.2em] mt-0.5 flex items-center gap-2">
+              <div className="w-1 h-3 bg-black rounded-full"></div> TAZU INVENTORY & STOCK MANAGEMENT
             </div>
           </div>
         </div>
-        
-        <div className="flex flex-col gap-3 w-full md:w-auto min-w-[280px]">
-          {/* SUPABASE DEBUG COUNTER CARD */}
-          <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-none flex items-center justify-between group hover:border-purple-500 transition-all">
-            <div className="flex flex-col">
-              <span className="text-[8px] font-black text-zinc-550 uppercase tracking-[0.2em] text-[#8c32ec]">Supabase Database</span>
-              <span className="text-[10px] font-black text-black uppercase tracking-tight">Total Products Found In Supabase</span>
-            </div>
-            <div className="text-2xl font-black text-purple-600 bg-white border border-zinc-200 px-3 py-1 font-mono">
-              {products.length}
-            </div>
+
+        <Link 
+          to="/admin/products/add" 
+          className="bg-[#0a0a0a] text-white hover:bg-black/90 px-5 py-3.5 rounded-none text-[10px] uppercase tracking-[0.2em] font-black flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] shadow-sm group sm:w-auto w-full shrink-0"
+        >
+          <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" /> Add Product Entry
+        </Link>
+      </div>
+
+      {/* STATISTICS CARDS - Full width 2-column grid, TAZU branding, equal height & width */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full">
+        {/* CARD 1: Total Products */}
+        <div className="bg-white border border-zinc-200 p-3.5 sm:p-5 rounded-none flex items-center justify-between group hover:border-black transition-all shadow-sm">
+          <div className="flex flex-col min-w-0 pr-2">
+            <span className="text-[8px] sm:text-[9px] font-black text-black uppercase tracking-[0.2em]">TAZU INVENTORY</span>
+            <span className="text-[10px] sm:text-xs font-black text-zinc-600 uppercase tracking-tight truncate mt-0.5">Total Products</span>
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-black bg-zinc-50 border border-zinc-200 px-3 py-1 font-mono shrink-0">
+            {products.length}
+          </div>
+        </div>
+
+        {/* CARD 2: Published Products */}
+        <div className="bg-white border border-zinc-200 p-3.5 sm:p-5 rounded-none flex items-center justify-between group hover:border-black transition-all shadow-sm">
+          <div className="flex flex-col min-w-0 pr-2">
+            <span className="text-[8px] sm:text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">TAZU COMMERCE</span>
+            <span className="text-[10px] sm:text-xs font-black text-zinc-600 uppercase tracking-tight truncate mt-0.5">Published Products</span>
+          </div>
+          <div className="text-xl sm:text-2xl font-black text-emerald-600 bg-emerald-50/50 border border-emerald-200 px-3 py-1 font-mono shrink-0">
+            {publishedProductsCount}
+          </div>
+        </div>
+      </div>
+
+      {/* Search Bar & Category Tabs Container with tight 10px spacing */}
+      <div className="space-y-2.5">
+        {/* Search Bar & Sort Toggle Row */}
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex-1">
+            <input 
+              type="text" 
+              placeholder="SEARCH PRODUCTS BY TITLE OR SKU CODE..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-4 py-3.5 bg-white border border-zinc-200 rounded-none text-xs uppercase tracking-widest focus:outline-none focus:border-black transition-colors" 
+            />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           </div>
 
-          {/* ACTIVE FILTERED ITEMS CARD */}
-          <div className="bg-white border border-zinc-100 p-4 rounded-none flex items-center justify-between group hover:border-purple-650 transition-all">
-            <div className="flex flex-col">
-              <span className="text-[8px] font-black text-neutral-400 uppercase tracking-[0.2em]">Filtered Results</span>
-              <span className="text-[10px] font-black text-neutral-700 uppercase tracking-tight">Match Current Search/Tab</span>
-            </div>
-            <div className="text-2xl font-black text-neutral-900 bg-neutral-50 border border-neutral-150 px-3 py-1 font-mono">
-              {filteredProducts.length}
-            </div>
-          </div>
-
-          {/* ADD PRODUCT BUTTON - Bottom */}
-          <Link 
-            to="/admin/products/add" 
-            className="bg-[#0a0a0a] text-white hover:bg-purple-600 px-6 py-4.5 rounded-none text-[10px] uppercase tracking-[0.2em] font-black flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-[0_10px_20px_rgba(0,0,0,0.1)] group"
+          {/* Sort Toggle Button */}
+          <button
+            onClick={toggleSort}
+            className="h-[46px] w-[105px] sm:w-[115px] shrink-0 bg-white border border-zinc-200 hover:border-black transition-all flex items-center justify-center gap-1.5 px-3 shadow-sm group active:scale-95"
+            title="Toggle sort order (Newest / Oldest)"
           >
-            <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" /> Add Product Entry
-          </Link>
+            <span className="text-xs font-bold text-zinc-700 group-hover:text-black">⇅</span>
+            <span className="text-[11px] font-black uppercase tracking-wider text-zinc-900">
+              {sortOrder === 'newest' ? 'Newest' : 'Oldest'}
+            </span>
+          </button>
         </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <input 
-          type="text" 
-          placeholder="SEARCH PRODUCTS BY TITLE OR SKU CODE..." 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-11 pr-4 py-4 bg-white border border-zinc-250 border-zinc-200 rounded-none text-xs uppercase tracking-widest focus:outline-none focus:border-black transition-colors" 
-        />
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 text-gray-400" />
-      </div>
-
-      {/* Category Tabs */}
-      <div className="overflow-x-auto hide-scrollbar">
-        <div className="flex gap-2 min-w-max pb-2">
-          {categories.map((category) => (
-            <button
-              key={category}
-              onClick={() => setActiveTab(category)}
-              className={`px-5 py-2.5 rounded-none text-xs font-black uppercase tracking-widest transition-colors border ${
-                activeTab === category 
-                  ? 'bg-black text-white border-black' 
-                  : 'bg-white text-gray-500 border-zinc-200 hover:border-black hover:text-black'
-              }`}
-            >
-              {category}
-            </button>
-          ))}
+        {/* Category Tabs - Immediately 10px below Search Bar */}
+        <div className="overflow-x-auto hide-scrollbar -mx-1 px-1">
+          <div className="flex gap-2 min-w-max pb-1">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setActiveTab(category)}
+                className={`px-4 py-2 rounded-none text-[11px] font-black uppercase tracking-widest transition-colors border ${
+                  activeTab === category 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-gray-600 border-zinc-200 hover:border-black hover:text-black'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -724,7 +763,7 @@ function AdminProductAdd() {
 
   return (
     <div className="bg-white rounded-none border border-zinc-200 overflow-hidden mb-12">
-        <div className="p-6 border-b border-zinc-200 flex justify-between items-center bg-zinc-50">
+        <div className="p-3.5 sm:p-6 border-b border-zinc-200 flex justify-between items-center bg-zinc-50">
            <div className="flex items-center gap-3">
               <button 
                 type="button"
@@ -757,8 +796,8 @@ function AdminProductAdd() {
            </button>
         </div>
         
-        <div className="p-6 md:p-10">
-           <form className="space-y-12 w-full" onSubmit={handleSubmit} onChange={() => setIsDirty(true)}>
+        <div className="p-3 sm:p-6 md:p-8">
+           <form className="space-y-10 w-full" onSubmit={handleSubmit} onChange={() => setIsDirty(true)}>
               
               {/* 8. IMAGE UPLOAD SECTION */}
               <div className="space-y-4">
@@ -767,7 +806,7 @@ function AdminProductAdd() {
                  {uploadedImages.length === 0 ? (
                     <div 
                        onClick={() => setShowSourceSheet(true)}
-                       className="border-2 border-dashed border-zinc-350 border-zinc-300 rounded-none p-8 text-center bg-zinc-50 hover:bg-zinc-100/50 hover:border-black transition-all cursor-pointer flex flex-col items-center justify-center min-h-[160px] group relative overflow-hidden"
+                       className="border-2 border-dashed border-zinc-350 border-zinc-300 rounded-none p-4 sm:p-8 text-center bg-zinc-50 hover:bg-zinc-100/50 hover:border-black transition-all cursor-pointer flex flex-col items-center justify-center min-h-[140px] sm:min-h-[160px] group relative overflow-hidden"
                     >
                        <div className="w-12 h-12 bg-white group-hover:bg-black group-hover:text-white transition-colors flex items-center justify-center mb-3 border border-zinc-200 shadow-sm rounded-none">
                           <Upload className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />

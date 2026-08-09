@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { Search, Plus, Trash2, MessageSquare, Loader2 } from 'lucide-react';
+import { Search, Plus, Trash2, MessageSquare, Loader2, Phone, MapPin, Calendar, Clock, ChevronRight, CheckCircle2, Truck, ShoppingBag } from 'lucide-react';
 import { formatPrice } from '../../lib/utils';
 import { useOrderStore, Order } from '../../store/useOrderStore';
+import { useCustomerStore } from '../../store/useCustomerStore';
 import AdminOrdersCardView from './AdminOrdersCardView';
 import PremiumOrderAdd from './PremiumOrderAdd';
 import AdminFakeOrderControl from './AdminFakeOrderControl';
@@ -13,6 +14,7 @@ import { DeleteOrderModal } from '../../components/admin/DeleteOrderModal';
 
 function AdminOrderList() {
   const { orders, updateOrderStatus, markAsRead, deleteOrder, clearAllOrders } = useOrderStore();
+  const { customers, fetchCustomers } = useCustomerStore();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,6 +22,10 @@ function AdminOrderList() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<any>(null);
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
 
   const filteredOrders = orders.filter(order => {
     const matchesTab = activeTab === 'All' || order.status === activeTab;
@@ -33,21 +39,41 @@ function AdminOrderList() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Pending Payment': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Placed': return 'bg-gray-100 text-gray-700 border-gray-200';
-      case 'Confirmed': return 'bg-purple-100 text-purple-700 border-purple-200';
-      case 'Preparing': return 'bg-orange-100 text-orange-700 border-orange-200';
-      case 'Packed': return 'bg-cyan-100 text-cyan-700 border-cyan-200';
+      case 'Pending Payment': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'Placed': return 'bg-slate-50 text-slate-700 border-slate-200';
+      case 'Confirmed': return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'Preparing': return 'bg-orange-50 text-orange-700 border-orange-200';
+      case 'Packed': return 'bg-cyan-50 text-cyan-700 border-cyan-200';
       case 'Shipped':
-      case 'Shipping': return 'bg-blue-100 text-blue-750 border-blue-200';
-      case 'Delivered': return 'bg-green-100 text-green-700 border-green-200';
-      case 'Completed': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-      case 'Cancelled': return 'bg-red-100 text-red-700 border-red-200';
-      case 'Returned': return 'bg-gray-200 text-gray-700 border-gray-300';
-      case 'Refund Requested': return 'bg-pink-100 text-pink-700 border-pink-200';
-      case 'Refunded': return 'bg-indigo-100 text-indigo-700 border-indigo-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
+      case 'Shipping': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'Delivered': return 'bg-green-50 text-green-700 border-green-200';
+      case 'Completed': return 'bg-purple-600 text-white border-purple-600';
+      case 'Cancelled': return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'Returned': return 'bg-gray-100 text-gray-700 border-gray-300';
+      case 'Refund Requested': return 'bg-pink-50 text-pink-700 border-pink-200';
+      case 'Refunded': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
+  };
+
+  const getCustomerInfo = (order: Order) => {
+    const matched = customers.find(c => 
+      (order.userId && (c.id === order.userId || c.googleId === order.userId || c.facebookId === order.userId)) ||
+      (c.phone && order.mobileNumber && c.phone.replace(/\D/g, '') === order.mobileNumber.replace(/\D/g, '')) ||
+      (c.email && order.email && c.email.trim().toLowerCase() === order.email.trim().toLowerCase())
+    );
+
+    const profileImage = matched?.profileImage || order.customerImage || null;
+    const displayName = order.customerName || matched?.name || 'Customer';
+    const firstLetter = displayName.trim().charAt(0).toUpperCase() || 'C';
+
+    return {
+      matchedCustomer: matched,
+      profileImage,
+      displayName,
+      firstLetter,
+      phone: order.mobileNumber || matched?.phone || ''
+    };
   };
 
   const toggleExpand = (id: string) => {
@@ -160,62 +186,136 @@ function AdminOrderList() {
         </div>
       </div>
 
-      <div className="p-4 space-y-3 flex-1 bg-gray-50/35">
+      <div className="p-3 sm:p-4 space-y-3 flex-1 bg-gray-50/50">
         {filteredOrders.map((order, index) => {
           const isExpanded = expandedId === order.id;
+          const custInfo = getCustomerInfo(order);
+          const totalQty = order.items?.reduce((acc, curr) => acc + (curr.quantity || 1), 0) || 0;
           const formattedFullDate = new Intl.DateTimeFormat('en-GB', {
             weekday: 'long',
             day: 'numeric',
-            month: 'long',
+            month: 'short',
             year: 'numeric'
-          }).format(new Date(order.date));
+          }).format(new Date(order.date || Date.now()));
 
           return (
             <div 
               key={`${order.id || index}-${index}`} 
-              className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden"
+              className="bg-white rounded-xl border border-gray-200/90 shadow-2xs hover:shadow-sm hover:border-purple-300 transition-all overflow-hidden"
             >
-              {/* Compact View */}
+              {/* Compact Order Card Header & Brief */}
               <div 
                 onClick={() => toggleExpand(order.id)}
-                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer hover:bg-gray-50/80 transition-colors"
+                className="p-3.5 sm:p-4 cursor-pointer space-y-2.5 hover:bg-gray-50/50 transition-colors"
                 id={`order-row-${order.id}`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-black text-white font-black flex items-center justify-center text-xs shrink-0 relative">
-                    {index + 1}
+                {/* Top Badge Row */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] font-black uppercase text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100">
+                      ORDER NO: #{order.orderId || order.id}
+                    </span>
+                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${
+                      order.type === 'Online' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-blue-50 text-blue-700 border-blue-100'
+                    }`}>
+                      {order.type || 'ONLINE'}
+                    </span>
+                    <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${
+                      order.paymentStatus === 'Paid' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                      order.paymentStatus === 'Unpaid' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                      'bg-amber-50 text-amber-700 border-amber-100'
+                    }`}>
+                      {order.paymentMethod || order.paymentStatus || 'UNPAID'}
+                    </span>
                     {!order.isRead && (
-                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 border-2 border-white rounded-full"></span>
+                      <span className="text-[9px] font-black uppercase bg-red-500 text-white px-1.5 py-0.5 rounded">
+                        NEW
+                      </span>
                     )}
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-[#000000] text-sm sm:text-base flex items-center gap-1.5 flex-wrap">
-                      {order.customerName}
-                      {getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName }) >= 5 && <VerifiedTick />}
-                    </h4>
-                    <div className="mt-1">
-                      <LoyaltyBadge count={getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName })} />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(order.date))}
-                    </p>
+
+                  {/* Total Amount Top Right */}
+                  <div className="text-right ml-auto">
+                    <span className="text-sm sm:text-base font-black font-mono text-neutral-900">
+                      {formatPrice(order.total)}
+                    </span>
                   </div>
                 </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-4">
-                    <p className="font-black text-black text-sm sm:text-base">
-                      {formatPrice(order.total)}
-                    </p>
-                    {(order.status === 'Completed') ? (
-                      <span className="px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 select-none uppercase tracking-wider">
-                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                        Complete Order
+
+                {/* Middle Customer & Order Details */}
+                <div className="flex items-start gap-3">
+                  {/* Square Profile Box */}
+                  <div className="w-10 h-10 rounded-lg border border-gray-200 overflow-hidden bg-purple-50 text-purple-700 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                    {custInfo.profileImage ? (
+                      <img src={custInfo.profileImage} alt={custInfo.displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="font-extrabold text-sm uppercase text-purple-700">{custInfo.firstLetter}</span>
+                    )}
+                  </div>
+
+                  {/* Customer Info */}
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4 className="font-extrabold text-neutral-900 text-sm truncate">
+                        {custInfo.displayName}
+                      </h4>
+                      {getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName }) >= 5 && <VerifiedTick />}
+                      <LoyaltyBadge count={getCompletedOrdersCount(orders, { email: order.email, phone: order.mobileNumber, name: order.customerName })} />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-neutral-600">
+                      {custInfo.phone && (
+                        <span className="flex items-center gap-1 font-bold text-neutral-800">
+                          <Phone className="w-3 h-3 text-neutral-400 shrink-0" />
+                          {custInfo.phone}
+                        </span>
+                      )}
+                      <span className="text-neutral-300">•</span>
+                      <span className="text-neutral-500 font-medium">
+                        {order.items?.length || 0} item{order.items?.length !== 1 ? 's' : ''} • {totalQty} qty • Order #{order.orderId || order.id}
+                      </span>
+                    </div>
+
+                    {(order.cityArea || order.fullAddress) && (
+                      <div className="flex items-center gap-1 text-[11px] text-neutral-500 truncate">
+                        <MapPin className="w-3 h-3 text-neutral-400 shrink-0" />
+                        <span className="truncate">{order.cityArea ? `Location: ${order.cityArea}` : order.fullAddress}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Subtle Divider */}
+                <div className="border-t border-gray-100 my-1" />
+
+                {/* Footer Meta & Actions Row */}
+                <div className="flex items-center justify-between gap-2 flex-wrap text-xs pt-0.5">
+                  <div className="flex items-center gap-2 text-neutral-500 font-medium text-[11px]">
+                    <Calendar className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                    <span>{new Date(order.date || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0 ml-1" />
+                    <span>{new Date(order.date || Date.now()).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-auto">
+                    {order.courier?.name && (
+                      <span className="bg-purple-50 text-purple-700 border border-purple-100 text-[10px] font-extrabold px-2 py-0.5 rounded flex items-center gap-1">
+                        <Truck className="w-3 h-3" />
+                        {order.courier.name} {order.courier.trackingId ? `· #${order.courier.trackingId}` : ''}
+                      </span>
+                    )}
+
+                    {order.status === 'Completed' ? (
+                      <span className="bg-purple-600 text-white font-extrabold text-[11px] px-2.5 py-1 rounded shadow-2xs flex items-center gap-1 uppercase tracking-wide">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Completed
                       </span>
                     ) : (
                       <div onClick={(e) => e.stopPropagation()}>
-                        <select 
+                        <select
                           value={order.status || ''}
                           onChange={(e) => updateOrderStatus(order.id, e.target.value as any)}
-                          className={`px-3 py-1 text-xs font-bold rounded-full border outline-none cursor-pointer ${getStatusColor(order.status || '')}`}
+                          className={`px-2.5 py-1 text-[11px] font-bold rounded border outline-none cursor-pointer ${getStatusColor(order.status || '')}`}
                         >
                           {['Placed', 'Pending Payment', 'Confirmed', 'Preparing', 'Packed', 'Shipping', 'Delivered', 'Completed', 'Cancelled', 'Returned', 'Refund Requested', 'Refund Approved', 'Refunded'].map(s => (
                             <option key={s} value={s}>{s}</option>
@@ -223,7 +323,10 @@ function AdminOrderList() {
                         </select>
                       </div>
                     )}
+
+                    <ChevronRight className={`w-4 h-4 text-neutral-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                   </div>
+                </div>
               </div>
 
               {/* Expandable Details Card */}
