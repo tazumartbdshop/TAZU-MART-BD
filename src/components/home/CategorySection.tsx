@@ -16,23 +16,26 @@ export function CategorySection({ categories }: CategorySectionProps) {
   if (!categories || categories.length === 0) return null;
 
   return (
-    <div className="w-full py-2.5 bg-white border-b border-gray-100">
-      <div className="flex gap-4 overflow-x-auto px-3 scrollbar-hide scroll-smooth">
+    <div className="w-full py-4 bg-white border-b border-gray-100 select-none">
+      <div className="flex gap-4 overflow-x-auto px-4 scrollbar-hide scroll-smooth">
         {categories.map((cat, idx) => (
           <Link
             key={cat.id || idx}
             to={cat.link}
-            className="flex flex-col items-center min-w-[64px] shrink-0"
+            className="flex flex-col items-center w-[72px] sm:w-20 md:w-24 shrink-0 group text-center"
           >
-            <div className="w-[54px] h-[54px] rounded-full overflow-hidden border border-slate-200 flex items-center justify-center bg-slate-50 transition-all hover:border-black hover:-translate-y-0.5">
+            <div className="w-full aspect-square rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center bg-slate-50 transition-all duration-300 group-hover:border-black group-hover:shadow-xs group-hover:-translate-y-0.5">
               <img
                 src={cat.image}
                 alt={cat.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />
             </div>
-            <span className="mt-1.5 text-[11px] font-semibold text-neutral-800 uppercase tracking-wide text-center whitespace-nowrap">
+            <span 
+              title={cat.name}
+              className="mt-2 w-full text-[10px] sm:text-xs font-bold text-neutral-800 uppercase tracking-wide text-center truncate whitespace-nowrap block px-0.5"
+            >
               {cat.name}
             </span>
           </Link>

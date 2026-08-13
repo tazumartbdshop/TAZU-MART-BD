@@ -25,6 +25,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import Account from './pages/Account';
+import AuthCallback from './pages/AuthCallback';
 import AuthGate from './pages/AuthGate';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { useAuthStore } from './store/useAuthStore';
@@ -333,6 +334,7 @@ export default function App() {
           
           <Route path="cart" element={<Cart />} />
           <Route path="login" element={<Login />} />
+          <Route path="auth/callback" element={<AuthCallback />} />
           <Route path="register" element={<Register />} />
           <Route path="forgot-password" element={<ForgotPassword />} />
           

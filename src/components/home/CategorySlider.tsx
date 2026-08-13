@@ -131,7 +131,7 @@ export function CategorySlider({ categories }: CategorySliderProps) {
               to={cat.link}
               className="flex-none w-[72px] sm:w-[88px] md:w-[98px] flex flex-col items-center group text-center cursor-pointer"
             >
-              <div className="relative w-15 h-15 sm:w-19 sm:h-19 md:w-20 md:h-20 rounded-full overflow-hidden border border-neutral-200/80 bg-neutral-50 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-black/30 group-hover:shadow-md shrink-0">
+              <div className="relative w-15 h-15 sm:w-19 sm:h-19 md:w-20 md:h-20 rounded-lg overflow-hidden border border-neutral-200/80 bg-neutral-50 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105 group-hover:border-black/30 group-hover:shadow-md shrink-0">
                 <img
                   src={getOptimizedImageUrl(cat.image, 200)}
                   alt={cat.name}

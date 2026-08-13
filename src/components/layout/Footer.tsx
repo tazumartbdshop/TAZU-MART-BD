@@ -140,7 +140,7 @@ export function Footer() {
           {/* Column 3: Customer Support / Address */}
           <div className="space-y-6">
             <h3 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-zinc-900'}`}>
-              {t.customerSupport}
+              {(t as any).customerSupport || 'Customer Support'}
             </h3>
             <ul className="space-y-4">
               {settings.address && (
@@ -161,7 +161,7 @@ export function Footer() {
           {/* Column 4: Contact Info */}
           <div className="space-y-6">
             <h3 className={`text-sm font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-zinc-900'}`}>
-              {t.contactInfo}
+              {(t as any).contactInfo || 'Contact Info'}
             </h3>
             <ul className="space-y-4">
               {settings.phone && (
@@ -172,7 +172,7 @@ export function Footer() {
                     <Phone className={`w-4 h-4 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{t.phone}</span>
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{(t as any).phone || 'Phone'}</span>
                     <a href={`tel:${settings.phone}`} className={`text-sm font-bold hover:underline ${
                       isDark ? 'text-white' : 'text-zinc-900'
                     }`}>{settings.phone}</a>
@@ -202,7 +202,7 @@ export function Footer() {
                     <Mail className={`w-4 h-4 ${isDark ? 'text-zinc-300' : 'text-zinc-600'}`} />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{t.email}</span>
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">{(t as any).email || 'Email'}</span>
                     <a href={`mailto:${settings.email}`} className={`text-sm font-bold hover:underline ${
                       isDark ? 'text-white' : 'text-zinc-900'
                     }`}>{settings.email}</a>
