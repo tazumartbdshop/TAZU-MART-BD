@@ -41,6 +41,7 @@ export const ThemeInitializer: React.FC = () => {
   }, [googleSearchConsoleCode]);
 
   useEffect(() => {
+    if (!theme) return;
     const root = document.documentElement;
 
     // Permanent White / Light Theme enforcement
@@ -69,38 +70,42 @@ export const ThemeInitializer: React.FC = () => {
     root.style.setProperty('--border-theme', '#eeeeee');
 
     // Buttons
-    Object.entries(theme.buttons).forEach(([key, config]) => {
-      root.style.setProperty(`--btn-${key}-bg`, config.bg);
-      root.style.setProperty(`--btn-${key}-text`, config.textColor);
-      root.style.setProperty(`--btn-${key}-radius`, `${config.radius}px`);
-      root.style.setProperty(`--btn-${key}-hover`, config.hoverColor);
-      root.style.setProperty(`--btn-${key}-shadow`, config.shadow);
-      root.style.setProperty(`--btn-${key}-border`, config.borderColor);
-    });
+    if (theme.buttons) {
+      Object.entries(theme.buttons).forEach(([key, config]) => {
+        if (config) {
+          root.style.setProperty(`--btn-${key}-bg`, config.bg || '#000000');
+          root.style.setProperty(`--btn-${key}-text`, config.textColor || '#ffffff');
+          root.style.setProperty(`--btn-${key}-radius`, `${config.radius ?? 8}px`);
+          root.style.setProperty(`--btn-${key}-hover`, config.hoverColor || '#333333');
+          root.style.setProperty(`--btn-${key}-shadow`, config.shadow || 'none');
+          root.style.setProperty(`--btn-${key}-border`, config.borderColor || 'transparent');
+        }
+      });
+    }
 
     // Typography
-    root.style.setProperty('--font-family', theme.fontFamily);
-    root.style.setProperty('--heading-font', theme.headingFont);
-    root.style.setProperty('--button-font', theme.buttonFont);
-    root.style.setProperty('--product-font', theme.productFont);
+    root.style.setProperty('--font-family', theme.fontFamily || 'sans-serif');
+    root.style.setProperty('--heading-font', theme.headingFont || 'sans-serif');
+    root.style.setProperty('--button-font', theme.buttonFont || 'sans-serif');
+    root.style.setProperty('--product-font', theme.productFont || 'sans-serif');
 
     // Font Sizes
     const sizes = { small: '0.875rem', medium: '1rem', large: '1.125rem' };
-    root.style.setProperty('--base-font-size', sizes[theme.fontSize]);
+    root.style.setProperty('--base-font-size', sizes[theme.fontSize] || '1rem');
 
     // Product Card
-    root.style.setProperty('--card-radius', `${theme.cardRadius}px`);
+    root.style.setProperty('--card-radius', `${theme.cardRadius ?? 12}px`);
     root.style.setProperty('--card-name-color', theme.productNameColor || '#000000');
-    root.style.setProperty('--card-price-color', theme.priceColor);
-    root.style.setProperty('--card-shadow', theme.cardShadow);
-    root.style.setProperty('--wishlist-icon-color', theme.wishlistIconColor);
-    root.style.setProperty('--rating-star-color', theme.ratingStarColor);
-    root.style.setProperty('--grid-spacing', `${theme.gridSpacing}px`);
+    root.style.setProperty('--card-price-color', theme.priceColor || '#000000');
+    root.style.setProperty('--card-shadow', theme.cardShadow || 'none');
+    root.style.setProperty('--wishlist-icon-color', theme.wishlistIconColor || '#ff0000');
+    root.style.setProperty('--rating-star-color', theme.ratingStarColor || '#f59e0b');
+    root.style.setProperty('--grid-spacing', `${theme.gridSpacing ?? 16}px`);
 
     // Banner
-    root.style.setProperty('--banner-overlay', theme.bannerOverlayColor);
-    root.style.setProperty('--banner-text', theme.bannerTextColor);
-    root.style.setProperty('--banner-button', theme.bannerButtonColor);
+    root.style.setProperty('--banner-overlay', theme.bannerOverlayColor || 'rgba(0,0,0,0.3)');
+    root.style.setProperty('--banner-text', theme.bannerTextColor || '#ffffff');
+    root.style.setProperty('--banner-button', theme.bannerButtonColor || '#ffffff');
 
     // Footer
     root.style.setProperty('--footer-bg', theme.footerBg || '#ffffff');

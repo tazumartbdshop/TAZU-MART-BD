@@ -18,9 +18,11 @@ import { pixelService } from '../utils/pixelService';
 import { cn } from '../lib/utils';
 import { uploadImage } from '../lib/imageUtils';
 import { bdAddressData } from '../data/addressData';
+import { useLoginBanner } from '../services/loginBannerService';
 
 export default function Register() {
   const { settings: branding } = useBrandingStore();
+  const { bannerUrl: liveLoginBanner } = useLoginBanner();
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -156,7 +158,7 @@ export default function Register() {
   const defaultMaleImg = branding.male_profile_image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
   const defaultFemaleImg = branding.female_profile_image || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80';
   const defaultGuestImg = branding.default_profile_image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
-  const defaultBannerImg = branding.login_banner || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80';
+  const defaultBannerImg = liveLoginBanner || branding.login_banner || '';
 
   const effectiveAvatar = customPhoto 
     ? customPhoto 

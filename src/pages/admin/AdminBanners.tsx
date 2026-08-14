@@ -20,6 +20,7 @@ import { useProductStore } from '../../store/useProductStore';
 import { useBrandingStore } from '../../store/useBrandingStore';
 import { uploadImage } from '../../lib/imageUtils';
 import { getSupabase } from '../../lib/supabase';
+import { loginBannerService } from '../../services/loginBannerService';
 import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';
 
 interface LocalPreview {
@@ -380,30 +381,34 @@ export default function AdminBanners() {
         const { objectToSnake } = await import('../../lib/supabaseUtils');
         const dbPayloads = objectToSnake(newBanners);
 
-        const { error: bannersErr } = await supabase.from('banners').upsert(dbPayloads);
-        if (bannersErr) {
-          throw new Error('Failed to save banner. Please try again.');
-        }
-
-        // If login banners were added, also sync to dedicated login_banners table
         if (bannerCategory === 'login') {
+          // If login banners were added, sync EXCLUSIVELY to dedicated login_banners table
           try {
             const loginPayloads = newBanners.map(b => ({
+              id: b.id, // Explicitly keep the ID to avoid mismatches
               title: b.name,
               image_url: b.image,
               is_active: b.status === 'active',
               sort_order: b.order || 0
             }));
-            await supabase.from('login_banners').insert(loginPayloads);
+            const { error: loginErr } = await supabase.from('login_banners').upsert(loginPayloads);
+            if (loginErr) throw loginErr;
           } catch (lErr) {
-            console.warn("login_banners table sync note:", lErr);
+            console.error("login_banners table sync error:", lErr);
+            throw new Error('Failed to save Login Banner. Please try again.');
           }
-        }
+        } else {
+          // For Main Banners, save to `banners` and `banners_draft` tables
+          const { error: bannersErr } = await supabase.from('banners').upsert(dbPayloads);
+          if (bannersErr) {
+            throw new Error('Failed to save banner. Please try again.');
+          }
 
-        try {
-          await supabase.from('banners_draft').upsert(dbPayloads);
-        } catch (draftErr) {
-          console.warn("banners_draft upsert note:", draftErr);
+          try {
+            await supabase.from('banners_draft').upsert(dbPayloads);
+          } catch (draftErr) {
+            console.warn("banners_draft upsert note:", draftErr);
+          }
         }
 
         const existingBanners = useBannerStore.getState().banners;
@@ -663,6 +668,10 @@ export default function AdminBanners() {
                         src={preview.previewUrl} 
                         alt={`Preview ${index + 1}`} 
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80';
+                        }}
                       />
                       <div className="absolute bottom-1 left-1 bg-black/80 px-1.5 py-0.5 text-[8px] font-black text-white uppercase tracking-wider">
                         #{index + 1}

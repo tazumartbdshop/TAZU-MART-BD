@@ -41,7 +41,7 @@ interface AuthState {
   isInitializing: boolean;
   setInitializing: (isInitializing: boolean) => void;
   login: (user: User) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateUser: (updatedUser: Partial<User>) => void;
 }
 
@@ -59,10 +59,10 @@ export const useAuthStore = create<AuthState>()(
           useCustomerStore.getState().syncCustomerFromAuth(user);
         }, 500);
       },
-      logout: () => {
+      logout: async () => {
         const supabase = getSupabase();
         if (supabase) {
-          supabase.auth.signOut().catch((err) => console.error("Supabase signOut failed:", err));
+          await supabase.auth.signOut().catch((err) => console.error("Supabase signOut failed:", err));
         }
         set({ user: null, isAuthenticated: false, isInitializing: false });
       },

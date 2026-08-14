@@ -228,22 +228,27 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   updateSliderConfigLocal: (autoSlide, duration) => set({ sliderConfig: { autoSlide, duration } }),
 
   updateBanner: (id, updates) => {
+    const bannerToUpdate = get().banners.find(b => b.id === id);
+    const isLogin = bannerToUpdate?.bannerCategory === 'login' || bannerToUpdate?.bannerCategory === 'login_banner';
+    
     const nextBanners = get().banners.map((b) => b.id === id ? { ...b, ...updates } : b);
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
     broadcastSync.publish('banners', nextBanners);
     const supabase = getSupabase();
     if (supabase) {
-      const dbPayload = objectToSnake(updates);
-      supabase.from('banners').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
-      
-      const loginUpdates: any = {};
-      if (updates.name !== undefined) loginUpdates.title = updates.name;
-      if (updates.image !== undefined) loginUpdates.image_url = updates.image;
-      if (updates.status !== undefined) loginUpdates.is_active = updates.status === 'active';
-      if (updates.order !== undefined) loginUpdates.sort_order = updates.order;
-      if (Object.keys(loginUpdates).length > 0) {
-        supabase.from('login_banners').update(loginUpdates).eq('id', id).then(({error}) => error && console.warn(error));
+      if (isLogin) {
+        const loginUpdates: any = {};
+        if (updates.name !== undefined) loginUpdates.title = updates.name;
+        if (updates.image !== undefined) loginUpdates.image_url = updates.image;
+        if (updates.status !== undefined) loginUpdates.is_active = updates.status === 'active';
+        if (updates.order !== undefined) loginUpdates.sort_order = updates.order;
+        if (Object.keys(loginUpdates).length > 0) {
+          supabase.from('login_banners').update(loginUpdates).eq('id', id).then(({error}) => error && console.warn(error));
+        }
+      } else {
+        const dbPayload = objectToSnake(updates);
+        supabase.from('banners').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
       }
     }
   },
@@ -395,16 +400,26 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     broadcastSync.publish('banners', nextBanners);
 
     try {
-      // Delete from banners table
-      const { error: liveErr } = await supabase.from('banners').delete().eq('id', id);
-      if (liveErr) {
-        throw new Error(liveErr.message || "Failed to delete from banners table");
-      }
+      const isLogin = previousBanners.find(b => b.id === id)?.bannerCategory === 'login_banner' || previousBanners.find(b => b.id === id)?.bannerCategory === 'login';
 
-      // Delete from banners_draft table
-      const { error: draftErr } = await supabase.from('banners_draft').delete().eq('id', id);
-      if (draftErr) {
-        throw new Error(draftErr.message || "Failed to delete from banners_draft table");
+      if (isLogin) {
+        // Delete from login_banners table
+        const { error: loginErr } = await supabase.from('login_banners').delete().eq('id', id);
+        if (loginErr) {
+          throw new Error(loginErr.message || "Failed to delete from login_banners table");
+        }
+      } else {
+        // Delete from banners table
+        const { error: liveErr } = await supabase.from('banners').delete().eq('id', id);
+        if (liveErr) {
+          throw new Error(liveErr.message || "Failed to delete from banners table");
+        }
+
+        // Delete from banners_draft table
+        const { error: draftErr } = await supabase.from('banners_draft').delete().eq('id', id);
+        if (draftErr) {
+          throw new Error(draftErr.message || "Failed to delete from banners_draft table");
+        }
       }
     } catch (err) {
       // Rollback on error

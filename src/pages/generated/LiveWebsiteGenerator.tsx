@@ -874,6 +874,7 @@ export default function LiveWebsiteGenerator() {
                   alt="Store banner"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
+                    e.currentTarget.onerror = null;
                     // Failover if broken link pasted
                     e.currentTarget.src = "https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=1200&q=80";
                   }}
@@ -1807,6 +1808,7 @@ export default function LiveWebsiteGenerator() {
             alt={product.name} 
             referrerPolicy="no-referrer"
             onError={(e) => {
+              e.currentTarget.onerror = null;
               e.currentTarget.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80";
             }}
           />

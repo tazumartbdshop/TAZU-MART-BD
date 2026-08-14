@@ -757,6 +757,7 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
                           alt={notif.title}
                           className="w-10 h-10 object-contain rounded-lg border border-slate-200 bg-slate-50 p-0.5 shrink-0"
                           onError={(e) => {
+                            e.currentTarget.onerror = null;
                             (e.target as HTMLImageElement).src = companyLogoFallback;
                           }}
                         />

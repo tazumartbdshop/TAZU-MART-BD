@@ -13,16 +13,16 @@ export default function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
   const { logout } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     onClose();
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 flex items-center justify-center p-4 z-[100] overflow-hidden">
+        <motion.div key="logout-modal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 flex items-center justify-center p-4 z-[100] overflow-hidden">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -77,7 +77,7 @@ export default function LogoutModal({ isOpen, onClose }: LogoutModalProps) {
               </div>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

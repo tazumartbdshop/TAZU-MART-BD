@@ -12,10 +12,13 @@ import { getSupabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { pixelService } from '../utils/pixelService';
 import { getProviderIcon } from '../components/ProviderIcon';
+import { useLoginBanner } from '../services/loginBannerService';
 
 export default function Login() {
   const { settings } = useSettingsStore();
   const { settings: branding } = useBrandingStore();
+  const { bannerUrl: liveLoginBanner } = useLoginBanner();
+  const loginBannerImg = liveLoginBanner || branding.login_banner || '';
   const ADMIN_EMAIL = (settings.adminEmail && settings.adminEmail !== "admin@tazumart.com" ? settings.adminEmail : "admin.tazumartbd@gmail.com").toLowerCase().trim();
   const ADMIN_PASSWORD = settings.adminPassword && settings.adminPassword !== "12345678" ? settings.adminPassword : "8963885522";
 
@@ -340,6 +343,22 @@ export default function Login() {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className="w-full max-w-[420px] bg-white px-5 py-4 md:px-6 md:py-5 rounded-[6px] border border-neutral-200 shadow-sm"
       >
+        {/* Dynamic Login Banner from login_banners table */}
+        {loginBannerImg && (
+          <div className="w-full mb-4 overflow-hidden rounded-[4px] border border-neutral-200 bg-neutral-50 select-none">
+            <img 
+              src={loginBannerImg} 
+              alt="Login Banner" 
+              className="w-full aspect-[3/2] object-contain bg-white block"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80';
+              }}
+            />
+          </div>
+        )}
+
         <div className="text-center mb-5">
           <Link to="/" className="flex flex-col items-center gap-2 mb-2">
             <div className="flex items-center justify-center select-none leading-none">
