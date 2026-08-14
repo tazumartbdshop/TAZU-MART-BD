@@ -95,99 +95,31 @@ export const themeSettingsService = {
   },
 
   async getThemeMode(): Promise<ThemeMode> {
-    const supabase = getSupabase();
-    if (!supabase) return 'white';
-
-    try {
-      const { data, error } = await supabase
-        .from('app_settings')
-        .select('theme_mode')
-        .eq('id', 'theme_config')
-        .limit(1);
-
-      if (!error && data && data.length > 0 && data[0].theme_mode) {
-        const val = data[0].theme_mode.toLowerCase();
-        return val === 'black' || val === 'dark' ? 'black' : 'white';
-      }
-    } catch (e) {
-      console.warn('Error fetching theme_mode from app_settings:', e);
-    }
     return 'white';
   },
 
   async saveThemeMode(themeMode: ThemeMode): Promise<{ success: boolean; message?: string }> {
-    const supabase = getSupabase();
-    const isBlack = themeMode === 'black';
-    
-    // Always apply live to DOM & Zustand store first
-    this.applyThemeModeToApp(themeMode);
-
-    if (!supabase) {
-      return { success: true };
-    }
-
-    try {
-      const now = new Date().toISOString();
-
-      // 1. Try upserting into app_settings
-      try {
-        await supabase
-          .from('app_settings')
-          .upsert({
-            id: 'theme_config',
-            theme_mode: themeMode,
-            updated_at: now
-          });
-      } catch (e) {
-        console.warn('app_settings upsert error:', e);
-      }
-
-      // 2. Try upserting into settings table
-      try {
-        await supabase
-          .from('settings')
-          .upsert([{
-            id: 'theme',
-            mode: isBlack ? 'dark' : 'light',
-            backgroundColor: isBlack ? '#0a0a0a' : '#ffffff',
-            textColor: isBlack ? '#ffffff' : '#000000',
-            navbarBg: isBlack ? '#000000' : '#ffffff',
-            navbarTextColor: isBlack ? '#ffffff' : '#000000',
-            cardBg: isBlack ? '#171717' : '#ffffff',
-            productNameColor: isBlack ? '#ffffff' : '#000000',
-            borderColor: isBlack ? '#27272a' : '#EEEEEE'
-          }]);
-      } catch (e) {
-        console.warn('settings upsert error:', e);
-      }
-
-      return {
-        success: true,
-        message: 'Theme updated successfully.'
-      };
-    } catch (err: any) {
-      console.warn('saveThemeMode unexpected error:', err);
-      return { success: true };
-    }
+    this.applyThemeModeToApp('white');
+    return {
+      success: true,
+      message: 'Theme set to White.'
+    };
   },
 
-  applyThemeModeToApp(themeMode: ThemeMode) {
+  applyThemeModeToApp(themeMode: ThemeMode = 'white') {
     const root = document.documentElement;
-    const isBlack = themeMode === 'black';
+    root.classList.remove('dark');
+    root.setAttribute('data-footer-theme', 'light');
 
-    // Toggle global dark class dynamically
-    if (isBlack) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tazu_theme_mode', 'light');
     }
-    root.setAttribute('data-footer-theme', isBlack ? 'dark' : 'light');
 
-    // Broadcast event so Footer component updates in real-time
-    window.dispatchEvent(new CustomEvent('tazu-theme-mode-changed', { detail: themeMode }));
+    // Broadcast event so any listener updates to white
+    window.dispatchEvent(new CustomEvent('tazu-theme-mode-changed', { detail: 'white' }));
 
     // Update Zustand useThemeStore
     const store = useThemeStore.getState();
-    store.setThemeModeState(isBlack ? 'dark' : 'light');
+    store.setThemeModeState('light');
   }
 };

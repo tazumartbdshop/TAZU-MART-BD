@@ -29,9 +29,10 @@ import { useCustomerStore, Customer } from '../../store/useCustomerStore';
 import { useLoginHistoryStore, LoginEvent } from '../../store/useLoginHistoryStore';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'motion/react';
+import AdminAuthImages from './AdminAuthImages';
 
 export default function AdminLoginInfo() {
-  const [activeTab, setActiveTab] = useState<'login' | 'create'>('login');
+  const [activeTab, setActiveTab] = useState<'login' | 'create' | 'images'>('login');
   const { history, clearHistory } = useLoginHistoryStore();
   const { customers } = useCustomerStore();
   
@@ -189,12 +190,24 @@ export default function AdminLoginInfo() {
                 setActiveTab('create');
                 resetFilters();
               }}
-              className={`flex-1 md:w-[200px] py-3 flex items-center justify-center font-bold text-xs uppercase tracking-wider transition-all select-none ${
+              className={`flex-1 md:w-[180px] py-3 flex items-center justify-center font-bold text-xs uppercase tracking-wider transition-all select-none ${
                 activeTab === 'create' ? 'bg-neutral-900 text-white shadow-sm' : 'text-neutral-550 hover:bg-neutral-200'
               }`}
             >
               <Users className="w-3.5 h-3.5 mr-2 shrink-0" />
               Registrations ({filteredCustomers.length})
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('images');
+                resetFilters();
+              }}
+              className={`flex-1 md:w-[180px] py-3 flex items-center justify-center font-bold text-xs uppercase tracking-wider transition-all select-none ${
+                activeTab === 'images' ? 'bg-neutral-900 text-white shadow-sm' : 'text-neutral-550 hover:bg-neutral-200'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 mr-2 shrink-0" />
+              Image Management
             </button>
           </div>
 
@@ -265,7 +278,9 @@ export default function AdminLoginInfo() {
       </div>
 
       {/* Main Content Render */}
-      {activeTab === 'login' ? (
+      {activeTab === 'images' ? (
+        <AdminAuthImages />
+      ) : activeTab === 'login' ? (
         <div className="space-y-4">
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

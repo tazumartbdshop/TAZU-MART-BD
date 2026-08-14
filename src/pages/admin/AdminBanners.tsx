@@ -1,48 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Upload, Layers, ChevronLeft, Search, X, Database, ArrowLeft } from 'lucide-react';
+import { 
+  Upload, 
+  ChevronLeft, 
+  Search, 
+  X, 
+  Check, 
+  Loader2, 
+  Image as ImageIcon,
+  User,
+  Sliders,
+  Sparkles,
+  Layers,
+  LayoutGrid
+} from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useBannerStore, Banner } from '../../store/useBannerStore';
 import { useProductStore } from '../../store/useProductStore';
+import { useBrandingStore } from '../../store/useBrandingStore';
+import { uploadImage } from '../../lib/imageUtils';
+import { getSupabase } from '../../lib/supabase';
 import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';
-import DeleteBannerConfirmationDialog from '../../components/common/DeleteBannerConfirmationDialog';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-  }
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: null,
-      email: null,
-    },
-    operationType,
-    path
-  };
-  const errorMsg = JSON.stringify(errInfo);
-  if (errInfo.error.includes('Quota limit exceeded')) {
-    console.warn("Firestore Quota Exceeded.");
-  } else {
-    console.error('Firestore Error: ', errorMsg);
-  }
-}
 
 interface LocalPreview {
   id: string;
@@ -51,56 +29,19 @@ interface LocalPreview {
   croppedBlob: Blob;
 }
 
+export type BannerCategoryType = 'main' | 'login';
+
 export default function AdminBanners() {
-  const { banners } = useBannerStore();
+  const { banners, updateBanner } = useBannerStore();
+  const { settings: branding, updateBranding, isLoaded: isBrandingLoaded } = useBrandingStore();
   const products = useProductStore((state) => state.products) || [];
   
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('editId');
-  const initialAction = searchParams.get('action');
   const navigate = useNavigate();
 
-  // Unsaved changes state and logic
-  const [isDirty, setIsDirty] = useState(false);
-  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
-  const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isDirty) return;
-
-    // Push dummy state to capture browser/gesture back button
-    window.history.pushState(null, '', window.location.href);
-
-    const handlePopState = () => {
-      // Show confirmation dialog
-      setShowLeaveDialog(true);
-      // Restore dummy state
-      window.history.pushState(null, '', window.location.href);
-    };
-
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [isDirty]);
-
-  const handleConfirmLeave = () => {
-    setIsDirty(false);
-    setShowLeaveDialog(false);
-    navigate(pendingNavigationPath || '/admin/banner/list', { replace: true });
-  };
-
-  const handleCancelLeave = () => {
-    setShowLeaveDialog(false);
-    setPendingNavigationPath(null);
-  };
+  // Banner Type Selector: 'main' (Main Banner) vs 'login' (Login Banner)
+  const [bannerCategory, setBannerCategory] = useState<BannerCategoryType>('main');
 
   // Form Fields State
   const [name, setName] = useState('');
@@ -114,40 +55,52 @@ export default function AdminBanners() {
   const [dragActive, setDragActive] = useState(false);
   const [localPreviews, setLocalPreviews] = useState<LocalPreview[]>([]);
 
-  // Delete modal states
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [bannerIdToDelete, setBannerIdToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Default Character Management States
+  const [maleImage, setMaleImage] = useState('');
+  const [femaleImage, setFemaleImage] = useState('');
+  const [guestImage, setGuestImage] = useState('');
+  const [characterUploadingSlot, setCharacterUploadingSlot] = useState<'male' | 'female' | 'guest' | null>(null);
 
-  // Database Schema Readiness Check State
-  const [schemaStatus, setSchemaStatus] = useState<{
-    checked: boolean;
-    ready: boolean;
-    error?: string;
-  }>({ checked: true, ready: true });
+  // Unsaved changes state
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [pendingNavigationPath, setPendingNavigationPath] = useState<string | null>(null);
 
-  const verifyDbSchema = async () => {
-    // Silent check to avoid blocking the user dashboard
-    setSchemaStatus({ checked: true, ready: true });
-  };
-
-  useEffect(() => {
-    verifyDbSchema();
-  }, []);
-
-  // Hidden file input ref
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const characterFileInputRef = useRef<HTMLInputElement>(null);
+  const [activeCharacterUploadSlot, setActiveCharacterUploadSlot] = useState<'male' | 'female' | 'guest' | null>(null);
 
-  // Auto-fill form state when editing
+  // Load existing character avatars from branding store
   useEffect(() => {
-    // Clear form when in "Add Mode"
-    setName('');
-    setOfferText('');
-    setDescription('');
-    setButtonText('Shop Now');
-    setButtonLink('');
-    setConnectedProductId('');
-  }, [banners]);
+    if (isBrandingLoaded || branding) {
+      setMaleImage(branding.male_profile_image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80');
+      setFemaleImage(branding.female_profile_image || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80');
+      setGuestImage(branding.default_profile_image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80');
+    }
+  }, [branding, isBrandingLoaded]);
+
+  // Load banner data if editId is provided
+  useEffect(() => {
+    if (editId) {
+      const bannerToEdit = banners.find(b => b.id === editId);
+      if (bannerToEdit) {
+        setName(bannerToEdit.name || '');
+        setOfferText(bannerToEdit.offerText || '');
+        setDescription(bannerToEdit.description || '');
+        setButtonText(bannerToEdit.buttonText || 'Shop Now');
+        setButtonLink(bannerToEdit.buttonLink || '');
+        setConnectedProductId(bannerToEdit.connectedProductId || '');
+        setBannerCategory((bannerToEdit.bannerCategory as BannerCategoryType) || 'main');
+      }
+    } else {
+      setName('');
+      setOfferText('');
+      setDescription('');
+      setButtonText('Shop Now');
+      setButtonLink('');
+      setConnectedProductId('');
+    }
+  }, [editId, banners]);
 
   // Clean up Object URLs on unmount
   useEffect(() => {
@@ -156,7 +109,19 @@ export default function AdminBanners() {
     };
   }, [localPreviews]);
 
-  // Handle drag events
+  // Navigation leave confirmation handlers
+  const handleConfirmLeave = () => {
+    setIsDirty(false);
+    setShowLeaveDialog(false);
+    navigate(pendingNavigationPath || '/admin/banner/list', { replace: true });
+  };
+
+  const handleCancelLeave = () => {
+    setShowLeaveDialog(false);
+    setPendingNavigationPath(null);
+  };
+
+  // Drag & drop handlers for banner image
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -212,9 +177,11 @@ export default function AdminBanners() {
           reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
-              const targetRatio = 1920 / 650;
-              const targetWidth = 1920;
-              const targetHeight = 650;
+              // For Main Banner: Standard Hero Ratio (1920x650)
+              // For Login Banner: 1536x1024 (3:2 Natural Aspect Ratio)
+              const targetWidth = bannerCategory === 'login' ? 1536 : 1920;
+              const targetHeight = bannerCategory === 'login' ? 1024 : 650;
+              const targetRatio = targetWidth / targetHeight;
               
               const canvas = document.createElement('canvas');
               canvas.width = targetWidth;
@@ -228,75 +195,135 @@ export default function AdminBanners() {
               let offsetX = 0;
               let offsetY = 0;
               
-              if (imgRatio > targetRatio) {
-                drawWidth = img.width * (targetHeight / img.height);
-                drawHeight = targetHeight;
-                if (drawWidth < targetWidth) {
-                    drawWidth = targetWidth;
-                    drawHeight = img.height * (targetWidth / img.width);
+              if (bannerCategory === 'login') {
+                // For Login Banner: preserve full image composition without aggressive cutting
+                if (imgRatio > targetRatio) {
+                  drawWidth = targetWidth;
+                  drawHeight = targetWidth / imgRatio;
+                  offsetX = 0;
+                  offsetY = (targetHeight - drawHeight) / 2;
+                } else {
+                  drawHeight = targetHeight;
+                  drawWidth = targetHeight * imgRatio;
+                  offsetX = (targetWidth - drawWidth) / 2;
+                  offsetY = 0;
                 }
               } else {
-                drawWidth = targetWidth;
-                drawHeight = img.height * (targetWidth / img.width);
-                if (drawHeight < targetHeight) {
-                    drawHeight = targetHeight;
-                    drawWidth = img.width * (targetHeight / img.height);
+                if (imgRatio > targetRatio) {
+                  drawWidth = img.width * (targetHeight / img.height);
+                  drawHeight = targetHeight;
+                  if (drawWidth < targetWidth) {
+                      drawWidth = targetWidth;
+                      drawHeight = img.height * (targetWidth / img.width);
+                  }
+                } else {
+                  drawWidth = targetWidth;
+                  drawHeight = img.height * (targetWidth / img.width);
+                  if (drawHeight < targetHeight) {
+                      drawHeight = targetHeight;
+                      drawWidth = img.width * (targetHeight / img.height);
+                  }
                 }
+                offsetX = (targetWidth - drawWidth) / 2;
+                offsetY = (targetHeight - drawHeight) / 2;
               }
               
-              offsetX = (targetWidth - drawWidth) / 2;
-              offsetY = (targetHeight - drawHeight) / 2;
-              
-              ctx.fillStyle = '#000000';
+              ctx.fillStyle = '#ffffff';
               ctx.fillRect(0, 0, targetWidth, targetHeight);
               ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
               
               canvas.toBlob((blob) => {
                 if (blob) resolve(blob);
-                else reject('Blob creation failed');
-              }, 'image/jpeg', 0.85);
+                else reject('Blob generation failed');
+              }, 'image/webp', 0.92);
             };
-            img.onerror = reject;
-            if (typeof e.target?.result === 'string') {
-              img.src = e.target.result;
-            }
+            img.onerror = () => reject('Image load failed');
+            img.src = e.target?.result as string;
           };
-          reader.onerror = reject;
           reader.readAsDataURL(file);
         });
 
         const previewUrl = URL.createObjectURL(bannerBlob);
         newPreviews.push({
-          id: `preview_${Date.now()}_${Math.floor(Math.random() * 1000)}_${newPreviews.length}`,
+          id: `preview_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           file,
           previewUrl,
           croppedBlob: bannerBlob
         });
       } catch (err) {
-        console.error(err);
-        toast.error(`❌ Failed to process ${file.name}`);
+        console.error("Image processing error:", err);
+        toast.error(`❌ Could not process ${file.name}`);
       }
     }
 
-    if (newPreviews.length > 0) {
-      setLocalPreviews((prev) => [...prev, ...newPreviews]);
-    }
-    
+    setLocalPreviews((prev) => [...prev, ...newPreviews]);
     setIsProcessing(false);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
-  const handlePublishBanners = async () => {
-    if (localPreviews.length === 0) return;
+  // Submit & Save Banner(s)
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    if (editId) {
+      // Editing single banner
+      setIsSubmitting(true);
+      try {
+        let imageUrl: string | undefined = undefined;
+        if (localPreviews.length > 0) {
+          imageUrl = await uploadImage(localPreviews[0].croppedBlob, 'banners', localPreviews[0].file.name);
+        }
+
+        const isLogin = bannerCategory === 'login';
+        const bannerTypeVal = isLogin ? 'login_banner' : 'main_banner';
+
+        const updates: Partial<Banner> = {
+          name: name.trim() || (isLogin ? 'Login Banner' : 'Main Banner'),
+          offerText: offerText.trim(),
+          description: description.trim(),
+          buttonText: buttonText.trim(),
+          buttonLink: buttonLink.trim(),
+          buttonEnabled: !!buttonText.trim() && !!buttonLink.trim(),
+          connectedProductId: connectedProductId || undefined,
+          bannerType: bannerTypeVal,
+          bannerCategory: bannerTypeVal,
+          mediaType: 'banner'
+        };
+
+        if (imageUrl) {
+          updates.image = imageUrl;
+        }
+
+        updateBanner(editId, updates);
+
+        // If this is a login banner, also keep branding.login_banner in sync
+        if (isLogin && imageUrl) {
+          await updateBranding({ login_banner: imageUrl });
+        }
+
+        toast.success(`Banner (${isLogin ? 'LOGIN BANNER' : 'MAIN BANNER'}) updated successfully!`);
+        setIsDirty(false);
+        navigate('/admin/banner/list');
+      } catch (err: any) {
+        console.error(err);
+        toast.error('Failed to update banner.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // Creating new banners
+    if (localPreviews.length === 0) {
+      toast.error('⚠️ Please select or drop at least one banner image.');
+      return;
+    }
+
     setIsSubmitting(true);
     let successCount = 0;
+    const supabase = getSupabase();
 
-    const { uploadImage } = await import('../../lib/imageUtils');
-    const supabase = await import('../../lib/supabase').then(m => m.getSupabase());
     if (!supabase) {
+      toast.error('❌ Supabase client unavailable');
       setIsSubmitting(false);
       return;
     }
@@ -311,10 +338,13 @@ export default function AdminBanners() {
           const targetId = `ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
           const currentOrder = currentBannersLength + successCount;
 
+          const isLogin = bannerCategory === 'login';
+          const bannerTypeVal = isLogin ? 'login_banner' : 'main_banner';
+
           const bannerData: Banner = {
             id: targetId,
             image: downloadUrl,
-            name: name.trim(),
+            name: name.trim() || (isLogin ? 'Login Banner' : 'Main Banner'),
             offerText: offerText.trim(),
             description: description.trim(),
             buttonText: buttonText.trim(),
@@ -322,15 +352,23 @@ export default function AdminBanners() {
             buttonEnabled: !!buttonText.trim() && !!buttonLink.trim(),
             connectedProductId: connectedProductId || undefined,
             isCustomButtonText: true,
-            locations: ['homepage-hero'],
+            locations: isLogin ? ['auth-page'] : ['homepage-hero'],
             bannerSize: 'hero',
             status: 'active',
             order: currentOrder,
-            bannerType: 'uploaded',
+            bannerType: bannerTypeVal,
+            bannerCategory: bannerTypeVal,
+            mediaType: 'banner',
             createdDate: new Date().toISOString()
           };
 
           newBanners.push(bannerData);
+
+          // If it's a login banner, update branding store's login_banner for instant live reflection on Create Account/Login pages
+          if (isLogin) {
+            await updateBranding({ login_banner: downloadUrl });
+          }
+
           successCount++;
         } catch (innerErr) {
           console.error(innerErr);
@@ -339,7 +377,6 @@ export default function AdminBanners() {
       }
 
       if (successCount > 0) {
-        // Convert to snake_case for Supabase database compatibility
         const { objectToSnake } = await import('../../lib/supabaseUtils');
         const dbPayloads = objectToSnake(newBanners);
 
@@ -348,37 +385,37 @@ export default function AdminBanners() {
           throw new Error('Failed to save banner. Please try again.');
         }
 
-        // Silent try-catch for banners_draft so that it is completely non-blocking if the table is absent
+        // If login banners were added, also sync to dedicated login_banners table
+        if (bannerCategory === 'login') {
+          try {
+            const loginPayloads = newBanners.map(b => ({
+              title: b.name,
+              image_url: b.image,
+              is_active: b.status === 'active',
+              sort_order: b.order || 0
+            }));
+            await supabase.from('login_banners').insert(loginPayloads);
+          } catch (lErr) {
+            console.warn("login_banners table sync note:", lErr);
+          }
+        }
+
         try {
           await supabase.from('banners_draft').upsert(dbPayloads);
         } catch (draftErr) {
-          console.warn("[Admin Banners] Optional banners_draft table error, ignored:", draftErr);
+          console.warn("banners_draft upsert note:", draftErr);
         }
 
-        // Instantly update the local Zustand store state to keep Homepage, Banner Listing, and Banner Management in perfect real-time sync
         const existingBanners = useBannerStore.getState().banners;
-        const existingDraftBanners = useBannerStore.getState().draftBanners;
-
         const updatedBanners = [...existingBanners.filter(b => !newBanners.some(n => n.id === b.id)), ...newBanners];
-        const updatedDraftBanners = [...existingDraftBanners.filter(b => !newBanners.some(n => n.id === b.id)), ...newBanners];
-
         useBannerStore.getState().setBanners(updatedBanners);
-        useBannerStore.getState().setDraftBanners(updatedDraftBanners);
         
         localPreviews.forEach(p => URL.revokeObjectURL(p.previewUrl));
         setLocalPreviews([]);
         
-        toast.success(`🎉 Banner saved successfully.`);
+        toast.success(`🎉 ${successCount} Banner(s) (${bannerCategory === 'login' ? 'LOGIN BANNER' : 'MAIN BANNER'}) saved successfully.`);
         
-        setName('');
-        setOfferText('');
-        setDescription('');
-        setButtonText('Shop Now');
-        setButtonLink('');
-        setConnectedProductId('');
-
         setIsDirty(false);
-        // Redirect user to Banner Listing as part of a smooth administrative workflow
         navigate('/admin/banner/list');
       }
     } catch (err: any) {
@@ -389,66 +426,69 @@ export default function AdminBanners() {
     setIsSubmitting(false);
   };
 
-  const handleCancel = () => {
-    setIsDirty(false);
-    navigate('/admin/banner/list');
+  // Character Upload & Replace Handlers
+  const handleCharacterSlotClick = (slot: 'male' | 'female' | 'guest') => {
+    setActiveCharacterUploadSlot(slot);
+    characterFileInputRef.current?.click();
   };
 
-  const handleEditClick = (banner: Banner, action?: string) => {
-    let url = `/admin/banner/create?editId=${banner.id}`;
-    if (action) {
-      url += `&action=${action}`;
-    }
-    navigate(url);
-  };
+  const handleCharacterFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const slot = activeCharacterUploadSlot;
+    if (!file || !slot) return;
 
-  const handleDeleteClick = (bannerId: string) => {
-    setBannerIdToDelete(bannerId);
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!bannerIdToDelete) return;
-    setIsDeleting(true);
+    setCharacterUploadingSlot(slot);
     try {
-      await useBannerStore.getState().deleteBannerPermanently(bannerIdToDelete);
-      toast.success("Banner সফলভাবে ডাটাবেজ থেকে মুছে ফেলা হয়েছে।");
-      setIsDeleteModalOpen(false);
-      setBannerIdToDelete(null);
+      const url = await uploadImage(file, 'profiles', `char_${slot}_${Date.now()}`);
+      if (url) {
+        if (slot === 'male') {
+          setMaleImage(url);
+          await updateBranding({ male_profile_image: url });
+        } else if (slot === 'female') {
+          setFemaleImage(url);
+          await updateBranding({ female_profile_image: url });
+        } else if (slot === 'guest') {
+          setGuestImage(url);
+          await updateBranding({ default_profile_image: url });
+        }
+        toast.success(`✅ ${slot.toUpperCase()} Character updated successfully!`);
+      }
     } catch (err: any) {
-      console.error(err);
-      toast.error(`❌ Failed to delete banner: ${err?.message || 'Unknown database error'}`);
+      console.error(`Failed to upload ${slot} character:`, err);
+      toast.error(`❌ Upload failed: ${err.message || 'Error'}`);
     } finally {
-      setIsDeleting(false);
+      setCharacterUploadingSlot(null);
+      if (characterFileInputRef.current) {
+        characterFileInputRef.current.value = '';
+      }
     }
   };
 
-  const handleCancelDelete = () => {
-    setIsDeleteModalOpen(false);
-    setBannerIdToDelete(null);
-  };
-
-  const handleSeqDragStart = (e: React.DragEvent, index: number) => {
-    e.dataTransfer.setData('text/plain', index.toString());
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleSeqDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-    const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
-    if (!isNaN(dragIndex) && dragIndex !== dropIndex) {
-      useBannerStore.getState().reorderBanners(dragIndex, dropIndex);
+  const handleResetCharacterSlot = async (slot: 'male' | 'female' | 'guest') => {
+    try {
+      if (slot === 'male') {
+        const def = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
+        setMaleImage(def);
+        await updateBranding({ male_profile_image: def });
+      } else if (slot === 'female') {
+        const def = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80';
+        setFemaleImage(def);
+        await updateBranding({ female_profile_image: def });
+      } else if (slot === 'guest') {
+        const def = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
+        setGuestImage(def);
+        await updateBranding({ default_profile_image: def });
+      }
+      toast.success(`Reset ${slot.toUpperCase()} to standard avatar`);
+    } catch (e) {
+      toast.error("Failed to reset slot");
     }
-  };
-
-  const handleSeqDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
   };
 
   return (
-    <div id="admin-banner-control" className="w-full max-w-5xl mx-auto px-3 sm:px-6 space-y-6 font-sans pb-24">
-      {/* Simple Back Button */}
+    <div id="admin-banner-control" className="w-full max-w-5xl mx-auto px-3 sm:px-6 space-y-6 font-sans pb-24 text-left">
+      
+      {/* Top Header & Back Link */}
       <div className="flex justify-between items-center pt-2">
         <button 
           type="button" 
@@ -466,246 +506,420 @@ export default function AdminBanners() {
         </button>
       </div>
 
-      {/* Form Sections (Each Field inside its own separate card container) */}
+      {/* Hidden file input for characters */}
+      <input 
+        ref={characterFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleCharacterFileChange}
+        className="hidden"
+      />
+
       <div className="space-y-6" onChange={() => setIsDirty(true)}>
-        
-        {/* 1. Banner Image Upload Card */}
-        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-4 shadow-sm">
-          <div className="border-b border-zinc-100 pb-3">
-            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
-              1. Banner Image Upload <span className="text-rose-500 font-bold">*</span>
-            </h4>
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-              Drag multiple hero banner images or browse to upload instantly
-            </p>
+
+        {/* ======================================================================= */}
+        {/* SECTION 1: BANNER CONTROL (Main Banner vs Login Banner Selection)       */}
+        {/* ======================================================================= */}
+        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-6 space-y-4 shadow-xs">
+          <div className="border-b border-zinc-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xs font-black text-black uppercase tracking-wider">
+                BANNER CONTROL — MEDIA TYPE SELECTION
+              </h3>
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
+                Choose banner destination type before uploading image
+              </p>
+            </div>
+
+            {/* Type selector toggle pills */}
+            <div className="flex items-center gap-2 p-1 bg-zinc-100 border border-zinc-200 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setBannerCategory('main');
+                  setIsDirty(true);
+                }}
+                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  bannerCategory === 'main' 
+                    ? 'bg-black text-white shadow-xs' 
+                    : 'text-neutral-600 hover:text-black'
+                }`}
+              >
+                Main Banner
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBannerCategory('login');
+                  setIsDirty(true);
+                }}
+                className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  bannerCategory === 'login' 
+                    ? 'bg-black text-white shadow-xs' 
+                    : 'text-neutral-600 hover:text-black'
+                }`}
+              >
+                Login Banner
+              </button>
+            </div>
           </div>
 
-          <div 
-            onDragEnter={handleDrag}
-            onDragOver={handleDrag}
-            onDragLeave={handleDrag}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all min-h-[220px] w-full ${
-              dragActive 
-                ? 'border-black bg-zinc-50 scale-[0.99]' 
-                : 'border-zinc-200 bg-zinc-50/50 hover:border-black hover:bg-zinc-50'
-            }`}
-          >
-            <input 
-              type="file"
-              multiple
-              ref={fileInputRef}
-              onChange={handleFileInputChange}
-              accept="image/*"
-              className="hidden"
-              id="banner-image-uploader"
-            />
-            {isProcessing ? (
-              <div className="flex flex-col items-center justify-center py-6">
-                <span className="w-6 h-6 border-2 border-black/30 border-t-black rounded-full animate-spin mb-2" />
-                <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest animate-pulse">Processing & Cropping...</span>
+          {/* Banner Upload Box */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-wider text-neutral-800">
+                1. Upload {bannerCategory === 'login' ? 'Login Banner Image' : 'Main Slideshow Image'} <span className="text-rose-500 font-bold">*</span>
+              </span>
+              <span className="text-[9px] font-mono font-bold text-neutral-800 uppercase bg-zinc-100 border border-zinc-300 px-2.5 py-1">
+                {bannerCategory === 'login' 
+                  ? 'Recommended: 1536 × 1024 px (Aspect Ratio: 3:2)' 
+                  : 'Recommended: 1920 × 650 px (Hero Slideshow)'}
+              </span>
+            </div>
+
+            <div 
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-none flex flex-col items-center justify-center cursor-pointer transition-all w-full p-6 text-center ${
+                bannerCategory === 'login' ? 'min-h-[220px] md:min-h-[260px]' : 'min-h-[180px]'
+              } ${
+                dragActive 
+                  ? 'border-black bg-zinc-50 scale-[0.99]' 
+                  : 'border-zinc-200 bg-zinc-50/50 hover:border-black hover:bg-zinc-50'
+              }`}
+            >
+              <input 
+                type="file"
+                multiple
+                ref={fileInputRef}
+                onChange={handleFileInputChange}
+                accept="image/*"
+                className="hidden"
+                id="banner-image-uploader"
+              />
+              {isProcessing ? (
+                <div className="flex flex-col items-center justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-black mb-2" />
+                  <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest animate-pulse">Processing Image...</span>
+                </div>
+              ) : (
+                <>
+                  <Upload className="w-7 h-7 text-neutral-400 mb-2.5" />
+                  <span className="text-[11px] font-black uppercase text-black tracking-wider">
+                    Drag {bannerCategory === 'login' ? 'Login Banner' : 'Main Banner'} Image Here or Browse
+                  </span>
+                  
+                  {bannerCategory === 'login' ? (
+                    <div className="mt-2 space-y-1">
+                      <span className="inline-block bg-black text-white text-[9px] font-black uppercase px-2.5 py-0.5 tracking-wider">
+                        এই সাইজের ব্যানার আপলোড করুন: 1536 × 1024 px (3:2)
+                      </span>
+                      <p className="text-[8px] text-zinc-500 uppercase tracking-widest font-bold block">
+                        Maintains 3:2 visual proportion across Create Account, Login & Member headers
+                      </p>
+                    </div>
+                  ) : (
+                    <span className="text-[8px] text-zinc-400 uppercase tracking-widest mt-1 font-bold">
+                      Used in Storefront Homepage hero carousel (1920 × 650 px)
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Login Banner Guidelines Box */}
+            {bannerCategory === 'login' && (
+              <div className="p-3 bg-zinc-50 border border-zinc-200 flex items-start gap-2.5">
+                <span className="text-xs mt-0.5">💡</span>
+                <div className="text-[10px] leading-relaxed text-neutral-700">
+                  <span className="text-black font-black uppercase tracking-wider">Login Banner Specification:</span>{' '}
+                  <span className="text-neutral-600">
+                    Recommended Banner Size: <strong>1536 × 1024 px</strong> | Aspect Ratio: <strong>3:2</strong>. 
+                    ব্যানারের সম্পূর্ণ গঠন ও ভিজ্যুয়াল ব্যালেন্স অক্ষুণ্ণ রাখতে এই সাইজ ব্যবহার করুন। ছবি কোনো চ্যাপ্টা হওয়া বা অবাঞ্ছিত ক্রপ ছাড়াই সরাসরি সুন্দরভাবে দেখা যাবে।
+                  </span>
+                </div>
               </div>
-            ) : (
-              <>
-                <Upload className="w-6 h-6 text-neutral-400 mb-2" />
-                <span className="text-[10px] font-black uppercase text-black tracking-wider">Drag Multiple Images Here or Browse</span>
-                <span className="text-[8px] text-zinc-400 uppercase tracking-widest mt-1.5 font-bold font-mono">Recommended Size: Desktop 1920 × 650 px / Mobile 1080 × 500 px</span>
-              </>
+            )}
+
+            {/* Selected local preview list */}
+            {localPreviews.length > 0 && (
+              <div className="pt-3 border-t border-zinc-100">
+                <div className="flex items-center justify-between text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-2">
+                  <span>Selected Images ({localPreviews.length})</span>
+                  <span>Target: {bannerCategory.toUpperCase()} BANNER</span>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  {localPreviews.map((preview, index) => (
+                    <div 
+                      key={preview.id} 
+                      className={`relative flex-none bg-zinc-100 border border-zinc-200 overflow-hidden group select-none ${
+                        bannerCategory === 'login' ? 'w-48 aspect-[3/2]' : 'w-52 aspect-[1920/650]'
+                      }`}
+                    >
+                      <img 
+                        src={preview.previewUrl} 
+                        alt={`Preview ${index + 1}`} 
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute bottom-1 left-1 bg-black/80 px-1.5 py-0.5 text-[8px] font-black text-white uppercase tracking-wider">
+                        #{index + 1}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemovePreview(preview.id);
+                        }}
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white flex items-center justify-center cursor-pointer"
+                        title="Remove"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
+        </div>
 
-          {/* Local Previews Horizontal Row (Only shown if local previews exist) */}
-          {localPreviews.length > 0 && (
-            <div className="pt-4 border-t border-zinc-100">
-              <div className="flex items-center justify-between text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-3">
-                <span>Selected Previews ({localPreviews.length})</span>
-                <span>Swipe to Scroll &rarr;</span>
+        {/* 2. Banner Details (Optional titles & links for main banners) */}
+        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-6 space-y-4 shadow-xs">
+          <div className="border-b border-zinc-100 pb-3">
+            <h3 className="text-xs font-black text-black uppercase tracking-wider">
+              2. Banner Information & Link Target <span className="text-zinc-400 font-bold">(Optional)</span>
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-800 mb-1">
+                Banner Name / Title
+              </label>
+              <input 
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={bannerCategory === 'login' ? 'e.g. Account Welcome Banner' : 'e.g. SUMMER APPARELS 50% FLAT'}
+                className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-800 mb-1">
+                Subtitle / Promo Catchphrase
+              </label>
+              <input 
+                type="text"
+                value={offerText}
+                onChange={(e) => setOfferText(e.target.value)}
+                placeholder="e.g. SPECIAL OFFER"
+                className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
+              />
+            </div>
+          </div>
+
+          {bannerCategory === 'main' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-800 mb-1">
+                  Connect Specific Product (Optional)
+                </label>
+                <ProductSearchDropdown 
+                  products={products}
+                  value={connectedProductId}
+                  onChange={(val) => {
+                    setConnectedProductId(val);
+                    setIsDirty(true);
+                  }}
+                />
               </div>
-              <div className="flex gap-4 overflow-x-auto pb-3 snap-x scrollbar-thin scrollbar-thumb-zinc-200">
-                {localPreviews.map((preview, index) => (
-                  <div 
-                    key={preview.id} 
-                    className="relative flex-none w-48 sm:w-64 aspect-[1080/500] sm:aspect-[1200/500] md:aspect-[1920/650] bg-zinc-100 border border-zinc-200 snap-start overflow-hidden group/thumb select-none"
-                  >
-                    <img 
-                      src={preview.previewUrl} 
-                      alt={`Banner ${index + 1}`} 
-                      className="w-full h-full object-cover"
-                    />
-                    {/* Badge Serial Indicator */}
-                    <div className="absolute bottom-1 left-1 bg-black/75 px-1.5 py-0.5 text-[8px] font-black text-white uppercase tracking-wider font-mono">
-                      Banner {index + 1}
-                    </div>
-                    {/* Close / Delete Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemovePreview(preview.id);
-                      }}
-                      className="absolute top-1 right-1 w-5 h-5 bg-black/85 text-white rounded-none border border-zinc-800 hover:bg-rose-600 hover:border-rose-600 flex items-center justify-center transition-all cursor-pointer opacity-100 group-hover/thumb:opacity-100"
-                      title="Remove from previews"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-800 mb-1">
+                  Direct Target Link / Route (Optional)
+                </label>
+                <input 
+                  type="text"
+                  value={buttonLink}
+                  onChange={(e) => setButtonLink(e.target.value)}
+                  placeholder="e.g. /category/electronics or /offers"
+                  className="w-full px-3 py-2.5 bg-zinc-50 border border-zinc-200 focus:outline-none focus:border-black font-mono text-xs text-black"
+                />
               </div>
             </div>
           )}
         </div>
 
-        {/* 2. Banner Title Card */}
-        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-4 shadow-sm">
+        {/* ======================================================================= */}
+        {/* SECTION 2: ACCOUNT PROFILE CHARACTERS (Male, Female, Guest)             */}
+        {/* Strictly separated from banners; saved to Account Character Settings    */}
+        {/* ======================================================================= */}
+        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-6 space-y-4 shadow-xs">
           <div className="border-b border-zinc-100 pb-3">
-            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
-              2. Banner Title <span className="text-zinc-400 font-bold">(Optional)</span>
-            </h4>
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-              Primary text displayed on top of the slideshow banner
+            <h3 className="text-xs font-black text-black uppercase tracking-wider">
+              ACCOUNT PROFILE CHARACTERS
+            </h3>
+            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
+              Default fallback avatars for Male, Female, and Guest customer profiles (Saved directly to Account Character Settings; not included in Banner Listing)
             </p>
           </div>
-          
-          <input 
-            type="text"
-            id="banner-title-input"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. SUMMER APPARELS 50% FLAT"
-            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
-          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            
+            {/* Slot 1: Male */}
+            <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
+                  <img 
+                    src={maleImage} 
+                    alt="Male Character" 
+                    className="w-full h-full object-cover rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                  {characterUploadingSlot === 'male' && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase text-black leading-none">Male Character</h4>
+                  <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => handleCharacterSlotClick('male')}
+                  className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
+                >
+                  Upload / Change
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResetCharacterSlot('male')}
+                  className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
+                  title="Reset to default"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Slot 2: Female */}
+            <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
+                  <img 
+                    src={femaleImage} 
+                    alt="Female Character" 
+                    className="w-full h-full object-cover rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                  {characterUploadingSlot === 'female' && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase text-black leading-none">Female Character</h4>
+                  <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => handleCharacterSlotClick('female')}
+                  className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
+                >
+                  Upload / Change
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResetCharacterSlot('female')}
+                  className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
+                  title="Reset to default"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            {/* Slot 3: Guest */}
+            <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
+                  <img 
+                    src={guestImage} 
+                    alt="Guest Character" 
+                    className="w-full h-full object-cover rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                  {characterUploadingSlot === 'guest' && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-black uppercase text-black leading-none">Guest Character</h4>
+                  <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                <button
+                  type="button"
+                  onClick={() => handleCharacterSlotClick('guest')}
+                  className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
+                >
+                  Upload / Change
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResetCharacterSlot('guest')}
+                  className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
+                  title="Reset to default"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* 3. Banner Subtitle Card */}
-        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-4 shadow-sm">
-          <div className="border-b border-zinc-100 pb-3">
-            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
-              3. Banner Subtitle <span className="text-zinc-400 font-bold">(Optional)</span>
-            </h4>
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-              Secondary text or promotional catchphrase (e.g. LIMITED TIME OFFER)
-            </p>
-          </div>
-          
-          <input 
-            type="text"
-            id="banner-subtitle-input"
-            value={offerText}
-            onChange={(e) => setOfferText(e.target.value)}
-            placeholder="e.g. SPECIAL RAMADAN COLLECTION"
-            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
-          />
-        </div>
-
-        {/* 4. Banner Description Card */}
-        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-4 shadow-sm">
-          <div className="border-b border-zinc-100 pb-3">
-            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
-              4. Banner Description <span className="text-zinc-400 font-bold">(Optional)</span>
-            </h4>
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-              Small descriptive text providing additional details
-            </p>
-          </div>
-          
-          <textarea 
-            id="banner-description-input"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="e.g. Explore our newest arrivals for the season with premium quality material."
-            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-bold text-xs uppercase text-black min-h-[80px] resize-none"
-          />
-        </div>
-
-        {/* 5. Banner Button Text Card */}
-        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-4 shadow-sm">
-          <div className="border-b border-zinc-100 pb-3">
-            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
-              5. Banner Button Text <span className="text-zinc-400 font-bold">(Optional)</span>
-            </h4>
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-              Call to action text inside the action button
-            </p>
-          </div>
-          
-          <input 
-            type="text"
-            id="banner-btn-text-input"
-            value={buttonText}
-            onChange={(e) => setButtonText(e.target.value)}
-            placeholder="e.g. SHOP NOW"
-            className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-bold text-xs uppercase text-black"
-          />
-        </div>
-
-        {/* 6. Banner Navigation Link Card */}
-        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-8 space-y-6 shadow-sm">
-          <div className="border-b border-zinc-100 pb-3">
-            <h4 className="text-[10px] font-black text-black uppercase tracking-widest">
-              6. Banner Navigation Link <span className="text-zinc-400 font-bold">(Optional)</span>
-            </h4>
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-              Select a pre-existing product or specify a custom routing path
-            </p>
-          </div>
-
-          {/* Shortcut Selector */}
-          <div className="space-y-1.5 relative">
-            <span className="text-[8px] font-black tracking-widest text-neutral-400 block uppercase">Product Selection Shortcut</span>
-            <ProductSearchDropdown 
-              products={products} 
-              value={connectedProductId} 
-              onChange={(val) => {
-                setConnectedProductId(val);
-                if (val) {
-                  setButtonLink(`/product/${val}`);
-                } else {
-                  setButtonLink('');
-                }
-              }}
-            />
-          </div>
-
-          {/* Raw Input Redirection Path */}
-          <div className="space-y-1.5">
-            <span className="text-[8px] font-black tracking-widest text-neutral-400 block uppercase">Custom Action Redirection Path</span>
-            <input 
-              type="text"
-              id="banner-redirect-path"
-              value={buttonLink}
-              onChange={(e) => setButtonLink(e.target.value)}
-              placeholder="e.g. /product/product-id-here or /shop"
-              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-none focus:outline-none focus:border-black font-mono font-bold text-xs text-black"
-            />
-          </div>
-        </div>
-
-        {/* 7. Save Banner Action Card */}
-        <div className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-sm">
-          <div>
-            <h4 className="text-[10px] font-black uppercase text-black tracking-widest">Ready to Publish?</h4>
-            <p className="text-[9px] text-zinc-400 uppercase font-black tracking-widest mt-1">
-              {localPreviews.length > 0 
-                ? `You have prepared ${localPreviews.length} banner(s) for publishing.` 
-                : "Select or drag hero images in the first step above to begin."}
-            </p>
-          </div>
-          <button 
+        {/* Bottom Save / Action Bar */}
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <button
             type="button"
-            disabled={isSubmitting || isProcessing || localPreviews.length === 0}
-            onClick={handlePublishBanners}
-            className="px-6 py-3 bg-black hover:bg-zinc-800 text-white text-xs font-black uppercase tracking-widest transition-all rounded-none duration-150 cursor-pointer disabled:bg-zinc-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 w-full sm:w-auto"
+            onClick={() => navigate('/admin/banner/list')}
+            className="px-5 py-3 border border-zinc-200 text-neutral-700 text-xs font-black uppercase tracking-wider hover:bg-zinc-50 cursor-pointer"
+          >
+            Cancel
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => handleSubmit()}
+            disabled={isSubmitting}
+            className="px-6 py-3 bg-black hover:bg-neutral-900 text-white text-xs font-black uppercase tracking-widest flex items-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Publishing...
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Saving...</span>
               </>
             ) : (
               <>
                 <Upload className="w-3.5 h-3.5" />
-                Save Banners ({localPreviews.length})
+                <span>Save {bannerCategory === 'login' ? 'Login Banner' : 'Main Banner'} ({localPreviews.length})</span>
               </>
             )}
           </button>
@@ -713,126 +927,18 @@ export default function AdminBanners() {
 
       </div>
 
-      {/* Main Sequence Panel */}
-      {banners.length >= 1 && (
-        <section className="bg-white border border-zinc-200 rounded-none p-6 md:p-8 shadow-sm space-y-4">
-          <div className="border-b border-zinc-100 pb-3">
-            <h2 className="text-sm font-black uppercase tracking-wider text-neutral-900">
-              🗂️ Banner Sequence ({banners.length})
-            </h2>
-            <p className="text-[9px] text-zinc-400 uppercase font-black tracking-widest mt-0.5">Drag and drop slides to adjust priority</p>
-          </div>
-          
-          <div className="flex items-center justify-between text-[8px] font-black text-zinc-400 uppercase tracking-widest px-1">
-            <span>← First Slide</span>
-            <span>Horizontal Scroll Area</span>
-          </div>
-          
-          <div 
-            className="flex overflow-x-auto gap-4 pb-4 snap-x pt-2"
-            style={{ scrollBehavior: 'smooth' }}
-          >
-            {banners.map((banner, index) => (
-              <BannerThumbnailItem 
-                key={banner.id}
-                banner={banner}
-                index={index}
-                onDelete={() => handleDeleteClick(banner.id)}
-                onDragStart={(e) => handleSeqDragStart(e, index)}
-                onDrop={(e) => handleSeqDrop(e, index)}
-                onDragOver={handleSeqDragOver}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-      
       <UnsavedChangesDialog
         isOpen={showLeaveDialog}
         title="Unsaved Changes"
-        message="আপনি এখনও ব্যানার তথ্য Save করেননি। আপনি কি নিশ্চিত এই পেজ থেকে বের হতে চান? আপনার করা পরিবর্তনগুলো হারিয়ে যাবে।"
+        message="আপনি এখনও ব্যানার তথ্য Save করেননি। আপনি কি নিশ্চিত এই পেজ থেকে বের হতে চান?"
         onConfirm={handleConfirmLeave}
         onCancel={handleCancelLeave}
         cancelText="Cancel"
         confirmText="Yes, Leave"
       />
-
-      <DeleteBannerConfirmationDialog
-        isOpen={isDeleteModalOpen}
-        onConfirm={handleConfirmDelete}
-        onCancel={handleCancelDelete}
-        isDeleting={isDeleting}
-      />
     </div>
   );
 }
-
-interface BannerThumbnailItemProps {
-  banner: Banner;
-  index: number;
-  onDelete: () => void;
-  onDragStart: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent) => void;
-  onDragOver: (e: React.DragEvent) => void;
-}
-
-const BannerThumbnailItem: React.FC<BannerThumbnailItemProps> = ({ 
-  banner, 
-  index, 
-  onDelete, 
-  onDragStart, 
-  onDrop, 
-  onDragOver 
-}) => {
-  // Pad the index with 0 for single digits
-  const formatIndex = (idx: number) => (idx + 1).toString().padStart(2, '0');
-
-  return (
-    <div 
-      className="shrink-0 w-32 snap-center relative group select-none cursor-grab active:cursor-grabbing"
-      draggable
-      onDragStart={onDragStart}
-      onDrop={onDrop}
-      onDragOver={onDragOver}
-    >
-      <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden flex flex-col h-full shadow-sm">
-        
-        {/* Top absolute actions */}
-        <button 
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-sm hover:bg-rose-600 scale-90 z-20"
-          title="Remove Banner"
-        >
-          ✕
-        </button>
-
-        {/* Thumbnail Image */}
-        <div 
-          className="aspect-[1080/500] sm:aspect-[1200/500] md:aspect-[1920/650] w-full bg-neutral-950 overflow-hidden relative border-b border-zinc-150 flex items-center justify-center cursor-pointer pointer-events-none"
-        >
-          {banner.image ? (
-            <img 
-              src={banner.image} 
-              alt={banner.name || 'Banner'} 
-              className="w-full h-full object-cover" 
-            />
-          ) : (
-            <div className="text-[10px] text-zinc-500 font-black uppercase">No Image</div>
-          )}
-        </div>
-
-        {/* Meta */}
-        <div className="p-1.5 bg-zinc-50 border-t border-zinc-100 flex justify-center items-center">
-          <span className="text-[9px] font-black text-neutral-900 uppercase tracking-widest bg-zinc-200 px-2 py-0.5 rounded-full">
-            {formatIndex(index)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---- Additional Components below ----
 
 interface ProductSearchDropdownProps {
   products: any[];
@@ -843,7 +949,6 @@ interface ProductSearchDropdownProps {
 const ProductSearchDropdown: React.FC<ProductSearchDropdownProps> = ({ products, value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -867,10 +972,10 @@ const ProductSearchDropdown: React.FC<ProductSearchDropdownProps> = ({ products,
     <div className="relative" ref={containerRef}>
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full border border-zinc-200 px-3 py-2.5 rounded-lg text-xs font-bold uppercase bg-white cursor-pointer h-11 flex justify-between items-center transition-colors hover:border-black"
+        className="w-full border border-zinc-200 px-3 py-2.5 rounded-none text-xs font-bold uppercase bg-zinc-50 cursor-pointer h-10 flex justify-between items-center transition-colors hover:border-black"
       >
         <span className="truncate pr-2">
-          {selectedProduct ? `${selectedProduct.name} (৳${selectedProduct.price})` : '-- Click to Preselect Product --'}
+          {selectedProduct ? `${selectedProduct.name} (৳${selectedProduct.price})` : '-- Select Connected Product --'}
         </span>
         <div className="flex items-center gap-1">
           {selectedProduct && (
@@ -880,10 +985,10 @@ const ProductSearchDropdown: React.FC<ProductSearchDropdownProps> = ({ products,
                 onChange('');
                 setQuery('');
               }}
-              className="p-1 hover:bg-zinc-100 rounded-full"
-              title="Clear Selection"
+              className="p-1 hover:bg-zinc-200"
+              title="Clear"
             >
-              <X className="w-3.5 h-3.5 text-zinc-500 hover:text-red-500" />
+              <X className="w-3.5 h-3.5 text-zinc-500" />
             </div>
           )}
           <span className="text-[10px] text-zinc-400">▼</span>
@@ -891,7 +996,7 @@ const ProductSearchDropdown: React.FC<ProductSearchDropdownProps> = ({ products,
       </div>
 
       {isOpen && (
-        <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-zinc-200 rounded-lg shadow-lg z-50 overflow-hidden">
+        <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-zinc-200 rounded-none shadow-lg z-50 overflow-hidden">
           <div className="p-2 border-b border-zinc-100 flex items-center gap-2 bg-zinc-50">
             <Search className="w-4 h-4 text-zinc-400" />
             <input 
@@ -903,7 +1008,7 @@ const ProductSearchDropdown: React.FC<ProductSearchDropdownProps> = ({ products,
               className="w-full bg-transparent text-xs outline-none uppercase font-bold"
             />
           </div>
-          <div className="max-h-60 overflow-y-auto">
+          <div className="max-h-52 overflow-y-auto">
             {filteredProducts.length > 0 ? (
               filteredProducts.map(p => (
                 <div 
@@ -913,16 +1018,16 @@ const ProductSearchDropdown: React.FC<ProductSearchDropdownProps> = ({ products,
                     setIsOpen(false);
                     setQuery('');
                   }}
-                  className={`p-3 text-xs cursor-pointer hover:bg-zinc-100 transition-colors uppercase font-bold flex items-center justify-between ${
+                  className={`p-2.5 text-xs cursor-pointer hover:bg-zinc-100 transition-colors uppercase font-bold flex items-center justify-between ${
                     value === p.id ? 'bg-zinc-100 border-l-2 border-black' : ''
                   }`}
                 >
-                  <span className="truncate pr-4">{p.name} <span className="text-zinc-500 font-mono text-[10px] ml-1">{p.sku && `[${p.sku}]`}</span></span>
+                  <span className="truncate pr-4">{p.name}</span>
                   <span className="text-emerald-600 font-black">৳{p.price}</span>
                 </div>
               ))
             ) : (
-              <div className="p-4 text-center text-xs text-zinc-500 uppercase font-bold">
+              <div className="p-3 text-center text-xs text-zinc-500 uppercase font-bold">
                 No Products Found
               </div>
             )}

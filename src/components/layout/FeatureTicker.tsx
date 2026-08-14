@@ -65,25 +65,6 @@ const featureMessages = [
 
 export function FeatureTicker() {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [themeMode, setThemeMode] = useState<'black' | 'white'>('white');
-
-  useEffect(() => {
-    themeSettingsService.getThemeMode().then((mode) => {
-      setThemeMode(mode === 'black' ? 'black' : 'white');
-    });
-
-    const handleThemeChange = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail) {
-        setThemeMode(customEvent.detail === 'black' ? 'black' : 'white');
-      }
-    };
-
-    window.addEventListener('tazu-theme-mode-changed', handleThemeChange);
-    return () => {
-      window.removeEventListener('tazu-theme-mode-changed', handleThemeChange);
-    };
-  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -93,18 +74,13 @@ export function FeatureTicker() {
     return () => clearInterval(timer);
   }, []);
 
-  const isDark = themeMode === 'black';
   const currentFeature = featureMessages[currentIndex];
   const IconComponent = currentFeature.icon;
 
   return (
     <div className="w-full mt-4 sm:mt-5 mb-4 sm:mb-5 px-4 sm:px-6 lg:px-8">
       <div 
-        className={`max-w-7xl mx-auto h-[48px] sm:h-[52px] rounded-xl border flex items-center justify-center overflow-hidden transition-colors duration-300 shadow-sm relative ${
-          isDark 
-            ? 'bg-[#0a0a0a] border-zinc-800 text-white' 
-            : 'bg-white border-zinc-200 text-zinc-900'
-        }`}
+        className="max-w-7xl mx-auto h-[48px] sm:h-[52px] rounded-xl border flex items-center justify-center overflow-hidden transition-colors duration-300 shadow-sm relative bg-white border-zinc-200 text-zinc-900"
       >
         <AnimatePresence mode="wait">
           <motion.div
@@ -115,10 +91,10 @@ export function FeatureTicker() {
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className="flex items-center justify-center gap-2.5 sm:gap-3 px-4 text-center select-none"
           >
-            <div className={`p-1.5 rounded-lg shrink-0 ${isDark ? 'bg-zinc-900/80' : 'bg-zinc-100/80'}`}>
+            <div className="p-1.5 rounded-lg shrink-0 bg-zinc-100/80">
               <IconComponent className={`w-4 h-4 sm:w-5 sm:h-5 ${currentFeature.iconColor}`} />
             </div>
-            <span className={`text-xs sm:text-sm font-semibold tracking-wide ${isDark ? 'text-zinc-100' : 'text-zinc-800'}`}>
+            <span className="text-xs sm:text-sm font-semibold tracking-wide text-zinc-800">
               {currentFeature.bnText}
             </span>
           </motion.div>
@@ -132,7 +108,7 @@ export function FeatureTicker() {
               className={`h-1.5 rounded-full transition-all duration-300 ${
                 idx === currentIndex 
                   ? 'w-4 bg-emerald-500 opacity-100' 
-                  : `w-1.5 ${isDark ? 'bg-zinc-700' : 'bg-zinc-300'}`
+                  : 'w-1.5 bg-zinc-300'
               }`}
             />
           ))}

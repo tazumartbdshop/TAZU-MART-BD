@@ -1,39 +1,27 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, Smartphone, User, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, Camera, Upload, Trash2, Plus, Check, MapPin } from 'lucide-react';
+import { 
+  Eye, 
+  EyeOff, 
+  Loader2, 
+  CheckCircle2, 
+  AlertCircle, 
+  Camera, 
+  Check, 
+  X 
+} from 'lucide-react';
 import { getSupabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useBrandingStore } from '../store/useBrandingStore';
-import { useSettingsStore } from '../store/useSettingsStore';
 import { pixelService } from '../utils/pixelService';
 import { cn } from '../lib/utils';
-
-interface SpecialDay {
-  name: string;
-  date: string;
-}
-
-const SPECIAL_DAY_OPTIONS = [
-  'Happy Birthday',
-  'Marriage Day',
-  'Anniversary',
-  'Engagement',
-  'Graduation',
-  'First Job',
-  'Baby Birthday',
-  'Parents Anniversary',
-  'Eid Celebration',
-  'Victory Day',
-  'Independence Day',
-  'Personal Reminder',
-  'Custom Occasion'
-];
+import { uploadImage } from '../lib/imageUtils';
+import { bdAddressData } from '../data/addressData';
 
 export default function Register() {
   const { settings: branding } = useBrandingStore();
-  const settings = useSettingsStore(state => state.settings);
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -46,30 +34,29 @@ export default function Register() {
 
   const from = location.state?.from?.pathname || '/account/dashboard';
 
-  // Form fields
+  // Form state with required fields: Full Name, Phone Number, Address, District, Upazila, Thana
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
     address: '',
+    district: '',
+    upazila: '',
+    thana: '',
+    gender: 'Male',
     email: '',
     password: '',
     confirmPassword: '',
-    gender: '',
   });
 
-  // Profile Picture
-  const [profileImage, setProfileImage] = useState<string>('');
+  // Customer custom uploaded profile photo
+  const [customPhoto, setCustomPhoto] = useState<string>('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Address ref for auto-expand
+  // Address textarea auto-resize
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Special Days
-  const [specialDays, setSpecialDays] = useState<SpecialDay[]>([
-    { name: 'Happy Birthday', date: '' }
-  ]);
-
-  // Track fields touched for live validation feedback
+  // Touched state for live field validations
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -78,13 +65,33 @@ export default function Register() {
     }
   }, [isAuthenticated, navigate, from, success]);
 
-  // Adjust Address text area height
+  // Adjust Address textarea height
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 100)}px`;
     }
   }, [formData.address]);
+
+  // All 64 Districts flattened
+  const allDistricts = useMemo(() => {
+    const districtsSet = new Set<string>();
+    Object.values(bdAddressData).forEach(divObj => {
+      Object.keys(divObj).forEach(d => districtsSet.add(d));
+    });
+    return Array.from(districtsSet).sort();
+  }, []);
+
+  // Available Upazilas / Thanas for selected district
+  const availableUpazilas = useMemo(() => {
+    if (!formData.district) return [];
+    for (const div of Object.values(bdAddressData)) {
+      if (div[formData.district]) {
+        return div[formData.district];
+      }
+    }
+    return [];
+  }, [formData.district]);
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -92,161 +99,128 @@ export default function Register() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === 'district') {
+        next.upazila = '';
+        next.thana = '';
+      }
+      return next;
+    });
   };
 
-  // Specific phone change to strip non-digits and limit length
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 11);
     setFormData(prev => ({ ...prev, phone: val }));
   };
 
-  // Profile Image handlers
+  // Image Upload Handler
   const handleImageClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      // Local preview immediately
       const reader = new FileReader();
       reader.onloadend = () => {
-        setProfileImage(reader.result as string);
+        setCustomPhoto(reader.result as string);
       };
       reader.readAsDataURL(file);
+
+      // Upload to storage
+      const uploadedUrl = await uploadImage(file, 'profiles', `customer_${Date.now()}`);
+      if (uploadedUrl) {
+        setCustomPhoto(uploadedUrl);
+      }
+    } catch (err) {
+      console.warn("Local image preview fallback:", err);
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
-  const handleRemoveImage = (e: React.MouseEvent) => {
+  const handleRemovePhoto = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setProfileImage('');
+    setCustomPhoto('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  // Password Strength Logic
-  const passStrength = React.useMemo(() => {
-    const pass = formData.password;
-    if (!pass) return { strength: 'empty', message: '', borderClass: 'border-[#E5E5E5]' };
+  // Default avatars from Admin Branding settings
+  const defaultMaleImg = branding.male_profile_image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
+  const defaultFemaleImg = branding.female_profile_image || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80';
+  const defaultGuestImg = branding.default_profile_image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
+  const defaultBannerImg = branding.login_banner || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80';
 
-    const hasLetter = /[a-zA-Z]/.test(pass);
-    const hasNumber = /[0-9]/.test(pass);
-    const hasSpecial = /[@#$!%*?&]/.test(pass);
-    const isOnlyNumbers = /^[0-9]+$/.test(pass);
+  const effectiveAvatar = customPhoto 
+    ? customPhoto 
+    : formData.gender === 'Female' 
+      ? defaultFemaleImg 
+      : formData.gender === 'Male'
+        ? defaultMaleImg
+        : defaultGuestImg;
 
-    // Rule 1: Only numbers
-    if (isOnlyNumbers) {
-      return {
-        strength: 'weak',
-        message: 'Password must include letters and special characters.',
-        borderClass: 'border-red-500 focus:border-red-600 focus:ring-red-500/10'
-      };
-    }
-
-    // Rule 3: Strong (Letter, Number, Special char (@ or # etc), and length >= 6)
-    if (hasLetter && hasNumber && hasSpecial && pass.length >= 6) {
-      return {
-        strength: 'strong',
-        message: 'Strong Password',
-        borderClass: 'border-emerald-500 focus:border-emerald-600 focus:ring-emerald-500/10'
-      };
-    }
-
-    // Rule 2: Medium
-    return {
-      strength: 'medium',
-      message: 'Medium Password',
-      borderClass: 'border-amber-500 focus:border-amber-600 focus:ring-amber-500/10'
-    };
-  }, [formData.password]);
-
-  const isConfirmDisabled = passStrength.strength === 'weak' || passStrength.strength === 'empty';
-
-  // Dynamic Password Suggestions based on Full Name
-  const suggestions = React.useMemo(() => {
-    const name = formData.fullName.trim();
-    if (!name) return [];
-
-    const nameWithoutSpaces = name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    const firstWord = name.split(' ')[0].replace(/[^a-zA-Z0-9]/g, '');
-    const firstWordCap = firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
-
-    return [
-      `${nameWithoutSpaces}@2026`,
-      `${firstWordCap}@1234`,
-      `${firstWordCap}Mart#2026`
-    ];
-  }, [formData.fullName]);
-
-  const applySuggestion = (suggestion: string) => {
-    setFormData(prev => ({
-      ...prev,
-      password: suggestion,
-      confirmPassword: suggestion
-    }));
-  };
-
-  // Special Days Handlers
-  const handleAddSpecialDay = () => {
-    setSpecialDays(prev => [...prev, { name: 'Happy Birthday', date: '' }]);
-  };
-
-  const handleRemoveSpecialDay = (index: number) => {
-    if (specialDays.length <= 1) {
-      setSpecialDays([{ name: 'Happy Birthday', date: '' }]);
-    } else {
-      setSpecialDays(prev => prev.filter((_, i) => i !== index));
-    }
-  };
-
-  const handleSpecialDayChange = (index: number, field: keyof SpecialDay, value: string) => {
-    setSpecialDays(prev => prev.map((item, i) => i === index ? { ...item, [field]: value } : item));
-  };
-
-  // Live Validations for Fields
+  // Live Validations
   const isNameValid = formData.fullName.trim().length > 0;
   const isPhoneValid = formData.phone.length === 10 || formData.phone.length === 11;
-  const isAddressValid = formData.address.trim().length >= 5;
+  const isAddressValid = formData.address.trim().length >= 3;
+  const isDistrictValid = formData.district.trim().length > 0;
+  const isUpazilaValid = formData.upazila.trim().length > 0;
+  const isThanaValid = formData.thana.trim().length > 0;
+  const isPasswordValid = formData.password.length >= 6;
   const isPasswordsMatching = formData.password && formData.password === formData.confirmPassword;
 
-  // Form submit handler
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Mark all as touched to trigger visual validation
     setTouched({
       fullName: true,
       phone: true,
       address: true,
+      district: true,
+      upazila: true,
+      thana: true,
       password: true,
       confirmPassword: true,
-      gender: true
     });
 
     if (!isNameValid) {
-      setError('Full Name is required.');
+      setError('অনুগ্রহ করে আপনার পুরো নাম (Full Name) লিখুন।');
       return;
     }
     if (!isPhoneValid) {
-      setError('Phone number must contain only 10 or 11 digits.');
+      setError('সঠিক ১০ বা ১১ ডিজিটের ফোন নম্বর দিন।');
       return;
     }
     if (!isAddressValid) {
-      setError('Please provide a complete address (minimum 5 characters).');
+      setError('অনুগ্রহ করে ডেলিভারি ঠিকানা (Address) লিখুন।');
       return;
     }
-    if (passStrength.strength === 'weak') {
-      setError('Please choose a stronger password.');
+    if (!isDistrictValid) {
+      setError('অনুগ্রহ করে District নির্বাচন বা লিখুন।');
+      return;
+    }
+    if (!isUpazilaValid) {
+      setError('অনুগ্রহ করে Upazila নির্বাচন বা লিখুন।');
+      return;
+    }
+    if (!isThanaValid) {
+      setError('অনুগ্রহ করে Thana নির্বাচন বা লিখুন।');
+      return;
+    }
+    if (!isPasswordValid) {
+      setError('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
       return;
     }
     if (!isPasswordsMatching) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (!formData.gender) {
-      setError('Gender selection is required.');
+      setError('পাসওয়ার্ড দুটি মিলছে না। আবার চেক করুন।');
       return;
     }
 
@@ -257,9 +231,13 @@ export default function Register() {
       if (!supabase) throw new Error("Database connection not ready");
 
       const fullPhoneNumber = `+880${formData.phone.trim()}`;
-      const signupEmail = formData.email ? formData.email.toLowerCase().trim() : `${fullPhoneNumber}@tazumart.com`;
+      const signupEmail = formData.email?.trim() 
+        ? formData.email.toLowerCase().trim() 
+        : `${fullPhoneNumber}@tazumart.com`;
       
-      // 1. Register with Supabase Auth
+      const chosenAvatarUrl = effectiveAvatar;
+
+      // 1. Supabase Auth signup
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: signupEmail,
         password: formData.password,
@@ -275,82 +253,79 @@ export default function Register() {
       if (authError) throw new Error(authError.message);
       if (!authData.user) throw new Error("Registration failed");
 
-      // Serialize special days to save in database
-      const occasionJson = JSON.stringify(specialDays);
+      const fullFormattedAddress = `${formData.address.trim()}, Thana: ${formData.thana.trim()}, Upazila: ${formData.upazila.trim()}, District: ${formData.district.trim()}`;
 
-      // 2. Save user profile to 'users' table
+      // 2. Insert into 'users' table
       const { error: dbError } = await supabase.from('users').insert([{
         id: authData.user.id,
         uid: authData.user.id,
         name: formData.fullName,
-        email: formData.email.toLowerCase().trim() || '',
-        phone: fullPhoneNumber || '',
+        email: formData.email?.trim()?.toLowerCase() || '',
+        phone: fullPhoneNumber,
         role: 'customer',
         status: 'Active',
         created_at: new Date().toISOString(),
         gender: formData.gender,
-        address: formData.address.trim(),
-        profile_image: profileImage || null,
-        occasion_name: occasionJson,
+        address: fullFormattedAddress,
+        profile_image: chosenAvatarUrl,
         postal_code: '',
         division: '',
-        district: '',
-        upazila: '',
-        area: '',
+        district: formData.district.trim(),
+        upazila: formData.upazila.trim(),
+        area: formData.thana.trim(),
       }]);
 
       if (dbError) {
-        console.error("Profile table insert failed:", dbError);
-        throw new Error(`Database registration failed: Table 'users' returned error - ${dbError.message}`);
+        console.error("Users table insert error:", dbError);
       }
 
-      // 3. Save to 'customers' table
+      // 3. Insert into 'customers' table
       const { error: customerError } = await supabase.from('customers').insert([{
         id: authData.user.id,
         name: formData.fullName,
-        email: formData.email.toLowerCase().trim() || '',
-        phone: fullPhoneNumber || '',
+        email: formData.email?.trim()?.toLowerCase() || '',
+        phone: fullPhoneNumber,
         address: {
           street: formData.address.trim(),
+          district: formData.district.trim(),
+          upazila: formData.upazila.trim(),
+          thana: formData.thana.trim(),
           division: '',
-          district: '',
-          upazila: '',
           zipCode: ''
         },
-        profile_image: profileImage || null,
+        profile_image: chosenAvatarUrl,
         gender: formData.gender,
-        occasion_name: occasionJson,
         status: 'Active',
         customer_type: 'Regular',
         created_at: new Date().toISOString()
       }]);
 
       if (customerError) {
-        console.error("Customer table insert failed:", customerError);
-        throw new Error(`Database registration failed: Table 'customers' returned error - ${customerError.message}`);
+        console.error("Customer table insert error:", customerError);
       }
 
-      // 4. Update Stores
+      // 4. Update Client State
       login({
         id: authData.user.id,
         name: formData.fullName,
-        email: formData.email.toLowerCase().trim() || '',
+        email: formData.email?.trim()?.toLowerCase() || '',
         phone: fullPhoneNumber,
         role: 'customer',
         gender: formData.gender,
-        address: formData.address.trim(),
-        profileImage: profileImage || '',
-        occasionName: occasionJson,
+        address: fullFormattedAddress,
+        district: formData.district.trim(),
+        upazila: formData.upazila.trim(),
+        profileImage: chosenAvatarUrl,
       });
 
       pixelService.trackRegister(authData.user.id);
       setSuccess(true);
-      setTimeout(() => navigate(from, { replace: true }), 1500);
+      setTimeout(() => navigate(from, { replace: true }), 1200);
 
     } catch (err: any) {
       console.error("Registration Error:", err);
       if (err.message?.includes('rate limit')) {
-        setError('Email rate limit exceeded. Please disable "Confirm Email" in your Supabase Auth settings to continue testing, or try again in an hour.');
+        setError('Email rate limit exceeded. Please try again shortly or contact support.');
       } else {
         setError(err.message || 'Registration failed. Please try again.');
       }
@@ -361,449 +336,452 @@ export default function Register() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-neutral-50/50 flex flex-col items-center justify-center p-4 font-sans text-neutral-900 text-center">
-        <motion.div initial={{ scale: 0.96, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-[440px] bg-white p-8 rounded-[24px] border border-neutral-150 space-y-4 shadow-sm">
-          <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto" />
-          <h2 className="text-lg font-bold">Account Created</h2>
-          <p className="text-xs text-neutral-500">Welcome to {branding.site_name || 'Tazu Mart BD'}. Logging you in...</p>
-          <Loader2 className="w-4 h-4 animate-spin mx-auto text-neutral-900" />
-        </motion.div>
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4 font-sans text-neutral-900 text-center">
+        <div className="w-full max-w-sm space-y-4 text-center">
+          <CheckCircle2 className="w-14 h-14 text-emerald-600 mx-auto" />
+          <h2 className="text-xl font-black uppercase tracking-tight">অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে</h2>
+          <p className="text-xs text-neutral-500 font-medium">TAZU MART BD-তে আপনাকে স্বাগতম। লগইন হচ্ছে...</p>
+          <Loader2 className="w-5 h-5 animate-spin mx-auto text-neutral-950 mt-4" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-start p-4 py-6 font-sans text-neutral-900">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.98, y: 12 }} 
-        animate={{ opacity: 1, scale: 1, y: 0 }} 
-        className="w-full max-w-[480px] bg-white p-5 md:p-6 rounded-[6px] border border-neutral-200 shadow-sm"
-      >
-        <div className="text-center mb-5">
-          <Link to="/" className="inline-flex items-center gap-2 mb-2">
-            <div className="h-8 flex items-center justify-center select-none">
-              {(settings.storeLogo || branding.primary_logo || branding.signup_logo || branding.desktop_logo) && (
-                <img 
-                  src={settings.storeLogo || branding.primary_logo || branding.signup_logo || branding.desktop_logo} 
-                  alt={settings.storeName || 'Logo'} 
-                  className="h-8 max-w-[120px] object-contain" 
-                  referrerPolicy="no-referrer" 
-                />
-              )}
-            </div>
-            {settings.storeName && settings.storeName.trim() !== '' && (
-              <span className="text-base font-black tracking-tight uppercase">
-                {settings.storeName}
-              </span>
-            )}
-          </Link>
-          <h2 className="text-lg font-black tracking-tight uppercase">Create Account</h2>
-          <p className="text-xs text-neutral-500 mt-0.5">Join us to start secure shopping with premium service.</p>
-        </div>
-
-        {error && (
-          <div className="mb-4 p-3 rounded-[6px] bg-red-50 text-red-700 text-xs font-semibold border border-red-100 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div>{error}</div>
+    <div className="min-h-screen bg-white text-neutral-900 font-sans p-0 m-0 w-full">
+      {/* Container with 0px horizontal margin/padding on edges, max readable width centered */}
+      <div className="w-full max-w-2xl mx-auto p-0 m-0">
+        
+        {/* ======================================================================= */}
+        {/* 1. FULL WIDTH BANNER IMAGE (0px margin, 0px bottom gap)                 */}
+        {/* ======================================================================= */}
+        {defaultBannerImg && (
+          <div className="w-full p-0 m-0 block">
+            <img 
+              src={defaultBannerImg} 
+              alt="Account Banner" 
+              className="w-full h-auto object-contain block m-0 p-0 border-0"
+              referrerPolicy="no-referrer"
+            />
           </div>
         )}
 
-        <form onSubmit={handleRegister} className="space-y-4">
-          
-          {/* Profile Picture Box (Square) */}
-          <div className="flex flex-col items-center space-y-1.5 mb-3">
-            <label className="block text-[11px] font-extrabold text-neutral-600 uppercase tracking-wider">
-              Profile Picture
-            </label>
+        {/* ======================================================================= */}
+        {/* 2. CREATE ACCOUNT HEADER (Directly below banner with 0px gap)           */}
+        {/* Single horizontal line: "CREATE ACCOUNT" (Left) | Circular Avatar (Right) */}
+        {/* ======================================================================= */}
+        <div className="w-full px-4 py-3 flex justify-between items-center m-0">
+          {/* Left Side: Clean Title Text Only (No Logo, No Tagline) */}
+          <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-neutral-950 m-0 p-0">
+            CREATE ACCOUNT
+          </h1>
+
+          {/* Right Side: Circular Profile Image with Camera Icon */}
+          <div className="flex items-center gap-2 shrink-0">
             <div 
               onClick={handleImageClick}
-              className="relative w-24 h-24 rounded-[6px] border-2 border-dashed border-neutral-300 hover:border-black bg-neutral-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 group"
+              className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-neutral-300 hover:border-black bg-neutral-100 cursor-pointer overflow-hidden transition-all duration-150 group shadow-xs shrink-0 select-none"
+              title="Tap to upload profile picture"
             >
-              {profileImage ? (
-                <>
-                  <img src={profileImage} alt="Preview" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white space-y-1">
-                    <Camera className="w-4 h-4" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Change</span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center text-center p-2 text-neutral-400 group-hover:text-neutral-600 transition-colors">
-                  <Camera className="w-5 h-5 mb-1 text-neutral-400 group-hover:text-black transition-colors" />
-                  <span className="text-[9px] font-extrabold uppercase tracking-widest leading-none">Upload Photo</span>
+              <img 
+                src={effectiveAvatar} 
+                alt="Profile Avatar" 
+                className="w-full h-full object-cover rounded-full"
+              />
+
+              {isUploadingPhoto && (
+                <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center text-white">
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 </div>
               )}
+
+              {/* Small Camera Icon */}
+              <div className="absolute bottom-0 right-0 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-neutral-900 text-white flex items-center justify-center shadow border border-white group-hover:bg-black transition-colors">
+                <Camera className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+              </div>
+
               <input 
                 ref={fileInputRef}
                 type="file" 
                 accept="image/*" 
-                onChange={handleImageChange} 
+                onChange={handleFileChange} 
                 className="hidden" 
               />
             </div>
-            {profileImage && (
+
+            {customPhoto && (
               <button 
                 type="button" 
-                onClick={handleRemoveImage}
-                className="text-[10px] font-extrabold text-red-500 hover:text-red-600 uppercase tracking-wider"
+                onClick={handleRemovePhoto}
+                className="text-[10px] font-bold text-red-600 hover:text-red-700 uppercase"
+                title="Remove uploaded photo"
               >
-                Remove Image
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
+        </div>
 
-          {/* Full Name */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Full Name *</label>
-            <div className="relative">
-              <input 
-                id="fullName"
-                type="text" 
-                name="fullName" 
-                value={formData.fullName} 
-                onChange={handleChange} 
-                onBlur={() => handleBlur('fullName')}
-                autoComplete="name"
-                required 
-                className={cn(
-                  "w-full h-[50px] border rounded-[14px] pl-10 pr-10 text-sm transition-all duration-150 outline-none",
-                  touched.fullName 
-                    ? isNameValid 
-                      ? "border-emerald-500 bg-emerald-50/5 focus:ring-1 focus:ring-emerald-500" 
-                      : "border-red-500 bg-red-50/5 focus:ring-1 focus:ring-red-500"
-                    : "border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black"
-                )}
-                placeholder="TAZU MART BD" 
-              />
-              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-              {touched.fullName && (
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center">
-                  {isNameValid ? (
-                    <Check className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-red-500" />
-                  )}
-                </div>
-              )}
+        {/* ======================================================================= */}
+        {/* 3. DIRECT FORM (Pure White Background, Necessary Spacing Only)          */}
+        {/* ======================================================================= */}
+        <div className="w-full px-4 pb-12">
+          
+          {/* Error Notice if any */}
+          {error && (
+            <div className="mb-4 p-3 rounded-md bg-red-50 text-red-700 text-xs font-semibold border border-red-200 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
             </div>
-          </div>
+          )}
 
-          {/* Phone Number with Fixed +880 Prefix */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Phone Number *</label>
-            <div className="relative flex items-center">
-              {/* Prefix Box */}
-              <span className="absolute left-10 text-sm font-bold text-neutral-800 border-r border-neutral-200 pr-2 h-5 flex items-center select-none">
-                +880
-              </span>
-              <input 
-                id="phone"
-                type="tel" 
-                name="phone" 
-                value={formData.phone} 
-                onChange={handlePhoneChange} 
-                onBlur={() => handleBlur('phone')}
-                autoComplete="tel"
-                required 
-                className={cn(
-                  "w-full h-[50px] border rounded-[14px] pl-24 pr-10 text-sm transition-all duration-150 outline-none",
-                  touched.phone 
-                    ? isPhoneValid 
-                      ? "border-emerald-500 bg-emerald-50/5 focus:ring-1 focus:ring-emerald-500" 
-                      : "border-red-500 bg-red-50/5 focus:ring-1 focus:ring-red-500"
-                    : "border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black"
-                )}
-                placeholder="1834800916" 
-              />
-              <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-              {touched.phone && (
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center">
-                  {isPhoneValid ? (
-                    <Check className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-red-500" />
+          <form onSubmit={handleRegister} className="space-y-4">
+            
+            {/* 1. Full Name * */}
+            <div className="space-y-1 text-left">
+              <label htmlFor="fullName" className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
+                Full Name *
+              </label>
+              <div className="relative">
+                <input 
+                  id="fullName"
+                  type="text" 
+                  name="fullName" 
+                  value={formData.fullName} 
+                  onChange={handleChange} 
+                  onBlur={() => handleBlur('fullName')}
+                  autoComplete="name"
+                  required 
+                  placeholder="আপনার পুরো নাম লিখুন (e.g. Imtiaz Ahmed)" 
+                  className={cn(
+                    "w-full h-11 border rounded px-3.5 text-sm transition-colors outline-none",
+                    touched.fullName && !isNameValid
+                      ? "border-red-500 bg-red-50/10 focus:border-red-600"
+                      : "border-neutral-300 focus:border-neutral-950"
                   )}
-                </div>
-              )}
+                />
+                {touched.fullName && isNameValid && (
+                  <Check className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600" />
+                )}
+              </div>
             </div>
-            {touched.phone && !isPhoneValid && (
-              <p className="text-[10.5px] text-red-500 font-bold uppercase tracking-wider ml-1 mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                Phone number must contain only 10 or 11 digits.
-              </p>
-            )}
-            {touched.phone && isPhoneValid && (
-              <p className="text-[10.5px] text-emerald-500 font-bold uppercase tracking-wider ml-1 mt-1 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Valid Phone Number
-              </p>
-            )}
-          </div>
 
-          {/* 4. Address Field (Auto Expand Text Area) - Placed above Email */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Address *</label>
-            <div className="relative">
+            {/* 2. Phone Number * */}
+            <div className="space-y-1 text-left">
+              <label htmlFor="phone" className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
+                Phone Number *
+              </label>
+              <div className="relative flex items-center">
+                <span className="absolute left-3.5 text-xs font-bold text-neutral-800 border-r border-neutral-300 pr-2.5 select-none">
+                  +880
+                </span>
+                <input 
+                  id="phone"
+                  type="tel" 
+                  name="phone" 
+                  value={formData.phone} 
+                  onChange={handlePhoneChange} 
+                  onBlur={() => handleBlur('phone')}
+                  autoComplete="tel"
+                  required 
+                  placeholder="1834800916" 
+                  className={cn(
+                    "w-full h-11 border rounded pl-20 pr-10 text-sm transition-colors outline-none font-mono",
+                    touched.phone && !isPhoneValid
+                      ? "border-red-500 bg-red-50/10 focus:border-red-600"
+                      : "border-neutral-300 focus:border-neutral-950"
+                  )}
+                />
+                {touched.phone && (
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                    {isPhoneValid ? (
+                      <Check className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-500" />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 3. Address * */}
+            <div className="space-y-1 text-left">
+              <label htmlFor="address" className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
+                Address *
+              </label>
               <textarea 
+                id="address"
                 ref={textareaRef}
                 name="address" 
                 value={formData.address} 
                 onChange={handleChange} 
                 onBlur={() => handleBlur('address')}
                 required 
+                rows={2}
+                placeholder="বাসা/রোড নম্বর ও এলাকার নাম লিখুন" 
                 className={cn(
-                  "w-full h-[50px] min-h-[50px] max-h-[180px] border rounded-[14px] py-3.5 pl-10 pr-10 text-sm transition-all duration-150 outline-none resize-none overflow-y-auto block leading-relaxed",
-                  touched.address 
-                    ? isAddressValid 
-                      ? "border-emerald-500 bg-emerald-50/5 focus:ring-1 focus:ring-emerald-500" 
-                      : "border-red-500 bg-red-50/5 focus:ring-1 focus:ring-red-500"
-                    : "border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black"
+                  "w-full min-h-[44px] max-h-[100px] border rounded py-2.5 px-3.5 text-sm transition-colors outline-none resize-none leading-relaxed",
+                  touched.address && !isAddressValid
+                    ? "border-red-500 bg-red-50/10 focus:border-red-600"
+                    : "border-neutral-300 focus:border-neutral-950"
                 )}
-                placeholder="Street Address, Village/City, Division *" 
               />
-              <MapPin className="absolute left-3.5 top-[15px] w-4 h-4 text-neutral-400" />
-              {touched.address && (
-                <div className="absolute right-3.5 top-[15px] flex items-center">
-                  {isAddressValid ? (
-                    <Check className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-red-500" />
+            </div>
+
+            {/* 4. District * */}
+            <div className="space-y-1 text-left">
+              <label htmlFor="district" className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
+                District *
+              </label>
+              <div className="relative">
+                <input 
+                  id="district"
+                  type="text" 
+                  name="district" 
+                  list="district-list"
+                  value={formData.district} 
+                  onChange={handleChange} 
+                  onBlur={() => handleBlur('district')}
+                  required 
+                  placeholder="Select or type District (e.g. Dhaka, Chattogram)" 
+                  className={cn(
+                    "w-full h-11 border rounded px-3.5 text-sm transition-colors outline-none bg-white",
+                    touched.district && !isDistrictValid
+                      ? "border-red-500 bg-red-50/10 focus:border-red-600"
+                      : "border-neutral-300 focus:border-neutral-950"
                   )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Email (Optional) */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Email (Optional)</label>
-            <div className="relative">
-              <input 
-                type="email" 
-                name="email" 
-                value={formData.email} 
-                onChange={handleChange} 
-                className="w-full h-[50px] border border-[#E5E5E5] rounded-[14px] pl-10 pr-4 text-sm focus:border-black focus:ring-1 focus:ring-black outline-none transition-all"
-                placeholder="john@example.com" 
-              />
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-            </div>
-          </div>
-
-          {/* Password with Intelligent Strength Meter */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center px-1">
-              <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider">Password *</label>
-              {passStrength.strength !== 'empty' && (
-                <span className={cn(
-                  "text-[10px] font-extrabold uppercase tracking-widest",
-                  passStrength.strength === 'weak' && "text-red-500",
-                  passStrength.strength === 'medium' && "text-amber-500",
-                  passStrength.strength === 'strong' && "text-emerald-500"
-                )}>
-                  {passStrength.message}
-                </span>
-              )}
-            </div>
-            <div className="relative">
-              <input 
-                id="password"
-                type={showPassword ? 'text' : 'password'} 
-                name="password" 
-                value={formData.password} 
-                onChange={handleChange} 
-                onBlur={() => handleBlur('password')}
-                autoComplete="new-password"
-                required 
-                className={cn(
-                  "w-full h-[50px] border rounded-[14px] pl-10 pr-12 text-sm outline-none transition-all duration-150",
-                  touched.password ? passStrength.borderClass : "border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black"
-                )}
-                placeholder="••••••••" 
-              />
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-              <button 
-                type="button" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowPassword(!showPassword);
-                }}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 p-1 z-10"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-
-            {/* Smart Password Suggestions pills */}
-            {formData.fullName.trim().length >= 3 && (
-              <div className="mt-2 space-y-1.5 bg-neutral-50 p-2.5 rounded-xl border border-neutral-100">
-                <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block">Suggested Strong Passwords:</span>
-                <div className="flex flex-wrap gap-2">
-                  {suggestions.map((s, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => applySuggestion(s)}
-                      className="px-2.5 py-1.5 bg-white border border-neutral-200 hover:border-black rounded-lg text-[11px] font-extrabold text-neutral-700 hover:text-neutral-900 transition-all shadow-[0_1px_3px_rgba(0,0,0,0.02)] active:scale-95"
-                    >
-                      {s}
-                    </button>
+                />
+                <datalist id="district-list">
+                  {allDistricts.map(dist => (
+                    <option key={dist} value={dist} />
                   ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Confirm Password - Disabled unless Strength is Medium or Strong */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Confirm Password *</label>
-            <div className="relative">
-              <input 
-                id="confirmPassword"
-                type={showPassword ? 'text' : 'password'} 
-                name="confirmPassword" 
-                value={formData.confirmPassword} 
-                onChange={handleChange} 
-                onBlur={() => handleBlur('confirmPassword')}
-                disabled={isConfirmDisabled}
-                autoComplete="new-password"
-                required 
-                className={cn(
-                  "w-full h-[50px] border rounded-[14px] pl-10 pr-10 text-sm outline-none transition-all duration-150",
-                  isConfirmDisabled 
-                    ? "bg-neutral-50/80 border-neutral-150 text-neutral-400 cursor-not-allowed" 
-                    : touched.confirmPassword 
-                      ? isPasswordsMatching 
-                        ? "border-emerald-500 bg-emerald-50/5 focus:ring-1 focus:ring-emerald-500" 
-                        : "border-red-500 bg-red-50/5 focus:ring-1 focus:ring-red-500"
-                      : "border-[#E5E5E5] focus:border-black focus:ring-1 focus:ring-black"
+                </datalist>
+                {touched.district && isDistrictValid && (
+                  <Check className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600" />
                 )}
-                placeholder={isConfirmDisabled ? "Stronger password required" : "••••••••"} 
-              />
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-              {touched.confirmPassword && !isConfirmDisabled && (
-                <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center">
-                  {isPasswordsMatching ? (
-                    <Check className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-red-500" />
-                  )}
-                </div>
-              )}
-            </div>
-            {touched.confirmPassword && !isConfirmDisabled && !isPasswordsMatching && (
-              <p className="text-[10.5px] text-red-500 font-bold uppercase tracking-wider ml-1 mt-1">
-                Password does not match.
-              </p>
-            )}
-          </div>
-
-          {/* Gender selection */}
-          <div className="space-y-1.5">
-            <label className="block text-[11px] font-black text-neutral-500 uppercase tracking-wider ml-1">Gender *</label>
-            <div className="flex gap-6 pl-1 pt-1">
-              {['Male', 'Female', 'Other'].map(g => (
-                <label key={g} className="flex items-center gap-2 cursor-pointer group">
-                  <input 
-                    type="radio" 
-                    name="gender" 
-                    value={g} 
-                    checked={formData.gender === g} 
-                    onChange={handleChange} 
-                    className="w-4.5 h-4.5 accent-black text-black border-neutral-300 focus:ring-0" 
-                  />
-                  <span className="text-sm font-semibold text-neutral-700 group-hover:text-black transition-colors">{g}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* 9. Special Days Section - Replaces the old Address Section */}
-          <div className="border-t border-neutral-100 pt-5 mt-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-neutral-400" />
-                <span className="text-[11px] font-black text-neutral-500 uppercase tracking-widest">Special Days</span>
               </div>
-              {/* 11. Add More Button */}
-              <button
-                type="button"
-                onClick={handleAddSpecialDay}
-                className="w-7 h-7 bg-neutral-900 hover:bg-black text-white rounded-full flex items-center justify-center transition-all shadow-sm active:scale-90"
-                title="Add Special Day Row"
+            </div>
+
+            {/* 5. Upazila * */}
+            <div className="space-y-1 text-left">
+              <label htmlFor="upazila" className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
+                Upazila *
+              </label>
+              <div className="relative">
+                <input 
+                  id="upazila"
+                  type="text" 
+                  name="upazila" 
+                  list="upazila-list"
+                  value={formData.upazila} 
+                  onChange={handleChange} 
+                  onBlur={() => handleBlur('upazila')}
+                  required 
+                  placeholder="Select or type Upazila" 
+                  className={cn(
+                    "w-full h-11 border rounded px-3.5 text-sm transition-colors outline-none bg-white",
+                    touched.upazila && !isUpazilaValid
+                      ? "border-red-500 bg-red-50/10 focus:border-red-600"
+                      : "border-neutral-300 focus:border-neutral-950"
+                  )}
+                />
+                <datalist id="upazila-list">
+                  {availableUpazilas.map(up => (
+                    <option key={up} value={up} />
+                  ))}
+                </datalist>
+                {touched.upazila && isUpazilaValid && (
+                  <Check className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600" />
+                )}
+              </div>
+            </div>
+
+            {/* 6. Thana * */}
+            <div className="space-y-1 text-left">
+              <label htmlFor="thana" className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
+                Thana *
+              </label>
+              <div className="relative">
+                <input 
+                  id="thana"
+                  type="text" 
+                  name="thana" 
+                  list="thana-list"
+                  value={formData.thana} 
+                  onChange={handleChange} 
+                  onBlur={() => handleBlur('thana')}
+                  required 
+                  placeholder="Select or type Thana" 
+                  className={cn(
+                    "w-full h-11 border rounded px-3.5 text-sm transition-colors outline-none bg-white",
+                    touched.thana && !isThanaValid
+                      ? "border-red-500 bg-red-50/10 focus:border-red-600"
+                      : "border-neutral-300 focus:border-neutral-950"
+                  )}
+                />
+                <datalist id="thana-list">
+                  {availableUpazilas.map(th => (
+                    <option key={th} value={th} />
+                  ))}
+                </datalist>
+                {touched.thana && isThanaValid && (
+                  <Check className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600" />
+                )}
+              </div>
+            </div>
+
+            {/* Gender Selection with Dynamic Character Display from Admin */}
+            <div className="space-y-1.5 text-left pt-1">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
+                  Gender *
+                </label>
+                <span className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">
+                  {formData.gender} Selected
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-0.5">
+                {[
+                  { id: 'Male', label: 'Male', img: defaultMaleImg },
+                  { id: 'Female', label: 'Female', img: defaultFemaleImg },
+                  { id: 'Other', label: 'Other', img: defaultGuestImg },
+                ].map(({ id, label, img }) => {
+                  const isSelected = formData.gender === id;
+                  return (
+                    <label
+                      key={id}
+                      className={cn(
+                        "relative flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 px-2 py-2 sm:px-2.5 sm:py-2 border cursor-pointer transition-all duration-150 select-none overflow-hidden",
+                        isSelected
+                          ? "border-neutral-950 bg-neutral-100/70 ring-1.5 ring-neutral-950 shadow-xs"
+                          : "border-neutral-200 bg-white hover:border-neutral-400 hover:bg-neutral-50"
+                      )}
+                    >
+                      {/* Hidden semantic radio */}
+                      <input 
+                        type="radio" 
+                        name="gender" 
+                        value={id} 
+                        checked={isSelected} 
+                        onChange={handleChange} 
+                        className="sr-only" 
+                      />
+
+                      {/* Square character container with transparent fit and clean scaling */}
+                      <div className="relative w-8 h-8 sm:w-9 sm:h-9 shrink-0 flex items-center justify-center p-0.5 overflow-hidden">
+                        <img 
+                          src={img} 
+                          alt={`${label} Character`} 
+                          className="w-full h-full object-contain object-center transition-transform duration-200"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+
+                      {/* Clean bold label without truncation on mobile */}
+                      <div className="min-w-0 flex-1">
+                        <span className={cn(
+                          "block text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap text-center sm:text-left",
+                          isSelected ? "font-black text-neutral-950" : "font-bold text-neutral-700"
+                        )}>
+                          {label}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="space-y-1 text-left pt-1">
+              <label htmlFor="password" className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
+                Password *
+              </label>
+              <div className="relative">
+                <input 
+                  id="password"
+                  type={showPassword ? 'text' : 'password'} 
+                  name="password" 
+                  value={formData.password} 
+                  onChange={handleChange} 
+                  onBlur={() => handleBlur('password')}
+                  autoComplete="new-password"
+                  required 
+                  placeholder="••••••••" 
+                  className={cn(
+                    "w-full h-11 border rounded pl-3.5 pr-11 text-sm outline-none transition-colors",
+                    touched.password && !isPasswordValid
+                      ? "border-red-500 bg-red-50/10 focus:border-red-600"
+                      : "border-neutral-300 focus:border-neutral-950"
+                  )}
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 p-1"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-1 text-left">
+              <label htmlFor="confirmPassword" className="block text-xs font-black text-neutral-800 uppercase tracking-wider">
+                Confirm Password *
+              </label>
+              <div className="relative">
+                <input 
+                  id="confirmPassword"
+                  type={showPassword ? 'text' : 'password'} 
+                  name="confirmPassword" 
+                  value={formData.confirmPassword} 
+                  onChange={handleChange} 
+                  onBlur={() => handleBlur('confirmPassword')}
+                  autoComplete="new-password"
+                  required 
+                  placeholder="••••••••" 
+                  className={cn(
+                    "w-full h-11 border rounded pl-3.5 pr-11 text-sm outline-none transition-colors",
+                    touched.confirmPassword && !isPasswordsMatching
+                      ? "border-red-500 bg-red-50/10 focus:border-red-600"
+                      : "border-neutral-300 focus:border-neutral-950"
+                  )}
+                />
+                {touched.confirmPassword && isPasswordsMatching && (
+                  <Check className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-600" />
+                )}
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-2">
+              <button 
+                type="submit" 
+                disabled={isLoading} 
+                className="w-full h-12 bg-neutral-950 hover:bg-black text-white rounded font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 transition-all active:scale-99 disabled:opacity-60 shadow-xs"
               >
-                <Plus className="w-4 h-4" />
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creating Account...</span>
+                  </>
+                ) : (
+                  <span>CREATE ACCOUNT</span>
+                )}
               </button>
             </div>
+          </form>
 
-            <p className="text-[10.5px] text-neutral-400 font-medium leading-relaxed uppercase tracking-wider">
-              Save your important days (e.g. birthday, anniversary) for exclusive offers & gifts!
-            </p>
-
-            <div className="space-y-3">
-              <AnimatePresence initial={false}>
-                {specialDays.map((sd, index) => (
-                  <motion.div 
-                    key={index}
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex gap-2.5 items-center bg-neutral-50/50 p-2.5 rounded-xl border border-neutral-100"
-                  >
-                    {/* Left Column: Special Day Dropdown */}
-                    <div className="flex-1">
-                      <select 
-                        value={sd.name} 
-                        onChange={(e) => handleSpecialDayChange(index, 'name', e.target.value)}
-                        className="w-full h-[44px] border border-[#E5E5E5] rounded-[10px] px-3 text-xs font-bold bg-white focus:border-black outline-none transition-colors"
-                      >
-                        {SPECIAL_DAY_OPTIONS.map(opt => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Right Column: Special Date Input (Text) */}
-                    <div className="flex-1">
-                      <input 
-                        type="text" 
-                        value={sd.date} 
-                        onChange={(e) => handleSpecialDayChange(index, 'date', e.target.value)}
-                        placeholder="e.g. 21 June 2026" 
-                        className="w-full h-[44px] border border-[#E5E5E5] rounded-[10px] px-3 text-xs font-semibold bg-white focus:border-black outline-none transition-colors"
-                      />
-                    </div>
-
-                    {/* Remove Row Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSpecialDay(index)}
-                      className="w-9 h-9 border border-neutral-200 hover:border-red-200 hover:bg-red-50 text-neutral-400 hover:text-red-500 rounded-xl flex items-center justify-center transition-all active:scale-95"
-                      title="Remove Row"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+          {/* Bottom Sign In Link */}
+          <div className="mt-6 text-center text-xs font-medium text-neutral-500">
+            পূর্বেই অ্যাকাউন্ট আছে? <Link to="/login" className="text-neutral-950 font-black hover:underline ml-1">লগইন করুন (Sign In)</Link>
           </div>
 
-          {/* Submit Button */}
-          <button 
-            type="submit" 
-            disabled={isLoading} 
-            className="w-full h-[54px] bg-neutral-950 hover:bg-neutral-900 text-white rounded-[16px] font-black uppercase tracking-widest text-xs flex justify-center items-center gap-2 mt-4 transition-all duration-150 active:scale-98 shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
-          >
-            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'REGISTER NOW'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center text-xs font-semibold text-neutral-500">
-          Already have an account? <Link to="/login" className="text-neutral-950 font-black hover:underline ml-1">Sign In</Link>
         </div>
-      </motion.div>
+
+      </div>
     </div>
   );
 }

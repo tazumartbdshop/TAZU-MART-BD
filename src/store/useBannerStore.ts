@@ -22,7 +22,10 @@ export interface Banner {
   ctaLink?: string;
   status: 'active' | 'draft' | 'hidden';
   order: number;
-  bannerType?: 'uploaded' | 'designed';
+  bannerType?: 'main_banner' | 'login_banner' | 'uploaded' | 'designed' | string;
+  bannerCategory?: 'main_banner' | 'login_banner' | 'main' | 'login' | 'custom' | string;
+  mediaType?: 'banner' | 'character';
+  characterRole?: 'male' | 'female' | 'guest';
   offerText?: string;
   discountText?: string;
   backgroundColor?: string;
@@ -119,18 +122,63 @@ export const useBannerStore = create<BannerState>((set, get) => ({
         return () => {};
     }
 
-    supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-        if (!error && data) {
-          const mapped = (data as any[]).map(row => objectToCamel(row)) as Banner[];
-          set({ banners: mapped, isLoaded: true });
-          saveCachedBanners(mapped);
-        } else {
-          set({ isLoaded: true });
-        }
+    const mapRowToBanner = (row: any): Banner => {
+      const item = objectToCamel(row) as Banner;
+      const isLogin = item.bannerType === 'login_banner' || 
+                      row.banner_type === 'login_banner' || 
+                      item.bannerCategory === 'login' || 
+                      item.bannerCategory === 'login_banner' ||
+                      row.banner_category === 'login' ||
+                      row.banner_category === 'login_banner';
+      item.bannerType = isLogin ? 'login_banner' : 'main_banner';
+      item.bannerCategory = isLogin ? 'login_banner' : 'main_banner';
+      return item;
+    };
+
+    const mapLoginBannerRow = (row: any): Banner => ({
+      id: String(row.id),
+      name: row.title || 'Login Banner',
+      image: row.image_url || '',
+      buttonEnabled: false,
+      buttonText: '',
+      buttonLink: '',
+      isCustomButtonText: false,
+      status: row.is_active ? 'active' : 'hidden',
+      order: Number(row.sort_order ?? 0),
+      bannerType: 'login_banner',
+      bannerCategory: 'login_banner',
+      locations: ['auth-page'],
+      bannerSize: 'hero',
+      createdDate: row.created_at || new Date().toISOString()
     });
 
+    const fetchAllBanners = async () => {
+      try {
+        const { data: mainData } = await supabase.from('banners').select('*').order('order', { ascending: true });
+        let mapped = ((mainData || []) as any[]).map(mapRowToBanner);
+
+        // Also fetch from login_banners table if present
+        const { data: loginData } = await supabase.from('login_banners').select('*').order('sort_order', { ascending: true });
+        if (loginData && loginData.length > 0) {
+          const mappedLogins = (loginData as any[]).map(mapLoginBannerRow);
+          // Merge avoiding ID collisions
+          const existingIds = new Set(mapped.map(m => m.id));
+          const newLogins = mappedLogins.filter(l => !existingIds.has(l.id));
+          mapped = [...mapped, ...newLogins];
+        }
+
+        set({ banners: mapped, isLoaded: true });
+        saveCachedBanners(mapped);
+      } catch (err) {
+        console.warn("Banner fetch fallback:", err);
+        set({ isLoaded: true });
+      }
+    };
+
+    fetchAllBanners();
+
     supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-        if (!error && data) set({ draftBanners: (data as any[]).map(row => objectToCamel(row)) as Banner[] });
+        if (!error && data) set({ draftBanners: (data as any[]).map(mapRowToBanner) });
     });
     
     // Fake slider config for now since we don't have key-value tables 
@@ -138,15 +186,15 @@ export const useBannerStore = create<BannerState>((set, get) => ({
 
     const channelLive = supabase
       .channel('public:banners:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, (payload) => {
-          supabase.from('banners').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-            if (!error && data) {
-              const mapped = (data as any[]).map(row => objectToCamel(row)) as Banner[];
-              set({ banners: mapped, isLoaded: true });
-              saveCachedBanners(mapped);
-              broadcastSync.publish('banners', mapped);
-            }
-          });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, () => {
+        fetchAllBanners();
+      })
+      .subscribe();
+
+    const channelLoginBanners = supabase
+      .channel('public:login_banners:' + Math.random().toString(36).substring(2, 9))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'login_banners' }, () => {
+        fetchAllBanners();
       })
       .subscribe();
 
@@ -154,13 +202,14 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       .channel('public:banners_draft:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'banners_draft' }, (payload) => {
           supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-            if (!error && data) set({ draftBanners: (data as any[]).map(row => objectToCamel(row)) as Banner[] });
+            if (!error && data) set({ draftBanners: (data as any[]).map(mapRowToBanner) });
           });
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channelLive);
+      supabase.removeChannel(channelLoginBanners);
       supabase.removeChannel(channelDraft);
     };
   },
@@ -187,6 +236,15 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     if (supabase) {
       const dbPayload = objectToSnake(updates);
       supabase.from('banners').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+      
+      const loginUpdates: any = {};
+      if (updates.name !== undefined) loginUpdates.title = updates.name;
+      if (updates.image !== undefined) loginUpdates.image_url = updates.image;
+      if (updates.status !== undefined) loginUpdates.is_active = updates.status === 'active';
+      if (updates.order !== undefined) loginUpdates.sort_order = updates.order;
+      if (Object.keys(loginUpdates).length > 0) {
+        supabase.from('login_banners').update(loginUpdates).eq('id', id).then(({error}) => error && console.warn(error));
+      }
     }
   },
 
@@ -297,7 +355,10 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     saveCachedBanners(nextBanners);
     broadcastSync.publish('banners', nextBanners);
     const supabase = getSupabase();
-    if (supabase) supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
+    if (supabase) {
+      supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
+      supabase.from('login_banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
+    }
   },
 
   removeDraftBanner: (id) => {

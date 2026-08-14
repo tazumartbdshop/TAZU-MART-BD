@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Search, ShoppingCart, Heart, User, Menu, X, Camera,
   ChevronRight, Grid, ClipboardList, Bell, Tag, 
-  HelpCircle, Info, Globe, Moon, Sun, LogOut, 
+  HelpCircle, Info, Globe, LogOut, 
   MapPin, Eye, Package, LogIn, ShoppingBag, Lock
 } from 'lucide-react';
 import { useCartStore } from '../../store/useCartStore';
@@ -32,8 +32,6 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchDrawerOpen, setIsSearchDrawerOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const { theme } = useThemeStore();
-  const isDarkMode = theme.mode === 'dark';
   const { language, toggleLanguage } = useLanguageStore();
   const [logoError, setLogoError] = useState(false);
   const cartCount = useCartStore((state) => state.getCartCount());
@@ -81,11 +79,6 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const toggleDarkMode = async () => {
-    const nextMode = isDarkMode ? 'white' : 'black';
-    await themeSettingsService.saveThemeMode(nextMode);
-  };
-
   const t = translations[language];
 
   const handleExternalLink = (url: string, title?: string, useWebview?: boolean, newTab?: boolean) => {
@@ -97,32 +90,34 @@ export function Header() {
     }
   };
 
+  const displayTagline = settings.storeTagline?.trim() || branding.site_tagline?.trim() || 'TAZU MART BD - YOUR TRUSTED ONLINE SHOPPING DESTINATION';
+
   return (
     <>
-      <header className={cn(
-        'sticky top-0 w-full z-50 transition-all duration-300 bg-navbar-bg border-b border-theme-border',
-        isScrolled ? 'shadow-sm' : ''
-      )}>
-        {/* 1️⃣ Thin premium headline text */}
-        {settings.storeTagline && settings.storeTagline.trim() !== '' && (
-          <div className="w-full bg-navbar-bg text-navbar-text border-b border-theme-border pt-[calc(10px+env(safe-area-inset-top,0px))] pb-2.5 overflow-hidden select-none font-sans relative">
-            <div className="container mx-auto px-3 flex justify-center items-center">
-              {settings.storeTagline.length > 35 ? (
-                <div className="w-full overflow-hidden whitespace-nowrap relative">
-                  <span className="animate-marquee inline-block text-[10px] font-bold tracking-[0.25em] uppercase opacity-80">
-                    {settings.storeTagline}
-                  </span>
-                </div>
-              ) : (
-                <p className="text-[10px] font-bold tracking-[0.25em] uppercase opacity-80 text-center">
-                  {settings.storeTagline}
-                </p>
-              )}
-            </div>
+      {/* 1️⃣ Always Sticky Tagline / Marquee Bar */}
+      {displayTagline && (
+        <div className={cn(
+          "sticky top-0 z-50 w-full bg-navbar-bg text-navbar-text border-b border-theme-border pt-[calc(10px+env(safe-area-inset-top,0px))] pb-2.5 overflow-hidden select-none font-sans relative transition-shadow duration-200",
+          isScrolled ? "shadow-sm" : ""
+        )}>
+          <div className="container mx-auto px-3 flex justify-center items-center">
+            {displayTagline.length > 35 ? (
+              <div className="w-full overflow-hidden whitespace-nowrap relative">
+                <span className="animate-marquee inline-block text-[10px] font-bold tracking-[0.25em] uppercase opacity-80">
+                  {displayTagline}
+                </span>
+              </div>
+            ) : (
+              <p className="text-[10px] font-bold tracking-[0.25em] uppercase opacity-80 text-center">
+                {displayTagline}
+              </p>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* 2️⃣ Logo/Header row */}
+      {/* 2️⃣ Logo/Header row - Natural Scroll (Hides on Scroll Down) */}
+      <header className="relative w-full z-40 bg-navbar-bg border-b border-theme-border transition-colors duration-200">
         <div className="container mx-auto px-3 h-14 md:h-16 flex items-center justify-between">
           {/* Group 1: Menu + Logo */}
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
@@ -246,18 +241,9 @@ export function Header() {
                   <button 
                     onClick={toggleLanguage}
                     title={language === 'en' ? 'বাংলা ভাষায় পরিবর্তন করুন' : 'Switch to English'}
-                    className="h-8 px-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-bg-secondary hover:bg-neutral-200 dark:hover:bg-neutral-800 text-text-primary transition-all flex items-center justify-center border border-border-theme shrink-0"
+                    className="h-8 px-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-bg-secondary hover:bg-neutral-200 text-text-primary transition-all flex items-center justify-center border border-border-theme shrink-0"
                   >
                     {language === 'en' ? 'বাংলা' : 'EN'}
-                  </button>
-
-                  {/* Dark Mode Toggle */}
-                  <button 
-                    onClick={toggleDarkMode}
-                    title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                    className="p-2 rounded-lg bg-bg-secondary hover:bg-neutral-200 dark:hover:bg-neutral-800 text-text-primary transition-all flex items-center justify-center border border-border-theme shrink-0"
-                  >
-                    {isDarkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-indigo-600" />}
                   </button>
 
                   {/* Close button */}

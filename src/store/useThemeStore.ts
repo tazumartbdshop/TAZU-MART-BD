@@ -162,7 +162,7 @@ const defaultConfig: ThemeConfig = {
   productFont: 'Inter',
   fontSize: 'medium',
 
-  mode: typeof window !== 'undefined' ? (localStorage.getItem('tazu_theme_mode') as 'light' | 'dark') || 'light' : 'light',
+  mode: 'light',
 
   smoothAnimation: true,
   glassEffect: true,
@@ -186,26 +186,13 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     if (!supabase) return () => {};
 
     const loadTheme = async () => {
-        let isBlackMode = typeof window !== 'undefined' ? localStorage.getItem('tazu_theme_mode') === 'dark' : false;
-        try {
-          const { data: appSettings } = await supabase.from('app_settings').select('theme_mode').eq('id', 'theme_config').limit(1);
-          if (appSettings && appSettings.length > 0 && appSettings[0].theme_mode) {
-            const val = String(appSettings[0].theme_mode).toLowerCase();
-            isBlackMode = val === 'black' || val === 'dark';
-            localStorage.setItem('tazu_theme_mode', isBlackMode ? 'dark' : 'light');
-          }
-        } catch (e) {
-          console.warn("Failed to fetch app_settings theme_mode:", e);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('tazu_theme_mode', 'light');
         }
 
-        const modeStr: 'dark' | 'light' = isBlackMode ? 'dark' : 'light';
         const root = document.documentElement;
-        if (isBlackMode) {
-          root.classList.add('dark');
-        } else {
-          root.classList.remove('dark');
-        }
-        root.setAttribute('data-footer-theme', isBlackMode ? 'dark' : 'light');
+        root.classList.remove('dark');
+        root.setAttribute('data-footer-theme', 'light');
 
         const { data, error } = await supabase.from('settings').select('*').eq('id', 'theme').limit(1);
         if (!error && data && data.length > 0) {
@@ -213,14 +200,14 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
             const mergedSettings = { 
               ...defaultConfig, 
               ...dataObj, 
-              mode: modeStr
+              mode: 'light' as const
             };
             set({ theme: mergedSettings, draftTheme: mergedSettings, isLoaded: true });
         } else if (!error && data && data.length === 0) {
-            supabase.from('settings').upsert([{ id: 'theme', ...defaultConfig }]).then(({error}) => error && console.warn(error));
+            supabase.from('settings').upsert([{ id: 'theme', ...defaultConfig, mode: 'light' }]).then(({error}) => error && console.warn(error));
             const mergedSettings = {
               ...defaultConfig,
-              mode: modeStr
+              mode: 'light' as const
             };
             set({ theme: mergedSettings, draftTheme: mergedSettings, isLoaded: true });
         }
@@ -235,33 +222,22 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
       })
       .subscribe();
 
-    const channel2 = supabase
-      .channel('public:app_settings:theme_config')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings', filter: 'id=eq.theme_config' }, () => {
-         loadTheme();
-      })
-      .subscribe();
-
     return () => {
         supabase.removeChannel(channel1);
-        supabase.removeChannel(channel2);
     };
   },
-  setThemeModeState: (mode: 'dark' | 'light') => {
-    const isBlack = mode === 'dark';
+  setThemeModeState: () => {
     const root = document.documentElement;
-    if (isBlack) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
+    root.classList.remove('dark');
+    root.setAttribute('data-footer-theme', 'light');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tazu_theme_mode', 'light');
     }
-    root.setAttribute('data-footer-theme', isBlack ? 'dark' : 'light');
-    localStorage.setItem('tazu_theme_mode', mode);
 
     const currentTheme = get().theme;
     const updated = {
       ...currentTheme,
-      mode
+      mode: 'light' as const
     };
     set({ theme: updated, draftTheme: updated });
   },

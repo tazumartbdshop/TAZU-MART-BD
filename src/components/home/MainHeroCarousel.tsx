@@ -10,8 +10,15 @@ interface MainHeroCarouselProps {
 }
 
 export default function MainHeroCarousel({ banners }: MainHeroCarouselProps) {
-  // Filter user uploaded active banners with real image
-  const uploadedBanners = (banners || []).filter(b => b && b.status === 'active' && b.image && b.image.trim() !== '');
+  // Filter user uploaded active main hero banners with real image (exclude login-only banners and character avatars)
+  const uploadedBanners = (banners || []).filter(b => 
+    b && 
+    b.status === 'active' && 
+    b.image && 
+    b.image.trim() !== '' && 
+    b.bannerCategory !== 'login' &&
+    b.mediaType !== 'character'
+  );
 
   const activeBannersToRender = uploadedBanners;
 

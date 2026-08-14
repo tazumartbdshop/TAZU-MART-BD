@@ -97,6 +97,7 @@ import AdminPopupManagement from './AdminPopupManagement';
 import AdminCourierAPI from './AdminCourierAPI';
 import AdminCourierCharges from './AdminCourierCharges';
 import AdminLoginInfo from './AdminLoginInfo';
+import AdminAuthImages from './AdminAuthImages';
 import AdminPromoCodes from './AdminPromoCodes';
 import AdminSiteManagement from './AdminSiteManagement';
 import AdminStoreIdentity from './AdminStoreIdentity';
@@ -698,6 +699,7 @@ export default function AdminDashboard() {
               <Route path="/brand-showcase" element={<PermissionGate moduleId="banners"><AdminBrandShowcase /></PermissionGate>} />
               <Route path="/management/site-management" element={<PermissionGate moduleId="dashboard"><AdminSiteManagement /></PermissionGate>} />
               <Route path="/management/store-identity" element={<PermissionGate moduleId="dashboard"><AdminStoreIdentity /></PermissionGate>} />
+              <Route path="/management/auth-images" element={<PermissionGate moduleId="dashboard"><AdminAuthImages /></PermissionGate>} />
               <Route path="/management/business-address" element={<PermissionGate moduleId="dashboard"><AdminBusinessAddress /></PermissionGate>} />
               <Route path="/management/social-links" element={<PermissionGate moduleId="dashboard"><AdminSocialLinks /></PermissionGate>} />
               <Route path="/management/footer" element={<PermissionGate moduleId="dashboard"><AdminFooterSettings /></PermissionGate>} />

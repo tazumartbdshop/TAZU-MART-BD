@@ -16,6 +16,16 @@ export default function BannerListing() {
   const [bannerIdToDelete, setBannerIdToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [filterType, setFilterType] = useState<'all' | 'main' | 'login'>('all');
+
+  // Filtered banners list
+  const filteredBanners = banners.filter(b => {
+    const isLogin = b.bannerType === 'login_banner' || b.bannerCategory === 'login_banner' || b.bannerCategory === 'login';
+    if (filterType === 'main') return !isLogin;
+    if (filterType === 'login') return isLogin;
+    return true;
+  });
+
   // Subscribe to real-time banner updates
   useEffect(() => {
     const unsub = useBannerStore.getState().subscribe();
@@ -92,17 +102,49 @@ export default function BannerListing() {
         </button>
       </div>
 
-      {/* Helpful Hint */}
-      {banners.length > 0 && (
-        <p className="text-[9px] text-zinc-400 uppercase font-bold tracking-wider">
-          💡 Drag & drop any card vertically to re-sequence the slideshow display order.
-        </p>
-      )}
+      {/* Filter Tabs & Helpful Hint */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 p-1 bg-zinc-100 border border-zinc-200 self-start">
+          <button
+            type="button"
+            onClick={() => setFilterType('all')}
+            className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+              filterType === 'all' ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'
+            }`}
+          >
+            All Banners ({banners.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterType('main')}
+            className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+              filterType === 'main' ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'
+            }`}
+          >
+            Main Banners ({banners.filter(b => b.bannerCategory !== 'login').length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterType('login')}
+            className={`px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+              filterType === 'login' ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'
+            }`}
+          >
+            Login Banners ({banners.filter(b => b.bannerCategory === 'login').length})
+          </button>
+        </div>
+
+        {filteredBanners.length > 0 && (
+          <p className="text-[9px] text-zinc-400 uppercase font-bold tracking-wider">
+            💡 Drag & drop any card vertically to re-sequence.
+          </p>
+        )}
+      </div>
 
       {/* Banner Cards List */}
       <div className="space-y-4">
-        {banners.length > 0 ? (
-          banners.map((banner, index) => {
+        {filteredBanners.length > 0 ? (
+          filteredBanners.map((banner, index) => {
             // Find linked product from productStore
             const linkedProduct = products.find(p => p.id === banner.connectedProductId);
             
@@ -119,34 +161,56 @@ export default function BannerListing() {
                 <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center w-full min-w-0">
                   
                   {/* Left Side: Thumbnail Preview */}
-                  <div className="w-full sm:w-48 aspect-[1080/500] sm:aspect-[1200/500] md:aspect-[1920/650] bg-zinc-50 border border-zinc-200 shrink-0 overflow-hidden relative flex items-center justify-center">
-                    {banner.image ? (
-                      <img 
-                        src={banner.image} 
-                        alt={banner.name || 'Banner'} 
-                        className="w-full h-full object-cover" 
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-zinc-300">
-                        <ImageIcon className="w-6 h-6" />
-                        <span className="text-[8px] font-black uppercase mt-1">No Image</span>
+                  {(() => {
+                    const isLogin = banner.bannerType === 'login_banner' || banner.bannerCategory === 'login_banner' || banner.bannerCategory === 'login';
+                    return (
+                      <div className={`w-full sm:w-48 bg-zinc-50 border border-zinc-200 shrink-0 overflow-hidden relative flex items-center justify-center ${
+                        isLogin ? 'aspect-[3/2]' : 'aspect-[1920/650] sm:aspect-[1920/650]'
+                      }`}>
+                        {banner.image ? (
+                          <img 
+                            src={banner.image} 
+                            alt={banner.name || 'Banner'} 
+                            className="w-full h-full object-cover" 
+                            referrerPolicy="no-referrer" 
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-zinc-300">
+                            <ImageIcon className="w-6 h-6" />
+                            <span className="text-[8px] font-black uppercase mt-1">No Image</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* Right Side: Information block */}
                   <div className="min-w-0 flex-1 space-y-2">
-                    {/* Header line: Position & Status badges */}
+                    {/* Header line: Position, Status & Type badges */}
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-[9px] font-black uppercase text-neutral-600 bg-zinc-100 px-2 py-0.5 border border-zinc-200">
                         Position #{index + 1}
                       </span>
-                      
-                      <div className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-150 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-neutral-500">
+
+                      {/* Status badge */}
+                      <div className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-neutral-700">
                         <span className={`w-1.5 h-1.5 rounded-full ${banner.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-neutral-400'}`} />
                         <span>{banner.status === 'active' ? 'Active' : 'Inactive'}</span>
                       </div>
+                      
+                      {/* Banner Category Badge: MAIN BANNER vs LOGIN BANNER */}
+                      {(() => {
+                        const isLogin = banner.bannerType === 'login_banner' || banner.bannerCategory === 'login_banner' || banner.bannerCategory === 'login';
+                        return (
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 border ${
+                            isLogin
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {isLogin ? 'LOGIN BANNER' : 'MAIN BANNER'}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Banner name */}

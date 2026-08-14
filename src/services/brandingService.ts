@@ -26,6 +26,9 @@ export interface BrandingSettings {
   
   // Branding Images
   default_profile_image: string;
+  male_profile_image: string;
+  female_profile_image: string;
+  login_banner: string;
   default_store_banner: string;
   default_category_banner: string;
   default_product_image: string;
@@ -76,7 +79,10 @@ export const DEFAULT_BRANDING_SETTINGS: BrandingSettings = {
   login_logo: '',
   signup_logo: '',
 
-  default_profile_image: '',
+  default_profile_image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
+  male_profile_image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
+  female_profile_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80',
+  login_banner: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80',
   default_store_banner: '',
   default_category_banner: '',
   default_product_image: '',
