@@ -130,9 +130,23 @@ export const brandingService = {
   },
 
   async getBrandingSettings(): Promise<BrandingSettings> {
-    const supabase = getSupabase();
     const fallback = this.getFallbackSettings();
-    if (!supabase) return fallback;
+    let apiSettings: Partial<BrandingSettings> = {};
+
+    try {
+      const res = await fetch('/api/account-characters', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.settings) {
+          apiSettings = json.settings;
+        }
+      }
+    } catch (apiErr) {
+      console.warn("API fetch for account-characters failed:", apiErr);
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) return { ...DEFAULT_BRANDING_SETTINGS, ...fallback, ...apiSettings };
     
     try {
       const { data, error } = await supabase
@@ -142,26 +156,37 @@ export const brandingService = {
         .limit(1);
         
       if (error) {
-        // Table may not be created yet, use fallback smoothly
         if (error.code === '42P01') {
-          console.warn("branding_settings table relation does not exist yet. Using offline premium fallback.");
-          return fallback;
+          return { ...DEFAULT_BRANDING_SETTINGS, ...fallback, ...apiSettings };
         }
         throw error;
       }
       
       if (data && data.length > 0) {
-        // Save to fallback cache for super fast initial load next time
-        this.saveFallbackSettings(data[0] as BrandingSettings);
-        return { ...DEFAULT_BRANDING_SETTINGS, ...data[0] };
+        const dbRow = data[0];
+        const mappedRow = {
+          ...dbRow,
+          primary_logo: dbRow.logo_url || dbRow.primary_logo || '',
+          favicon: dbRow.favicon_url || dbRow.favicon || '',
+          site_name: dbRow.site_title || dbRow.site_name || ''
+        };
+        const merged = { ...DEFAULT_BRANDING_SETTINGS, ...fallback, ...mappedRow, ...apiSettings };
+        this.saveFallbackSettings(merged as BrandingSettings);
+        return merged;
       } else {
-        // If row doesn't exist, insert defaults
-        await supabase.from('branding_settings').upsert([{ id: 'global', ...fallback }]);
-        return fallback;
+        const cleanRecord = {
+          id: 'global',
+          login_banner: fallback.login_banner || apiSettings.login_banner || '',
+          male_profile_image: fallback.male_profile_image || apiSettings.male_profile_image || '',
+          female_profile_image: fallback.female_profile_image || apiSettings.female_profile_image || '',
+          default_profile_image: fallback.default_profile_image || apiSettings.default_profile_image || ''
+        };
+        await supabase.from('branding_settings').upsert([cleanRecord]);
+        return { ...DEFAULT_BRANDING_SETTINGS, ...fallback, ...apiSettings };
       }
     } catch (e) {
-      console.warn("Supabase fetch for branding_settings failed, fallback in use:", e);
-      return fallback;
+      console.warn("Supabase fetch for branding_settings failed, using fallback:", e);
+      return { ...DEFAULT_BRANDING_SETTINGS, ...fallback, ...apiSettings };
     }
   },
 
@@ -173,22 +198,46 @@ export const brandingService = {
       updated_at: new Date().toISOString()
     };
     
-    // Save locally first for instant reactive update
+    // 1. Save locally for instant reactive UI sync
     this.saveFallbackSettings(updated);
-    
-    const supabase = getSupabase();
-    if (!supabase) return updated;
-    
+
+    // 2. Post to backend API
     try {
-      const { error } = await supabase
-        .from('branding_settings')
-        .upsert([{ id: 'global', ...updated }]);
-        
-      if (error && error.code !== '42P01') {
-        throw error;
+      await fetch('/api/account-characters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (apiErr) {
+      console.warn("POST /api/account-characters warning:", apiErr);
+    }
+
+    // 3. Sync directly with Supabase using clean table schema columns
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const cleanDbRecord: Record<string, any> = {
+          id: 'global',
+          updated_at: new Date().toISOString()
+        };
+        if (updated.login_banner !== undefined) cleanDbRecord.login_banner = updated.login_banner;
+        if (updated.male_profile_image !== undefined) cleanDbRecord.male_profile_image = updated.male_profile_image;
+        if (updated.female_profile_image !== undefined) cleanDbRecord.female_profile_image = updated.female_profile_image;
+        if (updated.default_profile_image !== undefined) cleanDbRecord.default_profile_image = updated.default_profile_image;
+        if (updated.primary_logo !== undefined) cleanDbRecord.logo_url = updated.primary_logo;
+        if (updated.favicon !== undefined) cleanDbRecord.favicon_url = updated.favicon;
+        if (updated.site_name !== undefined) cleanDbRecord.site_title = updated.site_name;
+
+        const { error } = await supabase
+          .from('branding_settings')
+          .upsert([cleanDbRecord]);
+          
+        if (error && error.code !== '42P01') {
+          console.warn("Supabase branding_settings notice:", error.message);
+        }
+      } catch (e) {
+        console.error("Supabase failed to save branding_settings:", e);
       }
-    } catch (e) {
-      console.error("Supabase failed to save branding_settings:", e);
     }
     
     return updated;

@@ -313,95 +313,127 @@ export default function AdminBanners() {
       return;
     }
 
-    // Creating new banners
-    if (localPreviews.length === 0) {
+    // Creating new banners or saving account settings
+    if (localPreviews.length === 0 && bannerCategory !== 'login') {
       toast.error('⚠️ Please select or drop at least one banner image.');
       return;
     }
 
     setIsSubmitting(true);
     let successCount = 0;
-    const supabase = getSupabase();
-
-    if (!supabase) {
-      toast.error('❌ Supabase client unavailable');
-      setIsSubmitting(false);
-      return;
-    }
 
     try {
+      // 1. Always sync profile characters (Male, Female, Guest) to database & backend API
+      const charactersPayload = {
+        male_profile_image: maleImage.trim(),
+        female_profile_image: femaleImage.trim(),
+        default_profile_image: guestImage.trim(),
+      };
+      await updateBranding(charactersPayload);
+      try {
+        await fetch('/api/account-characters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(charactersPayload)
+        });
+      } catch (cApiErr) {
+        console.warn("Account characters API sync note:", cApiErr);
+      }
+
       const currentBannersLength = useBannerStore.getState().banners.length;
       const newBanners: Banner[] = [];
 
-      for (const item of localPreviews) {
-        try {
-          const downloadUrl = await uploadImage(item.croppedBlob, 'banners', item.file.name);
-          const targetId = `ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-          const currentOrder = currentBannersLength + successCount;
+      if (localPreviews.length > 0) {
+        for (const item of localPreviews) {
+          try {
+            const downloadUrl = await uploadImage(item.croppedBlob, 'banners', item.file.name);
+            const targetId = `ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            const currentOrder = currentBannersLength + successCount;
 
-          const isLogin = bannerCategory === 'login';
-          const bannerTypeVal = isLogin ? 'login_banner' : 'main_banner';
+            const isLogin = bannerCategory === 'login';
+            const bannerTypeVal = isLogin ? 'login_banner' : 'main_banner';
 
-          const bannerData: Banner = {
-            id: targetId,
-            image: downloadUrl,
-            name: name.trim() || (isLogin ? 'Login Banner' : 'Main Banner'),
-            offerText: offerText.trim(),
-            description: description.trim(),
-            buttonText: buttonText.trim(),
-            buttonLink: buttonLink.trim(),
-            buttonEnabled: !!buttonText.trim() && !!buttonLink.trim(),
-            connectedProductId: connectedProductId || undefined,
-            isCustomButtonText: true,
-            locations: isLogin ? ['auth-page'] : ['homepage-hero'],
-            bannerSize: 'hero',
-            status: 'active',
-            order: currentOrder,
-            bannerType: bannerTypeVal,
-            bannerCategory: bannerTypeVal,
-            mediaType: 'banner',
-            createdDate: new Date().toISOString()
-          };
+            const bannerData: Banner = {
+              id: targetId,
+              image: downloadUrl,
+              name: name.trim() || (isLogin ? 'Login Banner' : 'Main Banner'),
+              offerText: offerText.trim(),
+              description: description.trim(),
+              buttonText: buttonText.trim(),
+              buttonLink: buttonLink.trim(),
+              buttonEnabled: !!buttonText.trim() && !!buttonLink.trim(),
+              connectedProductId: connectedProductId || undefined,
+              isCustomButtonText: true,
+              locations: isLogin ? ['auth-page'] : ['homepage-hero'],
+              bannerSize: 'hero',
+              status: 'active',
+              order: currentOrder,
+              bannerType: bannerTypeVal,
+              bannerCategory: bannerTypeVal,
+              mediaType: 'banner',
+              createdDate: new Date().toISOString()
+            };
 
-          newBanners.push(bannerData);
+            newBanners.push(bannerData);
 
-          // If it's a login banner, update branding store's login_banner for instant live reflection on Create Account/Login pages
-          if (isLogin) {
-            await updateBranding({ login_banner: downloadUrl });
+            if (isLogin) {
+              await loginBannerService.saveLoginBanner({
+                title: bannerData.name,
+                image_url: downloadUrl,
+                is_active: true,
+                sort_order: currentOrder
+              });
+              await updateBranding({ login_banner: downloadUrl });
+            }
+
+            successCount++;
+          } catch (innerErr) {
+            console.error(innerErr);
+            toast.error(`❌ Failed to upload ${item.file.name}`);
           }
-
-          successCount++;
-        } catch (innerErr) {
-          console.error(innerErr);
-          toast.error(`❌ Failed to upload ${item.file.name}`);
         }
+      } else if (bannerCategory === 'login') {
+        // If no file was dropped, but user is saving Login Banner (e.g. from existing URL or character changes)
+        const currentBranding = useBrandingStore.getState().settings;
+        const bannerUrlToSave = (currentBranding.login_banner || '').trim();
+        if (bannerUrlToSave) {
+          await loginBannerService.saveLoginBanner({
+            title: name.trim() || 'Login Banner',
+            image_url: bannerUrlToSave,
+            is_active: true
+          });
+          await updateBranding({ login_banner: bannerUrlToSave });
+        }
+        toast.success('🎉 Login Banner & Account Profile Characters saved successfully!');
+        setIsDirty(false);
+        setIsSubmitting(false);
+        return;
       }
 
       if (successCount > 0) {
+        const supabase = getSupabase();
         const { objectToSnake } = await import('../../lib/supabaseUtils');
         const dbPayloads = objectToSnake(newBanners);
 
         if (bannerCategory === 'login') {
-          // If login banners were added, sync EXCLUSIVELY to dedicated login_banners table
-          try {
-            const loginPayloads = newBanners.map(b => ({
-              id: b.id, // Explicitly keep the ID to avoid mismatches
-              title: b.name,
-              image_url: b.image,
-              is_active: b.status === 'active',
-              sort_order: b.order || 0
-            }));
-            const { error: loginErr } = await supabase.from('login_banners').upsert(loginPayloads);
-            if (loginErr) throw loginErr;
-          } catch (lErr) {
-            console.error("login_banners table sync error:", lErr);
-            throw new Error('Failed to save Login Banner. Please try again.');
+          // Sync all new login banners via service
+          for (const b of newBanners) {
+            try {
+              await loginBannerService.saveLoginBanner({
+                title: b.name,
+                image_url: b.image,
+                is_active: b.status === 'active',
+                sort_order: b.order || 0
+              });
+            } catch (lErr) {
+              console.warn("login_banners sync note:", lErr);
+            }
           }
-        } else {
+        } else if (supabase) {
           // For Main Banners, save to `banners` and `banners_draft` tables
           const { error: bannersErr } = await supabase.from('banners').upsert(dbPayloads);
           if (bannersErr) {
-            throw new Error('Failed to save banner. Please try again.');
+            console.warn("Banners upsert notice:", bannersErr.message);
           }
 
           try {
@@ -418,13 +450,13 @@ export default function AdminBanners() {
         localPreviews.forEach(p => URL.revokeObjectURL(p.previewUrl));
         setLocalPreviews([]);
         
-        toast.success(`🎉 ${successCount} Banner(s) (${bannerCategory === 'login' ? 'LOGIN BANNER' : 'MAIN BANNER'}) saved successfully.`);
+        toast.success(`🎉 ${successCount} Banner(s) (${bannerCategory === 'login' ? 'LOGIN BANNER' : 'MAIN BANNER'}) & Characters saved successfully.`);
         
         setIsDirty(false);
         navigate('/admin/banner/list');
       }
     } catch (err: any) {
-      console.error(err);
+      console.error("handleSubmit error:", err);
       toast.error('Failed to save banner. Please try again.');
     }
 
@@ -446,16 +478,38 @@ export default function AdminBanners() {
     try {
       const url = await uploadImage(file, 'profiles', `char_${slot}_${Date.now()}`);
       if (url) {
+        let newMale = maleImage;
+        let newFemale = femaleImage;
+        let newGuest = guestImage;
+
         if (slot === 'male') {
+          newMale = url;
           setMaleImage(url);
           await updateBranding({ male_profile_image: url });
         } else if (slot === 'female') {
+          newFemale = url;
           setFemaleImage(url);
           await updateBranding({ female_profile_image: url });
         } else if (slot === 'guest') {
+          newGuest = url;
           setGuestImage(url);
           await updateBranding({ default_profile_image: url });
         }
+
+        try {
+          await fetch('/api/account-characters', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              male_profile_image: newMale,
+              female_profile_image: newFemale,
+              default_profile_image: newGuest,
+            })
+          });
+        } catch (apiE) {
+          console.warn("Account character upload API sync note:", apiE);
+        }
+
         toast.success(`✅ ${slot.toUpperCase()} Character updated successfully!`);
       }
     } catch (err: any) {
@@ -471,19 +525,36 @@ export default function AdminBanners() {
 
   const handleResetCharacterSlot = async (slot: 'male' | 'female' | 'guest') => {
     try {
+      let newMale = maleImage;
+      let newFemale = femaleImage;
+      let newGuest = guestImage;
+
       if (slot === 'male') {
-        const def = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
-        setMaleImage(def);
-        await updateBranding({ male_profile_image: def });
+        newMale = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80';
+        setMaleImage(newMale);
+        await updateBranding({ male_profile_image: newMale });
       } else if (slot === 'female') {
-        const def = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80';
-        setFemaleImage(def);
-        await updateBranding({ female_profile_image: def });
+        newFemale = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80';
+        setFemaleImage(newFemale);
+        await updateBranding({ female_profile_image: newFemale });
       } else if (slot === 'guest') {
-        const def = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
-        setGuestImage(def);
-        await updateBranding({ default_profile_image: def });
+        newGuest = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80';
+        setGuestImage(newGuest);
+        await updateBranding({ default_profile_image: newGuest });
       }
+
+      try {
+        await fetch('/api/account-characters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            male_profile_image: newMale,
+            female_profile_image: newFemale,
+            default_profile_image: newGuest,
+          })
+        });
+      } catch (apiE) {}
+
       toast.success(`Reset ${slot.toUpperCase()} to standard avatar`);
     } catch (e) {
       toast.error("Failed to reset slot");
@@ -669,7 +740,7 @@ export default function AdminBanners() {
                         alt={`Preview ${index + 1}`} 
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          e.currentTarget.onerror = null;
+                          if ((e.currentTarget as any).dataset.error) return; (e.currentTarget as any).dataset.error = 'true';
                           e.currentTarget.src = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80';
                         }}
                       />

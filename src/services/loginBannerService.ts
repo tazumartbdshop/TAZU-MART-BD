@@ -38,9 +38,22 @@ export const loginBannerService = {
   },
 
   async getActiveLoginBanner(): Promise<string> {
-    const supabase = getSupabase();
     const fallback = this.getFallbackBanner();
 
+    try {
+      const res = await fetch('/api/login-banner', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.url) {
+          this.setFallbackBanner(json.url);
+          return json.url;
+        }
+      }
+    } catch (apiErr) {
+      console.warn("API fetch for active login banner warning:", apiErr);
+    }
+
+    const supabase = getSupabase();
     if (!supabase) return fallback;
 
     try {
@@ -106,11 +119,6 @@ export const loginBannerService = {
     is_active?: boolean;
     sort_order?: number;
   }): Promise<LoginBannerRecord> {
-    const supabase = getSupabase();
-    if (!supabase) {
-      throw new Error('Database connection unavailable');
-    }
-
     const dataToSave = {
       title: payload.title || 'Login Banner',
       image_url: payload.image_url,
@@ -119,41 +127,65 @@ export const loginBannerService = {
       updated_at: new Date().toISOString()
     };
 
-    let resultRecord: LoginBannerRecord;
-
-    if (payload.id && !payload.id.startsWith('ban_') && payload.id.length > 20) {
-      // Update existing
-      const { data, error } = await supabase
-        .from('login_banners')
-        .update(dataToSave)
-        .eq('id', payload.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      resultRecord = data as LoginBannerRecord;
-    } else {
-      // Insert new
-      const { data, error } = await supabase
-        .from('login_banners')
-        .insert([dataToSave])
-        .select()
-        .single();
-
-      if (error) throw error;
-      resultRecord = data as LoginBannerRecord;
+    // 1. Post to backend API
+    try {
+      await fetch('/api/login-banner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: payload.id,
+          title: dataToSave.title,
+          image_url: dataToSave.image_url,
+          is_active: dataToSave.is_active,
+          sort_order: dataToSave.sort_order
+        })
+      });
+    } catch (apiErr) {
+      console.warn("POST /api/login-banner warning:", apiErr);
     }
 
-    // Save locally
-    if (resultRecord.is_active && resultRecord.image_url) {
-      this.setFallbackBanner(resultRecord.image_url);
+    // 2. Save locally
+    if (dataToSave.is_active && dataToSave.image_url) {
+      this.setFallbackBanner(dataToSave.image_url);
     }
 
-    // Also sync branding_settings.login_banner
+    // 3. Sync branding settings
     try {
       await brandingService.updateBrandingSettings({ login_banner: payload.image_url });
     } catch (bErr) {
       console.warn('Branding sync note:', bErr);
+    }
+
+    const supabase = getSupabase();
+    let resultRecord: LoginBannerRecord = {
+      id: payload.id || `login_ban_${Date.now()}`,
+      ...dataToSave,
+      created_at: new Date().toISOString()
+    };
+
+    if (supabase) {
+      try {
+        if (payload.id && !payload.id.startsWith('ban_') && payload.id.length > 20) {
+          const { data, error } = await supabase
+            .from('login_banners')
+            .update(dataToSave)
+            .eq('id', payload.id)
+            .select()
+            .single();
+
+          if (!error && data) resultRecord = data as LoginBannerRecord;
+        } else {
+          const { data, error } = await supabase
+            .from('login_banners')
+            .insert([dataToSave])
+            .select()
+            .single();
+
+          if (!error && data) resultRecord = data as LoginBannerRecord;
+        }
+      } catch (sbErr) {
+        console.warn("Supabase login_banners save notice:", sbErr);
+      }
     }
 
     return resultRecord;

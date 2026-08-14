@@ -259,6 +259,292 @@ async function startServer() {
     }
   });
 
+  // ---------------------------------------------------------------------------
+  // Account / Login Banners API Endpoints
+  // ---------------------------------------------------------------------------
+  const LOGIN_BANNER_FILE = path.join(process.cwd(), 'public', 'login_banner_data.json');
+  const ACCOUNT_CHARACTERS_FILE = path.join(process.cwd(), 'public', 'account_characters_data.json');
+
+  app.get(["/api/login-banner", "/api/login-banners"], async (req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+
+      if (clientToUse) {
+        // 1. Try querying login_banners table
+        const { data: loginData, error: loginErr } = await clientToUse
+          .from('login_banners')
+          .select('*')
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: false });
+
+        if (!loginErr && loginData && loginData.length > 0) {
+          const activeItem = loginData.find((b: any) => b.is_active) || loginData[0];
+          return res.json({ 
+            success: true, 
+            url: activeItem.image_url || activeItem.image, 
+            banners: loginData 
+          });
+        }
+
+        // 2. Fallback to branding_settings
+        const { data: brandData, error: brandErr } = await clientToUse
+          .from('branding_settings')
+          .select('login_banner')
+          .eq('id', 'global')
+          .limit(1);
+
+        if (!brandErr && brandData && brandData.length > 0 && brandData[0].login_banner) {
+          return res.json({ success: true, url: brandData[0].login_banner, banners: [] });
+        }
+
+        // 3. Fallback to settings table
+        const { data: setDb } = await clientToUse.from('settings').select('*').eq('id', 'login_banner').limit(1);
+        if (setDb && setDb.length > 0 && setDb[0].value) {
+          return res.json({ success: true, url: setDb[0].value, banners: [] });
+        }
+      }
+
+      // 4. Local file backup fallback
+      try {
+        const fileContent = await fs.readFile(LOGIN_BANNER_FILE, 'utf-8');
+        const parsed = JSON.parse(fileContent);
+        return res.json({ success: true, url: parsed.url || parsed.image_url || '', banners: parsed.banners || [] });
+      } catch (fErr) {}
+
+      res.json({ success: true, url: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80', banners: [] });
+    } catch (err: any) {
+      console.error("[GET /api/login-banner] Error:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to load login banner" });
+    }
+  });
+
+  app.post(["/api/login-banner", "/api/login-banners"], async (req, res) => {
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      const { title, image_url, image, is_active, sort_order, id, banners } = req.body;
+      const bannerUrl = (image_url || image || req.body.url || '').trim();
+
+      if (!bannerUrl && (!banners || banners.length === 0)) {
+        return res.status(400).json({ success: false, error: "Banner image URL is required" });
+      }
+
+      const activeUrl = bannerUrl || (banners && banners[0]?.image) || '';
+
+      // Save to local backup file first for absolute persistence
+      try {
+        await fs.writeFile(LOGIN_BANNER_FILE, JSON.stringify({
+          url: activeUrl,
+          banners: banners || [{ id: id || `ban_${Date.now()}`, title: title || 'Login Banner', image_url: activeUrl, is_active: true, sort_order: 0 }],
+          updated_at: new Date().toISOString()
+        }, null, 2));
+      } catch (fErr) {
+        console.warn("[POST /api/login-banner] Local file save warning:", fErr);
+      }
+
+      if (clientToUse) {
+        // A. Save to login_banners table
+        try {
+          const payloadToSave: any = {
+            title: title || 'Login Banner',
+            image_url: activeUrl,
+            is_active: is_active !== undefined ? is_active : true,
+            sort_order: sort_order || 0,
+            updated_at: new Date().toISOString()
+          };
+
+          // Only supply id if it's a valid non-temporary UUID/key
+          if (id && !id.startsWith('ban_') && id.length > 20) {
+            payloadToSave.id = id;
+          }
+
+          const { error: loginDbErr } = await clientToUse.from('login_banners').upsert([payloadToSave]);
+          if (loginDbErr) {
+            console.warn("[POST /api/login-banner] login_banners upsert notice:", loginDbErr.message);
+          }
+        } catch (lErr: any) {
+          console.warn("[POST /api/login-banner] Exception in login_banners save:", lErr.message);
+        }
+
+        // B. Save to branding_settings table
+        try {
+          await clientToUse.from('branding_settings').upsert([{
+            id: 'global',
+            login_banner: activeUrl,
+            updated_at: new Date().toISOString()
+          }]);
+        } catch (bErr: any) {
+          console.warn("[POST /api/login-banner] branding_settings update notice:", bErr.message);
+        }
+
+        // C. Save to settings table
+        try {
+          await clientToUse.from('settings').upsert([{
+            id: 'login_banner',
+            value: activeUrl,
+            updated_at: new Date().toISOString()
+          }]);
+        } catch (sErr: any) {
+          console.warn("[POST /api/login-banner] settings update notice:", sErr.message);
+        }
+
+        // D. Save to banners table
+        try {
+          await clientToUse.from('banners').upsert([{
+            id: id || `login_ban_${Date.now()}`,
+            name: title || 'Login Banner',
+            image: activeUrl,
+            banner_type: 'login_banner',
+            banner_category: 'login_banner',
+            locations: ['auth-page'],
+            status: 'active',
+            created_at: new Date().toISOString()
+          }]);
+        } catch (banErr: any) {
+          console.warn("[POST /api/login-banner] banners update notice:", banErr.message);
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: "Login Banner saved successfully.",
+        url: activeUrl
+      });
+    } catch (err: any) {
+      console.error("[POST /api/login-banner] Error:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to save login banner" });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Account Profile Characters API Endpoints (Male, Female, Guest)
+  // ---------------------------------------------------------------------------
+  app.get(["/api/account-characters", "/api/branding-settings"], async (req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+
+      let resultSettings = {
+        male_profile_image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80',
+        female_profile_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80',
+        default_profile_image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
+        login_banner: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80'
+      };
+
+      if (clientToUse) {
+        // 1. Query branding_settings table
+        const { data: brandData, error: brandErr } = await clientToUse
+          .from('branding_settings')
+          .select('*')
+          .eq('id', 'global')
+          .limit(1);
+
+        if (!brandErr && brandData && brandData.length > 0) {
+          const row = brandData[0];
+          resultSettings = {
+            ...resultSettings,
+            ...row,
+            male_profile_image: row.male_profile_image || resultSettings.male_profile_image,
+            female_profile_image: row.female_profile_image || resultSettings.female_profile_image,
+            default_profile_image: row.default_profile_image || resultSettings.default_profile_image,
+            login_banner: row.login_banner || resultSettings.login_banner,
+          };
+          return res.json({ success: true, settings: resultSettings });
+        }
+
+        // 2. Query settings table for account_characters
+        const { data: setData } = await clientToUse.from('settings').select('*').eq('id', 'account_characters').limit(1);
+        if (setData && setData.length > 0 && setData[0].config) {
+          resultSettings = { ...resultSettings, ...setData[0].config };
+          return res.json({ success: true, settings: resultSettings });
+        }
+      }
+
+      // 3. Fallback file
+      try {
+        const fileData = await fs.readFile(ACCOUNT_CHARACTERS_FILE, 'utf-8');
+        const parsed = JSON.parse(fileData);
+        resultSettings = { ...resultSettings, ...parsed };
+      } catch (fErr) {}
+
+      res.json({ success: true, settings: resultSettings });
+    } catch (err: any) {
+      console.error("[GET /api/account-characters] Error:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to load account characters" });
+    }
+  });
+
+  app.post(["/api/account-characters", "/api/branding-settings"], async (req, res) => {
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      const { male_profile_image, female_profile_image, default_profile_image, guest_profile_image, login_banner, maleImage, femaleImage, guestImage, loginBanner } = req.body;
+
+      const maleUrl = (male_profile_image || maleImage || '').trim();
+      const femaleUrl = (female_profile_image || femaleImage || '').trim();
+      const guestUrl = (default_profile_image || guest_profile_image || guestImage || '').trim();
+      const bannerUrl = (login_banner || loginBanner || '').trim();
+
+      const payloadToSave: Record<string, string> = {};
+      if (maleUrl) payloadToSave.male_profile_image = maleUrl;
+      if (femaleUrl) payloadToSave.female_profile_image = femaleUrl;
+      if (guestUrl) payloadToSave.default_profile_image = guestUrl;
+      if (bannerUrl) payloadToSave.login_banner = bannerUrl;
+
+      payloadToSave.updated_at = new Date().toISOString();
+
+      // Save to local backup file for instant server persistence
+      try {
+        let existingFile = {};
+        try {
+          const raw = await fs.readFile(ACCOUNT_CHARACTERS_FILE, 'utf-8');
+          existingFile = JSON.parse(raw);
+        } catch (e) {}
+
+        await fs.writeFile(ACCOUNT_CHARACTERS_FILE, JSON.stringify({
+          ...existingFile,
+          ...payloadToSave,
+        }, null, 2));
+      } catch (fErr) {
+        console.warn("[POST /api/account-characters] Local file save warning:", fErr);
+      }
+
+      if (clientToUse) {
+        // A. Save to branding_settings table
+        try {
+          const { error: brandErr } = await clientToUse.from('branding_settings').upsert([{
+            id: 'global',
+            ...payloadToSave
+          }]);
+          if (brandErr) {
+            console.warn("[POST /api/account-characters] branding_settings upsert notice:", brandErr.message);
+          }
+        } catch (bErr: any) {
+          console.warn("[POST /api/account-characters] branding_settings exception:", bErr.message);
+        }
+
+        // B. Save to settings table
+        try {
+          await clientToUse.from('settings').upsert([{
+            id: 'account_characters',
+            config: payloadToSave,
+            updated_at: new Date().toISOString()
+          }]);
+        } catch (sErr: any) {
+          console.warn("[POST /api/account-characters] settings upsert notice:", sErr.message);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: "Account profile characters saved successfully.",
+        settings: payloadToSave
+      });
+    } catch (err: any) {
+      console.error("[POST /api/account-characters] Error:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to save account profile characters" });
+    }
+  });
+
   app.get("/api/game-config", async (req, res) => {
     try {
       const data = await fs.readFile(CONFIG_FILE, 'utf-8');

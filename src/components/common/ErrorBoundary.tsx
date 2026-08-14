@@ -10,15 +10,15 @@ interface State {
   error: Error | null;
 }
 
-export interface ErrorBoundary extends React.Component<Props, State> {}
-
 export class ErrorBoundary extends React.Component<Props, State> {
+  // @ts-ignore
+  state: State = {
+    hasError: false,
+    error: null,
+  };
+
   constructor(props: Props) {
     super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-    };
   }
 
   static getDerivedStateFromError(error: Error): State {
@@ -30,7 +30,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    (this as any).setState({ hasError: false, error: null });
     window.location.href = '/';
   };
 
@@ -39,7 +39,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
   };
 
   render() {
-    if (this.state.hasError) {
+    const currentState = (this as any).state as State;
+    if (currentState?.hasError) {
       return (
         <div className="min-h-screen bg-neutral-900 text-white flex items-center justify-center p-6 font-sans">
           <div className="max-w-md w-full bg-neutral-950 border border-neutral-800 rounded-2xl p-8 shadow-2xl text-center flex flex-col items-center">
@@ -55,10 +56,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
               An unexpected error occurred while loading this view. You can refresh the page or return to the homepage.
             </p>
 
-            {this.state.error?.message && (
+            {currentState?.error?.message && (
               <div className="w-full bg-neutral-900/80 border border-neutral-800 rounded-xl p-3 mb-6 text-left overflow-x-auto">
                 <code className="text-xs text-red-400 font-mono break-all">
-                  {this.state.error.message}
+                  {currentState.error.message}
                 </code>
               </div>
             )}
@@ -82,6 +83,6 @@ export class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    return this.props.children;
+    return ((this as any).props as Props).children;
   }
 }

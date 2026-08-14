@@ -13,12 +13,14 @@ import {
 } from 'lucide-react';
 import { useBrandingStore } from '../../store/useBrandingStore';
 import { uploadImage } from '../../lib/imageUtils';
+import { loginBannerService } from '../../services/loginBannerService';
 
 export default function AdminAuthImages() {
   const { settings: branding, updateBranding, isLoaded } = useBrandingStore();
 
   const [maleImage, setMaleImage] = useState(branding.male_profile_image || '');
   const [femaleImage, setFemaleImage] = useState(branding.female_profile_image || '');
+  const [guestImage, setGuestImage] = useState(branding.default_profile_image || '');
   const [loginBanner, setLoginBanner] = useState(branding.login_banner || '');
 
   const [isSaving, setIsSaving] = useState(false);
@@ -29,11 +31,12 @@ export default function AdminAuthImages() {
     if (isLoaded) {
       setMaleImage(branding.male_profile_image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400&auto=format&fit=crop&q=80');
       setFemaleImage(branding.female_profile_image || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80');
+      setGuestImage(branding.default_profile_image || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80');
       setLoginBanner(branding.login_banner || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80');
     }
   }, [branding, isLoaded]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'male' | 'female' | 'banner') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'male' | 'female' | 'guest' | 'banner') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -42,6 +45,7 @@ export default function AdminAuthImages() {
       const url = await uploadImage(file, 'auth_assets', `${field}_${Date.now()}`);
       if (field === 'male') setMaleImage(url);
       else if (field === 'female') setFemaleImage(url);
+      else if (field === 'guest') setGuestImage(url);
       else if (field === 'banner') setLoginBanner(url);
     } catch (err) {
       console.error(`Failed to upload ${field} image:`, err);
@@ -57,11 +61,29 @@ export default function AdminAuthImages() {
     setSaveSuccess(false);
 
     try {
-      await updateBranding({
+      const payload = {
         male_profile_image: maleImage.trim(),
         female_profile_image: femaleImage.trim(),
+        default_profile_image: guestImage.trim(),
         login_banner: loginBanner.trim(),
+      };
+
+      await updateBranding(payload);
+
+      if (loginBanner.trim()) {
+        await loginBannerService.saveLoginBanner({
+          image_url: loginBanner.trim(),
+          title: 'Login Banner',
+          is_active: true
+        });
+      }
+
+      await fetch('/api/account-characters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3500);
     } catch (err: any) {
@@ -252,6 +274,85 @@ export default function AdminAuthImages() {
                   value={femaleImage} 
                   onChange={(e) => setFemaleImage(e.target.value)}
                   placeholder="https://example.com/female-avatar.jpg"
+                  className="w-full h-10 border border-neutral-200 px-3 text-xs focus:border-neutral-950 outline-none transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Guest Profile Image */}
+          <div className="bg-white border border-neutral-200 p-6 flex flex-col justify-between md:col-span-2">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-100 mb-4">
+                <div className="flex items-center gap-2">
+                  <User className="w-4 h-4 text-neutral-700" />
+                  <h2 className="text-sm font-black uppercase tracking-wider text-neutral-900">
+                    3. Guest Character Profile Image
+                  </h2>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded">
+                  Default Avatar
+                </span>
+              </div>
+
+              <p className="text-xs text-neutral-500 mb-4 leading-relaxed">
+                Customer/Guest Profile-এ gender নির্দিষ্ট না করা থাকলে বা <strong>Guest Character</strong> হিসেবে এই Circular Avatar Image দেখাবে।
+              </p>
+
+              {/* Circular Avatar Preview */}
+              <div className="flex items-center gap-4 mb-4">
+                <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-neutral-300 bg-neutral-100 shrink-0 shadow-xs">
+                  {guestImage ? (
+                    <img 
+                      src={guestImage} 
+                      alt="Guest Profile Default" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-neutral-400">
+                      <User className="w-8 h-8" />
+                    </div>
+                  )}
+                  {uploadingField === 'guest' && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 flex-1">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-2 bg-neutral-900 hover:bg-black text-white text-xs font-bold uppercase tracking-wider cursor-pointer rounded transition-all">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Image</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={(e) => handleFileUpload(e, 'guest')} 
+                      className="hidden" 
+                    />
+                  </label>
+                  {guestImage && (
+                    <button 
+                      type="button" 
+                      onClick={() => setGuestImage('')}
+                      className="block text-[11px] font-bold text-red-600 hover:text-red-700 uppercase tracking-wider"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Image URL Input */}
+              <div className="space-y-1">
+                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-neutral-500">
+                  Image Direct URL
+                </label>
+                <input 
+                  type="text" 
+                  value={guestImage} 
+                  onChange={(e) => setGuestImage(e.target.value)}
+                  placeholder="https://example.com/guest-avatar.jpg"
                   className="w-full h-10 border border-neutral-200 px-3 text-xs focus:border-neutral-950 outline-none transition-colors"
                 />
               </div>
