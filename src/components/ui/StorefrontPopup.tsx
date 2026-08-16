@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Copy, ArrowRight, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ export function StorefrontPopup() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const rotationTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [timeLeft, setTimeLeft] = useState(6);
 
   useEffect(() => {
     // Only show once per session ideally, but for testing we can show it on mount
@@ -29,14 +29,22 @@ export function StorefrontPopup() {
   const activeCampaign = campaigns[currentIndex];
 
   useEffect(() => {
-    if (isOpen && activeCampaign) {
-      rotationTimerRef.current = setTimeout(() => {
-        handleNext();
-      }, 2000); // Maximum 2 seconds
-    }
-    return () => {
-      if (rotationTimerRef.current) clearTimeout(rotationTimerRef.current);
-    };
+    if (!isOpen || !activeCampaign) return;
+
+    setTimeLeft(6);
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleNext();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, [isOpen, currentIndex, activeCampaign]);
 
   const handleNext = () => {
@@ -139,7 +147,7 @@ export function StorefrontPopup() {
                   onClick={(e) => { e.stopPropagation(); handleNext(); }}
                   className="flex-1 h-11 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold uppercase tracking-wider text-xs transition-colors"
                 >
-                  Skip
+                  Skip ({timeLeft})
                 </button>
                 <button 
                   onClick={handleView}
