@@ -476,7 +476,7 @@ export default function Checkout() {
         body: JSON.stringify({
           code: cleanCode,
           subtotal: subtotal
-        })
+        , items: items})
       });
       
       if (data.isValid) {

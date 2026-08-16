@@ -10,6 +10,7 @@ import { useCategoryStore } from '../../store/useCategoryStore';
 import { useProductStore, Product } from '../../store/useProductStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { usePromoStore } from '../../store/usePromoStore';
+import { campaignService, Campaign } from '../../services/campaignService';
 
 interface AdminPushNotificationsProps {
   activeTab?: 'create' | 'history';
@@ -57,6 +58,8 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
   // Modal Preview state
   const [viewNotif, setViewNotif] = useState<PromotionalNotification | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [dbCampaigns, setDbCampaigns] = useState<any[]>([]);
+  useEffect(() => { campaignService.getCampaigns().then(setDbCampaigns).catch(console.error); }, [currentTab]);
 
   // Toast State
   const [toastMsg, setToastMsg] = useState('');
@@ -84,8 +87,8 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        triggerToast('⚠️ File size exceeds 5MB limit');
+      if (file.size > 2 * 1024 * 1024) {
+        triggerToast('⚠️ File size exceeds 2MB limit (1200x800 recommended)');
         return;
       }
       const reader = new FileReader();
@@ -171,6 +174,7 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
   };
 
   // Submit Handler (Create or Update)
+  
   const handlePublishCampaign = async (status: 'Published' | 'Draft' = 'Published') => {
     if (!title.trim()) {
       triggerToast('⚠️ Title is required');
@@ -180,80 +184,50 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
       triggerToast('⚠️ Description is required');
       return;
     }
+    if (!coverImage.trim()) {
+      triggerToast('⚠️ Campaign Banner Image is required (1200x800)');
+      return;
+    }
 
-    const finalImage = coverImage.trim() ? coverImage.trim() : companyLogoFallback;
-    const finalCoupon = hasCoupon && couponCode.trim() ? couponCode.trim().toUpperCase() : undefined;
-
-    // Sync Coupon Code to Promo Store if created
-    if (finalCoupon) {
-      const exists = promoCodes.some(p => p.code.toUpperCase() === finalCoupon);
-      if (!exists) {
-        await addPromoCode({
-          name: couponDesc.trim() || `${finalCoupon} Campaign Coupon`,
+    try {
+      const finalCoupon = hasCoupon && couponCode.trim() ? couponCode.trim().toUpperCase() : undefined;
+      const dbStatus = status === 'Published' ? 'active' : 'draft';
+      
+      let couponData = undefined;
+      if (finalCoupon) {
+        couponData = {
           code: finalCoupon,
-          type: discountType,
-          value: Number(discountAmount) || 10,
-          minOrder: 0,
-          expiryDate: expiryDate || '2026-12-31',
-          usageLimit: 1000,
-          status: 'Active'
-        });
+          discount_type: discountType,
+          discount_value: Number(discountAmount) || 10,
+          active: true,
+        };
       }
+
+      await campaignService.createCampaign(
+        {
+          title: title.trim(),
+          description: description.trim(),
+          image_url: coverImage.trim(),
+          status: dbStatus
+        },
+        selectedProductIds,
+        selectedCategories,
+        couponData as any
+      );
+      
+      triggerToast(`✅ Campaign successfully saved (${dbStatus})`);
+      setTitle('');
+      setDescription('');
+      setCoverImage('');
+      setCouponCode('');
+      setHasCoupon(false);
+      setSelectedCategories([]);
+      setSelectedProductIds([]);
+      setCurrentTab('history');
+      campaignService.getCampaigns().then(setDbCampaigns).catch(console.error);
+    } catch (e: any) {
+      triggerToast('❌ Error saving campaign: ' + e.message);
     }
-
-    if (editingId) {
-      updateNotification(editingId, {
-        title: title.trim(),
-        description: description.trim(),
-        message: description.trim().slice(0, 120),
-        coverImage: finalImage,
-        bannerImage: finalImage,
-        selectedCategoryIds: selectedCategories,
-        selectedProductIds: selectedProductIds,
-        couponCode: finalCoupon,
-        couponDescription: couponDesc.trim(),
-        discountType,
-        discountAmount: Number(discountAmount) || 0,
-        expiryDate,
-        publishedStatus: status,
-      });
-      triggerToast(status === 'Published' ? '🚀 Campaign updated & published live!' : '💾 Campaign saved as Draft!');
-    } else {
-      addNotification({
-        title: title.trim(),
-        description: description.trim(),
-        message: description.trim().slice(0, 120),
-        coverImage: finalImage,
-        bannerImage: finalImage,
-        selectedCategoryIds: selectedCategories,
-        selectedProductIds: selectedProductIds,
-        couponCode: finalCoupon,
-        couponDescription: couponDesc.trim(),
-        discountType,
-        discountAmount: Number(discountAmount) || 0,
-        expiryDate,
-        publishedStatus: status,
-        totalSent: 1250,
-        totalOpened: 0,
-        totalClicked: 0
-      });
-      triggerToast(status === 'Published' ? '🚀 Campaign published live!' : '💾 Campaign saved as Draft!');
-    }
-
-    // Reset Form
-    setEditingId(null);
-    setTitle('');
-    setDescription('');
-    setCoverImage('');
-    setHasCoupon(false);
-    setCouponCode('');
-    setCouponDesc('');
-    setSelectedCategories([]);
-    setSelectedProductIds([]);
-    setProductSearch('');
-
-    setCurrentTab('history');
-    navigate('/admin/campaigns/history');
   };
 
   // Get selected products for modal view
@@ -429,6 +403,7 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
                   required
                   placeholder="Campaign title (e.g. 🔥 50% OFF Premium Watches & Accessories)"
                   value={title}
+                          maxLength={60}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900 resize-none overflow-hidden"
                 />
@@ -445,6 +420,7 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
                   required
                   placeholder="Full description text... Expands automatically."
                   value={description}
+                          maxLength={160}
                   onChange={(e) => setDescription(e.target.value)}
                   className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-900 resize-none overflow-hidden"
                 />
@@ -729,15 +705,16 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
           
           {/* HISTORY CAMPAIGN LIST */}
           <div className="space-y-2">
-            {notifications.length > 0 ? (
-              notifications.map((notif) => {
-                const cover = notif.coverImage || notif.bannerImage || companyLogoFallback;
-                const formattedDate = new Date(notif.createdAt).toLocaleDateString('en-GB', {
+            {dbCampaigns.length > 0 ? (
+              dbCampaigns.map((camp: any) => {
+                const notif = camp; // reuse var names temporarily
+                const cover = notif.image_url || companyLogoFallback;
+                const formattedDate = new Date(notif.created_at).toLocaleDateString('en-GB', {
                   day: '2-digit',
                   month: 'short',
                   year: 'numeric'
                 });
-                const formattedTime = new Date(notif.createdAt).toLocaleTimeString('en-US', {
+                const formattedTime = new Date(notif.created_at).toLocaleTimeString('en-US', {
                   hour: '2-digit',
                   minute: '2-digit',
                   hour12: true
@@ -844,7 +821,7 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
                         <button
                           onClick={() => {
                             if (confirm('Delete this campaign?')) {
-                              deleteNotification(notif.id);
+                              campaignService.deleteCampaign(notif.id).then(() => setDbCampaigns(prev => prev.filter(c => c.id !== notif.id)));
                               triggerToast('Campaign deleted.');
                             }
                           }}

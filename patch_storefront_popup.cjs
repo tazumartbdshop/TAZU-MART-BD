@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+const fs = require('fs');
+const file = 'src/components/ui/StorefrontPopup.tsx';
+
+let code = `import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Copy, ArrowRight, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -55,9 +58,9 @@ export function StorefrontPopup() {
   const handleView = () => {
     if (!activeCampaign) return;
     if (activeCampaign.products && activeCampaign.products.length > 0) {
-      navigate(`/product/${activeCampaign.products[0]}`);
+      navigate(\`/product/\${activeCampaign.products[0]}\`);
     } else if (activeCampaign.categories && activeCampaign.categories.length > 0) {
-      navigate(`/category/${activeCampaign.categories[0]}`);
+      navigate(\`/category/\${activeCampaign.categories[0]}\`);
     } else {
       navigate('/shop');
     }
@@ -156,3 +159,5 @@ export function StorefrontPopup() {
     </AnimatePresence>
   );
 }
+`;
+fs.writeFileSync(file, code);
