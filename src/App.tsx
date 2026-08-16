@@ -41,7 +41,7 @@ import MyReviews from './pages/MyReviews';
 import ReviewDetails from './pages/ReviewDetails';
 import Support from './pages/Support';
 import Offers from './pages/Offers';
-import OfferPage from './pages/OfferPage';
+import CampaignProductsPage from './pages/CampaignProductsPage';
 import Games from './pages/Games';
 import DeliveryPoints from './pages/DeliveryPoints';
 import { ThemeInitializer } from './ThemeInitializer';
@@ -325,7 +325,7 @@ export default function App() {
           <Route path="support" element={<Support />} />
           <Route path="offers" element={<Offers />} />
           <Route path="products" element={<AllProducts />} />
-          <Route path="offer-page" element={<OfferPage />} />
+          <Route path="campaign/:id" element={<CampaignProductsPage />} />
           <Route path="shop" element={<div className="container mx-auto py-24 text-center text-primary-900"><h1 className="text-4xl font-serif mb-4">All Products</h1><p className="text-gray-500">Shop all luxury items.</p></div>} />
           <Route path="categories" element={<Categories />} />
           <Route path="search" element={<Search />} />

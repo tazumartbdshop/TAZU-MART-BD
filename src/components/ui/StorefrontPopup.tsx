@@ -14,9 +14,11 @@ export function StorefrontPopup() {
   const [timeLeft, setTimeLeft] = useState(6);
 
   useEffect(() => {
-    // Only show once per session ideally, but for testing we can show it on mount
-    const hasSeen = sessionStorage.getItem('tazumart_campaigns_seen');
-    if (!hasSeen) {
+    // Check if the user has already seen the popup in this specific session.
+    // We use sessionStorage so it persists during website navigation/refreshes,
+    // but resets completely when the user leaves the site or closes the tab.
+    const hasSeenInSession = sessionStorage.getItem('tazumart_campaigns_seen');
+    if (!hasSeenInSession) {
       campaignService.getActiveCampaigns().then(data => {
         if (data.length > 0) {
           setCampaigns(data);
@@ -62,13 +64,7 @@ export function StorefrontPopup() {
 
   const handleView = () => {
     if (!activeCampaign) return;
-    if (activeCampaign.products && activeCampaign.products.length > 0) {
-      navigate(`/product/${activeCampaign.products[0]}`);
-    } else if (activeCampaign.categories && activeCampaign.categories.length > 0) {
-      navigate(`/category/${activeCampaign.categories[0]}`);
-    } else {
-      navigate('/shop');
-    }
+    navigate(`/campaign/${activeCampaign.id}`);
     handleClose();
   };
 
