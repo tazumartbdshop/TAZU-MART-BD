@@ -228,31 +228,35 @@ export default function MainHeroCarousel({ banners }: MainHeroCarouselProps) {
         )}
       </div>
 
-      {/* Dynamic Action Button For Active Banner */}
-      {currentBanner && currentBanner.buttonEnabled && currentBanner.buttonText && (
-        <div className="w-full flex justify-center mt-2 mb-2 bg-transparent relative z-10">
-          {isExternalLink ? (
-            <a
-              href={bannerLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              className="flex items-center justify-center min-w-[120px] max-w-[220px] h-[40px] px-6 bg-black text-white hover:bg-neutral-800 hover:scale-105 transition-all rounded-lg font-bold text-xs uppercase shadow-md gap-2 whitespace-nowrap relative z-50 pointer-events-auto"
-            >
-              {currentBanner.buttonText}
-              <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-            </a>
-          ) : (
-            <Link
-              to={bannerLink}
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              className="flex items-center justify-center min-w-[120px] max-w-[220px] h-[40px] px-6 bg-black text-white hover:bg-neutral-800 hover:scale-105 transition-all rounded-lg font-bold text-xs uppercase shadow-md gap-2 whitespace-nowrap relative z-50 pointer-events-auto"
-            >
-              {currentBanner.buttonText}
-              <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-            </Link>
+      {/* Dynamic Action Button For Active Banner Overlay */}
+      {currentBanner && currentBanner.buttonEnabled && (
+        <div className="absolute inset-0 bg-black/30 flex items-end justify-center pb-6 md:pb-12 z-20 pointer-events-none">
+          {currentBanner.buttonText && (
+            <div className="pointer-events-auto relative z-50">
+              {isExternalLink ? (
+                <a
+                  href={bannerLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="flex items-center justify-center h-[36px] md:h-[48px] px-6 md:px-10 bg-white text-black hover:bg-zinc-100 hover:scale-105 transition-all rounded font-black text-xs md:text-sm uppercase tracking-widest shadow-xl gap-2 whitespace-nowrap"
+                >
+                  {currentBanner.buttonText}
+                  <ArrowRight className="w-4 h-4 shrink-0" />
+                </a>
+              ) : (
+                <Link
+                  to={bannerLink}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="flex items-center justify-center h-[36px] md:h-[48px] px-6 md:px-10 bg-white text-black hover:bg-zinc-100 hover:scale-105 transition-all rounded font-black text-xs md:text-sm uppercase tracking-widest shadow-xl gap-2 whitespace-nowrap"
+                >
+                  {currentBanner.buttonText}
+                  <ArrowRight className="w-4 h-4 shrink-0" />
+                </Link>
+              )}
+            </div>
           )}
         </div>
       )}

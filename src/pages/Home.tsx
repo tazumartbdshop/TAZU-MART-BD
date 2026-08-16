@@ -213,46 +213,10 @@ export default function Home() {
               />
 
               {/* Text and CTA Button Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/35 flex flex-col justify-end pb-3 sm:pb-6 md:pb-8 lg:pb-10 px-3 sm:px-6 md:px-12 z-10 select-text">
-                <div className="max-w-2xl space-y-1 sm:space-y-2">
-                  {/* 1. Title (name) */}
-                  {sliderBanners[activeSlide].name && !isNumericOrId(sliderBanners[activeSlide].name) && (
-                    <motion.h2 
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.15, duration: 0.4 }}
-                      className="text-xs sm:text-base md:text-2xl lg:text-3xl xl:text-4xl font-black text-white uppercase tracking-wider drop-shadow-md font-sans"
-                    >
-                      {sliderBanners[activeSlide].name}
-                    </motion.h2>
-                  )}
-
-                  {/* 2. Subtitle (offerText) */}
-                  {sliderBanners[activeSlide].offerText && !isNumericOrId(sliderBanners[activeSlide].offerText) && (
-                    <motion.h3
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2, duration: 0.4 }}
-                      className="text-amber-400 text-[8px] sm:text-xs md:text-sm font-black uppercase tracking-[0.2em] drop-shadow-sm"
-                    >
-                      {sliderBanners[activeSlide].offerText}
-                    </motion.h3>
-                  )}
-                  
-                  {/* 3. Description */}
-                  {sliderBanners[activeSlide].description && !isNumericOrId(sliderBanners[activeSlide].description) && (
-                    <motion.p 
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.25, duration: 0.4 }}
-                      className="text-white/90 text-[8px] sm:text-xs md:text-sm font-semibold uppercase tracking-widest max-w-xl drop-shadow-sm line-clamp-1 sm:line-clamp-2"
-                    >
-                      {sliderBanners[activeSlide].description}
-                    </motion.p>
-                  )}
-
-                  {/* 4. CTA Button */}
-                  {sliderBanners[activeSlide].buttonText && sliderBanners[activeSlide].buttonLink && (
+              {sliderBanners[activeSlide].buttonEnabled && sliderBanners[activeSlide].buttonText && (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/35 flex flex-col justify-end pb-3 sm:pb-6 md:pb-8 lg:pb-10 px-3 sm:px-6 md:px-12 z-10 select-text pointer-events-none">
+                  <div className="max-w-2xl space-y-1 sm:space-y-2 pointer-events-auto">
+                    {/* 4. CTA Button */}
                     <motion.div
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -260,16 +224,16 @@ export default function Home() {
                       className="pt-1 sm:pt-2"
                     >
                       <Link 
-                        to={sliderBanners[activeSlide].buttonLink}
+                        to={sliderBanners[activeSlide].buttonLink || '/'}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-4 sm:py-2.5 bg-black hover:bg-neutral-900 border border-white/20 hover:border-white/40 text-white text-[7px] sm:text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-150 active:scale-95 shadow-lg"
                       >
                         {sliderBanners[activeSlide].buttonText}
                         <span className="text-[8px] sm:text-xs font-light">&rarr;</span>
                       </Link>
                     </motion.div>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
             </motion.div>
           </AnimatePresence>
 
