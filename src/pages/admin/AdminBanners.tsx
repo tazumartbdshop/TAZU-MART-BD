@@ -324,20 +324,23 @@ export default function AdminBanners() {
 
     try {
       // 1. Always sync profile characters (Male, Female, Guest) to database & backend API
-      const charactersPayload = {
-        male_profile_image: maleImage.trim(),
-        female_profile_image: femaleImage.trim(),
-        default_profile_image: guestImage.trim(),
-      };
-      await updateBranding(charactersPayload);
-      try {
-        await fetch('/api/account-characters', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(charactersPayload)
-        });
-      } catch (cApiErr) {
-        console.warn("Account characters API sync note:", cApiErr);
+      // Only sync account character profile images when editing/saving Login Banner
+      if (bannerCategory === 'login') {
+        const charactersPayload = {
+          male_profile_image: maleImage.trim(),
+          female_profile_image: femaleImage.trim(),
+          default_profile_image: guestImage.trim(),
+        };
+        await updateBranding(charactersPayload);
+        try {
+          await fetch('/api/account-characters', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(charactersPayload)
+          });
+        } catch (cApiErr) {
+          console.warn("Account characters API sync note:", cApiErr);
+        }
       }
 
       const currentBannersLength = useBannerStore.getState().banners.length;
@@ -377,12 +380,15 @@ export default function AdminBanners() {
             newBanners.push(bannerData);
 
             if (isLogin) {
-              await loginBannerService.saveLoginBanner({
+              const savedRec = await loginBannerService.saveLoginBanner({
                 title: bannerData.name,
                 image_url: downloadUrl,
                 is_active: true,
                 sort_order: currentOrder
               });
+              if (savedRec?.id) {
+                bannerData.id = savedRec.id;
+              }
               await updateBranding({ login_banner: downloadUrl });
             }
 
@@ -393,7 +399,6 @@ export default function AdminBanners() {
           }
         }
       } else if (bannerCategory === 'login') {
-        // If no file was dropped, but user is saving Login Banner (e.g. from existing URL or character changes)
         const currentBranding = useBrandingStore.getState().settings;
         const bannerUrlToSave = (currentBranding.login_banner || '').trim();
         if (bannerUrlToSave) {
@@ -404,53 +409,48 @@ export default function AdminBanners() {
           });
           await updateBranding({ login_banner: bannerUrlToSave });
         }
+        await useBannerStore.getState().fetchAllBanners();
         toast.success('🎉 Login Banner & Account Profile Characters saved successfully!');
         setIsDirty(false);
         setIsSubmitting(false);
+        navigate('/admin/banner/list');
         return;
       }
 
       if (successCount > 0) {
-        const supabase = getSupabase();
-        const { objectToSnake } = await import('../../lib/supabaseUtils');
-        const dbPayloads = objectToSnake(newBanners);
+        if (bannerCategory !== 'login') {
+          // Main Banner POST API + Supabase sync
+          const apiRes = await fetch('/api/banners', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ banners: newBanners })
+          });
+          if (!apiRes.ok) {
+            const errData = await apiRes.json().catch(() => ({}));
+            throw new Error(errData.error || `Failed to save main banner to server (Status: ${apiRes.status})`);
+          }
 
-        if (bannerCategory === 'login') {
-          // Sync all new login banners via service
-          for (const b of newBanners) {
+          const supabase = getSupabase();
+          if (supabase) {
+            const allMainBanners = [...useBannerStore.getState().banners.filter(b => b.bannerCategory !== 'login' && b.bannerCategory !== 'login_banner' && !newBanners.some(nb => nb.id === b.id)), ...newBanners];
             try {
-              await loginBannerService.saveLoginBanner({
-                title: b.name,
-                image_url: b.image,
-                is_active: b.status === 'active',
-                sort_order: b.order || 0
+              await supabase.from('settings').upsert({
+                id: 'main_hero_banners',
+                value: JSON.stringify(allMainBanners)
               });
-            } catch (lErr) {
-              console.warn("login_banners sync note:", lErr);
+            } catch (sbErr: any) {
+              console.warn("Supabase main banner settings save notice:", sbErr);
             }
-          }
-        } else if (supabase) {
-          // For Main Banners, save to `banners` and `banners_draft` tables
-          const { error: bannersErr } = await supabase.from('banners').upsert(dbPayloads);
-          if (bannersErr) {
-            console.warn("Banners upsert notice:", bannersErr.message);
-          }
-
-          try {
-            await supabase.from('banners_draft').upsert(dbPayloads);
-          } catch (draftErr) {
-            console.warn("banners_draft upsert note:", draftErr);
           }
         }
 
-        const existingBanners = useBannerStore.getState().banners;
-        const updatedBanners = [...existingBanners.filter(b => !newBanners.some(n => n.id === b.id)), ...newBanners];
-        useBannerStore.getState().setBanners(updatedBanners);
+        // Re-fetch authoritative banners state from server
+        await useBannerStore.getState().fetchAllBanners();
         
         localPreviews.forEach(p => URL.revokeObjectURL(p.previewUrl));
         setLocalPreviews([]);
         
-        toast.success(`🎉 ${successCount} Banner(s) (${bannerCategory === 'login' ? 'LOGIN BANNER' : 'MAIN BANNER'}) & Characters saved successfully.`);
+        toast.success(`🎉 ${successCount} ${bannerCategory === 'login' ? 'Login Banner' : 'Main Banner'} saved successfully.`);
         
         setIsDirty(false);
         navigate('/admin/banner/list');
@@ -836,144 +836,146 @@ export default function AdminBanners() {
 
         {/* ======================================================================= */}
         {/* SECTION 2: ACCOUNT PROFILE CHARACTERS (Male, Female, Guest)             */}
-        {/* Strictly separated from banners; saved to Account Character Settings    */}
+        {/* Strictly separated from banners; belongs exclusively to Login Banner     */}
         {/* ======================================================================= */}
-        <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-6 space-y-4 shadow-xs">
-          <div className="border-b border-zinc-100 pb-3">
-            <h3 className="text-xs font-black text-black uppercase tracking-wider">
-              ACCOUNT PROFILE CHARACTERS
-            </h3>
-            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
-              Default fallback avatars for Male, Female, and Guest customer profiles (Saved directly to Account Character Settings; not included in Banner Listing)
-            </p>
+        {bannerCategory === 'login' && (
+          <div className="bg-white border border-zinc-200 rounded-none p-4 md:p-6 space-y-4 shadow-xs">
+            <div className="border-b border-zinc-100 pb-3">
+              <h3 className="text-xs font-black text-black uppercase tracking-wider">
+                ACCOUNT PROFILE CHARACTERS
+              </h3>
+              <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
+                Default fallback avatars for Male, Female, and Guest customer profiles (Saved directly to Account Character Settings; not included in Banner Listing)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              
+              {/* Slot 1: Male */}
+              <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
+                    <img 
+                      src={maleImage} 
+                      alt="Male Character" 
+                      className="w-full h-full object-cover rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                    {characterUploadingSlot === 'male' && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-black leading-none">Male Character</h4>
+                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    onClick={() => handleCharacterSlotClick('male')}
+                    className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
+                  >
+                    Upload / Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResetCharacterSlot('male')}
+                    className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
+                    title="Reset to default"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Slot 2: Female */}
+              <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
+                    <img 
+                      src={femaleImage} 
+                      alt="Female Character" 
+                      className="w-full h-full object-cover rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                    {characterUploadingSlot === 'female' && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-black leading-none">Female Character</h4>
+                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    onClick={() => handleCharacterSlotClick('female')}
+                    className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
+                  >
+                    Upload / Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResetCharacterSlot('female')}
+                    className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
+                    title="Reset to default"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              {/* Slot 3: Guest */}
+              <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
+                    <img 
+                      src={guestImage} 
+                      alt="Guest Character" 
+                      className="w-full h-full object-cover rounded-full"
+                      referrerPolicy="no-referrer"
+                    />
+                    {characterUploadingSlot === 'guest' && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-black leading-none">Guest Character</h4>
+                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    onClick={() => handleCharacterSlotClick('guest')}
+                    className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
+                  >
+                    Upload / Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResetCharacterSlot('guest')}
+                    className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
+                    title="Reset to default"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            
-            {/* Slot 1: Male */}
-            <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
-                  <img 
-                    src={maleImage} 
-                    alt="Male Character" 
-                    className="w-full h-full object-cover rounded-full"
-                    referrerPolicy="no-referrer"
-                  />
-                  {characterUploadingSlot === 'male' && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase text-black leading-none">Male Character</h4>
-                  <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
-                <button
-                  type="button"
-                  onClick={() => handleCharacterSlotClick('male')}
-                  className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
-                >
-                  Upload / Change
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleResetCharacterSlot('male')}
-                  className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
-                  title="Reset to default"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-
-            {/* Slot 2: Female */}
-            <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
-                  <img 
-                    src={femaleImage} 
-                    alt="Female Character" 
-                    className="w-full h-full object-cover rounded-full"
-                    referrerPolicy="no-referrer"
-                  />
-                  {characterUploadingSlot === 'female' && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase text-black leading-none">Female Character</h4>
-                  <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
-                <button
-                  type="button"
-                  onClick={() => handleCharacterSlotClick('female')}
-                  className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
-                >
-                  Upload / Change
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleResetCharacterSlot('female')}
-                  className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
-                  title="Reset to default"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-
-            {/* Slot 3: Guest */}
-            <div className="border border-zinc-200 p-3 bg-zinc-50/50 flex flex-col justify-between space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="relative w-12 h-12 rounded-full overflow-hidden border border-zinc-300 bg-white shrink-0">
-                  <img 
-                    src={guestImage} 
-                    alt="Guest Character" 
-                    className="w-full h-full object-cover rounded-full"
-                    referrerPolicy="no-referrer"
-                  />
-                  {characterUploadingSlot === 'guest' && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <h4 className="text-xs font-black uppercase text-black leading-none">Guest Character</h4>
-                  <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider mt-1 block">● Active Setting</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1 border-t border-zinc-100">
-                <button
-                  type="button"
-                  onClick={() => handleCharacterSlotClick('guest')}
-                  className="flex-1 py-1.5 bg-black text-white text-[9px] font-black uppercase tracking-wider hover:bg-neutral-800 cursor-pointer"
-                >
-                  Upload / Change
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleResetCharacterSlot('guest')}
-                  className="px-2 py-1.5 bg-zinc-200 text-neutral-700 text-[9px] font-black uppercase hover:bg-zinc-300 cursor-pointer"
-                  title="Reset to default"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Bottom Save / Action Bar */}
         <div className="flex items-center justify-end gap-3 pt-2">

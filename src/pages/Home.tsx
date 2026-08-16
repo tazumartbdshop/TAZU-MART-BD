@@ -80,9 +80,9 @@ export default function Home() {
     link: `/category/${cat.id || cat.slug || 'all'}`
   }));
 
-  // Filter Active Banners from DB
+  // Filter Active Main Hero Banners from DB
   const uploadedBanners = (storeBanners || [])
-    .filter(b => b && b.status === 'active' && b.image && b.image.trim() !== '');
+    .filter(b => b && b.status === 'active' && b.image && b.image.trim() !== '' && b.bannerCategory !== 'login_banner' && b.bannerCategory !== 'login' && b.bannerType !== 'login_banner');
 
   // If DB banners are set, use them, otherwise empty array as we do not use demo banners
   const sliderBanners = uploadedBanners;
@@ -190,9 +190,9 @@ export default function Home() {
   return (
     <div className="bg-neutral-50/50 min-h-screen pb-0 overflow-x-clip font-sans">
       
-      {/* 1. MAIN SLIDER BANNER (Responsive Balance Ratio: Desktop 1920:650 / Tablet 1200:500 / Mobile 1080:500) */}
+      {/* 1. MAIN SLIDER BANNER (Exact 1920 × 650 px Ratio (~2.95:1) preserved across all viewports) */}
       {sliderBanners.length > 0 && (
-        <section className="relative w-full aspect-[1080/500] sm:aspect-[1200/500] md:aspect-[1920/650] bg-neutral-900 overflow-hidden select-none">
+        <section className="relative w-full aspect-[1920/650] bg-neutral-900 overflow-hidden select-none">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSlide}

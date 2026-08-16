@@ -73,7 +73,8 @@ interface BannerState {
   removeBanner: (id: string) => void;
   removeDraftBanner: (id: string) => void;
   deleteBannerPermanently: (id: string) => Promise<void>;
-  reorderBanners: (startIndex: number, endIndex: number) => void;
+  fetchAllBanners: () => Promise<void>;
+  reorderBanners: (startIndex: number, endIndex: number, filterType?: 'all' | 'main' | 'login') => void;
   reorderDraftBanners: (startIndex: number, endIndex: number) => void;
   saveDraftBanners: () => Promise<void>;
   publishBanners: () => Promise<void>;
@@ -115,102 +116,172 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     duration: 5,
   },
 
+  fetchAllBanners: async () => {
+    const supabase = getSupabase();
+    try {
+      let fetchedMain: Banner[] = [];
+      let fetchedLogin: Banner[] = [];
+
+      // 1. Fetch Main Banners from API (which loads from Supabase settings & local backup)
+      try {
+        const mainRes = await fetch('/api/banners', { cache: 'no-store' });
+        if (mainRes.ok) {
+          const json = await mainRes.json();
+          if (json.success && Array.isArray(json.banners)) {
+            fetchedMain = json.banners.map((row: any) => {
+              const item = objectToCamel(row) as Banner;
+              item.bannerType = 'main_banner';
+              item.bannerCategory = 'main_banner';
+              return item;
+            });
+          }
+        }
+      } catch (mErr) {
+        console.warn("API fetch /api/banners notice:", mErr);
+      }
+
+      // 2. Fetch Login Banners from API
+      try {
+        const loginRes = await fetch('/api/login-banner', { cache: 'no-store' });
+        if (loginRes.ok) {
+          const json = await loginRes.json();
+          if (json.success && Array.isArray(json.banners) && json.banners.length > 0) {
+            fetchedLogin = json.banners.map((row: any) => ({
+              id: String(row.id || `login_${Date.now()}`),
+              name: row.title || 'Login Banner',
+              image: row.image_url || row.image || '',
+              buttonEnabled: false,
+              buttonText: '',
+              buttonLink: '',
+              isCustomButtonText: false,
+              status: row.is_active !== false ? 'active' : 'hidden',
+              order: Number(row.sort_order ?? 0),
+              bannerType: 'login_banner',
+              bannerCategory: 'login_banner',
+              locations: ['auth-page'],
+              bannerSize: 'hero',
+              createdDate: row.created_at || new Date().toISOString()
+            }));
+          } else if (json.success && json.url) {
+            fetchedLogin = [{
+              id: 'active_login_banner',
+              name: 'Login Banner',
+              image: json.url,
+              buttonEnabled: false,
+              buttonText: '',
+              buttonLink: '',
+              isCustomButtonText: false,
+              status: 'active',
+              order: 0,
+              bannerType: 'login_banner',
+              bannerCategory: 'login_banner',
+              locations: ['auth-page'],
+              bannerSize: 'hero',
+              createdDate: new Date().toISOString()
+            }];
+          }
+        }
+      } catch (lErr) {
+        console.warn("API fetch /api/login-banner notice:", lErr);
+      }
+
+      // 3. Fallback ONLY if API queries returned no results
+      if (supabase) {
+        try {
+          if (fetchedMain.length === 0) {
+            const { data: sData } = await supabase.from('settings').select('value').eq('id', 'main_hero_banners').maybeSingle();
+            if (sData?.value) {
+              const parsed = typeof sData.value === 'string' ? JSON.parse(sData.value) : sData.value;
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                fetchedMain = parsed.map((row: any) => {
+                  const item = objectToCamel(row) as Banner;
+                  item.bannerType = 'main_banner';
+                  item.bannerCategory = 'main_banner';
+                  return item;
+                });
+              }
+            }
+          }
+
+          if (fetchedLogin.length === 0) {
+            const { data: loginData } = await supabase
+              .from('login_banners')
+              .select('*')
+              .order('sort_order', { ascending: true });
+
+            if (loginData && loginData.length > 0) {
+              fetchedLogin = loginData.map((row: any) => ({
+                id: String(row.id || `login_${Date.now()}`),
+                name: row.title || 'Login Banner',
+                image: row.image_url || row.image || '',
+                buttonEnabled: false,
+                buttonText: '',
+                buttonLink: '',
+                isCustomButtonText: false,
+                status: row.is_active !== false ? 'active' : 'hidden',
+                order: Number(row.sort_order ?? 0),
+                bannerType: 'login_banner',
+                bannerCategory: 'login_banner',
+                locations: ['auth-page'],
+                bannerSize: 'hero',
+                createdDate: row.created_at || new Date().toISOString()
+              }));
+            }
+          }
+        } catch (sbErr) {
+          console.warn("Supabase query fallback notice:", sbErr);
+        }
+      }
+
+      // Filter valid banners (keeping all active banners from database)
+      const cleanMain = fetchedMain.filter(b => b && (b.status as string) !== 'deleted' && (b as any).is_active !== false && b.image && b.image.trim() !== '');
+      const cleanLogin = fetchedLogin.filter(b => b && (b.status as string) !== 'deleted' && (b as any).is_active !== false && (b.image && b.image.trim() !== ''));
+
+      const combined = [...cleanMain, ...cleanLogin];
+
+      set({ banners: combined, isLoaded: true });
+      saveCachedBanners(combined);
+    } catch (err) {
+      console.warn("Banner fetch fallback:", err);
+      set({ isLoaded: true });
+    }
+  },
+
   subscribe: () => {
     const supabase = getSupabase();
     if (!supabase) {
-        set({ isLoaded: true });
-        return () => {};
+      set({ isLoaded: true });
+      return () => {};
     }
 
-    const mapRowToBanner = (row: any): Banner => {
-      const item = objectToCamel(row) as Banner;
-      const isLogin = item.bannerType === 'login_banner' || 
-                      row.banner_type === 'login_banner' || 
-                      item.bannerCategory === 'login' || 
-                      item.bannerCategory === 'login_banner' ||
-                      row.banner_category === 'login' ||
-                      row.banner_category === 'login_banner';
-      item.bannerType = isLogin ? 'login_banner' : 'main_banner';
-      item.bannerCategory = isLogin ? 'login_banner' : 'main_banner';
-      return item;
-    };
+    get().fetchAllBanners();
 
-    const mapLoginBannerRow = (row: any): Banner => ({
-      id: String(row.id),
-      name: row.title || 'Login Banner',
-      image: row.image_url || '',
-      buttonEnabled: false,
-      buttonText: '',
-      buttonLink: '',
-      isCustomButtonText: false,
-      status: row.is_active ? 'active' : 'hidden',
-      order: Number(row.sort_order ?? 0),
-      bannerType: 'login_banner',
-      bannerCategory: 'login_banner',
-      locations: ['auth-page'],
-      bannerSize: 'hero',
-      createdDate: row.created_at || new Date().toISOString()
-    });
-
-    const fetchAllBanners = async () => {
-      try {
-        const { data: mainData } = await supabase.from('banners').select('*').order('order', { ascending: true });
-        let mapped = ((mainData || []) as any[]).map(mapRowToBanner);
-
-        // Also fetch from login_banners table if present
-        const { data: loginData } = await supabase.from('login_banners').select('*').order('sort_order', { ascending: true });
-        if (loginData && loginData.length > 0) {
-          const mappedLogins = (loginData as any[]).map(mapLoginBannerRow);
-          // Merge avoiding ID collisions
-          const existingIds = new Set(mapped.map(m => m.id));
-          const newLogins = mappedLogins.filter(l => !existingIds.has(l.id));
-          mapped = [...mapped, ...newLogins];
-        }
-
-        set({ banners: mapped, isLoaded: true });
-        saveCachedBanners(mapped);
-      } catch (err) {
-        console.warn("Banner fetch fallback:", err);
-        set({ isLoaded: true });
+    // Listen to local broadcast sync events
+    const unsubBroadcast = broadcastSync.subscribe('banners', (newBanners: Banner[]) => {
+      if (Array.isArray(newBanners) && newBanners.length > 0) {
+        set({ banners: newBanners, isLoaded: true });
+        saveCachedBanners(newBanners);
       }
-    };
-
-    fetchAllBanners();
-
-    supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-        if (!error && data) set({ draftBanners: (data as any[]).map(mapRowToBanner) });
     });
-    
-    // Fake slider config for now since we don't have key-value tables 
-    // unless we create a generic settings table. 
 
-    const channelLive = supabase
-      .channel('public:banners:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'banners' }, () => {
-        fetchAllBanners();
+    const channelSettings = supabase
+      .channel('public:settings:banners:' + Math.random().toString(36).substring(2, 9))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'settings', filter: 'id=eq.main_hero_banners' }, () => {
+        get().fetchAllBanners();
       })
       .subscribe();
 
     const channelLoginBanners = supabase
       .channel('public:login_banners:' + Math.random().toString(36).substring(2, 9))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'login_banners' }, () => {
-        fetchAllBanners();
-      })
-      .subscribe();
-
-    const channelDraft = supabase
-      .channel('public:banners_draft:' + Math.random().toString(36).substring(2, 9))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'banners_draft' }, (payload) => {
-          supabase.from('banners_draft').select('*').order('order', { ascending: true }).then(({ data, error }) => {
-            if (!error && data) set({ draftBanners: (data as any[]).map(mapRowToBanner) });
-          });
+        get().fetchAllBanners();
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channelLive);
+      unsubBroadcast();
+      supabase.removeChannel(channelSettings);
       supabase.removeChannel(channelLoginBanners);
-      supabase.removeChannel(channelDraft);
     };
   },
 
@@ -227,7 +298,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
 
   updateSliderConfigLocal: (autoSlide, duration) => set({ sliderConfig: { autoSlide, duration } }),
 
-  updateBanner: (id, updates) => {
+  updateBanner: async (id, updates) => {
     const bannerToUpdate = get().banners.find(b => b.id === id);
     const isLogin = bannerToUpdate?.bannerCategory === 'login' || bannerToUpdate?.bannerCategory === 'login_banner';
     
@@ -235,21 +306,40 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
     broadcastSync.publish('banners', nextBanners);
-    const supabase = getSupabase();
-    if (supabase) {
-      if (isLogin) {
-        const loginUpdates: any = {};
-        if (updates.name !== undefined) loginUpdates.title = updates.name;
-        if (updates.image !== undefined) loginUpdates.image_url = updates.image;
-        if (updates.status !== undefined) loginUpdates.is_active = updates.status === 'active';
-        if (updates.order !== undefined) loginUpdates.sort_order = updates.order;
-        if (Object.keys(loginUpdates).length > 0) {
-          supabase.from('login_banners').update(loginUpdates).eq('id', id).then(({error}) => error && console.warn(error));
+
+    try {
+      const supabase = getSupabase();
+      if (!isLogin) {
+        const updatedBanner = nextBanners.find(b => b.id === id);
+        if (updatedBanner) {
+          await fetch('/api/banners', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ banner: updatedBanner })
+          });
+        }
+        if (supabase) {
+          const mainBanners = nextBanners.filter(b => b.bannerCategory !== 'login' && b.bannerCategory !== 'login_banner');
+          await supabase.from('settings').upsert({
+            id: 'main_hero_banners',
+            value: JSON.stringify(mainBanners)
+          });
         }
       } else {
-        const dbPayload = objectToSnake(updates);
-        supabase.from('banners').update(dbPayload).eq('id', id).then(({error}) => error && console.warn(error));
+        if (supabase) {
+          const loginUpdates: any = {};
+          if (updates.name !== undefined) loginUpdates.title = updates.name;
+          if (updates.image !== undefined) loginUpdates.image_url = updates.image;
+          if (updates.status !== undefined) loginUpdates.is_active = updates.status === 'active';
+          if (updates.order !== undefined) loginUpdates.sort_order = updates.order;
+          if (Object.keys(loginUpdates).length > 0) {
+            await supabase.from('login_banners').update(loginUpdates).eq('id', id);
+          }
+        }
       }
+      await get().fetchAllBanners();
+    } catch (err) {
+      console.warn("updateBanner notice:", err);
     }
   },
 
@@ -263,7 +353,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     const newBanner: Banner = {
       id,
       image: '',
-      name: type === 'designed' ? 'New Summer Banner' : '',
+      name: type === 'designed' ? 'New Summer Banner' : 'New Banner',
       description: type === 'designed' ? 'Up to 50% Off on Premium Categories' : '',
       buttonEnabled: type === 'designed',
       buttonText: 'Shop Now',
@@ -272,12 +362,13 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       locations: ['homepage-hero'],
       bannerSize: 'hero',
       isCustomButtonText: type === 'designed',
-      status: 'draft',
+      status: 'active',
       order: get().banners.length,
-      bannerType: type,
-      backgroundColor: type === 'designed' ? '#1e1b4b' : '', // Royal Indigo
+      bannerType: 'main_banner',
+      bannerCategory: 'main_banner',
+      backgroundColor: type === 'designed' ? '#1e1b4b' : '',
       textColor: type === 'designed' ? '#ffffff' : '',
-      buttonColor: type === 'designed' ? '#fbbf24' : '', // Amber 400
+      buttonColor: type === 'designed' ? '#fbbf24' : '',
       buttonTextColor: type === 'designed' ? '#111111' : '',
       borderColor: type === 'designed' ? '#312e81' : '',
       fontFamily: 'sans',
@@ -288,15 +379,26 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       discountText: type === 'designed' ? '60% FLAT OFF' : '',
       stickerType: 'none',
       countdownEnabled: false,
+      createdDate: new Date().toISOString(),
     };
     const nextBanners = [...get().banners, newBanner];
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
     broadcastSync.publish('banners', nextBanners);
+
+    fetch('/api/banners', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ banner: newBanner })
+    }).catch(console.warn);
+
     const supabase = getSupabase();
     if (supabase) {
-      const dbPayload = objectToSnake(newBanner);
-      supabase.from('banners').insert([dbPayload]).then(({error}) => error && console.warn(error));
+      const mainBanners = nextBanners.filter(b => b.bannerCategory !== 'login' && b.bannerCategory !== 'login_banner');
+      supabase.from('settings').upsert({
+        id: 'main_hero_banners',
+        value: JSON.stringify(mainBanners)
+      }).then(({ error }) => { if (error) console.warn(error); });
     }
   },
 
@@ -305,7 +407,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     const newBanner: Banner = {
       id,
       image: '',
-      name: type === 'designed' ? 'New Summer Banner' : '',
+      name: type === 'designed' ? 'New Summer Banner' : 'New Banner',
       description: type === 'designed' ? 'Up to 50% Off on Premium Categories' : '',
       buttonEnabled: type === 'designed',
       buttonText: 'Shop Now',
@@ -316,10 +418,11 @@ export const useBannerStore = create<BannerState>((set, get) => ({
       isCustomButtonText: type === 'designed',
       status: 'draft',
       order: get().draftBanners.length,
-      bannerType: type,
-      backgroundColor: type === 'designed' ? '#1e1b4b' : '', // Royal Indigo
+      bannerType: 'main_banner',
+      bannerCategory: 'main_banner',
+      backgroundColor: type === 'designed' ? '#1e1b4b' : '',
       textColor: type === 'designed' ? '#ffffff' : '',
-      buttonColor: type === 'designed' ? '#fbbf24' : '', // Amber 400
+      buttonColor: type === 'designed' ? '#fbbf24' : '',
       buttonTextColor: type === 'designed' ? '#111111' : '',
       borderColor: type === 'designed' ? '#312e81' : '',
       fontFamily: 'sans',
@@ -355,14 +458,30 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   },
 
   removeBanner: (id) => {
-    const nextBanners = get().banners.filter((b) => b.id !== id);
+    const allBanners = get().banners;
+    const isLogin = allBanners.find(b => b.id === id)?.bannerCategory === 'login_banner' || allBanners.find(b => b.id === id)?.bannerCategory === 'login';
+
+    const nextBanners = allBanners.filter((b) => b.id !== id);
     set({ banners: nextBanners });
     saveCachedBanners(nextBanners);
     broadcastSync.publish('banners', nextBanners);
+
     const supabase = getSupabase();
-    if (supabase) {
-      supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
-      supabase.from('login_banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
+
+    if (isLogin) {
+      fetch(`/api/login-banners/${id}`, { method: 'DELETE' }).catch(console.warn);
+      if (supabase) {
+        supabase.from('login_banners').delete().eq('id', id).then(({ error }) => { if (error) console.warn(error); });
+      }
+    } else {
+      fetch(`/api/banners/${id}`, { method: 'DELETE' }).catch(console.warn);
+      if (supabase) {
+        const mainBanners = nextBanners.filter(b => b.bannerCategory !== 'login' && b.bannerCategory !== 'login_banner');
+        supabase.from('settings').upsert({
+          id: 'main_hero_banners',
+          value: JSON.stringify(mainBanners)
+        }).then(({ error }) => { if (error) console.warn(error); });
+      }
     }
   },
 
@@ -370,80 +489,154 @@ export const useBannerStore = create<BannerState>((set, get) => ({
     set((state) => ({
       draftBanners: state.draftBanners.filter((b) => b.id !== id)
     }));
-    const supabase = getSupabase();
-    if (supabase) {
-        supabase.from('banners_draft').delete().eq('id', id).then(({error}) => error && console.warn(error));
-        supabase.from('banners').delete().eq('id', id).then(({error}) => error && console.warn(error));
-    }
   },
 
-  deleteBannerPermanently: async (id) => {
-    const supabase = getSupabase();
-    if (!supabase) {
-      set((state) => ({
-        banners: state.banners.filter((b) => b.id !== id),
-        draftBanners: state.draftBanners.filter((b) => b.id !== id)
-      }));
-      return;
-    }
-
+  deleteBannerPermanently: async (id: string) => {
     const previousBanners = get().banners;
-    const previousDraftBanners = get().draftBanners;
-
-    // Optimistic Update
-    const nextBanners = get().banners.filter((b) => b.id !== id);
-    set({
-      banners: nextBanners,
-      draftBanners: get().draftBanners.filter((b) => b.id !== id)
-    });
-    saveCachedBanners(nextBanners);
-    broadcastSync.publish('banners', nextBanners);
+    const targetBanner = previousBanners.find(b => b.id === id);
+    const isLogin = targetBanner?.bannerCategory === 'login_banner' || targetBanner?.bannerCategory === 'login' || targetBanner?.bannerType === 'login_banner';
 
     try {
-      const isLogin = previousBanners.find(b => b.id === id)?.bannerCategory === 'login_banner' || previousBanners.find(b => b.id === id)?.bannerCategory === 'login';
-
+      const supabase = getSupabase();
       if (isLogin) {
-        // Delete from login_banners table
-        const { error: loginErr } = await supabase.from('login_banners').delete().eq('id', id);
-        if (loginErr) {
-          throw new Error(loginErr.message || "Failed to delete from login_banners table");
+        // 1. Call server DELETE endpoint for login banners
+        const res = await fetch(`/api/login-banners/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Failed to delete login banner (Status ${res.status})`);
+        }
+
+        // 2. Direct Supabase sync if client available
+        if (supabase) {
+          try {
+            await supabase.from('login_banners').delete().eq('id', id);
+          } catch (dbErr) {
+            console.warn("Direct login banner deletion notice:", dbErr);
+          }
         }
       } else {
-        // Delete from banners table
-        const { error: liveErr } = await supabase.from('banners').delete().eq('id', id);
-        if (liveErr) {
-          throw new Error(liveErr.message || "Failed to delete from banners table");
+        // 1. Call server DELETE endpoint for main banners
+        const res = await fetch(`/api/banners/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Failed to delete main banner (Status ${res.status})`);
         }
 
-        // Delete from banners_draft table
-        const { error: draftErr } = await supabase.from('banners_draft').delete().eq('id', id);
-        if (draftErr) {
-          throw new Error(draftErr.message || "Failed to delete from banners_draft table");
+        // 2. Direct Supabase sync
+        if (supabase) {
+          try {
+            await supabase.from('banners').delete().eq('id', id);
+            await supabase.from('banners_draft').delete().eq('id', id);
+          } catch (dbErr) {
+            console.warn("Direct database banner deletion notice:", dbErr);
+          }
+
+          try {
+            await supabase.from('banners').upsert({
+              id,
+              status: 'deleted',
+              is_active: false,
+              order: '-1',
+              display_order: -1,
+              locations: '[]'
+            });
+            await supabase.from('banners_draft').upsert({
+              id,
+              status: 'deleted',
+              order: '-1'
+            });
+          } catch (uErr) {
+            console.warn("Direct database banner status upsert notice:", uErr);
+          }
+
+          const remainingMainBanners = get().banners.filter(b => b.id !== id && b.bannerCategory !== 'login' && b.bannerCategory !== 'login_banner');
+          try {
+            await supabase.from('settings').upsert({
+              id: 'main_hero_banners',
+              value: JSON.stringify(remainingMainBanners)
+            });
+          } catch (sErr) {
+            console.warn("Direct database settings sync notice:", sErr);
+          }
         }
       }
-    } catch (err) {
-      // Rollback on error
-      set({
-        banners: previousBanners,
-        draftBanners: previousDraftBanners
-      });
+
+      // 3. Immediately re-fetch latest data from database to stay 100% in sync
+      await get().fetchAllBanners();
+      const updatedBanners = get().banners;
+      broadcastSync.publish('banners', updatedBanners);
+    } catch (err: any) {
+      console.error("deleteBannerPermanently error:", err);
+      // Revert/refresh store to true server state on failure
+      await get().fetchAllBanners();
       throw err;
     }
   },
 
-  reorderBanners: (startIndex, endIndex) => {
-    const result = Array.from(get().banners);
-    const [removed] = result.splice(startIndex, 1);
-    result.splice(endIndex, 0, removed);
-    const reordered = result.map((b, idx) => ({ ...b, order: idx }));
-    set({ banners: reordered });
-    saveCachedBanners(reordered);
-    broadcastSync.publish('banners', reordered);
+  reorderBanners: (startIndex, endIndex, filterType = 'all') => {
+    const allBanners = Array.from(get().banners);
+    
+    // Determine which subset of banners we are reordering
+    const isLogin = (b: Banner) => b.bannerCategory === 'login_banner' || b.bannerCategory === 'login';
+    
+    let targetSubset: Banner[];
+    let otherSubset: Banner[];
+    
+    if (filterType === 'login') {
+      targetSubset = allBanners.filter(isLogin);
+      otherSubset = allBanners.filter(b => !isLogin(b));
+    } else if (filterType === 'main') {
+      targetSubset = allBanners.filter(b => !isLogin(b));
+      otherSubset = allBanners.filter(isLogin);
+    } else {
+      targetSubset = allBanners;
+      otherSubset = [];
+    }
+
+    if (startIndex < 0 || startIndex >= targetSubset.length || endIndex < 0 || endIndex >= targetSubset.length) {
+      return; // Safety check
+    }
+
+    const [removed] = targetSubset.splice(startIndex, 1);
+    targetSubset.splice(endIndex, 0, removed);
+    
+    // Update order numbers
+    const reorderedTarget = targetSubset.map((b, idx) => ({ ...b, order: idx }));
+    
+    // Combine back
+    const combined = [...reorderedTarget, ...otherSubset];
+    
+    set({ banners: combined });
+    saveCachedBanners(combined);
+    broadcastSync.publish('banners', combined);
 
     const supabase = getSupabase();
-    if (supabase) {
-        const dbPayloads = reordered.map(b => objectToSnake(b));
-        supabase.from('banners').upsert(dbPayloads).then(({error}) => error && console.warn(error));
+
+    if (filterType === 'login' || filterType === 'all') {
+      const loginOnly = combined.filter(isLogin);
+      fetch('/api/login-banners/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ banners: loginOnly })
+      }).catch(console.warn);
+      
+      // We rely on the API to update the DB for login banners
+    }
+
+    if (filterType === 'main' || filterType === 'all') {
+      const mainOnly = combined.filter(b => !isLogin(b));
+      fetch('/api/banners/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ banners: mainOnly })
+      }).catch(console.warn);
+
+      if (supabase) {
+        supabase.from('settings').upsert({
+          id: 'main_hero_banners',
+          value: JSON.stringify(mainOnly)
+        }).then(({ error }) => { if (error) console.warn(error); });
+      }
     }
   },
 
@@ -458,29 +651,28 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   saveDraftBanners: async () => {
     try {
       const draftBanners = [...get().draftBanners].sort((a, b) => (Number(a.order) ?? 0) - (Number(b.order) ?? 0));
-      const supabase = getSupabase();
       
+      // Save via API
+      const res = await fetch('/api/banners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ banners: draftBanners })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error ${res.status}`);
+      }
+
+      const supabase = getSupabase();
       if (supabase) {
-          // Sync Draft Collection in Supabase
-          // First delete all existing rows
-          await supabase.from('banners_draft').delete().neq('id', '0'); // Delete all filter
-          
-          const cleanDrafts = draftBanners.map((b, idx) => ({...b, order: b.order !== undefined && b.order !== null ? Number(b.order) : idx}));
-          const dbDrafts = cleanDrafts.map(d => objectToSnake(d));
-          await supabase.from('banners_draft').upsert(dbDrafts);
-          
-          await supabase.from('banners').delete().neq('id', '0');
-          await supabase.from('banners').upsert(dbDrafts);
+        await supabase.from('settings').upsert({
+          id: 'main_hero_banners',
+          value: JSON.stringify(draftBanners)
+        });
       }
       
-      set({ 
-        banners: draftBanners,
-        draftBanners, 
-        hasUnsavedChanges: false 
-      });
-      saveCachedBanners(draftBanners);
-      broadcastSync.publish('banners', draftBanners);
-      console.log("Both Draft and Live Banners collections persisted successfully.");
+      await get().fetchAllBanners();
+      set({ hasUnsavedChanges: false });
     } catch (error) {
       console.error("Error saving banners:", error);
       throw error;
@@ -495,21 +687,27 @@ export const useBannerStore = create<BannerState>((set, get) => ({
         b.status === 'draft' ? { ...b, status: 'active' as const } : b
       );
 
-      const supabase = getSupabase();
-      if (supabase) {
-          await supabase.from('banners_draft').delete().neq('id', '0');
-          const cleanDrafts = updatedDraftBanners.map((b, idx) => ({...b, order: b.order !== undefined && b.order !== null ? Number(b.order) : idx}));
-          const dbPayloads = cleanDrafts.map(d => objectToSnake(d));
-          await supabase.from('banners_draft').upsert(dbPayloads);
-          
-          await supabase.from('banners').delete().neq('id', '0');
-          await supabase.from('banners').upsert(dbPayloads);
+      // Save via API
+      const res = await fetch('/api/banners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ banners: updatedDraftBanners })
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Server error ${res.status}`);
       }
 
-      console.log("Banners published successfully.");
-      set({ banners: updatedDraftBanners, draftBanners: updatedDraftBanners, hasUnsavedChanges: false });
-      saveCachedBanners(updatedDraftBanners);
-      broadcastSync.publish('banners', updatedDraftBanners);
+      const supabase = getSupabase();
+      if (supabase) {
+        await supabase.from('settings').upsert({
+          id: 'main_hero_banners',
+          value: JSON.stringify(updatedDraftBanners)
+        });
+      }
+
+      await get().fetchAllBanners();
+      set({ hasUnsavedChanges: false });
     } catch (error) {
       console.error("Error publishing banners:", error);
       throw error;
@@ -546,42 +744,7 @@ export const useBannerStore = create<BannerState>((set, get) => ({
   },
 
   seedDefaultBanner: async () => {
-      const supabase = getSupabase();
-      if (!supabase) return;
-      
-    try {
-      const { data: liveSnapshot } = await supabase.from('banners').select('*').limit(1);
-      const { data: draftSnapshot } = await supabase.from('banners_draft').select('*').limit(1);
-      
-      if ((!liveSnapshot || liveSnapshot.length === 0) && (!draftSnapshot || draftSnapshot.length === 0)) {
-        const defaultBanner: Banner = {
-          id: 'initial_promo',
-          image: '',
-          name: 'Launch Promotional Offer',
-          description: 'Tazu Mart BD advanced premium banner management loaded.',
-          buttonEnabled: true,
-          buttonText: 'Shop Now',
-          isCustomButtonText: false,
-          status: 'active',
-          order: 0,
-          bannerType: 'designed',
-          backgroundColor: '#0f172a',
-          backgroundGradient: '#1e3a8a',
-          isGradient: true,
-          textColor: '#ffffff',
-          buttonColor: '#ff007f',
-          fontFamily: 'sans',
-          alignment: 'center',
-          createdDate: new Date().toISOString()
-        };
-        
-        const dbPayload = objectToSnake(defaultBanner);
-        await supabase.from('banners_draft').upsert([dbPayload]);
-        await supabase.from('banners').upsert([dbPayload]);
-        console.log("Successfully seeded default banner.");
-      }
-    } catch (err) {
-      console.error("Failed to seed default banner:", err);
-    }
+    // No-op: Do not auto-generate test/demo banners
+    return;
   },
 }));

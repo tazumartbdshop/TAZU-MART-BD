@@ -166,13 +166,13 @@ export default function DesignedBannerRenderer({ banner, isDemo = false }: Desig
 
   const getHeaderSizeClass = () => {
     switch (fontSize) {
-      case 'base': return 'text-[3.5vw] md:text-lg lg:text-xl';
-      case 'lg': return 'text-[4vw] md:text-xl lg:text-3xl';
-      case 'xl': return 'text-[4.5vw] md:text-2xl lg:text-4xl';
-      case '2xl': return 'text-[5.5vw] md:text-3xl lg:text-5xl';
-      case '3xl': return 'text-[6.5vw] md:text-4xl lg:text-6xl';
-      case '4xl': return 'text-[7.5vw] md:text-5xl lg:text-7xl';
-      default: return 'text-[6.5vw] md:text-4xl lg:text-6xl';
+      case 'base': return 'text-[2.8vw] sm:text-base md:text-lg lg:text-xl';
+      case 'lg': return 'text-[3.2vw] sm:text-lg md:text-xl lg:text-3xl';
+      case 'xl': return 'text-[3.6vw] sm:text-xl md:text-2xl lg:text-4xl';
+      case '2xl': return 'text-[4vw] sm:text-2xl md:text-3xl lg:text-5xl';
+      case '3xl': return 'text-[4.5vw] sm:text-3xl md:text-4xl lg:text-6xl';
+      case '4xl': return 'text-[5vw] sm:text-4xl md:text-5xl lg:text-7xl';
+      default: return 'text-[4.5vw] sm:text-3xl md:text-4xl lg:text-6xl';
     }
   };
 
@@ -224,7 +224,7 @@ export default function DesignedBannerRenderer({ banner, isDemo = false }: Desig
   // Layout Container block for grid alignment
   return (
     <div 
-      className={`relative w-full h-full overflow-hidden flex items-center p-6 md:p-12 lg:p-16 select-none bg-cover bg-center transition-all ${getFontFamilyClass()}`}
+      className={`relative w-full h-full overflow-hidden flex items-center p-3 sm:p-6 md:p-10 lg:p-14 select-none bg-cover bg-center transition-all ${getFontFamilyClass()}`}
       style={bgStyle}
     >
       {/* Background visual geometric accents */}

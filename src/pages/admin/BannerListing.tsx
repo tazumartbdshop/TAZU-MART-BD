@@ -18,9 +18,15 @@ export default function BannerListing() {
 
   const [filterType, setFilterType] = useState<'all' | 'main' | 'login'>('all');
 
+  // Helper to check if banner is login type
+  const isLoginBanner = (b: Banner) => b.bannerType === 'login_banner' || b.bannerCategory === 'login_banner' || b.bannerCategory === 'login';
+
+  const mainBannersCount = banners.filter(b => !isLoginBanner(b)).length;
+  const loginBannersCount = banners.filter(b => isLoginBanner(b)).length;
+
   // Filtered banners list
   const filteredBanners = banners.filter(b => {
-    const isLogin = b.bannerType === 'login_banner' || b.bannerCategory === 'login_banner' || b.bannerCategory === 'login';
+    const isLogin = isLoginBanner(b);
     if (filterType === 'main') return !isLogin;
     if (filterType === 'login') return isLogin;
     return true;
@@ -72,7 +78,7 @@ export default function BannerListing() {
     e.preventDefault();
     const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
     if (!isNaN(dragIndex) && dragIndex !== dropIndex) {
-      useBannerStore.getState().reorderBanners(dragIndex, dropIndex);
+      useBannerStore.getState().reorderBanners(dragIndex, dropIndex, filterType);
       toast.success("↔️ Banner sequence updated!");
     }
   };
@@ -121,7 +127,7 @@ export default function BannerListing() {
               filterType === 'main' ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'
             }`}
           >
-            Main Banners ({banners.filter(b => b.bannerCategory !== 'login').length})
+            Main Banners ({mainBannersCount})
           </button>
           <button
             type="button"
@@ -130,7 +136,7 @@ export default function BannerListing() {
               filterType === 'login' ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'
             }`}
           >
-            Login Banners ({banners.filter(b => b.bannerCategory === 'login').length})
+            Login Banners ({loginBannersCount})
           </button>
         </div>
 

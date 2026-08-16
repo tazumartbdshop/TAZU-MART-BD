@@ -282,44 +282,88 @@ export default function AdminSiteManagement() {
 
         {/* Preview Side */}
         <div className="xl:col-span-5 sticky top-8 h-fit">
-          <div className="bg-zinc-100 rounded-none border border-zinc-200 p-8 flex flex-col gap-6 items-center">
-             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 mb-2">
-                <Eye className="w-3 h-3" /> Live Customer Panel Preview
+          <div className="bg-neutral-900 rounded-2xl border border-neutral-800 p-6 sm:p-8 flex flex-col gap-6 items-center shadow-xl">
+             <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400">
+                  <Eye className="w-3.5 h-3.5 text-emerald-400" /> Live Customer Panel Preview
+                </div>
+                <span className="text-[9px] font-bold text-neutral-500 uppercase tracking-widest bg-neutral-800 px-2.5 py-1 rounded-full">
+                  Real-time
+                </span>
              </div>
 
-             <div className="w-full max-w-[320px] bg-white rounded-[40px] border-[8px] border-zinc-800 shadow-2xl p-6 min-h-[500px]">
-                <div className="w-20 h-1 bg-zinc-200 rounded-full mx-auto mb-8" />
-                
-                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Site Links</h3>
-                
-                <div className="flex flex-col gap-3">
-                  {localData.developer_status && (
-                    <PreviewButton 
-                      name={localData.developer_button_name}
-                      logo={localData.developer_logo}
-                      icon={Code}
-                    />
-                  )}
-                  {localData.fashion_status && (
-                    <PreviewButton 
-                      name={localData.fashion_button_name}
-                      logo={localData.fashion_logo}
-                      icon={Store}
-                    />
-                  )}
-                  {(localData.custom_links || []).filter((l: any) => l.status).map((link: any) => (
-                    <PreviewButton 
-                      key={link.id}
-                      name={link.name}
-                      logo={link.logo}
-                      icon={Plus}
-                    />
-                  ))}
+             {/* Smartphone Mockup */}
+             <div className="w-full max-w-[320px] bg-neutral-950 rounded-[44px] border-[10px] border-neutral-800 shadow-2xl overflow-hidden min-h-[520px] flex flex-col">
+                {/* Phone Speaker & Camera Notch */}
+                <div className="pt-3 pb-2 px-6 flex justify-center items-center shrink-0">
+                  <div className="w-20 h-4 bg-neutral-900 rounded-full flex items-center justify-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-neutral-800" />
+                    <div className="w-8 h-1 bg-neutral-800 rounded-full" />
+                  </div>
+                </div>
+
+                {/* Simulated Customer Sidebar Content */}
+                <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 pb-4 mb-4 border-b border-neutral-800/80">
+                      <div className="w-9 h-9 rounded-xl bg-neutral-800 flex items-center justify-center text-neutral-300 font-bold text-xs border border-neutral-700">
+                        TM
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-white tracking-tight">Customer Menu</p>
+                        <p className="text-[9px] text-neutral-400 uppercase tracking-wider font-semibold">Sidebar Simulation</p>
+                      </div>
+                    </div>
+
+                    <h3 className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.2em] mb-3">Site Links</h3>
+                    
+                    <div className="flex flex-col gap-2.5">
+                      {localData.developer_status && (
+                        <PreviewButton 
+                          name={localData.developer_button_name || 'Web Developer'}
+                          logo={localData.developer_logo}
+                          icon={Code}
+                        />
+                      )}
+                      {localData.fashion_status && (
+                        <PreviewButton 
+                          name={localData.fashion_button_name || 'Tazu Fashion'}
+                          logo={localData.fashion_logo}
+                          icon={Store}
+                        />
+                      )}
+                      {(localData.custom_links || []).filter((l: any) => l.status).map((link: any) => (
+                        <PreviewButton 
+                          key={link.id}
+                          name={link.name || 'Custom Link'}
+                          logo={link.logo}
+                          icon={Plus}
+                        />
+                      ))}
+                      {!localData.developer_status && !localData.fashion_status && (localData.custom_links || []).filter((l: any) => l.status).length === 0 && (
+                        <div className="p-4 rounded-xl bg-neutral-900/60 border border-dashed border-neutral-800 text-center">
+                          <p className="text-[11px] text-neutral-400 font-medium">No site links enabled.</p>
+                          <p className="text-[9px] text-neutral-500 mt-1">Enable links on the left to preview.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-neutral-800/80 mt-6">
+                    <div className="w-full py-2 bg-neutral-900/80 rounded-xl text-center">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400">Footer Bar Preview</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Home Indicator Bar */}
+                <div className="py-2 flex justify-center">
+                  <div className="w-28 h-1 bg-neutral-700 rounded-full" />
                 </div>
              </div>
 
              <div className="text-center">
-                <p className="text-[11px] font-bold text-zinc-500 max-w-[280px]">
+                <p className="text-[11px] font-bold text-neutral-400 max-w-[280px]">
                   * This is how the buttons will appear in the customer sidebar. Animations and effects are exactly the same.
                 </p>
              </div>
@@ -491,19 +535,19 @@ function StatusToggle({ label, isEnabled, onChange }: { label: string, isEnabled
 function PreviewButton({ name, logo, icon: Icon }: { name: string, logo?: string, icon: any, key?: any }) {
   return (
     <div 
-      className="w-full h-14 bg-white border border-gray-200 rounded-[14px] flex items-center justify-between px-4 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
+      className="w-full h-12 bg-neutral-900 border border-neutral-800 hover:border-neutral-700 rounded-xl flex items-center justify-between px-3.5 transition-all shadow-sm group cursor-default"
     >
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center shrink-0 bg-gray-50 text-gray-600 overflow-hidden p-1">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-neutral-800 text-neutral-200 border border-neutral-700/60 overflow-hidden p-1">
            {logo ? (
              <img src={logo} alt={name} className="w-full h-full object-contain" />
            ) : (
-             <Icon className="w-4 h-4" />
+             <Icon className="w-3.5 h-3.5 text-neutral-300" />
            )}
         </div>
-        <span className="font-bold text-[13px] text-gray-800 tracking-tight">{name}</span>
+        <span className="font-bold text-xs text-neutral-100 tracking-tight">{name}</span>
       </div>
-      <ArrowRight className="w-4 h-4 text-gray-300" />
+      <ArrowRight className="w-3.5 h-3.5 text-neutral-500" />
     </div>
   );
 }

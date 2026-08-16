@@ -17,6 +17,8 @@ export default function MainHeroCarousel({ banners }: MainHeroCarouselProps) {
     b.image && 
     b.image.trim() !== '' && 
     b.bannerCategory !== 'login' &&
+    b.bannerCategory !== 'login_banner' &&
+    b.bannerType !== 'login_banner' &&
     b.mediaType !== 'character'
   );
 
@@ -146,8 +148,8 @@ export default function MainHeroCarousel({ banners }: MainHeroCarouselProps) {
       onMouseUp={handleMouseUp}
       onMouseLeave={() => { setSwipeStart(null); setSwipeEnd(null); }}
     >
-      {/* Hero Banner wrapper with balanced responsive aspects (Desktop 1920:650 / Tablet 1200:500 / Mobile 1080:500) */}
-      <div className="w-full relative bg-neutral-950 overflow-hidden flex flex-col justify-center aspect-[1080/500] sm:aspect-[1200/500] md:aspect-[1920/650]">
+      {/* Hero Banner wrapper with exact 1920:650 design ratio (1920 × 650 px, ~2.95:1) */}
+      <div className="w-full relative bg-neutral-950 overflow-hidden flex flex-col justify-center aspect-[1920/650]">
         
         {/* Toggle & Controls Floating Board on topright */}
         <div className="absolute top-4 right-4 z-40 flex items-center gap-2">

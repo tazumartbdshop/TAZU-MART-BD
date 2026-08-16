@@ -60,11 +60,25 @@ export const useAuthStore = create<AuthState>()(
         }, 500);
       },
       logout: async () => {
-        const supabase = getSupabase();
-        if (supabase) {
-          await supabase.auth.signOut().catch((err) => console.error("Supabase signOut failed:", err));
+        try {
+          const supabase = getSupabase();
+          if (supabase) {
+            // Race with 1000ms timeout so a slow or hanging network call never blocks logout
+            await Promise.race([
+              supabase.auth.signOut(),
+              new Promise((resolve) => setTimeout(resolve, 1000))
+            ]).catch((err) => console.error("Supabase signOut failed:", err));
+          }
+        } catch (err) {
+          console.error("Logout error:", err);
+        } finally {
+          set({ user: null, isAuthenticated: false, isInitializing: false });
+          try {
+            sessionStorage.clear();
+          } catch (e) {
+            console.warn("sessionStorage clear note:", e);
+          }
         }
-        set({ user: null, isAuthenticated: false, isInitializing: false });
       },
       updateUser: (updatedUser) => {
         set((state) => {

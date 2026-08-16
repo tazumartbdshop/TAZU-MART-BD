@@ -12,11 +12,33 @@ if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
   channel = new BroadcastChannel('tazu_mart_realtime_sync');
 }
 
+const listeners: Map<string, Set<(data: any) => void>> = new Map();
+
 export const broadcastSync = {
   publish: (type: string, data: any) => {
     if (channel) {
       channel.postMessage({ type, data });
     }
+  },
+
+  subscribe: (type: string, callback: (data: any) => void) => {
+    if (!listeners.has(type)) {
+      listeners.set(type, new Set());
+    }
+    listeners.get(type)!.add(callback);
+
+    if (channel && !channel.onmessage) {
+      channel.onmessage = (event) => {
+        const { type: evtType, data } = event.data || {};
+        if (evtType && listeners.has(evtType)) {
+          listeners.get(evtType)!.forEach(cb => cb(data));
+        }
+      };
+    }
+
+    return () => {
+      listeners.get(type)?.delete(callback);
+    };
   },
   
   init: () => {
@@ -26,6 +48,10 @@ export const broadcastSync = {
       const { type, data } = event.data || {};
       console.log(`%c[Cross-Tab Realtime Sync] Received update for: ${type}`, "color: #10b981; font-weight: bold;");
       
+      if (type && listeners.has(type)) {
+        listeners.get(type)!.forEach(cb => cb(data));
+      }
+
       switch (type) {
         case 'products':
           useProductStore.setState({ products: data, isLoaded: true });

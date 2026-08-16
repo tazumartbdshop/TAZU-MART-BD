@@ -262,157 +262,710 @@ async function startServer() {
   // ---------------------------------------------------------------------------
   // Account / Login Banners API Endpoints
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Account / Login Banners API Endpoints (Completely Independent from Main Banners)
+  // ---------------------------------------------------------------------------
   const LOGIN_BANNER_FILE = path.join(process.cwd(), 'public', 'login_banner_data.json');
   const ACCOUNT_CHARACTERS_FILE = path.join(process.cwd(), 'public', 'account_characters_data.json');
+
+  const sanitizeLoginBanners = (list: any[]): any[] => {
+    if (!Array.isArray(list)) return [];
+    return list.filter((b: any) => b && (b.image_url || b.image || b.url)).map((b: any, idx: number) => ({
+      id: String(b.id || `login_ban_${Date.now()}_${idx}`),
+      title: b.title || b.name || 'Login Banner',
+      name: b.title || b.name || 'Login Banner',
+      image_url: b.image_url || b.image || b.url || '',
+      image: b.image_url || b.image || b.url || '',
+      is_active: b.is_active !== undefined ? (b.is_active === true || b.is_active === 'true') : (b.status ? b.status === 'active' : true),
+      status: (b.is_active !== false && b.status !== 'hidden') ? 'active' : 'hidden',
+      sort_order: Number(b.sort_order ?? b.order ?? idx),
+      order: Number(b.sort_order ?? b.order ?? idx),
+      bannerType: 'login_banner',
+      bannerCategory: 'login_banner',
+      locations: ['auth-page'],
+      created_at: b.created_at || b.createdDate || new Date().toISOString(),
+      updated_at: b.updated_at || new Date().toISOString()
+    }));
+  };
 
   app.get(["/api/login-banner", "/api/login-banners"], async (req, res) => {
     try {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       const clientToUse = supabaseServiceRole || supabaseAdmin;
 
+      let loginBanners: any[] = [];
+
+      // 1. Try querying Supabase login_banners table
       if (clientToUse) {
-        // 1. Try querying login_banners table
-        const { data: loginData, error: loginErr } = await clientToUse
-          .from('login_banners')
-          .select('*')
-          .order('sort_order', { ascending: true })
-          .order('created_at', { ascending: false });
+        try {
+          const { data: loginData, error: loginErr } = await clientToUse
+            .from('login_banners')
+            .select('*')
+            .order('sort_order', { ascending: true })
+            .order('created_at', { ascending: false });
 
-        if (!loginErr && loginData && loginData.length > 0) {
-          const activeItem = loginData.find((b: any) => b.is_active) || loginData[0];
-          return res.json({ 
-            success: true, 
-            url: activeItem.image_url || activeItem.image, 
-            banners: loginData 
-          });
-        }
-
-        // 2. Fallback to branding_settings
-        const { data: brandData, error: brandErr } = await clientToUse
-          .from('branding_settings')
-          .select('login_banner')
-          .eq('id', 'global')
-          .limit(1);
-
-        if (!brandErr && brandData && brandData.length > 0 && brandData[0].login_banner) {
-          return res.json({ success: true, url: brandData[0].login_banner, banners: [] });
-        }
-
-        // 3. Fallback to settings table
-        const { data: setDb } = await clientToUse.from('settings').select('*').eq('id', 'login_banner').limit(1);
-        if (setDb && setDb.length > 0 && setDb[0].value) {
-          return res.json({ success: true, url: setDb[0].value, banners: [] });
+          if (!loginErr && loginData && loginData.length > 0) {
+            loginBanners = sanitizeLoginBanners(loginData);
+          }
+        } catch (sbErr) {
+          console.warn("[GET /api/login-banners] Supabase query notice:", sbErr);
         }
       }
 
-      // 4. Local file backup fallback
-      try {
-        const fileContent = await fs.readFile(LOGIN_BANNER_FILE, 'utf-8');
-        const parsed = JSON.parse(fileContent);
-        return res.json({ success: true, url: parsed.url || parsed.image_url || '', banners: parsed.banners || [] });
-      } catch (fErr) {}
+      // 2. Fallback / Merge with local JSON file if database empty
+      if (loginBanners.length === 0) {
+        try {
+          const fileContent = await fs.readFile(LOGIN_BANNER_FILE, 'utf-8');
+          const parsed = JSON.parse(fileContent);
+          if (Array.isArray(parsed.banners) && parsed.banners.length > 0) {
+            loginBanners = sanitizeLoginBanners(parsed.banners);
+          } else if (parsed.url || parsed.image_url) {
+            loginBanners = sanitizeLoginBanners([{
+              id: parsed.id || 'login_ban_primary',
+              title: parsed.title || 'Login Banner',
+              image_url: parsed.url || parsed.image_url,
+              is_active: true,
+              sort_order: 0
+            }]);
+          }
+        } catch (fErr) {}
+      }
 
-      res.json({ success: true, url: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1200&auto=format&fit=crop&q=80', banners: [] });
+      // 3. Fallback to branding_settings
+      if (loginBanners.length === 0 && clientToUse) {
+        try {
+          const { data: brandData } = await clientToUse
+            .from('branding_settings')
+            .select('login_banner')
+            .eq('id', 'global')
+            .limit(1);
+
+          if (brandData && brandData.length > 0 && brandData[0].login_banner) {
+            loginBanners = sanitizeLoginBanners([{
+              id: 'login_ban_branding',
+              title: 'Login Banner',
+              image_url: brandData[0].login_banner,
+              is_active: true,
+              sort_order: 0
+            }]);
+          }
+        } catch (bErr) {}
+      }
+
+      const activeBanner = loginBanners.find((b: any) => b.is_active || b.status === 'active') || loginBanners[0];
+      const activeUrl = activeBanner ? (activeBanner.image_url || activeBanner.image) : '';
+
+      res.json({
+        success: true,
+        url: activeUrl,
+        banners: loginBanners
+      });
     } catch (err: any) {
       console.error("[GET /api/login-banner] Error:", err);
-      res.status(500).json({ success: false, error: err.message || "Failed to load login banner" });
+      res.status(500).json({ success: false, error: err.message || "Failed to load login banners" });
     }
   });
 
   app.post(["/api/login-banner", "/api/login-banners"], async (req, res) => {
     try {
       const clientToUse = supabaseServiceRole || supabaseAdmin;
-      const { title, image_url, image, is_active, sort_order, id, banners } = req.body;
-      const bannerUrl = (image_url || image || req.body.url || '').trim();
+      const { title, name: bannerName, image_url, image, is_active, status, sort_order, order: bannerOrder, id, banner, banners } = req.body;
 
-      if (!bannerUrl && (!banners || banners.length === 0)) {
-        return res.status(400).json({ success: false, error: "Banner image URL is required" });
+      const incomingList: any[] = Array.isArray(banners) 
+        ? banners 
+        : (banner ? [banner] : (image_url || image || req.body.url ? [{ id, title: title || bannerName, image_url: image_url || image || req.body.url, is_active: is_active !== undefined ? is_active : (status ? status === 'active' : true), sort_order: sort_order ?? bannerOrder ?? 0 }] : []));
+
+      if (incomingList.length === 0) {
+        return res.status(400).json({ success: false, error: "Banner image URL or list is required" });
       }
 
-      const activeUrl = bannerUrl || (banners && banners[0]?.image) || '';
+      // Read current login banners from database or local file
+      let existingLoginBanners: any[] = [];
+      if (clientToUse) {
+        try {
+          const { data: currentRows } = await clientToUse.from('login_banners').select('*').order('sort_order', { ascending: true });
+          if (currentRows) existingLoginBanners = sanitizeLoginBanners(currentRows);
+        } catch {}
+      }
 
-      // Save to local backup file first for absolute persistence
+      if (existingLoginBanners.length === 0) {
+        try {
+          const rawFile = await fs.readFile(LOGIN_BANNER_FILE, 'utf-8');
+          const parsed = JSON.parse(rawFile);
+          if (Array.isArray(parsed.banners)) existingLoginBanners = sanitizeLoginBanners(parsed.banners);
+        } catch {}
+      }
+
+      const savedRecords: any[] = [];
+
+      for (const item of incomingList) {
+        const itemUrl = (item.image_url || item.image || item.url || '').trim();
+        if (!itemUrl) continue;
+
+        const itemTitle = item.title || item.name || 'Login Banner';
+        const itemIsActive = item.is_active !== undefined ? (item.is_active === true || item.is_active === 'true') : (item.status ? item.status === 'active' : true);
+        const itemSortOrder = Number(item.sort_order ?? item.order ?? existingLoginBanners.length);
+
+        let recordId = item.id;
+        let isUuid = recordId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recordId);
+
+        let dbResultRow: any = null;
+
+        if (clientToUse) {
+          try {
+            if (isUuid) {
+              const { data: updatedRow, error: upErr } = await clientToUse
+                .from('login_banners')
+                .update({
+                  title: itemTitle,
+                  image_url: itemUrl,
+                  is_active: itemIsActive,
+                  sort_order: itemSortOrder,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', recordId)
+                .select()
+                .single();
+
+              if (!upErr && updatedRow) {
+                dbResultRow = updatedRow;
+              }
+            }
+
+            // If not updated by UUID, check if a row matches image_url or string id
+            if (!dbResultRow && existingLoginBanners.length > 0) {
+              const matched = existingLoginBanners.find((b: any) => 
+                (recordId && String(b.id) === String(recordId)) || 
+                (b.image_url && b.image_url === itemUrl)
+              );
+              if (matched && matched.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matched.id)) {
+                const { data: updatedMatch } = await clientToUse
+                  .from('login_banners')
+                  .update({
+                    title: itemTitle,
+                    image_url: itemUrl,
+                    is_active: itemIsActive,
+                    sort_order: itemSortOrder,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', matched.id)
+                  .select()
+                  .single();
+
+                if (updatedMatch) dbResultRow = updatedMatch;
+              }
+            }
+
+            // Insert new row if no existing row matched
+            if (!dbResultRow) {
+              const { data: insertedRow, error: inErr } = await clientToUse
+                .from('login_banners')
+                .insert([{
+                  title: itemTitle,
+                  image_url: itemUrl,
+                  is_active: itemIsActive,
+                  sort_order: itemSortOrder,
+                  updated_at: new Date().toISOString()
+                }])
+                .select()
+                .single();
+
+              if (!inErr && insertedRow) {
+                dbResultRow = insertedRow;
+              }
+            }
+          } catch (sbErr) {
+            console.warn("[POST /api/login-banners] Supabase login_banners mutation warning:", sbErr);
+          }
+        }
+
+        const finalRecord = {
+          id: dbResultRow ? String(dbResultRow.id) : (recordId || `login_ban_${Date.now()}_${Math.floor(Math.random() * 1000)}`),
+          title: itemTitle,
+          name: itemTitle,
+          image_url: itemUrl,
+          image: itemUrl,
+          is_active: itemIsActive,
+          status: itemIsActive ? 'active' : 'hidden',
+          sort_order: itemSortOrder,
+          order: itemSortOrder,
+          bannerType: 'login_banner',
+          bannerCategory: 'login_banner',
+          locations: ['auth-page'],
+          created_at: dbResultRow?.created_at || item.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        savedRecords.push(finalRecord);
+      }
+
+      // Merge saved records into login banners list
+      const savedIds = new Set(savedRecords.map(r => r.id));
+      const mergedList = [
+        ...existingLoginBanners.filter(b => !savedIds.has(b.id)),
+        ...savedRecords
+      ];
+      mergedList.sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
+
+      const activeUrl = savedRecords[0]?.image_url || mergedList[0]?.image_url || '';
+
+      // Save to local file backup
       try {
         await fs.writeFile(LOGIN_BANNER_FILE, JSON.stringify({
           url: activeUrl,
-          banners: banners || [{ id: id || `ban_${Date.now()}`, title: title || 'Login Banner', image_url: activeUrl, is_active: true, sort_order: 0 }],
+          banners: mergedList,
           updated_at: new Date().toISOString()
         }, null, 2));
       } catch (fErr) {
-        console.warn("[POST /api/login-banner] Local file save warning:", fErr);
+        console.warn("[POST /api/login-banners] Local file save warning:", fErr);
       }
 
-      if (clientToUse) {
-        // A. Save to login_banners table
-        try {
-          const payloadToSave: any = {
-            title: title || 'Login Banner',
-            image_url: activeUrl,
-            is_active: is_active !== undefined ? is_active : true,
-            sort_order: sort_order || 0,
-            updated_at: new Date().toISOString()
-          };
-
-          // Only supply id if it's a valid non-temporary UUID/key
-          if (id && !id.startsWith('ban_') && id.length > 20) {
-            payloadToSave.id = id;
-          }
-
-          const { error: loginDbErr } = await clientToUse.from('login_banners').upsert([payloadToSave]);
-          if (loginDbErr) {
-            console.warn("[POST /api/login-banner] login_banners upsert notice:", loginDbErr.message);
-          }
-        } catch (lErr: any) {
-          console.warn("[POST /api/login-banner] Exception in login_banners save:", lErr.message);
-        }
-
-        // B. Save to branding_settings table
-        try {
-          await clientToUse.from('branding_settings').upsert([{
-            id: 'global',
-            login_banner: activeUrl,
-            updated_at: new Date().toISOString()
-          }]);
-        } catch (bErr: any) {
-          console.warn("[POST /api/login-banner] branding_settings update notice:", bErr.message);
-        }
-
-        // C. Save to settings table
-        try {
-          await clientToUse.from('settings').upsert([{
-            id: 'login_banner',
-            value: activeUrl,
-            updated_at: new Date().toISOString()
-          }]);
-        } catch (sErr: any) {
-          console.warn("[POST /api/login-banner] settings update notice:", sErr.message);
-        }
-
-        // D. Save to banners table
-        try {
-          await clientToUse.from('banners').upsert([{
-            id: id || `login_ban_${Date.now()}`,
-            name: title || 'Login Banner',
-            image: activeUrl,
-            banner_type: 'login_banner',
-            banner_category: 'login_banner',
-            locations: ['auth-page'],
-            status: 'active',
-            created_at: new Date().toISOString()
-          }]);
-        } catch (banErr: any) {
-          console.warn("[POST /api/login-banner] banners update notice:", banErr.message);
-        }
+      // Sync active url to branding_settings and settings table
+      if (clientToUse && activeUrl) {
+        clientToUse.from('branding_settings').upsert([{ id: 'global', login_banner: activeUrl, updated_at: new Date().toISOString() }]).then(() => {}).catch(() => {});
+        clientToUse.from('settings').upsert([{ id: 'login_banner', value: activeUrl, updated_at: new Date().toISOString() }]).then(() => {}).catch(() => {});
       }
 
       return res.json({
         success: true,
-        message: "Login Banner saved successfully.",
+        message: "Login Banner(s) saved successfully.",
+        banners: mergedList,
         url: activeUrl
       });
     } catch (err: any) {
-      console.error("[POST /api/login-banner] Error:", err);
+      console.error("[POST /api/login-banners] Error:", err);
       res.status(500).json({ success: false, error: err.message || "Failed to save login banner" });
+    }
+  });
+
+  app.post("/api/login-banners/reorder", async (req, res) => {
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      const { banners } = req.body;
+
+      if (!Array.isArray(banners)) {
+        return res.status(400).json({ success: false, error: "Banners array required for reordering" });
+      }
+
+      const reordered = sanitizeLoginBanners(banners).map((b, idx) => ({ ...b, sort_order: idx, order: idx }));
+
+      // Update Supabase login_banners table
+      if (clientToUse) {
+        for (const item of reordered) {
+          if (item.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) {
+            clientToUse.from('login_banners').update({ sort_order: item.sort_order }).eq('id', item.id).then(() => {}).catch(() => {});
+          }
+        }
+      }
+
+      // Save to local file
+      await fs.writeFile(LOGIN_BANNER_FILE, JSON.stringify({
+        url: reordered[0]?.image_url || '',
+        banners: reordered,
+        updated_at: new Date().toISOString()
+      }, null, 2));
+
+      res.json({ success: true, message: "Login banners reordered successfully", banners: reordered });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete(["/api/login-banner/:id", "/api/login-banners/:id"], async (req, res) => {
+    try {
+      const bannerId = String(req.params.id);
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+
+      // 1. Delete from Supabase login_banners table
+      if (clientToUse) {
+        try {
+          // Attempt exact ID match first
+          const { error: delErr } = await clientToUse.from('login_banners').delete().eq('id', bannerId);
+          if (delErr) {
+            console.warn("[DELETE /api/login-banners] Direct ID delete error:", delErr.message);
+          }
+
+          // If bannerId wasn't a UUID or didn't delete, also query rows to delete matching record by string id/title/image
+          const { data: currentRows } = await clientToUse.from('login_banners').select('*');
+          if (currentRows && currentRows.length > 0) {
+            const match = currentRows.find((r: any) => String(r.id) === bannerId || r.title === bannerId || String(r.sort_order) === bannerId);
+            if (match) {
+              await clientToUse.from('login_banners').delete().eq('id', match.id);
+            }
+          }
+        } catch (sbErr) {
+          console.warn("[DELETE /api/login-banners] Supabase delete notice:", sbErr);
+        }
+      }
+
+      // 2. Delete from local JSON file
+      let updatedList: any[] = [];
+      try {
+        const fileContent = await fs.readFile(LOGIN_BANNER_FILE, 'utf-8');
+        const parsed = JSON.parse(fileContent);
+        if (Array.isArray(parsed.banners)) {
+          updatedList = parsed.banners.filter((b: any) => String(b.id) !== bannerId);
+          await fs.writeFile(LOGIN_BANNER_FILE, JSON.stringify({
+            url: updatedList[0]?.image_url || '',
+            banners: updatedList,
+            updated_at: new Date().toISOString()
+          }, null, 2));
+        }
+      } catch (fErr) {}
+
+      res.json({ success: true, message: "Login banner deleted successfully", banners: updatedList });
+    } catch (err: any) {
+      console.error("[DELETE /api/login-banners/:id] Error:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Main Banners API Endpoints (Persistent Storage via Supabase Settings & Local Backup)
+  // ---------------------------------------------------------------------------
+  const MAIN_BANNERS_FILE = path.join(process.cwd(), 'public', 'main_banners_data.json');
+
+  const filterMainBannersOnly = (list: any[]): any[] => {
+    if (!Array.isArray(list)) return [];
+    return list.filter((b: any) => 
+      b &&
+      b.status !== 'deleted' &&
+      b.is_active !== false &&
+      b.image && 
+      b.image.trim() !== '' &&
+      b.bannerType !== 'login_banner' && 
+      b.banner_type !== 'login_banner' &&
+      b.bannerCategory !== 'login_banner' && 
+      b.bannerCategory !== 'login' &&
+      b.banner_category !== 'login_banner' &&
+      b.banner_category !== 'login'
+    ).map((b: any, idx: number) => ({
+      id: String(b.id || `ban_${Date.now()}_${idx}`),
+      name: b.name || b.title || 'Main Banner',
+      image: b.image || b.image_url || '',
+      offerText: b.offerText || b.offer_text || '',
+      description: b.description || '',
+      buttonText: b.buttonText || b.button_text || 'Shop Now',
+      buttonLink: b.buttonLink || b.button_link || '',
+      buttonEnabled: b.buttonEnabled !== undefined ? Boolean(b.buttonEnabled) : Boolean(b.button_enabled),
+      connectedProductId: b.connectedProductId || b.connected_product_id || null,
+      locations: b.locations || ['homepage-hero'],
+      bannerSize: b.bannerSize || 'hero',
+      status: (b.status === 'draft' || b.status === 'hidden') ? b.status : 'active',
+      order: Number(b.order ?? b.sort_order ?? idx),
+      bannerType: 'main_banner',
+      bannerCategory: 'main_banner',
+      mediaType: 'banner',
+      createdDate: b.createdDate || b.created_date || b.created_at || new Date().toISOString()
+    }));
+  };
+
+  app.get("/api/banners", async (req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+
+      let banners: any[] = [];
+
+      // 1. First priority: Check Supabase settings table ('main_hero_banners')
+      if (clientToUse) {
+        try {
+          const { data: sData, error: sErr } = await clientToUse
+            .from('settings')
+            .select('value')
+            .eq('id', 'main_hero_banners')
+            .maybeSingle();
+
+          if (!sErr && sData?.value) {
+            const parsed = typeof sData.value === 'string' ? JSON.parse(sData.value) : sData.value;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              banners = filterMainBannersOnly(parsed);
+            }
+          }
+        } catch (sbErr) {
+          console.warn("[GET /api/banners] Supabase settings query warning:", sbErr);
+        }
+
+        // Check direct banners table if settings had no banners
+        if (banners.length === 0) {
+          try {
+            const { data: bTableData } = await clientToUse.from('banners').select('*').order('order', { ascending: true });
+            if (bTableData && bTableData.length > 0) {
+              banners = filterMainBannersOnly(bTableData);
+            }
+          } catch (btErr) {
+            console.warn("[GET /api/banners] banners table query warning:", btErr);
+          }
+        }
+      }
+
+      // 2. Fallback to local JSON file ONLY if Supabase returned no banners
+      if (banners.length === 0) {
+        try {
+          const fileContent = await fs.readFile(MAIN_BANNERS_FILE, 'utf-8');
+          const parsed = JSON.parse(fileContent);
+          if (parsed && Array.isArray(parsed.banners)) {
+            banners = filterMainBannersOnly(parsed.banners);
+          }
+        } catch (fErr) {}
+      } else {
+        // Keep local JSON backup in sync with Supabase settings
+        try {
+          await fs.writeFile(MAIN_BANNERS_FILE, JSON.stringify({
+            banners,
+            updated_at: new Date().toISOString()
+          }, null, 2));
+        } catch {}
+      }
+
+      res.json({ success: true, banners });
+    } catch (err: any) {
+      console.error("[GET /api/banners] Error:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to load main banners" });
+    }
+  });
+
+  app.post("/api/banners", async (req, res) => {
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      const { banners, banner } = req.body;
+      const incomingList: any[] = Array.isArray(banners) ? banners : (banner ? [banner] : []);
+
+      if (incomingList.length === 0) {
+        return res.status(400).json({ success: false, error: "No banners provided" });
+      }
+
+      const cleanedIncoming = filterMainBannersOnly(incomingList);
+
+      // Load existing list
+      let currentBanners: any[] = [];
+      if (clientToUse) {
+        try {
+          const { data: sData } = await clientToUse.from('settings').select('value').eq('id', 'main_hero_banners').maybeSingle();
+          if (sData?.value) {
+            const parsed = typeof sData.value === 'string' ? JSON.parse(sData.value) : sData.value;
+            if (Array.isArray(parsed)) currentBanners = filterMainBannersOnly(parsed);
+          }
+        } catch {}
+      }
+
+      if (currentBanners.length === 0) {
+        try {
+          const fileContent = await fs.readFile(MAIN_BANNERS_FILE, 'utf-8');
+          const parsed = JSON.parse(fileContent);
+          if (Array.isArray(parsed.banners)) currentBanners = filterMainBannersOnly(parsed.banners);
+        } catch {}
+      }
+
+      let mergedBanners: any[];
+      if (Array.isArray(banners)) {
+        // Full replacement or merge
+        const newIds = new Set(cleanedIncoming.map(b => b.id));
+        mergedBanners = [
+          ...cleanedIncoming,
+          ...currentBanners.filter(cb => !newIds.has(cb.id))
+        ];
+      } else {
+        const newIds = new Set(cleanedIncoming.map(b => b.id));
+        mergedBanners = [
+          ...currentBanners.filter(cb => !newIds.has(cb.id)),
+          ...cleanedIncoming
+        ];
+      }
+
+      // Sort by order
+      mergedBanners.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+
+      // 1. Save to local file backup
+      try {
+        await fs.writeFile(MAIN_BANNERS_FILE, JSON.stringify({
+          banners: mergedBanners,
+          updated_at: new Date().toISOString()
+        }, null, 2));
+      } catch (fErr) {
+        console.warn("[POST /api/banners] Local file save warning:", fErr);
+      }
+
+      // 2. Save to Supabase settings table (single source of truth with PK)
+      if (clientToUse) {
+        try {
+          await clientToUse.from('settings').upsert({
+            id: 'main_hero_banners',
+            value: JSON.stringify(mergedBanners)
+          });
+        } catch (sbErr: any) {
+          console.warn("[POST /api/banners] Supabase settings save notice:", sbErr.message);
+        }
+
+        // Also sync active banners to banners & banners_draft tables for direct DB visibility
+        try {
+          for (const b of mergedBanners) {
+            const bannerRow = {
+              id: String(b.id),
+              name: b.name || "Main Banner",
+              title: b.name || "Main Banner",
+              image: b.image || "",
+              image_url: b.image || "",
+              banner_image_url: b.image || "",
+              mobile_image_url: b.image || "",
+              desktop_image_url: b.image || "",
+              banner_size: b.bannerSize || "hero",
+              banner_type: "main_banner",
+              button_enabled: String(b.buttonEnabled || false),
+              button_text: b.buttonText || "Shop Now",
+              button_link: b.buttonLink || "",
+              button_type: "Shop Now",
+              connected_product_id: b.connectedProductId || null,
+              locations: JSON.stringify(b.locations || ["homepage-hero"]),
+              order: String(b.order ?? 0),
+              display_order: Number(b.order ?? 0),
+              status: b.status || "active",
+              is_active: b.status === "active" || b.status === undefined,
+              description: b.description || "",
+              offer_text: b.offerText || "",
+              created_date: b.createdDate || new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+            await clientToUse.from('banners').upsert(bannerRow);
+
+            const draftRow = {
+              id: String(b.id),
+              name: b.name || "Main Banner",
+              image: b.image || "",
+              banner_size: b.bannerSize || "hero",
+              banner_type: "main_banner",
+              button_enabled: String(b.buttonEnabled || false),
+              button_link: b.buttonLink || "",
+              button_text: b.buttonText || "Shop Now",
+              connected_product_id: b.connectedProductId || "",
+              created_date: b.createdDate || new Date().toISOString(),
+              is_custom_button_text: "true",
+              locations: JSON.stringify(b.locations || ["homepage-hero"]),
+              order: String(b.order ?? 0),
+              status: b.status || "active"
+            };
+            await clientToUse.from('banners_draft').upsert(draftRow);
+          }
+        } catch (syncErr: any) {
+          console.warn("[POST /api/banners] Supabase banners table upsert notice:", syncErr.message);
+        }
+      }
+
+      return res.json({ success: true, message: "Main Banners saved successfully.", banners: mergedBanners });
+    } catch (err: any) {
+      console.error("[POST /api/banners] Error:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to save main banners" });
+    }
+  });
+
+  app.post("/api/banners/reorder", async (req, res) => {
+    try {
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+      const { banners } = req.body;
+
+      if (!Array.isArray(banners)) {
+        return res.status(400).json({ success: false, error: "Banners array required for reordering" });
+      }
+
+      const reordered = filterMainBannersOnly(banners).map((b, idx) => ({ ...b, order: idx }));
+
+      // Save to local file
+      await fs.writeFile(MAIN_BANNERS_FILE, JSON.stringify({
+        banners: reordered,
+        updated_at: new Date().toISOString()
+      }, null, 2));
+
+      // Save to Supabase settings table
+      if (clientToUse) {
+        await clientToUse.from('settings').upsert({
+          id: 'main_hero_banners',
+          value: JSON.stringify(reordered)
+        });
+      }
+
+      res.json({ success: true, message: "Main Banners reordered successfully", banners: reordered });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete("/api/banners/:id", async (req, res) => {
+    try {
+      const bannerId = String(req.params.id);
+      const clientToUse = supabaseServiceRole || supabaseAdmin;
+
+      let currentBanners: any[] = [];
+
+      // 1. Get current list from Supabase settings
+      if (clientToUse) {
+        try {
+          const { data: sData } = await clientToUse.from('settings').select('value').eq('id', 'main_hero_banners').maybeSingle();
+          if (sData?.value) {
+            const parsed = typeof sData.value === 'string' ? JSON.parse(sData.value) : sData.value;
+            if (Array.isArray(parsed)) currentBanners = filterMainBannersOnly(parsed);
+          }
+        } catch {}
+      }
+
+      // Fallback read from file if needed
+      if (currentBanners.length === 0) {
+        try {
+          const fileContent = await fs.readFile(MAIN_BANNERS_FILE, 'utf-8');
+          const parsed = JSON.parse(fileContent);
+          if (Array.isArray(parsed.banners)) currentBanners = filterMainBannersOnly(parsed.banners);
+        } catch {}
+      }
+
+      // Filter out deleted banner
+      const filtered = currentBanners.filter((b: any) => String(b.id) !== bannerId);
+
+      // Save to local file
+      try {
+        await fs.writeFile(MAIN_BANNERS_FILE, JSON.stringify({ banners: filtered, updated_at: new Date().toISOString() }, null, 2));
+      } catch {}
+
+      // Save to Supabase settings table and delete from banners tables
+      if (clientToUse) {
+        try {
+          await clientToUse.from('banners').delete().eq('id', bannerId);
+          await clientToUse.from('banners_draft').delete().eq('id', bannerId);
+        } catch (bErr: any) {
+          console.warn("[DELETE /api/banners] Supabase banners table delete notice:", bErr.message);
+        }
+
+        try {
+          await clientToUse.from('banners').upsert({
+            id: bannerId,
+            status: 'deleted',
+            is_active: false,
+            order: '-1',
+            display_order: -1,
+            locations: '[]'
+          });
+          await clientToUse.from('banners_draft').upsert({
+            id: bannerId,
+            status: 'deleted',
+            order: '-1'
+          });
+        } catch (uErr: any) {
+          console.warn("[DELETE /api/banners] Supabase banners status mark notice:", uErr.message);
+        }
+
+        try {
+          await clientToUse.from('settings').upsert({
+            id: 'main_hero_banners',
+            value: JSON.stringify(filtered)
+          });
+        } catch (sErr: any) {
+          console.warn("[DELETE /api/banners] Supabase settings update notice:", sErr.message);
+        }
+      }
+
+      res.json({ success: true, message: "Main Banner deleted successfully", banners: filtered });
+    } catch (err: any) {
+      console.error("[DELETE /api/banners/:id] Error:", err);
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -732,23 +1285,44 @@ async function startServer() {
         return res.status(500).json({ error: "Supabase client not initialized" });
       }
 
-      const [bannersRes, categoriesRes, productsRes, settingsRes, reviewsRes] = await Promise.all([
-        client.from('banners').select('*').order('order', { ascending: true }),
+      const [settingsBannerRes, categoriesRes, productsRes, settingsRes, reviewsRes] = await Promise.all([
+        client.from('settings').select('value').eq('id', 'main_hero_banners').maybeSingle(),
         client.from('categories').select('*'),
         client.from('products').select('*'),
         client.from('settings').select('*').eq('id', 'global').limit(1),
         client.from('reviews').select('*').eq('status', 'approved').order('created_at', { ascending: false })
       ]);
 
-      let bannersList = bannersRes.data || [];
+      let bannersList: any[] = [];
+      if (settingsBannerRes?.data?.value) {
+        try {
+          const parsed = typeof settingsBannerRes.data.value === 'string' 
+            ? JSON.parse(settingsBannerRes.data.value) 
+            : settingsBannerRes.data.value;
+          if (Array.isArray(parsed)) {
+            bannersList = filterMainBannersOnly(parsed);
+          }
+        } catch {}
+      }
+
       if (bannersList.length === 0) {
-        const draftBannersRes = await client.from('banners_draft').select('*').order('order', { ascending: true });
-        if (draftBannersRes.data && draftBannersRes.data.length > 0) {
-          bannersList = draftBannersRes.data.filter((b: any) => b.status === 'active' || !b.status);
+        try {
+          const fileContent = await fs.readFile(MAIN_BANNERS_FILE, 'utf-8');
+          const parsed = JSON.parse(fileContent);
+          if (Array.isArray(parsed.banners)) {
+            bannersList = filterMainBannersOnly(parsed.banners);
+          }
+        } catch {}
+      }
+
+      if (bannersList.length === 0) {
+        const bannersRes = await client.from('banners').select('*').order('order', { ascending: true });
+        if (bannersRes.data && bannersRes.data.length > 0) {
+          bannersList = filterMainBannersOnly(bannersRes.data);
         }
       }
 
-      const firstError = bannersRes.error || categoriesRes.error || productsRes.error || settingsRes.error || reviewsRes.error;
+      const firstError = categoriesRes.error || productsRes.error || settingsRes.error || reviewsRes.error;
 
       if (firstError) {
         console.error("[Supabase API Connection Error]", firstError);
