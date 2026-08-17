@@ -39,6 +39,7 @@ import { useProductStore } from '../../store/useProductStore';
 import { usePromoStore } from '../../store/usePromoStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { useAIStore } from '../../store/useAIStore';
 import { formatPrice } from '../../lib/utils';
 import { LiveOrderTracker } from '../orders/LiveOrderTracker';
 
@@ -507,21 +508,71 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
     }, 850);
   };
 
-  const handleSendAiMessage = (e: React.FormEvent) => {
+  const handleSendAiMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim()) return;
 
     const text = userInput.trim();
-    setAiChatHistory(prev => [...prev, {
+    const userMsg: ChatMessage = {
       id: `user-msg-${Date.now()}`,
       sender: 'customer',
       text: text,
       timestamp: new Date().toISOString(),
       seen: true
-    }]);
+    };
 
+    const updatedHistory = [...aiChatHistory, userMsg];
+    setAiChatHistory(updatedHistory);
     setUserInput('');
     playTone('send');
+    setIsAiTyping(true);
+
+    try {
+      const aiState = useAIStore.getState();
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: updatedHistory,
+          knowledge: aiState.knowledge,
+          settings: aiState.settings,
+          systemPrompt: aiState.prompt.systemPrompt,
+          customerAuth: {
+            name: fullName,
+            phone: mobileNumber,
+            email: user?.email,
+            uid: user?.id
+          },
+          liveContext: {
+            products: products.map(p => ({ id: p.id, name: p.name, category: p.category, price: p.price, discountPrice: p.discountPrice, stock: p.stock })),
+            orders: matchedOrders.map(o => ({ id: o.id, orderId: o.orderId, total: o.total, status: o.status, items: o.items })),
+            offers: promoCodes,
+            delivery: { divisionCharges: [{ name: 'Inside Dhaka', charge: 60 }, { name: 'Outside Dhaka', charge: 120 }] },
+            payment: { codEnabled: true, bkashEnabled: true, nagadEnabled: true }
+          }
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.text) {
+          setAiChatHistory(prev => [...prev, {
+            id: `ai-msg-${Date.now()}`,
+            sender: 'admin',
+            text: data.text,
+            timestamp: new Date().toISOString(),
+            seen: true
+          }]);
+          setIsAiTyping(false);
+          playTone('receive');
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("AI backend call failed, falling back to local matcher", err);
+    }
+
     executeLocalAIResponse(text);
   };
 
@@ -1340,6 +1391,20 @@ export function SupportCenter({ isModal = false, onClose }: SupportCenterProps) 
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {chatType === 'ai' && (
+                      <button 
+                        onClick={() => {
+                          setChatType('human');
+                          playTone('open');
+                          const sessId = createNewSession(fullName, mobileNumber, user?.email, user?.profileImage, user?.id);
+                          setActiveSessionId(sessId);
+                        }}
+                        className="px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <Headset className="w-3.5 h-3.5" />
+                        Human Handover
+                      </button>
+                    )}
                     <button 
                       onClick={() => {
                         if (window.confirm('আপনি কি এই চ্যাট সেশনটি বন্ধ করতে চান?')) {

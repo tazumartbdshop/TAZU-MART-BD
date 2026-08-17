@@ -134,12 +134,12 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
     });
   }, [products, categories, selectedCategories, productSearch]);
 
-  // Toggle Product selection (preserves order)
+  // Toggle Product selection (Single product only)
   const handleToggleProduct = (prodId: string) => {
     if (selectedProductIds.includes(prodId)) {
-      setSelectedProductIds(selectedProductIds.filter(id => id !== prodId));
+      setSelectedProductIds([]);
     } else {
-      setSelectedProductIds([...selectedProductIds, prodId]);
+      setSelectedProductIds([prodId]);
     }
   };
 
@@ -476,7 +476,7 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
               <div className="space-y-1.5 pt-1 border-t border-slate-200">
                 <div className="flex items-center justify-between gap-2">
                   <label className="block text-[11px] font-black uppercase tracking-wider text-slate-900">
-                    Products ({selectedProductIds.length} Selected)
+                    Product ({selectedProductIds.length} Selected)
                   </label>
 
                   <div className="relative w-44 sm:w-52">
@@ -495,7 +495,6 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
                   {filteredProducts.length > 0 ? (
                     filteredProducts.map((prod) => {
                       const isSelected = selectedProductIds.includes(prod.id);
-                      const orderIdx = selectedProductIds.indexOf(prod.id);
                       const img = prod.images?.[0] || prod.image || companyLogoFallback;
 
                       return (
@@ -509,10 +508,10 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
                           }`}
                         >
                           <input
-                            type="checkbox"
+                            type="radio"
                             checked={isSelected}
                             onChange={() => {}}
-                            className="w-3.5 h-3.5 text-amber-500 rounded border-slate-300 pointer-events-none"
+                            className="w-3.5 h-3.5 text-amber-500 border-slate-300 pointer-events-none"
                           />
 
                           <img
@@ -531,8 +530,8 @@ export default function AdminPushNotifications({ activeTab: initialTab = 'create
                           </div>
 
                           {isSelected && (
-                            <span className="bg-amber-500 text-slate-950 text-[9px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0">
-                              {orderIdx + 1}
+                            <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shrink-0">
+                              Selected
                             </span>
                           )}
                         </div>

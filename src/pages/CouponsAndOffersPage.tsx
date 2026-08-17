@@ -126,7 +126,14 @@ export default function CouponsAndOffersPage() {
 
                 <div className="p-3 sm:p-4 pt-0">
                   <button
-                    onClick={() => navigate(`/campaign/${campaign.id}`)}
+                    onClick={() => {
+                      const productId = campaign.products?.[0] || campaign.productIds?.[0];
+                      if (productId) {
+                        navigate(`/product/${productId}`);
+                      } else {
+                        navigate(`/campaign/${campaign.id}`);
+                      }
+                    }}
                     className="w-full h-9 sm:h-10 bg-black hover:bg-neutral-800 text-white rounded-lg font-black uppercase tracking-widest text-[10px] sm:text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     View Offer

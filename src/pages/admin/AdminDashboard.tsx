@@ -705,6 +705,7 @@ export default function AdminDashboard() {
               <Route path="/management/footer" element={<PermissionGate moduleId="dashboard"><AdminFooterSettings /></PermissionGate>} />
               <Route path="/management/support-banner" element={<PermissionGate moduleId="dashboard"><AdminSupportBanner /></PermissionGate>} />
               <Route path="/support" element={<PermissionGate moduleId="support"><AdminSupport /></PermissionGate>} />
+              <Route path="/support/ai" element={<PermissionGate moduleId="support"><AdminAIControlCenter /></PermissionGate>} />
               <Route path="/notifications" element={<PermissionGate moduleId="support"><AdminNotificationsPage /></PermissionGate>} />
               <Route path="/ai-control-center" element={<PermissionGate moduleId="settings"><AdminAIControlCenter /></PermissionGate>} />
               <Route path="/reviews" element={<PermissionGate moduleId="dashboard"><AdminReviewList /></PermissionGate>} />

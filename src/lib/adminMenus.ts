@@ -46,6 +46,7 @@ import {
   Share2,
   ListChecks,
   MessageSquareCode,
+  MessageSquare,
   RefreshCw,
   Play,
   Video,
@@ -188,7 +189,7 @@ export const defaultNavItems: NavItem[] = [
       { name: 'Facebook', path: '/admin/marketing/facebook', icon: Fingerprint },
       { name: 'TikTok', path: '/admin/marketing/tiktok', icon: Video },
       { name: 'Google', path: '/admin/marketing/google', icon: Globe },
-      { name: 'Server Side', path: '/admin/marketing/server-side', icon: Zap },
+      { name: 'Server-Side Tracking', path: '/admin/marketing/server-side', icon: Zap },
       { name: 'Tracking Overview', path: '/admin/marketing/tracking-overview', icon: Activity }
     ]
   },
@@ -251,7 +252,11 @@ export const defaultNavItems: NavItem[] = [
     name: 'Support', 
     path: '/admin/support', 
     icon: HelpCircle, 
-    moduleId: 'support' 
+    moduleId: 'support',
+    subItems: [
+      { name: 'Live Support Inbox', path: '/admin/support', icon: MessageSquare },
+      { name: 'AI Support / TAZU Chat', path: '/admin/support/ai', icon: Sparkles }
+    ]
   },
   {
     name: 'AI Agent Center',

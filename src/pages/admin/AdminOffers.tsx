@@ -4,7 +4,7 @@ import {
   Sparkles, CheckCircle, Eye, EyeOff, Search, HelpCircle, 
   ArrowLeft, Grid, Image as ImageIcon, Percent, ShoppingBag, 
   Flame, Calendar, FileText, ChevronRight, Package, DollarSign,
-  Star
+  Star, ChevronDown, X
 } from 'lucide-react';
 import { useOfferStore, Offer } from '../../store/useOfferStore';
 import { useProductStore, Product } from '../../store/useProductStore';
@@ -349,6 +349,10 @@ function OfferFormView() {
   const { products } = useProductStore();
   const [productIds, setProductIds] = useState<string[]>(existingOffer?.productIds || []);
   const [formSearchQuery, setFormSearchQuery] = useState('');
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
+
+  const selectedProduct = products.find(p => p.id === productIds[0]);
 
   // Website Control Toggles
   const [homepageVisibility, setHomepageVisibility] = useState(existingOffer?.homepageVisibility ?? true);
@@ -680,124 +684,138 @@ function OfferFormView() {
               />
             </div>
 
-            {/* LINKED PRODUCTS SELECTION SECTION */}
+            {/* SINGLE CAMPAIGN PRODUCT SELECTION FIELD */}
             <div className="space-y-3 pt-4 border-t border-neutral-100">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div>
-                  <label className="text-[11px] font-black uppercase tracking-[0.12em] text-neutral-950 flex items-center gap-1.5">
-                    <ShoppingBag className="w-4 h-4 text-black" /> Select Campaign Products <span className="text-red-500">*</span>
-                  </label>
-                  <p className="text-[9px] text-neutral-400 font-bold uppercase mt-0.5">
-                    Which products are linked and shown on clicking this Offer Banner?
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const currentActiveIds = products.map(p => p.id);
-                      setProductIds(prev => Array.from(new Set([...prev, ...currentActiveIds])));
-                    }}
-                    className="text-[9px] font-bold uppercase tracking-wider text-black bg-neutral-100 hover:bg-neutral-200 px-2 py-1 rounded"
-                  >
-                    Select All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductIds([]);
-                    }}
-                    className="text-[9px] font-bold uppercase tracking-wider text-red-600 bg-red-50 hover:bg-red-100 px-2 py-1 rounded"
-                  >
-                    Clear All
-                  </button>
-                </div>
+              <div className="flex justify-between items-center">
+                <label className="text-[11px] font-black uppercase tracking-[0.12em] text-neutral-950 flex items-center gap-1.5">
+                  <ShoppingBag className="w-4 h-4 text-black" /> Campaign Product <span className="text-red-500">*</span>
+                </label>
+                <span className="text-[9px] font-bold text-neutral-500 uppercase">
+                  {productIds.length > 0 ? "PRODUCT (1 SELECTED)" : "PRODUCT (0 SELECTED)"}
+                </span>
               </div>
 
-              {/* Internal Product Filter Search box */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -to-[10px] -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
-                <input
-                  type="text"
-                  placeholder="Quick search products by name, category or SKU..."
-                  value={formSearchQuery}
-                  onChange={(e) => setFormSearchQuery(e.target.value)}
-                  className="w-full text-xs pl-8 pr-4 py-2 bg-neutral-50/50 border border-neutral-200 rounded-lg outline-none focus:border-black focus:bg-white transition-all"
-                />
+              {/* Main Selector Field/Button */}
+              <div className="flex gap-2 items-center">
+                <button
+                  type="button"
+                  onClick={() => setIsProductModalOpen(true)}
+                  className={cn(
+                    "flex-1 flex items-center justify-between px-4 py-3 border text-left rounded-lg transition-all cursor-pointer font-bold text-xs uppercase tracking-wider",
+                    selectedProduct
+                      ? "border-black bg-neutral-50 text-neutral-950 shadow-xs"
+                      : "border-neutral-300 bg-white text-neutral-500 hover:border-black"
+                  )}
+                >
+                  <span className="truncate">
+                    {selectedProduct ? selectedProduct.name : "SELECT YOUR PRODUCT"}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0 ml-2" />
+                </button>
+
+                {selectedProduct && (
+                  <button
+                    type="button"
+                    onClick={() => setProductIds([])}
+                    className="text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-50 hover:bg-red-100 px-3 py-3 rounded-lg border border-red-200 shrink-0 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
 
-              {/* Scrollable checklist container */}
-              <div className="border border-neutral-200 rounded-lg bg-neutral-50/30 divide-y divide-neutral-100 max-h-[250px] overflow-y-auto">
-                {products.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-neutral-400">
-                    No products found in the store. Please add products first.
+              {/* Clean Selection Modal / Popup */}
+              {isProductModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+                  <div className="bg-white rounded-xl border border-neutral-200 shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+                    {/* Modal Header */}
+                    <div className="p-4 border-b border-neutral-100 flex items-center justify-between bg-neutral-50">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-neutral-900 flex items-center gap-2">
+                        <ShoppingBag className="w-4 h-4 text-black" /> Select Product
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setIsProductModalOpen(false)}
+                        className="p-1 rounded-md text-neutral-400 hover:text-black hover:bg-neutral-200 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Modal Search Input */}
+                    <div className="p-3 border-b border-neutral-100 bg-white">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
+                        <input
+                          type="text"
+                          placeholder="Search product name..."
+                          value={modalSearchQuery}
+                          onChange={(e) => setModalSearchQuery(e.target.value)}
+                          className="w-full text-xs pl-8 pr-4 py-2 bg-neutral-50 border border-neutral-200 rounded-lg outline-none focus:border-black focus:bg-white transition-all font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Product Names ONLY List */}
+                    <div className="flex-1 overflow-y-auto divide-y divide-neutral-100">
+                      {products.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-neutral-400 font-bold uppercase">
+                          No products found in database store.
+                        </div>
+                      ) : (
+                        (() => {
+                          const filtered = products.filter((p) =>
+                            p.name.toLowerCase().includes(modalSearchQuery.toLowerCase())
+                          );
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="p-8 text-center text-xs text-neutral-400 font-bold uppercase">
+                                No matching products found.
+                              </div>
+                            );
+                          }
+                          return filtered.map((p) => {
+                            const isSelected = productIds.includes(p.id);
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setProductIds([p.id]);
+                                  setIsProductModalOpen(false);
+                                  setModalSearchQuery('');
+                                }}
+                                className={cn(
+                                  "w-full text-left px-4 py-3.5 text-xs font-bold transition-colors hover:bg-neutral-100 flex items-center justify-between gap-3 cursor-pointer",
+                                  isSelected ? "bg-neutral-950 text-white hover:bg-neutral-900" : "text-neutral-900"
+                                )}
+                              >
+                                <span className="truncate">{p.name}</span>
+                                {isSelected && (
+                                  <span className="text-[9px] font-black uppercase bg-amber-400 text-black px-2 py-0.5 rounded tracking-wider shrink-0">
+                                    Selected
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          });
+                        })()
+                      )}
+                    </div>
+
+                    {/* Modal Footer */}
+                    <div className="p-3 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsProductModalOpen(false)}
+                        className="px-4 py-2 bg-neutral-200 hover:bg-neutral-300 text-neutral-800 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  (() => {
-                    const filtered = products.filter(p => {
-                      if (!formSearchQuery.trim()) return true;
-                      return (
-                        p.name.toLowerCase().includes(formSearchQuery.toLowerCase()) ||
-                        p.sku.toLowerCase().includes(formSearchQuery.toLowerCase()) ||
-                        (p.category && p.category.toLowerCase().includes(formSearchQuery.toLowerCase()))
-                      );
-                    });
-                    if (filtered.length === 0) {
-                      return (
-                        <div className="p-8 text-center text-xs text-neutral-400">
-                          No matching products found.
-                        </div>
-                      );
-                    }
-                    return filtered.map((p) => {
-                      const isSelected = productIds.includes(p.id);
-                      return (
-                        <div 
-                          key={p.id}
-                          onClick={() => {
-                            if (isSelected) {
-                              setProductIds(prev => prev.filter(id => id !== p.id));
-                            } else {
-                              setProductIds(prev => [...prev, p.id]);
-                            }
-                          }}
-                          className={cn(
-                            "flex items-center gap-3 p-2 hover:bg-neutral-100 transition-colors cursor-pointer select-none",
-                            isSelected ? "bg-amber-100/10" : ""
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => {}} // handled by parent click handler
-                            className="w-4 h-4 text-black rounded border-neutral-300 focus:ring-black"
-                          />
-                          <img 
-                            src={p.featured_image || p.image} 
-                            alt={p.name} 
-                            className="w-8 h-8 object-cover rounded border border-neutral-200 shrink-0" 
-                          />
-                          <div className="flex-1 min-w-0 text-left">
-                            <h5 className="text-[11px] font-bold text-neutral-900 truncate">{p.name}</h5>
-                            <p className="text-[9px] text-neutral-500 font-mono tracking-tight mt-0.5">
-                              {p.sku} • {p.category}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0 pr-1">
-                            <span className="text-[11px] font-black text-neutral-950">{formatPrice(p.price)}</span>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()
-                )}
-              </div>
-              <div className="flex justify-between items-center text-[9px] text-neutral-400 font-bold uppercase py-1">
-                <span>Selected: <span className="text-black font-extrabold">{productIds.length}</span> products</span>
-                {productIds.length > 0 && (
-                  <span className="text-emerald-600 font-extrabold font-mono">Status: Connected to Campaign</span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Banner Presentation System selector */}

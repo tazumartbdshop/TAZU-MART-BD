@@ -23,10 +23,14 @@ export default function CampaignProductsPage() {
       .then(data => {
         const found = data.find(c => String(c.id) === String(id));
         if (found) {
+          const allowedIds = found.products || [];
+          if (allowedIds.length > 0) {
+            navigate(`/product/${allowedIds[0]}`, { replace: true });
+            return;
+          }
           setCampaign(found);
           
           // Filter products based on selected product IDs
-          const allowedIds = found.products || [];
           const filtered = products.filter(p => allowedIds.includes(String(p.id)));
           setCampaignProducts(filtered);
         } else {

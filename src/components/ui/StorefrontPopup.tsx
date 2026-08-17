@@ -64,7 +64,12 @@ export function StorefrontPopup() {
 
   const handleView = () => {
     if (!activeCampaign) return;
-    navigate(`/campaign/${activeCampaign.id}`);
+    const productId = activeCampaign.products?.[0] || activeCampaign.productIds?.[0];
+    if (productId) {
+      navigate(`/product/${productId}`);
+    } else {
+      navigate(`/campaign/${activeCampaign.id}`);
+    }
     handleClose();
   };
 

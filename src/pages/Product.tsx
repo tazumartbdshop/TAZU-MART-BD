@@ -21,6 +21,7 @@ import ProductReviews from '../components/product/ProductReviews';
 import BannerSlider from '../components/common/BannerSlider';
 import { pixelService } from '../utils/pixelService';
 import { useSmartBack } from '../hooks/useSmartBack';
+import { pushEvent } from '../lib/gtm';
 
 const ALL_FALLBACK_PRODUCTS = [
   {
@@ -719,6 +720,12 @@ export default function Product() {
         price: product.price,
         category: product.category
       });
+      pushEvent('product_view', {
+        product_id: product.id,
+        product_name: product.name,
+        price: product.price,
+        category: product.category
+      });
     }
   }, [product, addViewedProduct]);
 
@@ -780,6 +787,12 @@ export default function Product() {
             slug: product.slug,
             sku: product.sku,
             quantity: 1,
+          });
+          pushEvent('add_to_cart', {
+            product_id: product.id,
+            product_name: product.name,
+            price: (product.discountPrice || product.price) + extraPrice,
+            quantity: 1
           });
           toast.success("Product added to cart");
           navigate('/cart');

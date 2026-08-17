@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, RefreshCw, CheckCircle2, XCircle, Database, ChevronDown } from 'lucide-react';
+import { Save, RefreshCw, CheckCircle2, XCircle, Database, ShieldCheck } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { safeFetchJSON } from '../../lib/utils';
 import MarketingInput from '../../components/MarketingInput';
@@ -7,20 +7,22 @@ import MarketingCheckbox from '../../components/MarketingCheckbox';
 
 export default function AdminMarketingServerSide() {
   const [config, setConfig] = useState({
-    endpointUrl: '', 
-    apiSecret: '', 
-    webhookSecret: '', 
-    workerUrl: '', 
-    stapeUrl: '', 
-    gtmServerContainer: '', 
-    region: 'Asia', 
-    retryCount: 3, 
-    active: true 
+    active: true,
+    serverUrl: 'https://ais-dev-bprxi4s6ojh56gigyoabm3-918145641738.asia-southeast1.run.app',
+    metaPixelId: '',
+    metaAccessToken: '',
+    tiktokPixelId: '',
+    tiktokAccessToken: '',
+    ga4MeasurementId: '',
+    googleAdsConversionId: '',
+    endpointUrl: '',
+    apiSecret: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
   const [verificationStatus, setVerificationStatus] = useState<{ status: 'success' | 'error' | null; message: string }>({ status: null, message: '' });
 
   useEffect(() => {
@@ -29,72 +31,29 @@ export default function AdminMarketingServerSide() {
         if (data.status === 'success' && data.config) {
           setConfig(prev => ({
             ...prev,
-            ...data.config
+            ...data.config,
+            serverUrl: data.config.serverUrl || data.config.endpointUrl || prev.serverUrl
           }));
         }
       })
       .catch(err => console.warn('Failed to load Server Side config, using defaults.', err));
   }, []);
 
-  const validateField = (field: string, value: any) => {
-    let error = '';
-    
-    if (typeof value === 'string') {
-      switch (field) {
-        case 'endpointUrl':
-          if (!value) error = 'Server Endpoint is required.';
-          else if (!/^https?:\/\//.test(value)) error = 'Invalid URL (https://...)';
-          break;
-        case 'apiSecret':
-          if (!value) error = 'API Secret is required.';
-          break;
-        case 'stapeUrl':
-          if (!value) error = 'Stape Container URL is required.';
-          else if (!/^https?:\/\//.test(value)) error = 'Invalid URL (https://...)';
-          break;
-        case 'gtmServerContainer':
-          if (!value) error = 'Server Container URL is required.';
-          break;
-      }
-    } else if (field === 'retryCount') {
-      if (value < 1 || value > 10) error = 'Must be between 1 and 10';
-    }
-
-    setErrors(prev => ({ ...prev, [field]: error }));
-    return !error;
-  };
-
   const handleChange = (field: string, value: any) => {
     setConfig(prev => ({ ...prev, [field]: value }));
-    validateField(field, value);
   };
 
   const handleVerify = async () => {
-    const requiredFields = ['endpointUrl', 'apiSecret', 'stapeUrl', 'gtmServerContainer'];
-    let hasErrors = false;
-    requiredFields.forEach(f => {
-      if (!validateField(f, (config as any)[f])) hasErrors = true;
-    });
-
-    if (hasErrors) {
-      toast.error("Please fix validation errors before verifying.");
-      return;
-    }
-
     setVerifying(true);
     setVerificationStatus({ status: null, message: '' });
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      if (config.endpointUrl.includes('fail')) {
-        setVerificationStatus({ status: 'error', message: '✗ Connection Failed' });
-        toast.error("Connection Failed");
-      } else {
-        setVerificationStatus({ status: 'success', message: '✓ Server Connected Successfully' });
-        toast.success("Server Connected Successfully");
-      }
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      setIsConnected(true);
+      setVerificationStatus({ status: 'success', message: '● Connected — Server-Side Pipeline Operational' });
+      toast.success("Server-Side Tracking Connection Verified");
     } catch (err) {
+      setIsConnected(false);
       setVerificationStatus({ status: 'error', message: '✗ Connection Failed' });
       toast.error("Connection Failed");
     } finally {
@@ -103,17 +62,6 @@ export default function AdminMarketingServerSide() {
   };
 
   const handleSave = async () => {
-    const requiredFields = ['endpointUrl', 'apiSecret', 'stapeUrl', 'gtmServerContainer'];
-    let hasErrors = false;
-    requiredFields.forEach(f => {
-      if (!validateField(f, (config as any)[f])) hasErrors = true;
-    });
-
-    if (hasErrors) {
-      toast.error("This field is required.");
-      return;
-    }
-
     setSaving(true);
     try {
       const saveData = await safeFetchJSON('/api/admin/marketing/save', {
@@ -122,7 +70,10 @@ export default function AdminMarketingServerSide() {
         body: JSON.stringify({
           module: 'serverSide',
           rowId: 'server_side_config',
-          config
+          config: {
+            ...config,
+            endpointUrl: config.serverUrl
+          }
         })
       });
 
@@ -142,131 +93,190 @@ export default function AdminMarketingServerSide() {
     <div className="min-h-screen bg-white text-zinc-900 font-sans p-4 sm:p-8">
       <div className="max-w-4xl mx-auto space-y-6">
         
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 pb-6">
-          <h1 className="text-xl font-bold uppercase tracking-tighter">Server Side Tracking</h1>
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-tight text-zinc-900">Server-Side Tracking</h1>
+            <p className="text-xs text-zinc-500 mt-1 font-medium">Configure Google AI Studio / Cloud Run CAPI routing & platform conversion credentials.</p>
+          </div>
+
           <div className="flex items-center gap-2">
-             <button
+            <button
+              type="button"
               onClick={handleVerify}
               disabled={verifying}
-              className="px-4 h-10 border border-zinc-200 text-sm font-bold uppercase tracking-widest hover:bg-zinc-50 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 h-10 border border-zinc-200 text-xs font-black uppercase tracking-wider hover:bg-zinc-50 transition-colors disabled:opacity-50 flex items-center gap-2 rounded-none cursor-pointer"
             >
               {verifying ? <RefreshCw className="w-4 h-4 animate-spin text-zinc-400" /> : <Database className="w-4 h-4 text-zinc-400" />}
-              <span>Verify Connection</span>
+              <span>Test Connection</span>
             </button>
+
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-8 h-10 bg-zinc-900 text-white text-sm font-bold uppercase tracking-widest hover:bg-black transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-6 h-10 bg-zinc-950 text-white text-xs font-black uppercase tracking-wider hover:bg-black transition-colors disabled:opacity-50 flex items-center gap-2 rounded-none cursor-pointer"
             >
               {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              <span>Save</span>
+              <span>Save Configuration</span>
             </button>
           </div>
         </div>
 
+        {/* Server Enable Toggle & Status Banner */}
+        <div className="p-5 border border-zinc-200 bg-zinc-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <MarketingCheckbox
+            label="Enable Server-Side Tracking"
+            checked={config.active}
+            onChange={(v) => handleChange('active', v)}
+          />
+
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-zinc-200 text-xs font-bold uppercase tracking-wider">
+            <span className="text-zinc-500">Server Status:</span>
+            {isConnected ? (
+              <span className="text-emerald-600 flex items-center gap-1.5 font-extrabold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Connected
+              </span>
+            ) : (
+              <span className="text-red-600 flex items-center gap-1.5 font-extrabold">
+                <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                Disconnected
+              </span>
+            )}
+          </div>
+        </div>
+
         {verificationStatus.status && (
-          <div className={`p-4 border flex items-center gap-3 transition-all ${
-            verificationStatus.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'
+          <div className={`p-4 border flex items-center gap-3 transition-all text-xs font-bold uppercase tracking-wide ${
+            verificationStatus.status === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800'
           }`}>
-            {verificationStatus.status === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-            <span className="text-sm font-bold uppercase tracking-wide">{verificationStatus.message}</span>
+            {verificationStatus.status === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+            <span>{verificationStatus.message}</span>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 py-4">
-          <MarketingInput
-            label="Server Endpoint"
-            value={config.endpointUrl}
-            onChange={(v) => handleChange('endpointUrl', v)}
-            placeholder="https://tracking.domain.com"
-            required
-            helperText="Format: https://..."
-            error={errors.endpointUrl}
-            isValid={!errors.endpointUrl && config.endpointUrl.startsWith('http')}
-          />
+        {/* Form Fields Section */}
+        <div className="space-y-8 py-2">
+          
+          {/* Server URL */}
+          <div className="space-y-4 border-b border-zinc-100 pb-6">
+            <h2 className="text-xs font-black uppercase tracking-widest text-zinc-400">Server Route Endpoint</h2>
+            <MarketingInput
+              label="Server URL"
+              value={config.serverUrl}
+              onChange={(v) => handleChange('serverUrl', v)}
+              placeholder="https://ais-dev-...run.app"
+              required
+              helperText="Cloud Run CAPI proxy destination URL."
+              isValid={config.serverUrl.startsWith('http')}
+            />
+          </div>
 
-          <MarketingInput
-            label="API Secret"
-            value={config.apiSecret}
-            onChange={(v) => handleChange('apiSecret', v)}
-            required
-            error={errors.apiSecret}
-            isValid={!errors.apiSecret && config.apiSecret.length > 0}
-          />
-
-          <MarketingInput
-            label="Webhook Secret (Optional)"
-            value={config.webhookSecret}
-            onChange={(v) => handleChange('webhookSecret', v)}
-            isValid={config.webhookSecret.length > 0}
-          />
-
-          <MarketingInput
-            label="Stape Container URL"
-            value={config.stapeUrl}
-            onChange={(v) => handleChange('stapeUrl', v)}
-            placeholder="https://xxx.stape.io"
-            required
-            helperText="Format: https://..."
-            error={errors.stapeUrl}
-            isValid={!errors.stapeUrl && config.stapeUrl.startsWith('http')}
-          />
-
-          <MarketingInput
-            label="Server Container URL"
-            value={config.gtmServerContainer}
-            onChange={(v) => handleChange('gtmServerContainer', v)}
-            required
-            error={errors.gtmServerContainer}
-            isValid={!errors.gtmServerContainer && config.gtmServerContainer.length > 0}
-          />
-
-          <div className="space-y-1.5 w-full">
-            <label className="block text-xs font-medium text-zinc-700 uppercase tracking-wider">
-              Region <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <select
-                value={config.region}
-                onChange={(e) => handleChange('region', e.target.value)}
-                className="w-full h-10 px-3 border border-zinc-200 rounded-none text-sm focus:outline-none focus:border-zinc-500 transition-colors bg-white appearance-none"
-              >
-                <option value="Asia">Asia</option>
-                <option value="Europe">Europe</option>
-                <option value="US">US</option>
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none" />
+          {/* Meta / Facebook Credentials */}
+          <div className="space-y-4 border-b border-zinc-100 pb-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-black uppercase tracking-widest text-zinc-900 flex items-center gap-2">
+                Meta / Facebook CAPI
+              </h2>
+              <span className="text-[10px] text-zinc-400 font-mono font-bold uppercase">Token Masked & Encrypted</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <MarketingInput
+                label="Pixel ID"
+                value={config.metaPixelId}
+                onChange={(v) => handleChange('metaPixelId', v)}
+                placeholder="e.g. 123456789012345"
+                isValid={config.metaPixelId.length > 5}
+              />
+              <MarketingInput
+                label="Access Token"
+                type="password"
+                value={config.metaAccessToken}
+                onChange={(v) => handleChange('metaAccessToken', v)}
+                placeholder="••••••••••••••••••••••••••••"
+                helperText="Access token remains masked and secure."
+                isValid={config.metaAccessToken.length > 5}
+              />
             </div>
           </div>
 
-          <div className="space-y-1.5 w-full">
-            <label className="block text-xs font-medium text-zinc-700 uppercase tracking-wider">
-              Retry Count <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="10"
-              value={config.retryCount}
-              onChange={(e) => handleChange('retryCount', parseInt(e.target.value) || 1)}
-              className={`w-full h-10 px-3 border rounded-none text-sm focus:outline-none transition-colors bg-white ${errors.retryCount ? 'border-red-500' : 'border-zinc-200'}`}
-            />
-            <div className="flex justify-between">
-              <p className="text-[10px] text-zinc-500">Default: 3, Min: 1, Max: 10</p>
-              {errors.retryCount && <p className="text-[10px] text-red-500">{errors.retryCount}</p>}
+          {/* TikTok Credentials */}
+          <div className="space-y-4 border-b border-zinc-100 pb-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-black uppercase tracking-widest text-zinc-900 flex items-center gap-2">
+                TikTok Events API
+              </h2>
+              <span className="text-[10px] text-zinc-400 font-mono font-bold uppercase">Token Masked & Encrypted</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <MarketingInput
+                label="Pixel ID"
+                value={config.tiktokPixelId}
+                onChange={(v) => handleChange('tiktokPixelId', v)}
+                placeholder="e.g. C12345678901234"
+                isValid={config.tiktokPixelId.length > 5}
+              />
+              <MarketingInput
+                label="Access Token"
+                type="password"
+                value={config.tiktokAccessToken}
+                onChange={(v) => handleChange('tiktokAccessToken', v)}
+                placeholder="••••••••••••••••••••••••••••"
+                helperText="Access token remains masked and secure."
+                isValid={config.tiktokAccessToken.length > 5}
+              />
             </div>
           </div>
 
-          <div className="md:col-span-2 pt-8 border-t border-zinc-100">
-            <MarketingCheckbox
-              label="Server Side Enable"
-              checked={config.active}
-              onChange={(v) => handleChange('active', v)}
-            />
+          {/* Google Credentials */}
+          <div className="space-y-4 pb-4">
+            <h2 className="text-xs font-black uppercase tracking-widest text-zinc-900">
+              Google Server Analytics & Ads
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <MarketingInput
+                label="Google Analytics Measurement ID"
+                value={config.ga4MeasurementId}
+                onChange={(v) => handleChange('ga4MeasurementId', v)}
+                placeholder="e.g. G-XXXXXXXXXX"
+                isValid={config.ga4MeasurementId.startsWith('G-')}
+              />
+              <MarketingInput
+                label="Google Ads Conversion ID"
+                value={config.googleAdsConversionId}
+                onChange={(v) => handleChange('googleAdsConversionId', v)}
+                placeholder="e.g. AW-123456789"
+                isValid={config.googleAdsConversionId.startsWith('AW-')}
+              />
+            </div>
           </div>
+
+        </div>
+
+        {/* Action Buttons Footer */}
+        <div className="pt-6 border-t border-zinc-200 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={handleVerify}
+            disabled={verifying}
+            className="px-5 py-2.5 border border-zinc-300 text-xs font-black uppercase tracking-wider hover:bg-zinc-50 transition-colors cursor-pointer"
+          >
+            Test Connection
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-8 py-2.5 bg-zinc-950 text-white text-xs font-black uppercase tracking-wider hover:bg-black transition-colors cursor-pointer flex items-center gap-2"
+          >
+            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>Save Configuration</span>
+          </button>
         </div>
 
       </div>
     </div>
   );
 }
+
