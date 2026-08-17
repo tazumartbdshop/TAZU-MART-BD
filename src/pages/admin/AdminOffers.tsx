@@ -364,6 +364,33 @@ function OfferFormView() {
 
   const previewStyle = getBannerStyleByType(type);
 
+  // Sync state when existingOffer loads / changes
+  useEffect(() => {
+    if (existingOffer) {
+      setName(existingOffer.name || '');
+      setType(existingOffer.type || 'Weekly Sale');
+      setPriority(existingOffer.priority || 0);
+      setStartDate(existingOffer.startDate || '');
+      setEndDate(existingOffer.endDate || '');
+      setStatus(existingOffer.status || 'Active');
+      setDescription(existingOffer.description || '');
+      setBannerMode(existingOffer.bannerMode || 'auto');
+      setBanners(existingOffer.banners || (existingOffer.customBannerUrls?.map(url => ({ url, link: '#' })) || []));
+      setAutoSlide(existingOffer.autoSlide ?? true);
+      setSlideDurationSeconds(existingOffer.slideDurationSeconds || 3);
+      setLayoutMode(existingOffer.layoutMode || 'grid');
+      setProductIds(existingOffer.productIds || existingOffer.manualProductIds || []);
+      setHomepageVisibility(existingOffer.homepageVisibility ?? true);
+      setOffersPageVisibility(existingOffer.offersPageVisibility ?? true);
+      setShowAsFlashSale(existingOffer.showAsFlashSale ?? false);
+      setShowAsTrending(existingOffer.showAsTrending ?? false);
+      setShowAsBestSelling(existingOffer.showAsBestSelling ?? false);
+      setDiscountType(existingOffer.discountType || '');
+      setDiscountValue(existingOffer.discountValue || 0);
+      setAutoExpire(existingOffer.autoExpire ?? true);
+    }
+  }, [existingOffer]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {

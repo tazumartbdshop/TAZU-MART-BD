@@ -79,29 +79,101 @@ export const campaignService = {
   async getActiveCampaigns(): Promise<(Campaign & { products: string[], categories: string[], coupon?: Coupon })[]> {
     await ensureDBSetup();
     const supabase = getSupabase();
+    
+    let dbCampaigns: any[] = [];
     if (useFallback) {
       const data = await getFallbackData();
-      return data.filter(d => d.campaign.status === 'active').map(d => ({
+      dbCampaigns = data.filter(d => d.campaign.status === 'active').map(d => ({
         ...d.campaign,
-        products: d.products.map(p => p.product_id),
-        categories: d.categories.map(c => c.category_id),
+        products: d.products.map((p: any) => p.product_id),
+        categories: d.categories.map((c: any) => c.category_id),
         coupon: d.coupon
       }));
+    } else {
+      // Using Supabase relationships (if foreign keys exist)
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('*, campaign_products(product_id), campaign_categories(category_id), coupons(*)')
+        .eq('status', 'active');
+        
+      if (!error && data) {
+        dbCampaigns = data.map((d: any) => ({
+          ...d,
+          title: d.title || d.name,
+          image_url: d.image_url || d.banners?.[0]?.url || d.customBannerUrls?.[0],
+          products: d.campaign_products?.map((p: any) => p.product_id) || d.productIds || d.manualProductIds || [],
+          categories: d.campaign_categories?.map((c: any) => c.category_id) || [],
+          coupon: d.coupons?.[0] || d.coupon
+        }));
+      }
     }
-    // Using Supabase relationships (if foreign keys exist)
-    const { data, error } = await supabase
-      .from('campaigns')
-      .select('*, campaign_products(product_id), campaign_categories(category_id), coupons(*)')
-      .eq('status', 'active');
-      
-    if (error) throw error;
-    
-    return data.map((d: any) => ({
-      ...d,
-      products: d.campaign_products?.map((p: any) => p.product_id) || [],
-      categories: d.campaign_categories?.map((c: any) => c.category_id) || [],
-      coupon: d.coupons?.[0]
-    }));
+
+    // Also include active offers from useOfferStore (created via Admin Offers)
+    let storeOffers: any[] = [];
+    try {
+      const { useOfferStore } = await import('../store/useOfferStore');
+      storeOffers = useOfferStore.getState().offers || [];
+    } catch {
+      // ignore
+    }
+
+    const offerCampaigns = storeOffers
+      .filter(o => o.status === 'Active' && o.offersPageVisibility !== false)
+      .map(o => ({
+        id: o.id,
+        title: o.name,
+        description: o.description,
+        image_url: o.banners?.[0]?.url || o.customBannerUrls?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=200',
+        status: 'active' as const,
+        products: [...(o.productIds || []), ...(o.manualProductIds || [])],
+        categories: [],
+        coupon: o.discountType ? {
+          code: `DISCOUNT${o.discountValue || 0}`,
+          discount_type: o.discountType === 'percentage' ? 'Percentage' : 'Fixed Amount',
+          discount_value: o.discountValue || 0,
+          active: true
+        } : undefined,
+        created_at: new Date().toISOString()
+      }));
+
+    // Also include active popup campaigns from usePopupStore (created via Admin Popup Management)
+    let popupCampaignsList: any[] = [];
+    try {
+      const { usePopupStore } = await import('../store/usePopupStore');
+      popupCampaignsList = usePopupStore.getState().popupCampaigns || [];
+    } catch {
+      // ignore
+    }
+
+    const popupOffers = popupCampaignsList
+      .filter(p => p.status === 'ACTIVE')
+      .map(p => ({
+        id: p.id,
+        title: p.title || p.campaignValue,
+        description: p.subtitle,
+        image_url: p.bannerUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=200',
+        status: 'active' as const,
+        products: p.selectedProducts || [],
+        categories: p.selectedCategories || [],
+        coupon: p.discountPercentage ? {
+          code: p.campaignValue ? p.campaignValue.toUpperCase().replace(/\s+/g, '') : 'EIDOFFER',
+          discount_type: 'Percentage',
+          discount_value: parseInt(p.discountPercentage) || 10,
+          active: true
+        } : undefined,
+        created_at: new Date().toISOString()
+      }));
+
+    // Combine and deduplicate by id
+    const combined = [...dbCampaigns, ...offerCampaigns, ...popupOffers];
+    const uniqueMap = new Map();
+    for (const c of combined) {
+      if (c.id && !uniqueMap.has(c.id)) {
+        uniqueMap.set(c.id, c);
+      }
+    }
+
+    return Array.from(uniqueMap.values());
   },
 
   async createCampaign(campaign: Omit<Campaign, 'id'>, productIds: string[], categoryIds: string[], coupon?: Omit<Coupon, 'campaign_id'>) {

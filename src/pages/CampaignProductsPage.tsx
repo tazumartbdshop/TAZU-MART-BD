@@ -3,18 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Percent } from 'lucide-react';
 import { campaignService, Campaign } from '../services/campaignService';
 import { useProductStore, Product } from '../store/useProductStore';
-import { useCartStore } from '../store/useCartStore';
-import { formatPrice } from '../lib/utils';
-import { toast } from 'react-hot-toast';
 import ProductCard from '../components/ui/ProductCard';
 
 export default function CampaignProductsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { products } = useProductStore();
-  const { addItem, clearCart } = useCartStore();
   
-  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [campaign, setCampaign] = useState<any | null>(null);
   const [campaignProducts, setCampaignProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +21,7 @@ export default function CampaignProductsPage() {
     // We fetch all active campaigns and find the one that matches.
     campaignService.getActiveCampaigns()
       .then(data => {
-        const found = data.find(c => c.id === id);
+        const found = data.find(c => String(c.id) === String(id));
         if (found) {
           setCampaign(found);
           
@@ -40,8 +36,6 @@ export default function CampaignProductsPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [id, products]);
-
-  
 
   if (loading) {
     return (
@@ -60,7 +54,9 @@ export default function CampaignProductsPage() {
     );
   }
 
-  // If only one product exists, we just show it.
+  const campaignTitle = campaign.title || campaign.name || 'Campaign Offer';
+  const campaignDesc = campaign.description;
+
   return (
     <div className="bg-[#fcfcfc] min-h-screen pb-24 font-sans selection:bg-black selection:text-white">
       <div className="bg-black text-white pt-10 pb-6 px-4 relative flex flex-col items-center justify-center text-center">
@@ -70,34 +66,34 @@ export default function CampaignProductsPage() {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <h1 className="text-xl font-black uppercase tracking-widest text-[#00E676] mb-1">
-          {campaign.title}
+        <h1 className="text-xl sm:text-2xl font-black uppercase tracking-widest text-[#00E676] mb-1">
+          {campaignTitle}
         </h1>
-        <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest leading-relaxed">
-          Special Selected Products
-        </p>
+        {campaignDesc ? (
+          <p className="text-xs text-gray-300 font-medium max-w-lg mx-auto mt-1 leading-relaxed">
+            {campaignDesc}
+          </p>
+        ) : (
+          <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest leading-relaxed">
+            Special Selected Products
+          </p>
+        )}
       </div>
 
-      <div className="pt-6 px-4 md:px-6 max-w-5xl mx-auto">
+      <div className="pt-6 px-3 sm:px-6 max-w-7xl mx-auto">
          {campaignProducts.length === 0 ? (
-            <div className="text-center py-20 px-6 border border-gray-200 mt-10 bg-white">
+            <div className="text-center py-20 px-6 border border-gray-200 mt-10 bg-white rounded-xl">
                <Percent className="w-10 h-10 text-gray-300 mx-auto mb-4" />
-               <h3 className="text-[12px] font-black uppercase tracking-widest text-gray-800">No Products Available</h3>
+               <h3 className="text-[12px] font-black uppercase tracking-widest text-gray-800">No products available for this offer.</h3>
                <p className="text-[10px] font-bold text-gray-500 uppercase mt-2">Check back later</p>
             </div>
          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-               {campaignProducts.map(product => {
-                  const offerPrice = product.discountPrice || product.price;
-                  const regularPrice = product.price;
-                  const discountPercent = regularPrice > offerPrice ? Math.round(((regularPrice - offerPrice) / regularPrice) * 100) : 0;
-                  
-                  return (
-    <div key={product.id}>
-      <ProductCard product={product} />
-    </div>
-  );
-})}
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+               {campaignProducts.map(product => (
+                  <div key={product.id}>
+                     <ProductCard product={product} />
+                  </div>
+               ))}
             </div>
          )}
       </div>

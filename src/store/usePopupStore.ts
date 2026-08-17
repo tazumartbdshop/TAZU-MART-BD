@@ -191,6 +191,10 @@ export const usePopupStore = create<PopupStore>()((set) => ({
         ...popup,
         id: docId,
       };
+      set((state) => {
+        const next = [newPopup, ...state.popupCampaigns];
+        return { popupCampaigns: next, config: state.config || newPopup };
+      });
       const supabase = getSupabase();
       if (supabase) {
         await supabase.from('popup_campaigns').upsert([newPopup]);
@@ -202,6 +206,11 @@ export const usePopupStore = create<PopupStore>()((set) => ({
 
   updatePopupCampaign: async (id, updates) => {
     try {
+      set((state) => {
+        const next = state.popupCampaigns.map(c => c.id === id ? { ...c, ...updates } : c);
+        const nextConfig = state.config?.id === id ? { ...state.config, ...updates } : state.config;
+        return { popupCampaigns: next, config: nextConfig };
+      });
       const supabase = getSupabase();
       if (supabase) {
         await supabase.from('popup_campaigns').update(updates).eq('id', id);
@@ -213,6 +222,10 @@ export const usePopupStore = create<PopupStore>()((set) => ({
 
   deletePopupCampaign: async (id) => {
     try {
+      set((state) => {
+        const next = state.popupCampaigns.filter(c => c.id !== id);
+        return { popupCampaigns: next };
+      });
       const supabase = getSupabase();
       if (supabase) {
         await supabase.from('popup_campaigns').delete().eq('id', id);
