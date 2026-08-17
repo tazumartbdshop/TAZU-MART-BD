@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Upload, Image as ImageIcon, X, Trash2, ArrowRight, Camera, AlertCircle, Eye, Globe } from 'lucide-react';
+import { ChevronLeft, Upload, Image as ImageIcon, X, Trash2, ArrowRight, Camera, AlertCircle, Eye, Globe, Crop, CheckCircle2 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCategoryStore, Category } from '../../store/useCategoryStore';
 import { cn } from '../../lib/utils';
@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { uploadImage } from '../../lib/imageUtils';
 import UnsavedChangesDialog from '../../components/common/UnsavedChangesDialog';
+import BannerCropModal from '../../components/common/BannerCropModal';
 
 export default function AddCategory() {
   const navigate = useNavigate();
@@ -92,6 +93,11 @@ export default function AddCategory() {
   const [showSourceSheet, setShowSourceSheet] = useState(false);
   const [displayOrderError, setDisplayOrderError] = useState<string | null>(null);
 
+  // Banner Crop Modal State (1920x650 standard ratio)
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string>('');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
   const bannerGalleryInputRef = useRef<HTMLInputElement>(null);
   const bannerCameraInputRef = useRef<HTMLInputElement>(null);
   const thumbnailInputRef = useRef<HTMLInputElement>(null);
@@ -156,29 +162,45 @@ export default function AddCategory() {
   };
 
   const processBannerFiles = (files: FileList | null) => {
-    if (!files) return;
+    if (!files || files.length === 0) return;
     setBannerError(null);
     setIsDirty(true);
-    const newBanners = [...bannerImages];
-    const newFiles = [...bannerFiles];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-      if (!validTypes.includes(file.type)) {
-        setBannerError("Only JPG, PNG and WEBP formats are supported.");
-        continue;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        setBannerError(`Banner image "${file.name}" exceeds 5MB limit.`);
-        continue;
-      }
-      const url = URL.createObjectURL(file);
-      newBanners.push(url);
-      newFiles.push(file);
+    const file = files[0];
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setBannerError("Only JPG, PNG and WEBP formats are supported.");
+      return;
     }
-    setBannerImages(newBanners);
-    setBannerFiles(newFiles);
+    if (file.size > 10 * 1024 * 1024) {
+      setBannerError(`Banner image "${file.name}" exceeds 10MB limit.`);
+      return;
+    }
+    const tempUrl = URL.createObjectURL(file);
+    setCropImageSrc(tempUrl);
+    setEditingIndex(null); // adding new banner
+    setCropModalOpen(true);
+  };
+
+  const handleCropComplete = (croppedFile: File, croppedUrl: string) => {
+    setIsDirty(true);
+    if (editingIndex !== null) {
+      const newImages = [...bannerImages];
+      const newFiles = [...bannerFiles];
+      newImages[editingIndex] = croppedUrl;
+      newFiles[editingIndex] = croppedFile;
+      setBannerImages(newImages);
+      setBannerFiles(newFiles);
+    } else {
+      setBannerImages(prev => [...prev, croppedUrl]);
+      setBannerFiles(prev => [...prev, croppedFile]);
+    }
+    toast.success("✅ Banner cropped to 1920:650 standard ratio");
+  };
+
+  const triggerRecrop = (idx: number) => {
+    setCropImageSrc(bannerImages[idx]);
+    setEditingIndex(idx);
+    setCropModalOpen(true);
   };
 
   const processThumbnailFile = (files: FileList | null) => {
@@ -486,61 +508,82 @@ export default function AddCategory() {
                   </div>
 
                   {/* 5. Upload banners image */}
-                  <div className="space-y-4">
-                    <h5 className="text-[10px] font-black text-black uppercase tracking-widest">Category Page Hero Banners</h5>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight -mt-3">Drag to reorder, replace, or remove banners (Auto-slider enabled for multiple)</p>
-                    
+                  <div className="space-y-4 col-span-full">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-100 pb-3">
+                      <div>
+                        <h5 className="text-xs font-black text-black uppercase tracking-widest flex items-center gap-2">
+                          <span>Category Hero Banners</span>
+                          <span className="bg-black text-white text-[9px] px-2 py-0.5 font-mono font-bold">1920×650 PX</span>
+                        </h5>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tight mt-0.5">
+                          Enforce strict 1920:650 aspect ratio across desktop, tablet & mobile screens.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="bg-amber-50 border border-amber-300 text-amber-900 px-3 py-1 text-[10px] font-black uppercase tracking-wider">
+                          Recommended Banner Size: 1920 × 650 px
+                        </div>
+                        <div className="bg-orange-100 border border-orange-400 text-orange-900 px-3 py-1 text-[10px] font-black uppercase tracking-wider">
+                          Banner Ratio: 1920:650
+                        </div>
+                      </div>
+                    </div>
+
                     <div 
                       onClick={() => bannerGalleryInputRef.current?.click()}
-                      className="border-2 border-dashed border-zinc-200 hover:border-black bg-zinc-50 hover:bg-zinc-100/50 p-6 text-center cursor-pointer min-h-[112px] flex flex-col items-center justify-center mb-4"
+                      className="border-2 border-dashed border-zinc-300 hover:border-black bg-zinc-50 hover:bg-zinc-100/80 p-6 text-center cursor-pointer min-h-[120px] flex flex-col items-center justify-center transition-colors group"
                     >
-                      <Upload className="w-5 h-5 text-gray-400 mb-1" />
-                      <span className="text-[9px] text-black font-extrabold uppercase tracking-widest">TAP TO UPLOAD MORE BANNERS</span>
-                      <span className="text-[8px] text-gray-400 uppercase tracking-widest mt-0.5">JPG, PNG, WEBP FORMATS ONLY</span>
+                      <Upload className="w-6 h-6 text-gray-400 group-hover:text-black mb-1.5 transition-colors" />
+                      <span className="text-xs text-black font-black uppercase tracking-widest">TAP TO UPLOAD CATEGORY BANNER</span>
+                      <span className="text-[10px] text-orange-600 font-bold uppercase tracking-wider mt-1">
+                        Interactive Crop Tool to Enforce 1920:650 Ratio
+                      </span>
                     </div>
 
                     {bannerImages.length > 0 && (
-                      <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
-                        {bannerImages.map((bUrl, idx) => (
-                          <div key={idx} className="relative flex-shrink-0 w-[120px] h-[70px] border border-zinc-200 p-0.5 bg-white group rounded-lg overflow-hidden">
-                            <img src={bUrl} alt={`banner ${idx}`} className="w-full h-full object-cover rounded-md" referrerPolicy="no-referrer" />
-                            
-                            {/* Management Actions */}
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'image/*';
-                                  input.onchange = (e: any) => {
-                                    const file = e.target.files[0];
-                                    if (file) {
-                                      const url = URL.createObjectURL(file);
-                                      const newImages = [...bannerImages];
-                                      const newFiles = [...bannerFiles];
-                                      newImages[idx] = url;
-                                      newFiles[idx] = file;
-                                      setBannerImages(newImages);
-                                      setBannerFiles(newFiles);
-                                    }
-                                  };
-                                  input.click();
-                                }}
-                                className="text-white text-[9px] font-black uppercase hover:text-orange-400 absolute top-1 left-1 bg-black/50 px-1 rounded"
-                              >
-                                Edit
-                              </button>
+                      <div className="space-y-3 mt-4">
+                        <p className="text-[10px] font-black uppercase text-zinc-600 tracking-wider">
+                          Active Category Banners ({bannerImages.length}) — Exact 1920:650 Frame Preview:
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {bannerImages.map((bUrl, idx) => (
+                            <div 
+                              key={idx} 
+                              className="relative w-full aspect-[1920/650] border-2 border-zinc-200 bg-black group overflow-hidden shadow-md"
+                            >
+                              <img 
+                                src={bUrl} 
+                                alt={`Category Banner ${idx + 1}`} 
+                                className="w-full h-full object-cover" 
+                                referrerPolicy="no-referrer" 
+                              />
+                              
+                              <div className="absolute top-2 left-2 bg-black/80 text-orange-400 border border-orange-500/40 text-[9px] font-black px-2 py-0.5 uppercase tracking-widest pointer-events-none">
+                                BANNER #{idx + 1} (1920:650)
+                              </div>
+
+                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity p-2">
+                                <button
+                                  type="button"
+                                  onClick={() => triggerRecrop(idx)}
+                                  className="bg-white text-black hover:bg-orange-400 font-black text-[10px] uppercase px-3 py-1.5 flex items-center gap-1 shadow transition-colors"
+                                >
+                                  <Crop className="w-3.5 h-3.5" />
+                                  Crop / Adjust
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => removeBannerImage(idx)}
-                                  className="text-white hover:text-red-400 absolute top-1 right-1 bg-red-600/50 p-0.5 rounded"
+                                  className="bg-red-600 hover:bg-red-700 text-white font-black text-[10px] uppercase px-3 py-1.5 flex items-center gap-1 shadow transition-colors"
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Remove
                                 </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
 
@@ -548,12 +591,11 @@ export default function AddCategory() {
                       type="file" 
                       ref={bannerGalleryInputRef} 
                       className="hidden" 
-                      multiple 
                       accept="image/*" 
                       onChange={(e) => processBannerFiles(e.target.files)} 
                     />
                     {bannerError && (
-                      <p className="text-[10px] text-red-650 text-red-650 text-red-600 font-bold mt-2">{bannerError}</p>
+                      <p className="text-[10px] text-red-600 font-bold mt-2">{bannerError}</p>
                     )}
                   </div>
                 </div>
@@ -736,6 +778,16 @@ export default function AddCategory() {
         onCancel={handleCancelLeave}
         cancelText="Cancel"
         confirmText="Yes, Leave"
+      />
+
+      <BannerCropModal
+        isOpen={cropModalOpen}
+        imageSrc={cropImageSrc}
+        onClose={() => setCropModalOpen(false)}
+        onCropComplete={handleCropComplete}
+        targetWidth={1920}
+        targetHeight={650}
+        aspectRatioText="1920:650"
       />
       </div>
     );

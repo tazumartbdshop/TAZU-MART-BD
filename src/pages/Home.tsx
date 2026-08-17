@@ -383,34 +383,36 @@ export default function Home() {
           const displayCategoryProducts = categoryProducts.slice(0, 4);
 
           return (
-            <section key={cat.id} className="py-4 md:py-6 container mx-auto px-3 border-b border-neutral-100 last:border-b-0">
-              {/* Category Banner (Only Category Sections have banners) */}
+            <section key={cat.id} className="py-4 md:py-6 border-b border-neutral-100 last:border-b-0">
+              {/* Category Banner (Full-Width Edge-to-Edge 1920:650) */}
               {cat.bannerImage && (
-                <div className="mb-4 rounded-xl overflow-hidden shadow-sm">
+                <div className="mb-4 w-full p-0 overflow-hidden">
                   <CategoryBannerCarousel category={cat} />
                 </div>
               )}
 
-              {/* Category Name & View All */}
-              <div className="flex items-center justify-between mb-3 md:mb-5">
-                <div className="flex flex-col">
-                  <h2 className="text-xs md:text-base font-black uppercase tracking-wider text-neutral-900 font-display">
-                    {cat.name}
-                  </h2>
-                  <p className="text-[9px] md:text-xs text-neutral-400 font-bold uppercase tracking-wider mt-0.5">
-                    {cat.bannerName || `${cat.name} Collection`}
-                  </p>
+              <div className="container mx-auto px-3">
+                {/* Category Name & View All */}
+                <div className="flex items-center justify-between mb-3 md:mb-5">
+                  <div className="flex flex-col">
+                    <h2 className="text-xs md:text-base font-black uppercase tracking-wider text-neutral-900 font-display">
+                      {cat.name}
+                    </h2>
+                    <p className="text-[9px] md:text-xs text-neutral-400 font-bold uppercase tracking-wider mt-0.5">
+                      {cat.bannerName || `${cat.name} Collection`}
+                    </p>
+                  </div>
+                  <Link 
+                    to={`/category/${cat.id}`} 
+                    className="text-[9px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
+                  >
+                    View All <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
-                <Link 
-                  to={`/category/${cat.id}`} 
-                  className="text-[9px] md:text-xs font-black uppercase tracking-widest text-neutral-600 hover:text-black hover:underline inline-flex items-center gap-1 transition-all"
-                >
-                  View All <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
 
-              {/* Products grid */}
-              {renderCategoryGrid(displayCategoryProducts)}
+                {/* Products grid */}
+                {renderCategoryGrid(displayCategoryProducts)}
+              </div>
             </section>
           );
         });

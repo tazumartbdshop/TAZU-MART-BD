@@ -86,12 +86,11 @@ export default function CategoryBannerCarousel({ category }: CategoryBannerCarou
     <Link 
       to={`/category/${category.id}`} 
       className="block relative w-full overflow-hidden select-none outline-none group/banner"
-      style={{ borderRadius: '10px' }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Outer Banner Wrapper */}
-      <div className="relative h-[160px] md:h-[260px] w-full bg-neutral-100 overflow-hidden">
+      {/* Outer Banner Wrapper - Standard 1920:650 Aspect Ratio */}
+      <div className="relative aspect-[1920/650] w-full bg-neutral-100 overflow-hidden">
         {/* Slides Track */}
         <div 
           className="absolute inset-0 flex transition-transform duration-500 ease-in-out will-change-transform"

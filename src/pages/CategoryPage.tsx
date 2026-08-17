@@ -101,11 +101,9 @@ export default function CategoryPage() {
         </div>
       </div>
 
-      {/* 2. Category Banner (Full Width) */}
-      <section className="px-4 mb-6">
-        <div className="container mx-auto">
-          <CategoryBannerCarousel category={category} />
-        </div>
+      {/* 2. Category Banner (Full-Width Edge-to-Edge 1920:650) */}
+      <section className="w-full mb-6 p-0 overflow-hidden">
+        <CategoryBannerCarousel category={category} />
       </section>
 
       {/* 3. Category Info (Below Banner) */}
